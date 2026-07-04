@@ -520,7 +520,12 @@
         }
 
         // ─── 🎲 КАЗИНО (попытать удачу — проверка на жадность) ───
-        const WIN_MULT = 5;   // выигрыш ×5 при выпадении 6 (шанс 1/6 → матожидание ≈ −17%, дом в плюсе)
+        // Выплаты по грани кубика = множитель ВОЗВРАТА от ставки (грань не в таблице → ставка сгорает).
+        // Джекпот ×3 на 6 цепляет азарт, малый ×1.5 на 5 держит «почти-почти».
+        // Матожидание ≈ −25% (дом в плюсе): выигрыш ~1 из 3 — чувствуется выигрышным, человек лудит дальше,
+        // но на дистанции жадный проигрывает ВСЁ. Это и есть урок «лёгких денег в казино нет».
+        // Дать банку доить сильнее (к 60%) → уменьшай числа (напр. {6:2}); мягче → увеличивай. Позже — ползунок в пульте.
+        const CASINO_PAYOUT = { 6: 3, 5: 1.5 };
         function gambleRoll(){
             const p=state.players.find(x=>x.id==state.currentPlayerId);
             if(!p) return;
@@ -531,24 +536,39 @@
             const roll=1+Math.floor(Math.random()*6);
             // ставка списывается СРАЗУ (committed). Проигрыш мгновенный.
             p.savings=Math.round((p.savings-bet)*100)/100;
-            if(roll===6){
-                const payout=bet*WIN_MULT;   // полная выплата ×5 (вернётся при одобрении ведущего)
+            const mult = CASINO_PAYOUT[roll] || 0;
+            if(mult > 0){
+                const payout=Math.round(bet*mult*100)/100;   // возврат (включает ставку), вернётся при одобрении ведущего
                 state.deals.push({
                     id: uid(), pId: p.id, pName: p.name, type:'CASINO_WIN',
                     details:{ bet, roll, payout }, status:'PENDING'
                 });
                 save(); render();
-                alert('🎰🎉 ШЕСТЁРКА!!! ТЫ ВЫИГРАЛ '+payout+'$! 👑⭐\n📨 Заявка ушла ведущему — как одобрит, выигрыш упадёт в кассу!');
+                const msg = roll===6
+                    ? '🎰🎉 ШЕСТЁРКА!!! ДЖЕКПОТ ×'+mult+' → '+payout+'$! 👑⭐'
+                    : '🎲✨ Пятёрка! Малый выигрыш ×'+mult+' → '+payout+'$. Фартит!';
+                alert(msg+'\n📨 Заявка ушла ведущему — как одобрит, выигрыш упадёт в кассу!');
             } else {
                 const near=['Так близко! 😤','Ещё чуть-чуть! 🎲','Удача уже рядом — чувствуешь? 🔥','Не сдавайся, фортуна любит упорных! 💪','В следующий раз точно шестёрка! 😏'];
                 save(); render();
-                alert('🎲 Выпало '+roll+'... '+near[Math.floor(Math.random()*near.length)]+'\n−'+bet+'$. Рискни ещё разок!');
+                alert('🎲 Выпало '+roll+'... '+near[Math.floor(Math.random()*near.length)]+'\n−'+bet+'$. Казино не спешит отдавать. Рискни ещё разок!');
             }
         }
         function clearNotify(){ const p=state.players.find(x=>x.id==state.currentPlayerId); if(p){ p.notify=null; save(); render(); } }
         function giveSalary(id){
             const p=state.players.find(x=>x.id==id); if(!p) return;
             const f=calc(p);
+            if (SERVER_MODE) {
+                // Сервер-авторитет: начисление применяет сервер (атомарно под LOCK) и рассылает всем.
+                // Локально кассу НЕ трогаем и save() НЕ зовём — иначе свой же полный бланк затрёт зарплату (баг).
+                fetch('/salary', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({ pid: id, flow: f.flow, txid: uid() })
+                }).then(r=>{ if(!r.ok) alert('Зарплата не прошла — нажми ещё раз.'); })
+                  .catch(e=>{ console.warn('salary error:', e); alert('Зарплата не прошла (сеть) — нажми ещё раз.'); });
+                return;
+            }
+            // Локальный режим (без сервера) — как раньше.
             p.savings=Math.round((p.savings + f.flow)*100)/100;
             p.notify = (f.flow>=0
                 ? '💵 ЗАРПЛАТА! Ведущий начислил +'+f.flow+'$ (месячный поток). Касса пополнена! 🎉'
@@ -559,7 +579,7 @@
             return `<div class="card" style="border:2px solid #a855f7;background:linear-gradient(135deg,rgba(168,85,247,0.18),rgba(236,72,153,0.10));">
                 <div class="block-title" style="color:#e9d5ff;font-size:18px;letter-spacing:.5px;">🎰 ИСПЫТАЙ УДАЧУ</div>
                 <p style="font-size:15px;color:#f5d0fe;font-weight:800;margin-bottom:2px;">Удача любит смелых! 🍀</p>
-                <p style="font-size:13px;color:#e9d5ff;margin-bottom:8px;">Один бросок — и ставка взлетает <b style="color:#34d399;">×${WIN_MULT}</b>! 🚀<br>Кто не рискует — тот не пьёт шампанское 🍾</p>
+                <p style="font-size:13px;color:#e9d5ff;margin-bottom:8px;">Выпадет <b style="color:#fbbf24;">6</b> — джекпот <b style="color:#34d399;">×${CASINO_PAYOUT[6]}</b>! Выпадет <b style="color:#fbbf24;">5</b> — <b style="color:#34d399;">×${CASINO_PAYOUT[5]}</b>. Иначе ставка сгорает. 🚀<br>Кто не рискует — тот не пьёт шампанское 🍾</p>
                 <div style="display:flex;gap:8px;">
                     <input id="betAmt" type="number" min="1" placeholder="твоя ставка, $" style="flex:1;padding:12px;border-radius:10px;border:1px solid #a855f7;background:#0b1020;color:#fff;font-size:16px;font-weight:700;">
                     <button onclick="gambleRoll()" class="btn" style="background:linear-gradient(90deg,#a855f7,#ec4899);color:#fff;font-weight:900;font-size:15px;padding:12px 18px;box-shadow:0 0 14px rgba(236,72,153,.5);">🎲 БРОСИТЬ!</button>

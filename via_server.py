@@ -40,6 +40,7 @@ LOCK = threading.Lock()
 # у клиента как страховка, если провод оборвётся.
 SUBS_LOCK = threading.Lock()
 SUBSCRIBERS = set()   # набор queue.Queue — по одному на подключённый браузер
+APPLIED_TX = set()    # txid уже начисленных зарплат — защита от двойного клика/ретрая сети
 
 
 def broadcast():
@@ -224,6 +225,43 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 self.wfile.write(b'{"ok":true}')
+            except Exception as e:
+                self.send_response(400)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(str(e).encode())
+            return
+        if self.path == '/salary':
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw)
+                pid = req.get('pid')
+                flow = round(float(req.get('flow', 0)), 2)
+                txid = req.get('txid')
+                applied = False
+                with LOCK:
+                    if not (txid and txid in APPLIED_TX):
+                        pl = next((p for p in DATA['players'] if p.get('id') == pid), None)
+                        if pl is None:
+                            raise ValueError('player not found')
+                        pl['savings'] = round(float(pl.get('savings', 0) or 0) + flow, 2)
+                        pl['notify'] = (
+                            '💵 ЗАРПЛАТА! Ведущий начислил +%s$ (месячный поток). Касса пополнена! 🎉' % flow
+                            if flow >= 0 else
+                            '💸 Месяц в минус: %s$ (расходы выше дохода). Управляй потоком!' % flow)
+                        if txid:
+                            APPLIED_TX.add(txid)
+                            if len(APPLIED_TX) > 500:
+                                APPLIED_TX.clear()   # простая защита от роста набора
+                        applied = True
+                        save_data(DATA)
+                        broadcast()
+                self.send_response(200)
+                self._cors()
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'ok': True, 'applied': applied}).encode('utf-8'))
             except Exception as e:
                 self.send_response(400)
                 self._cors()
