@@ -1,0 +1,2234 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIA GAME</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #0b0f19;
+            color: #f1f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 18px;
+        }
+        .container { max-width: 1080px; margin: 0 auto; }
+
+        .card {
+            background: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 12px;
+            padding: 22px;
+            margin-bottom: 18px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        .flex-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 16px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; margin-bottom: 16px; }
+
+        .stat-box { border-radius: 10px; padding: 18px; border: 1px solid #1f2937; }
+        .stat-blue { background: rgba(30, 58, 138, 0.2); border-color: #2563eb; }
+        .stat-rose { background: rgba(153, 27, 27, 0.2); border-color: #dc2626; }
+        .stat-emerald { background: rgba(6, 78, 59, 0.2); border-color: #059669; }
+        .stat-amber { background: rgba(120, 53, 15, 0.25); border-color: #d97706; }
+        .val-blue { color: #3b82f6; font-size: 24px; font-weight: 800; }
+        .val-rose { color: #ef4444; font-size: 24px; font-weight: 800; }
+        .val-emerald { color: #10b981; font-size: 24px; font-weight: 800; }
+        .val-amber { color: #fbbf24; font-size: 24px; font-weight: 800; }
+
+        .block-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #1f2937;
+            padding-bottom: 10px;
+            margin-bottom: 14px;
+        }
+
+        .inp {
+            background: #030712;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: white;
+            width: 100%;
+            font-size: 14px;
+        }
+        .inp:focus { border-color: #3b82f6; outline: none; }
+        select.inp { cursor: pointer; }
+
+        .btn {
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.18s;
+        }
+        .btn-blue { background: #2563eb; color: white; }
+        .btn-green { background: #059669; color: white; width: 100%; padding: 13px; font-size: 14px; }
+        .btn-amber { background: #d97706; color: white; }
+        .btn-orange { background: #ea580c; color: white; font-size: 11px; text-transform: uppercase; padding: 6px 12px; }
+        .btn-gray { background: #374151; color: #d1d5db; }
+        .btn:hover { filter: brightness(1.2); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .row-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 11px 13px;
+            background: #030712;
+            border-radius: 8px;
+            margin-bottom: 7px;
+            font-size: 13.5px;
+            border: 1px solid #1f2937;
+        }
+        .strike { text-decoration: line-through; opacity: 0.35; }
+
+        .player-card {
+            background: #111827; border: 1px solid #1f2937; padding: 14px; border-radius: 10px; margin-bottom: 8px; cursor: pointer;
+        }
+        .player-card:hover { border-color: #3b82f6; background: #1f2937; }
+
+        .win-box { background: rgba(17, 24, 39, 0.6); border: 2px solid #1f2937; text-align: center; }
+        .win-active { border-color: #10b981; background: rgba(6, 78, 59, 0.1); }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-left: 6px;
+        }
+        .b-blue { background: #1e3a8a; color: #93c5fd; }
+        .b-green { background: #064e3b; color: #6ee7b7; }
+        .b-amber { background: #78350f; color: #fcd34d; }
+        .b-rose { background: #7f1d1d; color: #fca5a5; }
+
+        .sub-section {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px dashed #1f2937;
+        }
+        .sub-label {
+            font-size: 11px;
+            color: #6b7280;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 6px;
+            letter-spacing: 0.4px;
+        }
+        .pending-alert {
+            background: #78350f;
+            border: 1px solid #d97706;
+            color: #fcd34d;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 12px;
+            font-weight: bold;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Плавающий индикатор данных (правый верх) — всегда видно содержимое localStorage -->
+    <div id="debugBar" style="position:fixed; top:8px; right:8px; background:#0b0f19; border:1px solid #1f2937; padding:6px 12px; border-radius:8px; font-size:11px; color:#9ca3af; z-index:1000; font-family:monospace;">
+        💾 LS: загрузка...
+    </div>
+
+    <div id="app" class="container"></div>
+
+    <script>
+        // ─── ПРОФЕССИИ для VIA ───
+        const professionsDB = [
+            { id: 1, name: 'Дворник 🧹', salary: 1840, taxes: 280,
+              mortgagePay: 200, eduPay: 0, autoPay: 190, ccPay: 50, retailPay: 30, otherExp: 300, childCost: 70, savings: 660,
+              initMortgage: 20000, initEdu: 0, initAuto: 7000, initCC: 1000, initRetail: 800 },
+
+            { id: 2, name: 'Охранник 🛡️', salary: 1380, taxes: 200,
+              mortgagePay: 180, eduPay: 0, autoPay: 100, ccPay: 60, retailPay: 50, otherExp: 200, childCost: 60, savings: 400,
+              initMortgage: 18000, initEdu: 0, initAuto: 4000, initCC: 1500, initRetail: 1200 },
+
+            { id: 3, name: 'Полицейский 👮‍♂️', salary: 2070, taxes: 250,
+              mortgagePay: 550, eduPay: 80, autoPay: 200, ccPay: 60, retailPay: 50, otherExp: 250, childCost: 120, savings: 750,
+              initMortgage: 55000, initEdu: 6000, initAuto: 12000, initCC: 2000, initRetail: 1500 },
+
+            { id: 4, name: 'Программист 💻', salary: 5175, taxes: 700,
+              mortgagePay: 1200, eduPay: 100, autoPay: 220, ccPay: 90, retailPay: 80, otherExp: 1000, childCost: 160, savings: 1200,
+              initMortgage: 120000, initEdu: 12000, initAuto: 11000, initCC: 3000, initRetail: 2000 },
+
+            { id: 5, name: 'Юрист ⚖️', salary: 4830, taxes: 600,
+              mortgagePay: 1100, eduPay: 120, autoPay: 300, ccPay: 100, retailPay: 80, otherExp: 750, childCost: 160, savings: 1500,
+              initMortgage: 110000, initEdu: 13000, initAuto: 14000, initCC: 4000, initRetail: 2200 },
+
+            { id: 6, name: 'Врач 🩺', salary: 3680, taxes: 600,
+              mortgagePay: 900, eduPay: 300, autoPay: 350, ccPay: 70, retailPay: 100, otherExp: 350, childCost: 170, savings: 800,
+              initMortgage: 90000, initEdu: 30000, initAuto: 15000, initCC: 3500, initRetail: 2500 },
+
+            { id: 7, name: 'Инфобизнесмен 🚀', salary: 7475, taxes: 1000,
+              mortgagePay: 1300, eduPay: 80, autoPay: 300, ccPay: 120, retailPay: 100, otherExp: 2500, childCost: 160, savings: 2500,
+              initMortgage: 130000, initEdu: 8000, initAuto: 18000, initCC: 5000, initRetail: 3000 },
+
+            { id: 8, name: 'Кинопродюсер 🎬', salary: 10925, taxes: 1900,
+              mortgagePay: 1800, eduPay: 120, autoPay: 400, ccPay: 200, retailPay: 200, otherExp: 3300, childCost: 170, savings: 5000,
+              initMortgage: 180000, initEdu: 12000, initAuto: 22000, initCC: 8000, initRetail: 5000 }
+        ];
+
+        // ─── КАРЬЕРА: 10 навыков (d10). pct = прибавка к зарплате; кап суммарно +20%. ───
+        const CAREER_SKILLS = [
+            { key:'kurs',   name:'Курсы квалификации 🎓', pct:0.02, note:'+2% к зарплате' },
+            { key:'eng',    name:'Английский язык 🗣️',    pct:0.01, note:'+1%, межд. сделки' },
+            { key:'time',   name:'Тайм-менеджмент ⏱️',    pct:0.01, note:'+1% к зарплате' },
+            { key:'nego',   name:'Переговоры/продажи 🤝', pct:0.02, note:'+2% к зарплате' },
+            { key:'comp',   name:'Компьютер/AI 💻',        pct:0.02, note:'+2% к зарплате' },
+            { key:'lead',   name:'Лидерство 👑',           pct:0.02, note:'+2%, шанс смены ×2 (6%)' },
+            { key:'fin',    name:'Фин. грамотность 📊',    pct:0.01, note:'+1%, дешевле кредиты' },
+            { key:'net',    name:'Нетворкинг 🌐',          pct:0.01, note:'+1%, бонус на «Связи»' },
+            { key:'health', name:'Здоровье/спорт 💪',      pct:0.01, note:'+1%, защита на «Медицине»' },
+            { key:'second', name:'Вторая специальность 🧩',pct:0.02, note:'+2%, шанс смены сразу' }
+        ];
+
+        // ─── НАВЫК (отдельная клетка): «вкладываешь в себя», НЕ всегда про работу.
+        // Эффекты — ЧЕРНОВИК (Rinat дорабатывает), движком ещё не применяются. ───
+        const LIFE_SKILLS = [
+            { key:'nego',   name:'Переговоры 🤝',             draft:'скидка на первый взнос в крупных сделках' },
+            { key:'sales',  name:'Продажи 💼',                draft:'продаёшь активы/акции дороже' },
+            { key:'know',   name:'Знакомства 🌐',             draft:'бонус на клетке «Связи», доступ к партнёрам' },
+            { key:'rel',    name:'Отношения ❤️',              draft:'крепче семья: меньше расходов на детей / защита от события' },
+            { key:'finlit', name:'Финансовая грамотность 📊', draft:'дешевле кредиты, видишь подсказки рынка' }
+        ];
+
+        // SERVER_MODE: если открыто через http://localhost — используем общий Python-сервер
+        // (sync между ВСЕМИ браузерами). file:// → fallback на localStorage (только Chrome).
+        const SERVER_MODE = location.protocol === 'http:' || location.protocol === 'https:';
+
+        let state = {
+            view: 'lobby',
+            players: SERVER_MODE ? [] : (JSON.parse(localStorage.getItem('v0_players')) || []),
+            deals: SERVER_MODE ? [] : (JSON.parse(localStorage.getItem('v0_deals')) || []),
+            currentPlayerId: null,
+            chosenProf: null,
+            nameDraft: '',
+            err: '',
+            skillModal: null,
+            govModal: null,
+            world: SERVER_MODE ? null : (JSON.parse(localStorage.getItem('v0_world') || 'null')),
+            worldDraw: null,
+            worldShow: null,
+            workModal: null,
+            expenseModal: null,
+            taxModal: null,
+            svyazModal: null,
+            sdelkaModal: null,
+            medModal: null
+        };
+
+        // Глобально уникальный id заявки: время + счётчик + случайное.
+        // Раньше был bare Date.now() → у двух игроков в одну миллисекунду совпадали id,
+        // и одобрение/слияние заявок уходило не тому игроку (напр. закрытие кредита чужому).
+        let _uidSeq = 0;
+        function uid() {
+            return 'd' + Date.now().toString(36) + (_uidSeq++).toString(36) + Math.floor(Math.random()*1e9).toString(36);
+        }
+
+        function reloadFromStorage() {
+            if (SERVER_MODE) return;  // в server-mode polling обновляет state в фоне
+            state.players = JSON.parse(localStorage.getItem('v0_players')) || [];
+            state.deals = JSON.parse(localStorage.getItem('v0_deals')) || [];
+            state.world = JSON.parse(localStorage.getItem('v0_world') || 'null');
+            maybeShowWorld();
+        }
+
+        // BroadcastChannel — самый надёжный канал между вкладками (работает в file://).
+        let bc = null;
+        try { bc = new BroadcastChannel('via_sync'); } catch(e) { console.warn('BroadcastChannel недоступен'); }
+        let lastDataHash = '';
+        function dataHash() {
+            return (localStorage.getItem('v0_players')||'') + '|' + (localStorage.getItem('v0_deals')||'');
+        }
+        function safeRerender() {
+            const a = document.activeElement;
+            if (!a || (a.tagName !== 'INPUT' && a.tagName !== 'TEXTAREA' && a.tagName !== 'SELECT')) {
+                render();
+            }
+        }
+
+        function save(meId) {
+            lastSaveT = Date.now();   // отметка: только что записали локально — опрос не затирает 2.2с
+            if (SERVER_MODE) {
+                // meId != null → сервер сольёт ТОЛЬКО этого игрока (без затирания остальных).
+                // Игрок пишет только свой бланк; ведущий (admin) шлёт всё целиком (авторитет).
+                const me = (meId != null) ? meId
+                          : (state.view === 'player' ? state.currentPlayerId : null);
+                // fire-and-forget POST — UI обновится мгновенно, остальные браузеры подтянут polling'ом
+                fetch('/data', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({players: state.players, deals: state.deals, world: state.world, me: me})
+                }).catch(e => console.warn('save error:', e));
+                return;
+            }
+            localStorage.setItem('v0_players', JSON.stringify(state.players));
+            localStorage.setItem('v0_deals', JSON.stringify(state.deals));
+            localStorage.setItem('v0_world', JSON.stringify(state.world || null));
+            lastDataHash = dataHash();
+            if (bc) { try { bc.postMessage('updated'); } catch(e) {} }
+        }
+
+        // Сервер-mode: применяем стейт с сервера (общий код для push и опроса)
+        let lastServerData = '';
+        let lastSaveT = 0;   // время последней локальной записи (антизатирание своих же ходов)
+        function applyServerData(txt) {
+            if (!txt || txt === lastServerData) return;
+            let j; try { j = JSON.parse(txt); } catch(e) { return; }
+            // рынок и мировые события — всегда актуальные
+            if (j.market) state.market = j.market;   // живые цены рынка
+            state.world = j.world || null;           // мировое событие (broadcast)
+            // players/deals НЕ затираем, пока наш свежий POST (покупка/заявка) не долетел —
+            // иначе обновление стирает только что созданную заявку/покупку игрока.
+            if (Date.now() - lastSaveT > 2200) {
+                lastServerData = txt;
+                state.players = j.players || [];
+                state.deals = j.deals || [];
+            }
+            maybeShowWorld();
+            safeRerender();
+        }
+        // ГЛАВНЫЙ канал: SSE — сервер сам мгновенно толкает изменения (реальное время).
+        let _es = null;
+        function startSSE() {
+            try {
+                _es = new EventSource('/events');
+                _es.onmessage = (e) => applyServerData(e.data);
+                // onerror: EventSource сам переподключается; опрос ниже подстрахует
+                _es.onerror = () => {};
+            } catch(e) {}
+        }
+        // Страховка: опрос /data (реже, чем раньше — основную работу делает push)
+        async function pollServer() {
+            try {
+                const r = await fetch('/data', {cache: 'no-store'});
+                if (!r.ok) return;
+                applyServerData(await r.text());
+            } catch(e) {}
+        }
+
+        function calc(p) {
+            if (!p) return {};
+            const skillBonus = Math.min(0.20, (p.skills || []).reduce((s, sk) => s + (Number(sk.pct) || 0), 0));
+            const baseSalary = p.prof.salary;
+            const salary = Math.round(baseSalary * (1 + skillBonus));
+            const passive = p.assets.reduce((s, a) => s + Number(a.cf || 0), 0);
+            const income = salary + passive;
+
+            const taxes = Math.max(0, p.prof.taxes + (Number(p.taxMod) || 0)) + Math.round(income * (Number(p.taxPct) || 0) / 100);
+            const mortgagePay = p.isM ? 0 : p.prof.mortgagePay;
+            const eduPay = p.isE ? 0 : p.prof.eduPay;
+            const autoPay = p.isA ? 0 : p.prof.autoPay;
+            const ccPay = p.isCC ? 0 : p.prof.ccPay;
+            const retailPay = p.isR ? 0 : p.prof.retailPay;
+            const otherExp = p.prof.otherExp + (Number(p.expMod) || 0);
+            const childExp = p.children * p.prof.childCost;
+            const bankPay = Math.round(p.bankLoan * 0.10);
+
+            const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay;
+            const flow = income - totalExp;
+            const target = totalExp * 7;
+
+            return { salary, baseSalary, skillBonus, passive, income, taxes, mortgagePay, eduPay, autoPay, ccPay, retailPay,
+                     otherExp, childExp, bankPay, totalExp, flow, target,
+                     win: passive >= target };
+        }
+
+        function hasPendingFor(pId) {
+            return state.deals.some(d => d.pId == pId && d.status === 'PENDING');
+        }
+
+        function updateDebugBar() {
+            const bar = document.getElementById('debugBar');
+            if (!bar) return;
+            const pCount = state.players.length;
+            const dCount = state.deals.length;
+            const mode = SERVER_MODE
+                ? '<span style="color:#10b981;">🌐 SERVER</span>'
+                : '<span style="color:#fbbf24;">💾 LS-only</span>';
+            bar.innerHTML = `${mode}: <b style="color:#3b82f6;">${pCount}</b> игроков · <b style="color:#ef4444;">${dCount}</b> заявок`;
+        }
+
+        function render() {
+            // ВСЕГДА перечитываем перед рендером — гарантирует свежесть данных
+            reloadFromStorage();
+            // Лечим активы из старых данных: карты-сделки раньше клали название в name, а бланк ждёт title
+            (state.players || []).forEach(p => (p.assets || []).forEach(a => {
+                if (a && a.title == null && a.name != null) a.title = a.name;
+            }));
+            const app = document.getElementById('app');
+            app.innerHTML = '';
+            if (state.view === 'lobby') renderLobby(app);
+            else if (state.view === 'player') { renderPlayer(app); renderAssetForm(); }
+            else if (state.view === 'admin') renderAdmin(app);
+            updateDebugBar();
+        }
+
+        function renderLobby(app) {
+            app.innerHTML = `
+                <div class="card" style="max-width: 600px; margin: 30px auto;">
+                    <h2 style="text-align:center; margin-bottom:25px; font-weight:900; letter-spacing:2px; color:#3b82f6;">V I A</h2>
+                    <p style="text-align:center; color:#9ca3af; margin-top:-20px; margin-bottom:25px; font-size:12px;">Бланк настольной игры. Цель — добиться пассивного дохода ≥ 7× расходов.</p>
+
+                    <div style="border-bottom:1px solid #1f2937; padding-bottom:20px; margin-bottom:20px;">
+                        <p class="block-title" style="color:#10b981; border:none; margin:0; padding:0; margin-bottom:10px;">Регистрация игрока</p>
+                        <input type="text" id="pName" placeholder="Введите имя игрока" class="inp" style="margin-bottom:12px;" value="${state.nameDraft || ''}" oninput="state.nameDraft = this.value;">
+                        <div class="flex-between" style="margin-bottom:15px;">
+                            <button onclick="roll()" class="btn btn-blue">🎲 Вытянуть роль</button>
+                            <div style="background:#030712; padding:11px; border-radius:8px; width:100%; text-align:center; font-weight:bold; border:1px solid #1f2937; font-size:13px;">
+                                ${state.chosenProf ? state.chosenProf.name + ' · з/п ' + state.chosenProf.salary + '$' : 'Нажмите кнопку слева'}
+                            </div>
+                        </div>
+                        <button onclick="reg()" class="btn btn-green">Создать бланк</button>
+                    </div>
+
+                    <div style="margin-bottom:20px;">
+                        <p class="block-title" style="border:none; margin:0; padding:0; margin-bottom:10px;">Бланки за столом (${state.players.length})</p>
+                        ${state.players.length === 0
+                            ? '<p style="color:#6b7280; font-size:13px;">Бланков пока нет — зарегистрируй первого.</p>'
+                            : state.players.map(p => {
+                                const f = calc(p);
+                                const pendCount = state.deals.filter(d => d.pId == p.id && d.status === 'PENDING').length;
+                                return `
+                                <div class="player-card flex-between" onclick="openPlayer(${p.id})">
+                                    <div>
+                                        <b>👤 ${p.name}</b> <span style="color:#9ca3af; font-size:13px;">— ${p.prof.name}</span>
+                                        <div style="font-size:11px; color:#6b7280; margin-top:3px;">Поток ${f.flow}$ · Пассив ${f.passive}$${pendCount>0 ? ' · ⏳ '+pendCount+' заявок' : ''}</div>
+                                    </div>
+                                    <span style="color:#3b82f6; font-weight:bold; font-size:13px;">Открыть →</span>
+                                </div>`;
+                            }).join('')}
+                    </div>
+
+                    <div style="border-top:1px solid #1f2937; padding-top:20px;">
+                        <p class="block-title" style="color:#ef4444; border:none; margin:0; padding:0; margin-bottom:10px;">Пульт ведущего</p>
+                        <div class="flex-between">
+                            <input type="password" id="pass" placeholder="Пароль администратора" class="inp" style="padding:10px;">
+                            <button onclick="login()" class="btn" style="background:#ef4444; color:white;">Управлять</button>
+                        </div>
+                        ${state.err ? `<p style="color:#ef4444; font-size:12px; margin-top:8px; font-weight:bold;">${state.err}</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAssetForm() {
+            const t = document.getElementById('aType').value;
+            const target = document.getElementById('assetFields');
+            if (!target) return;
+            if (t === 'STOCK') {
+                target.innerHTML = `
+                    <input type="text" id="aT" placeholder="Тикер / Название акции" class="inp">
+                    <input type="number" id="aPrice" placeholder="Цена покупки за 1 шт ($)" class="inp">
+                    <input type="number" id="aQty" placeholder="Количество (шт)" class="inp">
+                    <input type="number" id="aNow" placeholder="Цена сейчас за 1 шт ($)" class="inp">
+                    <input type="number" id="aDiv" placeholder="Дивиденды % (0-50, 0 если нет)" class="inp" min="0" max="50" step="0.5">
+                `;
+            } else if (t === 'ESTATE' || t === 'BUSINESS') {
+                const label = t === 'ESTATE' ? 'Название недвижки' : 'Название бизнеса';
+                target.innerHTML = `
+                    <input type="text" id="aT" placeholder="${label}" class="inp">
+                    <input type="number" id="aDown" placeholder="Первый взнос ($)" class="inp">
+                    <input type="number" id="aPrice" placeholder="Цена покупки ($)" class="inp">
+                    <input type="number" id="aF" placeholder="+CF поток ($/мес)" class="inp" style="color:#10b981; font-weight:bold;">
+                `;
+            } else {  // OTHER — монеты, золото, антиквариат (без дохода, только цена)
+                target.innerHTML = `
+                    <input type="text" id="aT" placeholder="Название (монета, золото, антиквариат...)" class="inp">
+                    <input type="number" id="aPrice" placeholder="Цена покупки ($)" class="inp">
+                    <input type="number" id="aNow" placeholder="Цена сейчас ($)" class="inp">
+                `;
+            }
+        }
+
+        // ─── БИРЖА (торговля по живой цене сервера) ───
+        function assetById(id){ const m=state.market; return (m&&m.assets)?m.assets.find(x=>String(x.id)===String(id)):null; }
+        function curPrice(id){ const a=assetById(id); return a?a.price:null; }
+        function portfolioValue(p){ let v=0; if(p&&p.holdings){for(const id in p.holdings){const pr=curPrice(id); if(pr) v+=pr*p.holdings[id].qty;}} return v; }
+        function buyAsset(id){
+            const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(id);
+            if(!p||!a) return;
+            const q=parseInt((prompt('Сколько штук «'+a.name+'» купить? Цена сейчас '+a.price+'$')||'0'),10);
+            if(!q||q<1) return;
+            const cost=q*a.price;
+            if(p.savings<cost){ alert('Не хватает кассы.\nНужно '+Math.round(cost)+'$, есть '+Math.round(p.savings)+'$'); return; }
+            p.savings=Math.round((p.savings-cost)*100)/100;
+            p.holdings=p.holdings||{};
+            const h=p.holdings[id]||{qty:0,avg:0,name:a.name};
+            h.avg=(h.avg*h.qty + a.price*q)/(h.qty+q); h.qty+=q; h.name=a.name;
+            p.holdings[id]=h; save(); render();
+            alert('✅ Куплено '+q+' «'+a.name+'» по '+a.price+'$  (−'+Math.round(cost)+'$)');
+        }
+        function sellAsset(id){
+            const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(id);
+            if(!p||!a||!p.holdings||!p.holdings[id]) return;
+            const have=p.holdings[id].qty;
+            const q=parseInt((prompt('Сколько штук «'+a.name+'» продать? Есть '+have+', цена '+a.price+'$')||'0'),10);
+            if(!q||q<1) return;
+            if(q>have){ alert('У тебя только '+have+' шт.'); return; }
+            // ПРОДАЖА только через одобрение ведущего. Цена фиксируется на момент заявки.
+            state.deals.push({
+                id: uid(), pId: p.id, pName: p.name, type: 'SELL_MARKET',
+                details: { assetId: id, assetName: a.name, qty: q, price: a.price, total: Math.round(q*a.price) },
+                status: 'PENDING'
+            });
+            save(); render();
+            alert('📨 Заявка на продажу отправлена ведущему.\n'+q+' «'+a.name+'» по '+a.price+'$ (+'+Math.round(q*a.price)+'$).\nПосле одобрения деньги придут в кассу.');
+        }
+        function renderMarketPanel(p){
+            const m=state.market;
+            if(!m||!m.assets) return '<div class="card"><div class="block-title">📈 Биржа</div><div style="color:#9ca3af;font-size:13px;">рынок загружается…</div></div>';
+            p.holdings=p.holdings||{};
+            const ownIds=Object.keys(p.holdings);
+            let holdHtml = ownIds.length ? ownIds.map(id=>{
+                const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, pl=h.avg?((pr/h.avg-1)*100):0, c=pl>=0?'#10b981':'#f43f5e';
+                return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт · ср.${h.avg.toFixed(2)}$</span><div style="font-size:12px;color:${c};">сейчас ${pr.toFixed(pr<1?4:2)}$ · ${pl>=0?'+':''}${pl.toFixed(1)}%</div></div><div style="text-align:right;"><b>${Math.round(val)} $</b><br><button onclick="sellAsset('${id}')" class="btn btn-orange" style="margin-top:4px;">Продать</button></div></div>`;
+            }).join('') : '<div style="color:#9ca3af;font-size:13px;">пока нет активов — открой биржу и купи</div>';
+            const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
+            const alertHtml = ev.length ? ev.map(e=>`<div style="background:${e.kind==='КРАХ'?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${e.kind==='КРАХ'?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`).join('') : '';
+            let listHtml='';
+            if(state.showMarket){
+                listHtml=m.assets.map(a=>{
+                    const base=a.price0||a.price, chg=base?((a.price/base-1)*100):0, c=chg>=0?'#10b981':'#f43f5e';
+                    return `<div class="row-item"><div style="flex:1;"><b>${a.name}</b> <span style="font-size:10px;color:#9ca3af;">${a.type}</span><div style="font-size:12px;color:${c};">${a.price.toFixed(a.price<1?4:2)}$ · ${chg>=0?'+':''}${chg.toFixed(1)}%</div></div><button onclick="buyAsset('${a.id}')" class="btn" style="background:#10b981;color:#fff;">Купить</button></div>`;
+                }).join('');
+            }
+            return `<div class="card">
+                <div class="block-title">📈 Биржа · Год ${m.game_year||1}</div>
+                ${alertHtml}
+                <div style="font-size:13px;color:#a7f3d0;margin-bottom:8px;">💼 Портфель: <b>${Math.round(portfolioValue(p))} $</b> &nbsp;·&nbsp; 💰 Касса: <b>${Math.round(p.savings)} $</b></div>
+                <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Мои активы</div>
+                ${holdHtml}
+                <button onclick="state.showMarket=!state.showMarket;render();" class="btn" style="width:100%;margin:8px 0;background:${state.showMarket?'#374151':'#2563eb'};color:#fff;">${state.showMarket?'Скрыть биржу ▲':'📈 Открыть биржу (купить акции) ▼'}</button>
+                ${listHtml}
+            </div>`;
+        }
+
+        // ─── 🎲 КАЗИНО (попытать удачу — проверка на жадность) ───
+        const WIN_MULT = 5;   // выигрыш ×5 при выпадении 6 (шанс 1/6 → матожидание ≈ −17%, дом в плюсе)
+        function gambleRoll(){
+            const p=state.players.find(x=>x.id==state.currentPlayerId);
+            if(!p) return;
+            const el=document.getElementById('betAmt');
+            const bet=Math.floor(Number(el? el.value : 0));
+            if(!bet||bet<1){ alert('Введи ставку (число больше 0).'); return; }
+            if(bet>p.savings){ alert('Не хватает кассы. У тебя '+Math.round(p.savings)+'$.'); return; }
+            const roll=1+Math.floor(Math.random()*6);
+            // ставка списывается СРАЗУ (committed). Проигрыш мгновенный.
+            p.savings=Math.round((p.savings-bet)*100)/100;
+            if(roll===6){
+                const payout=bet*WIN_MULT;   // полная выплата ×5 (вернётся при одобрении ведущего)
+                state.deals.push({
+                    id: uid(), pId: p.id, pName: p.name, type:'CASINO_WIN',
+                    details:{ bet, roll, payout }, status:'PENDING'
+                });
+                save(); render();
+                alert('🎰🎉 ШЕСТЁРКА!!! ТЫ ВЫИГРАЛ '+payout+'$! 👑⭐\n📨 Заявка ушла ведущему — как одобрит, выигрыш упадёт в кассу!');
+            } else {
+                const near=['Так близко! 😤','Ещё чуть-чуть! 🎲','Удача уже рядом — чувствуешь? 🔥','Не сдавайся, фортуна любит упорных! 💪','В следующий раз точно шестёрка! 😏'];
+                save(); render();
+                alert('🎲 Выпало '+roll+'... '+near[Math.floor(Math.random()*near.length)]+'\n−'+bet+'$. Рискни ещё разок!');
+            }
+        }
+        function clearNotify(){ const p=state.players.find(x=>x.id==state.currentPlayerId); if(p){ p.notify=null; save(); render(); } }
+        function giveSalary(id){
+            const p=state.players.find(x=>x.id==id); if(!p) return;
+            const f=calc(p);
+            p.savings=Math.round((p.savings + f.flow)*100)/100;
+            p.notify = (f.flow>=0
+                ? '💵 ЗАРПЛАТА! Ведущий начислил +'+f.flow+'$ (месячный поток). Касса пополнена! 🎉'
+                : '💸 Месяц в минус: '+f.flow+'$ (расходы выше дохода). Управляй потоком!');
+            save(); render();
+        }
+        function renderLuckPanel(p){
+            return `<div class="card" style="border:2px solid #a855f7;background:linear-gradient(135deg,rgba(168,85,247,0.18),rgba(236,72,153,0.10));">
+                <div class="block-title" style="color:#e9d5ff;font-size:18px;letter-spacing:.5px;">🎰 ИСПЫТАЙ УДАЧУ</div>
+                <p style="font-size:15px;color:#f5d0fe;font-weight:800;margin-bottom:2px;">Удача любит смелых! 🍀</p>
+                <p style="font-size:13px;color:#e9d5ff;margin-bottom:8px;">Один бросок — и ставка взлетает <b style="color:#34d399;">×${WIN_MULT}</b>! 🚀<br>Кто не рискует — тот не пьёт шампанское 🍾</p>
+                <div style="display:flex;gap:8px;">
+                    <input id="betAmt" type="number" min="1" placeholder="твоя ставка, $" style="flex:1;padding:12px;border-radius:10px;border:1px solid #a855f7;background:#0b1020;color:#fff;font-size:16px;font-weight:700;">
+                    <button onclick="gambleRoll()" class="btn" style="background:linear-gradient(90deg,#a855f7,#ec4899);color:#fff;font-weight:900;font-size:15px;padding:12px 18px;box-shadow:0 0 14px rgba(236,72,153,.5);">🎲 БРОСИТЬ!</button>
+                </div>
+                <p style="font-size:13px;color:#fcd34d;font-weight:700;margin-top:8px;text-align:center;">🔥 Чувствуешь — сегодня ТВОЙ день? Фортуна ждёт дерзких! 😏</p>
+                <p style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center;">Твоя касса: <b>${Math.round(p.savings)} $</b></p>
+            </div>`;
+        }
+
+        function renderPlayer(app) {
+            const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            if (!p) { state.view='lobby'; render(); return; }
+            const f = calc(p);
+            const hasP = hasPendingFor(p.id);
+
+            const debtRow = (paid, name, debt, monthly, type) => `
+                <div class="row-item ${paid ? 'strike' : ''}">
+                    <div style="flex:1;">
+                        <span style="font-size:11px; color:#9ca3af;">${name} · ежемес. ${monthly}$</span>
+                        <div style="font-size:15px; font-weight:bold;">Долг: ${debt} $</div>
+                    </div>
+                    ${!paid && debt > 0
+                        ? `<button onclick="send('${type}')" ${hasP?'disabled':''} class="btn btn-orange">Погасить</button>`
+                        : paid ? '<b style="color:#10b981; font-size:12px;">Выплачено</b>' : '<b style="color:#6b7280; font-size:12px;">Нет</b>'}
+                </div>
+            `;
+
+            app.innerHTML = `
+                ${p.notify ? `<div style="background:linear-gradient(90deg,#10b981,#059669);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>${p.notify}</span><button onclick="clearNotify()" class="btn" style="background:#fff;color:#059669;flex:0 0 auto;">ОК</button></div>` : ''}
+                ${(Number(p.jail)||0)>0 ? `<div style="background:linear-gradient(90deg,#7f1d1d,#991b1b);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-weight:800;text-align:center;">🔒 ТЫ В ТЮРЬМЕ — осталось ${p.jail} ход(ов). Пропускаешь ход! <button onclick="jailDec(${p.id})" class="btn" style="background:#fff;color:#991b1b;margin-left:8px;">Отбыл ход (−1)</button></div>` : ''}
+                ${p.allow ? `<div style="background:linear-gradient(90deg,#065f46,#047857);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">✅ Ведущий ОТКРЫЛ клетку: ${ALLOW_LABEL[p.allow]||p.allow}. Жми её кнопку и тяни карту.</div>` : `<div style="background:#1f2937;color:#9ca3af;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-size:12px;text-align:center;">🔒 Клетки закрыты. Попал на клетку → жди, пока ведущий откроет её тебе.</div>`}
+                <div class="card flex-between" style="background:#1f2937;">
+                    <div>
+                        <h2 style="font-size:21px; font-weight:800;">${p.name}</h2>
+                        <p style="color:#10b981; font-weight:bold; font-size:13px; margin-top:3px;">${p.prof.name} · Зарплата ${f.salary}$${f.skillBonus>0?` <span style="color:#a5b4fc;">(база ${p.prof.salary}$ +${Math.round(f.skillBonus*100)}% навыки)</span>`:''}</p>
+                    </div>
+                    <button onclick="state.view='lobby';render();" class="btn btn-gray">← В лобби</button>
+                </div>
+
+                <div class="grid-3">
+                    <div class="stat-box stat-blue">
+                        <span style="font-size:11px; color:#9ca3af; font-weight:700; text-transform:uppercase;">Пассивный доход</span>
+                        <div class="val-blue">+${f.passive} $</div>
+                    </div>
+                    <div class="stat-box stat-rose">
+                        <span style="font-size:11px; color:#9ca3af; font-weight:700; text-transform:uppercase;">Общий расход</span>
+                        <div class="val-rose">${f.totalExp} $</div>
+                    </div>
+                    <div class="stat-box stat-emerald">
+                        <span style="font-size:11px; color:#a7f3d0; font-weight:700; text-transform:uppercase;">Месячный поток</span>
+                        <div class="val-emerald">${f.flow} $</div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="stat-box stat-amber">
+                        <span style="font-size:11px; color:#fcd34d; font-weight:700; text-transform:uppercase;">💰 Сбережения (касса)</span>
+                        <div class="val-amber">${p.savings} $</div>
+                        <p style="font-size:11px; color:#9ca3af; margin-top:6px;">Стартовая касса + кредиты + поток (правит ведущий)</p>
+                    </div>
+                    <div class="stat-box" style="background:rgba(67,56,202,0.15); border-color:#6366f1;">
+                        <span style="font-size:11px; color:#a5b4fc; font-weight:700; text-transform:uppercase;">🏦 Кредит банка</span>
+                        <div style="color:#818cf8; font-size:24px; font-weight:800;">${p.bankLoan} $</div>
+                        <p style="font-size:11px; color:#9ca3af; margin-top:6px;">Платёж ${f.bankPay}$/мес (10% от долга)</p>
+                    </div>
+                </div>
+
+                ${renderMarketPanel(p)}
+
+                <div class="card">
+                    <div class="block-title">🛒 Покупка актива</div>
+                    <p style="font-size:11px; color:#9ca3af; margin-bottom:10px;">Акции и фонды покупаются выше — в бирже. Здесь — недвижимость, бизнес и прочее.</p>
+                    <div style="margin-bottom:12px;">
+                        <select id="aType" class="inp" onchange="renderAssetForm()">
+                            <option value="ESTATE">🏠 Недвижимость</option>
+                            <option value="BUSINESS">💼 Бизнес</option>
+                            <option value="OTHER">📦 Прочее</option>
+                        </select>
+                    </div>
+                    <div id="assetFields" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-bottom:12px;"></div>
+                    <button onclick="sendAsset()" ${hasP?'disabled':''} class="btn btn-green">Отправить на одобрение ведущему</button>
+                    ${hasP ? `<div class="pending-alert">⏳ Заявка отправлена. Бланк ожидает решения ведущего...</div>` : ''}
+                </div>
+
+                ${renderLuckPanel(p)}
+                ${renderCareerPanel(p)}
+                ${renderSkillPanel(p)}
+                ${renderSkillModal()}
+                ${renderGovPanel(p)}
+                ${renderGovModal()}
+                ${renderWorldPanel(p)}
+                ${renderWorldModal()}
+                ${renderWorldShow()}
+                ${renderWorkPanel(p)}
+                ${renderWorkModal()}
+                ${renderExpensePanel(p)}
+                ${renderExpenseModal()}
+                ${renderTaxPanel(p)}
+                ${renderTaxModal()}
+                ${renderSvyazPanel(p)}
+                ${renderSvyazModal()}
+                ${renderSdelkaPanel(p)}
+                ${renderSdelkaModal()}
+                ${renderMedPanel(p)}
+                ${renderMedModal()}
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="block-title">📈 Доходы</div>
+                        <div class="row-item">
+                            <span>Заработок (${p.prof.name}):</span>
+                            <b style="color:#10b981;">+${f.salary} $</b>
+                        </div>
+                        <div class="sub-section">
+                            <div class="sub-label">Капиталовложения · Дивиденды · Недвижимость · Бизнес</div>
+                            ${p.assets.length === 0
+                                ? '<p style="color:#4b5563; font-size:13px;">Активов пока нет</p>'
+                                : p.assets.map(a => {
+                                    if (a.type === 'STOCK') {
+                                        return `
+                                            <div class="row-item" style="display:block; padding:12px;">
+                                                <div class="flex-between" style="margin-bottom:8px;">
+                                                    <div>
+                                                        <b>${a.title}</b>
+                                                        <span class="badge b-blue">STOCK</span>
+                                                        <div style="font-size:11px; color:#9ca3af; margin-top:3px;">
+                                                            ${a.qty} шт × ${a.price}$ = ${a.qty*a.price}$ · сейчас ${a.now}$/шт${a.div?` · див ${a.div}%`:''}
+                                                        </div>
+                                                    </div>
+                                                    <b style="color:#10b981;">+${a.cf}$/мес</b>
+                                                </div>
+                                                <div style="display:grid; grid-template-columns: 1fr auto; gap:8px;">
+                                                    <input type="number" id="sellQty_${a.id}" placeholder="Сколько штук продать? (макс ${a.qty})" class="inp" min="1" max="${a.qty}" style="padding:6px 10px; font-size:12px;">
+                                                    <button onclick="sellStock(${a.id}, '${a.title.replace(/'/g,"\\'")}')" ${hasP?'disabled':''} class="btn btn-gray" style="padding:6px 12px; font-size:11px;">📤 Продать N шт</button>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }
+                                    return `
+                                        <div class="row-item">
+                                            <span>
+                                                <b>${a.title}</b>
+                                                <span class="badge ${a.type==='ESTATE'?'b-amber':a.type==='BUSINESS'?'b-green':'b-rose'}">${a.type}</span>
+                                            </span>
+                                            <div class="flex-between">
+                                                <b style="color:#10b981; margin-right:10px;">+${a.cf}$/мес</b>
+                                                <button onclick="send('SELL_ASSET', {aId:${a.id}, title:'${a.title.replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-gray" style="padding:3px 8px; font-size:11px;">Продать</button>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                        </div>
+                        <div class="sub-section">
+                            <div class="row-item" style="background:#064e3b; border-color:#10b981;">
+                                <b>Общий доход:</b>
+                                <b style="color:#10b981; font-size:16px;">+${f.income} $</b>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="block-title">📉 Расходы</div>
+                        <div class="row-item" style="opacity:0.5;"><span>Налоги:</span><span>${f.taxes} $</span></div>
+                        <div class="row-item ${p.isM?'strike':''}"><span>Платёж по ипотеке:</span><span>${p.prof.mortgagePay} $</span></div>
+                        <div class="row-item ${p.isE?'strike':''}" ${p.prof.eduPay===0?'style="opacity:0.4;"':''}><span>Платёж по образованию:</span><span>${p.prof.eduPay} $</span></div>
+                        <div class="row-item ${p.isA?'strike':''}"><span>Платёж по авто-кредиту:</span><span>${p.prof.autoPay} $</span></div>
+                        <div class="row-item ${p.isCC?'strike':''}"><span>Платёж по кредитной карте:</span><span>${p.prof.ccPay} $</span></div>
+                        <div class="row-item ${p.isR?'strike':''}"><span>Платёж по розничному кредиту:</span><span>${p.prof.retailPay} $</span></div>
+                        <div class="row-item" style="opacity:0.5;"><span>Прочие расходы:</span><span>${f.otherExp} $</span></div>
+                        <div class="row-item" style="background:#1e1b4b;"><span>Расходы на детей (${p.children}):</span><b style="color:#ef4444;">${f.childExp} $</b></div>
+                        <div class="row-item" style="background:#1e1b4b;"><span>Платёж по кредиту банка:</span><b style="color:#ef4444;">${f.bankPay} $</b></div>
+                        <div class="sub-section">
+                            <div class="row-item" style="background:#7f1d1d; border-color:#ef4444;">
+                                <b>Общий расход:</b>
+                                <b style="color:#fca5a5; font-size:16px;">${f.totalExp} $</b>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="block-title">📋 Пассивы (долги на погашение)</div>
+                    <div class="grid-2" style="margin:0; gap:10px;">
+                        ${debtRow(p.isM, 'Закладная на дом', p.mLeft, p.prof.mortgagePay, 'PAY_MORTGAGE')}
+                        ${p.prof.eduPay > 0 ? debtRow(p.isE, 'Кредит на образование', p.eLeft, p.prof.eduPay, 'PAY_EDU') : ''}
+                        ${debtRow(p.isA, 'Авто-кредит', p.aLeft, p.prof.autoPay, 'PAY_AUTO')}
+                        ${debtRow(p.isCC, 'Долг по кредитным карточкам', p.ccLeft, p.prof.ccPay, 'PAY_CC')}
+                        ${debtRow(p.isR, 'Розничный долг', p.rLeft, p.prof.retailPay, 'PAY_RETAIL')}
+                        ${p.bankLoan > 0 ? `
+                            <div class="row-item" style="border-color:#6366f1;">
+                                <div style="flex:1;">
+                                    <span style="font-size:11px; color:#a5b4fc;">Кредит банка · 10%/мес</span>
+                                    <div style="font-size:15px; font-weight:bold;">Долг: ${p.bankLoan} $</div>
+                                </div>
+                                <button onclick="payBank()" ${hasP?'disabled':''} class="btn btn-orange">Погасить полностью</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div class="card" style="border-color:#6366f1; background:rgba(67,56,202,0.05);">
+                    <div class="block-title" style="color:#a5b4fc;">🏦 Взять кредит банка</div>
+                    <p style="font-size:12px; color:#9ca3af; margin-bottom:12px;">Доступно кратно $1000. Платёж = 10% от суммы (например, $5000 → $500/мес). После одобрения деньги поступят в кассу.</p>
+                    <div style="display:grid; grid-template-columns:1fr auto; gap:10px;">
+                        <input type="number" id="loanAmount" placeholder="Сколько занять? ($1000, $2000, $5000...)" class="inp" step="1000" min="1000">
+                        <button onclick="reqLoan()" ${hasP?'disabled':''} class="btn btn-amber">Запросить кредит</button>
+                    </div>
+                </div>
+
+                <div class="card win-box ${f.win ? 'win-active' : ''}">
+                    <div style="font-size:12px; color:#9ca3af; font-weight:700; text-transform:uppercase; margin-bottom:5px;">🏆 Условие победы</div>
+                    <p style="font-size:13px; color:#cbd5e1; margin-bottom:10px;">Пассивный доход ≥ Расходы × 7</p>
+                    <div style="font-size:20px; font-weight:800; font-family:monospace;">
+                        <span style="color:#3b82f6;">${f.passive} $</span>
+                        <span style="color:#6b7280;"> ${f.win?'≥':'<'} </span>
+                        <span style="color:#ef4444;">${f.target} $</span>
+                    </div>
+                    <p style="margin-top:10px; font-weight:bold; font-size:13px; color:${f.win?'#10b981':'#f59e0b'};">
+                        ${f.win ? '🎉 ПОБЕДА В VIA! 🎉' : `Осталось добрать пассива: ${f.target - f.passive} $`}
+                    </p>
+                </div>
+            `;
+        }
+
+        function renderAdmin(app) {
+            const pending = state.deals.filter(d => d.status === 'PENDING');
+            const dealLabel = {
+                BUY_ASSET: 'ПОКУПКА АКТИВА',
+                SELL_ASSET: 'ПРОДАЖА АКТИВА',
+                SELL_STOCK: 'ПРОДАЖА АКЦИЙ',
+                SELL_MARKET: 'ПРОДАЖА (БИРЖА)',
+                CASINO_WIN: '🎰 ВЫИГРЫШ В КАЗИНО',
+                PAY_MORTGAGE: 'ПОГАШЕНИЕ ИПОТЕКИ',
+                PAY_EDU: 'ПОГАШЕНИЕ ОБРАЗОВАНИЯ',
+                PAY_AUTO: 'ПОГАШЕНИЕ АВТО',
+                PAY_CC: 'ПОГАШЕНИЕ КАРТЫ',
+                PAY_RETAIL: 'ПОГАШЕНИЕ РОЗНИЦЫ',
+                PAY_BANK: 'ПОГАШЕНИЕ КРЕДИТА БАНКА',
+                TAKE_LOAN: 'ВЗЯТЬ КРЕДИТ В БАНКЕ'
+            };
+
+            app.innerHTML = `
+                <div class="card flex-between" style="border-color:#ef4444; background:rgba(239,68,68,0.05);">
+                    <div>
+                        <h2 style="color:#ef4444; font-weight:900;">🎛 ПУЛЬТ ВЕДУЩЕГО</h2>
+                        <p style="font-size:12px; color:#9ca3af; margin-top:2px;">Все сделки игроков проходят через тебя · Игроков: <b>${state.players.length}</b> · Заявок: <b>${pending.length}</b></p>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="reloadFromStorage(); render();" class="btn btn-blue" title="Подтянуть свежие данные из других вкладок">🔄 Обновить</button>
+                        <button onclick="clearAllPlayers()" class="btn" style="background:#7f1d1d; color:#fca5a5;" title="Очистить весь стол перед новой партией">🗑 Очистить ВСЕХ</button>
+                        <button onclick="state.view='lobby';render();" class="btn btn-gray">← В лобби</button>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="block-title" style="color:#ea580c;">📥 Запросы (${pending.length})</div>
+                        ${pending.length === 0
+                            ? '<p style="color:#4b5563; text-align:center; padding:20px 0; font-size:13px;">Запросов нет. Ожидайте действий игроков.</p>'
+                            : pending.map(d => {
+                                let details = '';
+                                if (d.type === 'BUY_ASSET') {
+                                    const dd = d.details;
+                                    if (dd.type === 'STOCK') details = `📈 Акции "<b>${dd.title}</b>": <b>${dd.qty} шт × ${dd.price}$</b> = <b style="color:#fbbf24;">${dd.qty*dd.price}$</b> · Сейчас: <b>${dd.now}$</b>${dd.div ? ` · Дивиденды <b>${dd.div}%</b> → <span style="color:#10b981;">+${dd.cf}$/мес</span>` : ' · без дивидендов'}`;
+                                    else if (dd.type === 'ESTATE') details = `🏠 Недвижка "<b>${dd.title}</b>": Цена <b style="color:#fbbf24;">${dd.price}$</b>, первый взнос <b>${dd.down}$</b>, ипотека <b style="color:#ef4444;">${dd.price-dd.down}$</b>, поток <span style="color:#10b981;">+${dd.cf}$/мес</span>`;
+                                    else if (dd.type === 'BUSINESS') details = `💼 Бизнес "<b>${dd.title}</b>": Цена <b style="color:#fbbf24;">${dd.price}$</b>, первый взнос <b>${dd.down}$</b>, кредит <b style="color:#ef4444;">${dd.price-dd.down}$</b>, поток <span style="color:#10b981;">+${dd.cf}$/мес</span>`;
+                                    else details = `📦 "<b>${dd.title}</b>": Куплено за <b style="color:#fbbf24;">${dd.price}$</b> · Сейчас <b>${dd.now}$</b> (прибыль/убыток при продаже)`;
+                                }
+                                else if (d.type === 'SELL_ASSET') details = `Продажа актива "<b>${d.details.title}</b>" (удаление из бланка)`;
+                                else if (d.type === 'SELL_STOCK') {
+                                    const dd = d.details;
+                                    const total = dd.sellQty * dd.price;
+                                    const profit = (dd.price - dd.buyPrice) * dd.sellQty;
+                                    details = `📈 Продажа <b>${dd.sellQty}</b> из ${dd.totalQty} шт "<b>${dd.title}</b>" по <b style="color:#fbbf24;">${dd.price}$/шт</b> = <b style="color:#10b981;">${total}$</b> в кассу (${profit>=0?'прибыль':'убыток'} ${profit>=0?'+':''}${profit}$)`;
+                                }
+                                else if (d.type === 'SELL_MARKET') {
+                                    const dd = d.details;
+                                    details = `📈 БИРЖА: продать <b>${dd.qty}</b> шт «<b>${dd.assetName}</b>» по <b style="color:#fbbf24;">${dd.price}$</b> = <b style="color:#10b981;">+${dd.total}$</b> в кассу`;
+                                }
+                                else if (d.type === 'CASINO_WIN') {
+                                    const dd = d.details;
+                                    details = `🎰🎉 СОРВАЛ КУШ! Ставка ${dd.bet}$ → выпала 6 → выигрыш <b style="color:#10b981;">+${dd.payout}$</b>. Поздравь и выплати! 👑`;
+                                }
+                                else if (d.type === 'TAKE_LOAN') details = `Игрок запрашивает <b style="color:#fbbf24;">${d.details.amount}$</b> кредитом → +${Math.round(d.details.amount*0.10)}$/мес расход, +${d.details.amount}$ в кассу`;
+                                else if (d.type === 'PAY_MORTGAGE') details = `Закрыть <b>ипотеку</b> полностью`;
+                                else if (d.type === 'PAY_EDU') details = `Закрыть <b>кредит на образование</b>`;
+                                else if (d.type === 'PAY_AUTO') details = `Закрыть <b>авто-кредит</b>`;
+                                else if (d.type === 'PAY_CC') details = `Закрыть <b>долг по кредитной карте</b>`;
+                                else if (d.type === 'PAY_RETAIL') details = `Закрыть <b>розничный долг</b>`;
+                                else if (d.type === 'PAY_BANK') details = `Закрыть <b>кредит банка</b> полностью`;
+
+                                return `
+                                <div style="background:#030712; padding:14px; border-radius:8px; margin-bottom:10px; border:1px solid #1f2937;">
+                                    <div class="flex-between">
+                                        <b>${d.pName}</b>
+                                        <span style="background:#78350f; color:#fcd34d; font-size:10px; padding:3px 7px; border-radius:4px; font-weight:bold;">${dealLabel[d.type]||d.type}</span>
+                                    </div>
+                                    <p style="font-size:13px; color:#cbd5e1; margin:10px 0;">${details}</p>
+                                    <div class="flex-between" style="margin-top:10px; gap:10px;">
+                                        <button onclick="appr('${d.id}')" class="btn" style="background:#10b981; color:white; width:100%;">✅ Одобрить</button>
+                                        <button onclick="rejl('${d.id}')" class="btn" style="background:#ef4444; color:white; width:100%;">❌ Отказать</button>
+                                    </div>
+                                </div>
+                            `;
+                            }).join('')}
+                    </div>
+
+                    <div class="card">
+                        <div class="block-title">👥 Игроки за столом</div>
+                        ${state.players.length === 0
+                            ? '<p style="color:#4b5563; text-align:center; padding:20px 0; font-size:13px;">Игроки не зарегистрированы</p>'
+                            : state.players.map(p => {
+                                const f = calc(p);
+                                // Сводка долгов
+                                const debts = [];
+                                if (!p.isM && p.mLeft > 0) debts.push(`ипотека ${p.mLeft}$`);
+                                if (!p.isE && p.eLeft > 0) debts.push(`образ. ${p.eLeft}$`);
+                                if (!p.isA && p.aLeft > 0) debts.push(`авто ${p.aLeft}$`);
+                                if (!p.isCC && p.ccLeft > 0) debts.push(`карта ${p.ccLeft}$`);
+                                if (!p.isR && p.rLeft > 0) debts.push(`розн. ${p.rLeft}$`);
+                                if (p.bankLoan > 0) debts.push(`банк ${p.bankLoan}$`);
+                                const debtTotal = (p.isM?0:p.mLeft) + (p.isE?0:p.eLeft) + (p.isA?0:p.aLeft) + (p.isCC?0:p.ccLeft) + (p.isR?0:p.rLeft) + p.bankLoan;
+
+                                return `
+                                <div style="background:#030712; padding:13px; border-radius:8px; margin-bottom:12px; border:1px solid #1f2937; font-size:13px;">
+                                    <div class="flex-between" style="border-bottom:1px solid #1f2937; padding-bottom:7px; margin-bottom:8px;">
+                                        <div>
+                                            <b style="font-size:14px;">${p.name}</b>
+                                            <span style="color:#6b7280; font-weight:normal; font-size:12px;"> · ${p.prof.name}</span>
+                                        </div>
+                                        <div style="display:flex; gap:6px; align-items:center;">
+                                            <span style="color:${f.flow>=0?'#10b981':'#ef4444'}; font-weight:bold;">${f.flow>=0?'+':''}${f.flow}$/мес</span>
+                                            <button onclick="deletePlayer(${p.id}, '${(p.name||'').replace(/'/g,"\\'")}')" class="btn" style="background:#7f1d1d; color:#fca5a5; padding:3px 8px; font-size:11px;" title="Удалить игрока полностью">🗑</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Управление -->
+                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                                        <div>
+                                            👶 Дети: <b style="color:#3b82f6; font-size:14px; margin:0 5px;">${p.children}</b>
+                                            <button onclick="chChild(${p.id},1)" class="btn btn-gray" style="padding:2px 8px; font-size:11px;">+</button>
+                                            <button onclick="chChild(${p.id},-1)" class="btn btn-gray" style="padding:2px 8px; font-size:11px;">−</button>
+                                        </div>
+                                        <div>
+                                            💰 Касса:
+                                            <input type="number" value="${p.savings}" onchange="chSavings(${p.id},this.value)" style="width:90px; background:#111827; color:#fbbf24; border:1px solid #374151; padding:3px; border-radius:4px; text-align:right; font-weight:bold;">
+                                        </div>
+                                    </div>
+
+                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; background:#0c1424; border:1px solid #1e3a5f; border-radius:6px; padding:7px 9px;">
+                                        <span style="font-size:13px; color:#93c5fd; white-space:nowrap;">🏦 Кредит банка:</span>
+                                        <input type="number" value="${Number(p.bankLoan)||0}" min="0" step="100" onchange="chBankLoan(${p.id},this.value)" style="width:100px; background:#111827; color:#93c5fd; border:1px solid #1e3a5f; padding:3px; border-radius:4px; text-align:right; font-weight:bold;">
+                                        <span style="font-size:11px; color:#6b7280; white-space:nowrap;">→ ${Math.round((Number(p.bankLoan)||0)*0.10)}$/мес расход</span>
+                                    </div>
+
+                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; background:#1c1017; border:1px solid #4c1d24; border-radius:6px; padding:7px 9px;">
+                                        <span style="font-size:13px; color:#fca5a5;">🧾 Налог игроку:</span>
+                                        <input type="number" value="${Number(p.taxPct)||0}" min="0" step="1" onchange="setTaxPct(${p.id},this.value)" style="width:70px; background:#111827; color:#fca5a5; border:1px solid #4c1d24; padding:3px; border-radius:4px; text-align:right; font-weight:bold;">
+                                        <span style="font-size:12px; color:#9ca3af;">% от дохода → +${Math.round(f.income*(Number(p.taxPct)||0)/100)}$/мес к расходу</span>
+                                    </div>
+
+                                    <div style="display:flex; gap:6px; margin-bottom:8px; background:#0c1f16; border:1px solid #14532d; border-radius:6px; padding:7px 9px; align-items:center;">
+                                        <span style="font-size:13px; color:#6ee7b7; white-space:nowrap;">💎 Карточка:</span>
+                                        <select id="card_${p.id}" class="inp" style="flex:1; padding:4px; font-size:12px; min-width:0;">${CARDS.map((c,i)=>`<option value="${i}">${c.name} · ${c.cost}$ · +${c.cf}$/мес</option>`).join('')}</select>
+                                        <button onclick="giveCard(${p.id}, document.getElementById('card_${p.id}').value)" class="btn" style="background:#047857; color:#fff; padding:4px 10px; font-size:12px; white-space:nowrap;">➕ Выдать пассив</button>
+                                    </div>
+                                    <div style="display:flex; gap:6px; margin-bottom:8px; background:#1f0c0c; border:1px solid #532626; border-radius:6px; padding:7px 9px; align-items:center;">
+                                        <span style="font-size:13px; color:#fca5a5; white-space:nowrap;">➖ Минус:</span>
+                                        <select id="minus_${p.id}" class="inp" style="flex:1; padding:4px; font-size:12px; min-width:0;">${MINUS_CARDS.map((c,i)=>`<option value="${i}">${c.name} · ${minusEffect(c)}</option>`).join('')}</select>
+                                        <button onclick="giveMinus(${p.id}, document.getElementById('minus_${p.id}').value)" class="btn" style="background:#991b1b; color:#fff; padding:4px 10px; font-size:12px; white-space:nowrap;">➖ Отнять</button>
+                                    </div>
+
+                                    <button onclick="giveSalary(${p.id})" class="btn" style="width:100%; background:#059669; color:#fff; font-weight:800; margin-bottom:8px; font-size:14px;">💵 ВЫДАТЬ ЗАРПЛАТУ (${f.flow>=0?'+':''}${f.flow}$)</button>
+
+                                    <!-- ТЮРЬМА (ведущий) -->
+                                    <div style="background:#1c1917; border:1px solid #44403c; border-radius:6px; padding:8px; margin-bottom:8px;">
+                                        <div style="font-size:12px; color:#d6d3d1; margin-bottom:6px;">🔒 Тюрьма: ${(Number(p.jail)||0)>0?`<b style="color:#f87171;">сидит, осталось ${p.jail} ход(ов)</b>`:'<span style="color:#6b7280;">на свободе</span>'}</div>
+                                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                            <button onclick="setJail(${p.id},2)" class="btn" style="background:#7c2d12; color:#fed7aa; padding:3px 8px; font-size:11px;">🔒 2 хода</button>
+                                            <button onclick="setJail(${p.id},3)" class="btn" style="background:#7c2d12; color:#fed7aa; padding:3px 8px; font-size:11px;">🔒 3 хода</button>
+                                            <button onclick="setJail(${p.id},1)" class="btn btn-gray" style="padding:3px 8px; font-size:11px;">🔒 1 ход</button>
+                                            <button onclick="jailDec(${p.id})" class="btn btn-gray" style="padding:3px 8px; font-size:11px;">−1 ход</button>
+                                            <button onclick="jailFree(${p.id})" class="btn" style="background:#065f46; color:#a7f3d0; padding:3px 8px; font-size:11px;">Освободить</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- РАЗРЕШЕНИЕ КЛЕТОК (ведущий открывает игроку одну клетку на раз) -->
+                                    <div style="background:#0c1a2b; border:1px solid #1e3a5f; border-radius:6px; padding:8px; margin-bottom:8px;">
+                                        <div style="font-size:12px; color:#93c5fd; margin-bottom:6px;">🎫 Открыта клетка: ${p.allow?`<b style="color:#34d399;">${ALLOW_LABEL[p.allow]||p.allow}</b>`:'<span style="color:#6b7280;">закрыто (все кнопки заблокированы)</span>'}</div>
+                                        <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                            ${Object.keys(ALLOW_LABEL).map(k=>`<button onclick="setAllow(${p.id},'${k}')" class="btn" style="background:${p.allow===k?'#047857':'#1e3a5f'}; color:#dbeafe; padding:2px 6px; font-size:10px;">${ALLOW_LABEL[k]}</button>`).join('')}
+                                            <button onclick="setAllow(${p.id},null)" class="btn btn-gray" style="padding:2px 6px; font-size:10px;">✖ Закрыть</button>
+                                        </div>
+                                    </div>
+                                    ${p.notify?`<div style="background:#111827; border-left:3px solid #34d399; padding:6px 8px; border-radius:4px; font-size:11px; color:#d1d5db; margin-bottom:8px;">📋 ${p.notify}</div>`:''}
+
+                                    <!-- Сводка статистики -->
+                                    <div style="background:#111827; padding:8px; border-radius:6px; font-size:11px; color:#9ca3af; margin-bottom:8px;">
+                                        💵 Зарплата ${p.prof.salary}$ · 📈 Пассив <b style="color:#10b981;">${f.passive}$</b> · 📉 Расход <b style="color:#ef4444;">${f.totalExp}$</b>
+                                        <br>🎯 До победы: <b style="color:${f.win?'#10b981':'#fbbf24'};">${f.win?'ПОБЕДА!':`${f.target-f.passive}$ пассива`}</b>
+                                    </div>
+
+                                    <!-- ПОРТФЕЛЬ АКТИВОВ -->
+                                    <details style="margin-bottom:6px;">
+                                        <summary style="cursor:pointer; font-size:12px; color:#10b981; font-weight:bold; padding:4px 0;">📊 Портфель активов (${p.assets.length})</summary>
+                                        <div style="padding:6px 0 0 0;">
+                                        ${p.assets.length === 0
+                                            ? '<div style="color:#4b5563; font-size:11px; padding:4px;">Активов нет</div>'
+                                            : p.assets.map(a => {
+                                                let info = '';
+                                                if (a.type === 'STOCK') {
+                                                    const val = (a.qty || 0) * (a.now || a.price || 0);
+                                                    info = `${a.qty}×${a.price}$ → сейчас ${a.now}$/шт = ${val}$${a.div?` · ${a.div}%div`:''}`;
+                                                } else if (a.type === 'ESTATE' || a.type === 'BUSINESS') {
+                                                    info = `взнос ${a.down}$, цена ${a.price}$`;
+                                                } else if (a.type === 'OTHER') {
+                                                    info = `куплено ${a.price}$ → сейчас ${a.now}$`;
+                                                }
+                                                return `
+                                                    <div style="padding:5px 8px; background:#0b0f19; border-radius:4px; margin-bottom:3px; font-size:11px;">
+                                                        <div class="flex-between">
+                                                            <span><b>${a.title}</b> <span style="color:#6b7280;">[${a.type}]</span></span>
+                                                            <span style="display:flex;align-items:center;gap:6px;"><b style="color:${a.cf>0?'#10b981':'#6b7280'};">${a.cf>0?'+':''}${a.cf}$/мес</b><button onclick="admSellAsset(${p.id},'${a.id}')" class="btn" style="background:#065f46;color:#a7f3d0;padding:2px 7px;font-size:10px;" title="Продать в кассу игрока">💵</button><button onclick="admRemoveAsset(${p.id},'${a.id}')" class="btn" style="background:#7f1d1d;color:#fca5a5;padding:2px 7px;font-size:10px;" title="Убрать без денег">✖</button></span>
+                                                        </div>
+                                                        <div style="color:#6b7280; margin-top:2px;">${info}</div>
+                                                    </div>`;
+                                            }).join('')}
+                                        </div>
+                                    </details>
+
+                                    <!-- 💼 АКЦИИ (биржа) — ведущий видит портфель игрока -->
+                                    ${(() => {
+                                        const hids = Object.keys(p.holdings || {});
+                                        const pv = Math.round(portfolioValue(p));
+                                        return `
+                                    <details style="margin-bottom:6px;">
+                                        <summary style="cursor:pointer; font-size:12px; color:#38bdf8; font-weight:bold; padding:4px 0;">💼 Акции на бирже (${hids.length}) · ${pv}$</summary>
+                                        <div style="padding:6px 0 0 0;">
+                                        ${hids.length === 0
+                                            ? '<div style="color:#4b5563; font-size:11px; padding:4px;">Акций нет</div>'
+                                            : hids.map(id => {
+                                                const h = p.holdings[id]; const pr = curPrice(id) || 0;
+                                                const val = Math.round(pr * (h.qty||0));
+                                                const pl = h.avg ? ((pr/h.avg - 1)*100) : 0;
+                                                const c = pl>=0 ? '#10b981' : '#f43f5e';
+                                                return `<div style="padding:5px 8px; background:#0b0f19; border-radius:4px; margin-bottom:3px; font-size:11px;">
+                                                    <div class="flex-between"><span><b>${h.name||id}</b> · ${h.qty} шт</span><span style="display:flex;align-items:center;gap:6px;"><b style="color:${c};">${val}$ (${pl>=0?'+':''}${pl.toFixed(0)}%)</b><button onclick="admSellHolding(${p.id},'${id}')" class="btn" style="background:#065f46;color:#a7f3d0;padding:2px 7px;font-size:10px;" title="Продать в кассу игрока">💵</button><button onclick="admRemoveHolding(${p.id},'${id}')" class="btn" style="background:#7f1d1d;color:#fca5a5;padding:2px 7px;font-size:10px;" title="Убрать без денег">✖</button></span></div>
+                                                    <div style="color:#6b7280; margin-top:2px;">средняя ${Math.round(h.avg||0)}$ · сейчас ${pr}$/шт</div>
+                                                </div>`;
+                                            }).join('')}
+                                        </div>
+                                    </details>`;
+                                    })()}
+
+                                    <!-- ДОЛГИ -->
+                                    <details>
+                                        <summary style="cursor:pointer; font-size:12px; color:#ef4444; font-weight:bold; padding:4px 0;">💳 Непогашенные долги (${debts.length}) · Всего ${debtTotal}$</summary>
+                                        <div style="padding:6px 0 0 0;">
+                                            ${debts.length === 0
+                                                ? '<div style="color:#10b981; font-size:11px; padding:4px;">✓ Все долги закрыты!</div>'
+                                                : debts.map(d => `<div style="padding:4px 8px; background:#0b0f19; border-radius:4px; margin-bottom:3px; font-size:11px;">${d}</div>`).join('')}
+                                        </div>
+                                    </details>
+                                </div>
+                            `;
+                            }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ─── Действия ───
+        function roll() { state.chosenProf = professionsDB[Math.floor(Math.random()*professionsDB.length)]; render(); }
+
+        // ─── КАРЬЕРА (player-side): кубик → 97% навык (+1-2%, кап +20%), 3% (6% c Лидерством)
+        // — ШАНС сменить профессию (по выбору игрока). ───
+        function careerRoll(id) {
+            if (!gate(id,'career')) return;
+            const p = state.players.find(x => x.id === id);
+            if (!p) return;
+            if (!p.skills) p.skills = [];
+            const hasLead = p.skills.some(s => s.key === 'lead');
+            const changeChance = hasLead ? 6 : 3;
+            const d100 = Math.floor(Math.random()*100) + 1;
+            if (d100 <= changeChance) { offerProfessionChange(id); return; }
+            const sk = CAREER_SKILLS[Math.floor(Math.random()*CAREER_SKILLS.length)];
+            const curBonus = p.skills.reduce((s,x)=>s+(x.pct||0),0);
+            if (curBonus >= 0.20) {
+                p.notify = `🎓 Карьера (d100=${d100}): навык «${sk.name}», но бонус уже на капе +20% — прибавка не идёт, опыт записан.`;
+            } else {
+                p.skills.push({ key: sk.key, name: sk.name, pct: sk.pct });
+                p.notify = `🎓 Карьера (d100=${d100}): навык «${sk.name}» (${sk.note}). Бонус навыков: +${Math.round(Math.min(0.20,curBonus+sk.pct)*100)}%.`;
+            }
+            if (sk.key === 'second') { save(); render(); offerProfessionChange(id); return; }
+            save(); render();
+        }
+
+        function offerProfessionChange(id) {
+            const p = state.players.find(x => x.id === id);
+            if (!p) return;
+            const opts = professionsDB.filter(pr => pr.name !== p.prof.name);
+            const np = opts[Math.floor(Math.random()*opts.length)];
+            const ok = confirm(`🔀 ШАНС СМЕНИТЬ ПРОФЕССИЮ!\n\nНовая: ${np.name} · з/п ${np.salary}$ (налог ${np.taxes}$)\nТекущая: ${p.prof.name} · з/п ${p.prof.salary}$\n\nПоменять? Касса, активы, долги и дети остаются — меняются зарплата и ставки расходов профессии.`);
+            if (ok) {
+                const old = p.prof.name; p.prof = np;
+                p.notify = `🔀 Профессия изменена: ${old} → ${np.name}. Новая зарплата ${np.salary}$.`;
+            } else {
+                p.notify = `🔀 Шанс смены был — ты ОСТАЛСЯ: ${p.prof.name}.`;
+            }
+            save(); render();
+        }
+
+        function renderCareerPanel(p) {
+            const f = calc(p);
+            const bonusPct = Math.round((f.skillBonus||0)*100);
+            const capped = (f.skillBonus||0) >= 0.20;
+            const skillsHtml = (p.skills && p.skills.length)
+                ? p.skills.map(s => `<span style="display:inline-block;background:#0b0f19;border:1px solid #334155;border-radius:6px;padding:2px 8px;margin:2px;font-size:11px;">${s.name} +${Math.round((s.pct||0)*100)}%</span>`).join('')
+                : '<span style="color:#4b5563;font-size:12px;">Навыков пока нет</span>';
+            return `
+                <div class="card" style="border-color:#6366f1;">
+                    <div class="block-title" style="color:#a5b4fc;">🎯 КАРЬЕРА (клетка после Зарплаты)</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на «Карьеру» → жми кубик. 97% — новый НАВЫК (+1-2% к зарплате, кап +20%); 3% (6% с Лидерством) — ШАНС сменить профессию (решаешь сам).</p>
+                    <div style="margin-bottom:8px;">Бонус навыков: <b style="color:${capped?'#fbbf24':'#10b981'};">+${bonusPct}%${capped?' (кап)':''}</b> · база ${p.prof.salary}$ → <b style="color:#10b981;">${f.salary}$</b></div>
+                    <div style="margin-bottom:10px;">${skillsHtml}</div>
+                    <button onclick="careerRoll(${p.id})" class="btn" style="width:100%;background:#4f46e5;color:#fff;font-weight:800;font-size:14px;">🎲 КУБИК КАРЬЕРЫ</button>
+                </div>
+            `;
+        }
+
+        // ─── Клетка НАВЫК: окно с 5 картами (рубашкой вниз), выбираешь одну.
+        // Шанс навыка = SKILL_CHANCE (10%), иначе пусто. «Вкладываешь в себя». ───
+        const SKILL_CHANCE = 0.10;  // ← Rinat может менять процент здесь
+        function openSkillModal(id) { if(!gate(id,'skill')) return; state.skillModal = { pId:id, revealed:null, gotKey:null }; render(); }
+        function closeSkillModal() { state.skillModal = null; render(); }
+        function pickSkillCard(idx) {
+            const m = state.skillModal; if (!m || m.revealed !== null) return;
+            const p = state.players.find(x => x.id === m.pId); if (!p) return;
+            if (!p.lifeSkills) p.lifeSkills = {};
+            if (Math.random() < SKILL_CHANCE) {
+                const sk = LIFE_SKILLS[Math.floor(Math.random()*LIFE_SKILLS.length)];
+                p.lifeSkills[sk.key] = (p.lifeSkills[sk.key]||0) + 1;
+                m.gotKey = sk.key;
+                p.notify = `💡 НАВЫК! Выпал «${sk.name}» — уровень ${p.lifeSkills[sk.key]}. (${sk.draft})`;
+            } else {
+                m.gotKey = null;
+                p.notify = `💡 Навык: пусто (шанс был ${Math.round(SKILL_CHANCE*100)}%). В другой раз.`;
+            }
+            m.revealed = idx;
+            save(); render();
+        }
+        function renderSkillModal() {
+            const m = state.skillModal; if (!m) return '';
+            const skName = m.gotKey ? ((LIFE_SKILLS.find(s=>s.key===m.gotKey)||{}).name || '') : '';
+            const cards = [0,1,2,3,4].map(i => {
+                let face='🂠', bg='#1e293b', label='';
+                if (m.revealed !== null) {
+                    if (i === m.revealed) {
+                        if (m.gotKey) { face='💡'; bg='#065f46'; label=skName; }
+                        else { face='✖'; bg='#374151'; label='Пусто'; }
+                    } else { face='·'; bg='#0b0f19'; }
+                }
+                const click = m.revealed===null ? `onclick="pickSkillCard(${i})"` : '';
+                const cur = m.revealed===null ? 'cursor:pointer;' : '';
+                return `<div ${click} style="${cur}width:62px;height:90px;background:${bg};border:2px solid #475569;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:26px;">${face}<div style="font-size:9px;color:#cbd5e1;margin-top:3px;text-align:center;line-height:1.1;">${label}</div></div>`;
+            }).join('');
+            const footer = m.revealed===null
+                ? `<p style="color:#94a3b8;font-size:12px;margin-top:12px;">Выбери ОДНУ карту. Шанс навыка ${Math.round(SKILL_CHANCE*100)}%.</p>`
+                : `<button onclick="closeSkillModal()" class="btn" style="margin-top:14px;background:#0284c7;color:#fff;font-weight:800;padding:8px 22px;">Закрыть</button>`;
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:22px;max-width:420px;text-align:center;">
+                    <div style="font-size:16px;font-weight:800;color:#7dd3fc;margin-bottom:10px;">💡 НАВЫК — вытяни карту</div>
+                    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">${cards}</div>
+                    ${footer}
+                </div>
+            </div>`;
+        }
+        function renderSkillPanel(p) {
+            const ls = p.lifeSkills || {};
+            const owned = LIFE_SKILLS.filter(s => ls[s.key]);
+            const chips = owned.length
+                ? owned.map(s=>`<span style="display:inline-block;background:#0b0f19;border:1px solid #334155;border-radius:6px;padding:2px 8px;margin:2px;font-size:11px;">${s.name} ур.${ls[s.key]} <span style="color:#64748b;">— ${s.draft}</span></span>`).join('')
+                : '<span style="color:#4b5563;font-size:12px;">Навыков пока нет</span>';
+            return `
+                <div class="card" style="border-color:#0ea5e9;">
+                    <div class="block-title" style="color:#7dd3fc;">💡 НАВЫК (вкладываешь в себя — не всегда про работу)</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Клетка «Навык» → окно с 5 картами, выбери одну. Шанс получить навык ${Math.round(SKILL_CHANCE*100)}% (иначе пусто). Эффекты пока черновик.</p>
+                    <div style="margin-bottom:10px;">${chips}</div>
+                    <button onclick="openSkillModal(${p.id})" class="btn" style="width:100%;background:#0284c7;color:#fff;font-weight:800;font-size:14px;">🃏 КЛЕТКА «НАВЫК» (5 карт)</button>
+                </div>
+            `;
+        }
+
+        // ─── Клетка ГОСУДАРСТВО: налоги/сборы меняются со временем (1 год = 10 мин, как рынок).
+        // ПРИНЦИП (Rinat): не крушить игру → капы + недостача кассы уходит в ДОЛГ банку (не в
+        // минус-спираль). Обычно аккуратно; редко РЕЗКИЙ БУМ — больно, но выживаемо. ───
+        let GAME_T0 = +(localStorage.getItem('via_t0') || 0);
+        if (!GAME_T0) { GAME_T0 = Date.now(); try { localStorage.setItem('via_t0', GAME_T0); } catch(e){} }
+        function govYears() { return Math.floor((Date.now() - GAME_T0) / (10*60*1000)); }
+        function openGovModal(id) { if(!gate(id,'gov')) return; state.govModal = { pId:id, drawn:null }; render(); }
+        function closeGovModal() { state.govModal = null; render(); }
+        function drawGovCard() {
+            const m = state.govModal; if (!m || m.drawn) return;
+            const p = state.players.find(x => x.id === m.pId); if (!p) return;
+            const yrReal = govYears();
+            const yr = Math.min(yrReal, 15);
+            const baseTax = p.prof.taxes;
+            const TAXMOD_CAP = baseTax * 2;               // налоги не выше 3× базы (защита от краха)
+            const pay = (amount) => {                     // касса не в минус: недостача → долг банку
+                amount = Math.max(0, Math.round(amount));
+                const fc = Math.min(amount, Math.max(0, Number(p.savings)||0));
+                p.savings = (Number(p.savings)||0) - fc;
+                const rest = amount - fc;
+                if (rest > 0) p.bankLoan = (Number(p.bankLoan)||0) + rest;
+                return rest;
+            };
+            const sal = p.prof.salary;
+            const addTax = (delta) => { p.taxMod = Math.max(-baseTax, Math.min(TAXMOD_CAP, (Number(p.taxMod)||0) + Math.round(delta))); };
+            const hasBiz = (p.assets||[]).some(a => a.type === 'BUSINESS');
+            const note = (amt, rest) => `${amt}$${rest>0?` (кассы не хватило, ${rest}$ в долг банку)`:''}`;
+            // КОЛОДА ГОСУДАРСТВА (14 событий). w = вес (частота). Все капы → игра не рушится.
+            const E = [
+                // 🟢 аккуратно (часто)
+                { w:16, run:()=>{ const h=Math.max(10,Math.round(baseTax*(0.03+0.012*yr))); addTax(h); return {emoji:'🏛️',title:'Индексация налогов',text:`Инфляция: налоги +${h}$/мес (год ${yrReal}). Терпимо.`}; }},
+                { w:15, run:()=>{ const fee=Math.max(30,Math.round(sal*0.04)); const r=pay(fee); return {emoji:'🧾',title:'Новый сбор',text:`Эко/утиль-сбор ${note(fee,r)} списан.`}; }},
+                { w:14, run:()=>{ const up=Math.random()<0.5; const dlt=Math.max(10,Math.round(baseTax*0.04))*(up?1:-1); addTax(dlt); return {emoji:'⚖️',title:'Перерасчёт ставки',text:`Ставку ${up?'подняли':'снизили'}: налоги ${dlt>=0?'+':''}${dlt}$/мес.`}; }},
+                // 🟡 заметно (разовое)
+                { w:10, run:()=>{ const fee=Math.max(50,Math.round(sal*0.10)); const r=pay(fee); return {emoji:'📜',title:'Госпошлина/лицензия',text:`Оформление документов: ${note(fee,r)}.`}; }},
+                { w:9,  run:()=>{ const fee=Math.max(40,Math.round(sal*(0.06+0.04*Math.random()))); const r=pay(fee); return {emoji:'🚓',title:'Штраф',text:`Админ-штраф ${note(fee,r)}.`}; }},
+                { w:8,  run:()=>{ const fee=Math.max(60,Math.round(sal*(0.12+0.04*yr/15))); const r=pay(fee); return {emoji:'🔍',title:'Налоговая проверка',text:`Проверка по доходу: штраф ${note(fee,r)}.`}; }},
+                { w:6,  run:()=>{ const fee=hasBiz?Math.max(150,Math.round(sal*0.25)):Math.max(40,Math.round(sal*0.05)); const r=pay(fee); return {emoji:'🏢',title:'Лицензия дороже',text:hasBiz?`Перелицензирование бизнеса: ${note(fee,r)}.`:`Сбор за разрешение ${note(fee,r)}.`}; }},
+                // 🔴 резкий бум (редко, выживаемо)
+                { w:5,  run:()=>{ const h=Math.max(50,Math.round(baseTax*(0.18+0.03*yr))); const before=Number(p.taxMod)||0; addTax(h); const got=(Number(p.taxMod)||0)-before; return {emoji:'💥',title:'Налоговая реформа',text:`Крупный рост: налоги +${got}$/мес. Держись.`}; }},
+                { w:4,  run:()=>{ const h=Math.max(40,Math.round(baseTax*0.12)); addTax(h); const cap=Math.round(Math.max(0,Number(p.savings)||0)*0.5+sal*0.5); const f=Math.min(Math.round(sal*(0.25+0.05*yr)),Math.max(sal,cap)); const r=pay(f); return {emoji:'📉',title:'Кризис/девальвация',text:`Налоги +${h}$/мес и сбор ${note(f,r)}. Выкарабкивайся.`}; }},
+                { w:3,  run:()=>{ const cap=Math.round(Math.max(0,Number(p.savings)||0)*0.5+sal*0.6); const f=Math.min(Math.round(sal*(0.30+0.05*yr)),Math.max(sal,cap)); const r=pay(f); return {emoji:'🧮',title:'Доначисление налоговой',text:`Доначислили ${note(f,r)}.`}; }},
+                // ✨ повезло (редко)
+                { w:3,  run:()=>{ const back=Math.max(15,Math.round(baseTax*0.18)); addTax(-back); return {emoji:'✨',title:'Налоговая льгота',text:`Вычет: налоги −${back}$/мес. Повезло!`}; }},
+                { w:3,  run:()=>{ const b=Math.max(80,Math.round(sal*0.15)); p.savings=(Number(p.savings)||0)+b; return {emoji:'💸',title:'Субсидия/пособие',text:`Господдержка +${b}$ в кассу.`}; }},
+                { w:2,  run:()=>{ const cut=Math.min(Number(p.bankLoan)||0,Math.max(100,Math.round(sal*0.5))); p.bankLoan=(Number(p.bankLoan)||0)-cut; return {emoji:'🕊️',title:'Налоговая амнистия',text:cut>0?`Списали ${cut}$ долга банку!`:`Амнистия — но долгов нет, повезло без выгоды.`}; }},
+                { w:2,  run:()=>{ const kids=Number(p.children)||0; if(kids>0){ const b=kids*Math.max(100,Math.round(sal*0.12)); p.savings=(Number(p.savings)||0)+b; return {emoji:'👶',title:'Маткапитал',text:`За детей (${kids}) +${b}$ в кассу.`}; } const b=Math.max(50,Math.round(sal*0.08)); p.savings=(Number(p.savings)||0)+b; return {emoji:'🎁',title:'Соцвыплата',text:`Детей нет — но дали ${b}$.`}; }}
+            ];
+            const total = E.reduce((s,e)=>s+e.w,0);
+            let rr = Math.random()*total, ev = E[0];
+            for (const e of E) { if ((rr -= e.w) < 0) { ev = e; break; } }
+            const res = ev.run();
+            m.drawn = res;
+            p.notify = `🏛️ Государство: ${res.title} — ${res.text}`;
+            save(); render();
+        }
+        function renderGovModal() {
+            const m = state.govModal; if (!m) return '';
+            if (!m.drawn) {
+                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
+                        <div style="font-size:16px;font-weight:800;color:#fcd34d;margin-bottom:14px;">🏛️ ГОСУДАРСТВО — вытяни карту</div>
+                        <div onclick="drawGovCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#92400e,#b45309);border:2px solid #f59e0b;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">🏛️</div>
+                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Нажми на карту, чтобы вытянуть. Событие касается ТОЛЬКО тебя.</p>
+                    </div>
+                </div>`;
+            }
+            const dr = m.drawn;
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:1px solid #f59e0b;border-radius:14px;padding:24px;max-width:400px;text-align:center;">
+                    <div style="font-size:48px;">${dr.emoji}</div>
+                    <div style="font-size:17px;font-weight:800;color:#fcd34d;margin:6px 0;">${dr.title}</div>
+                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
+                    <button onclick="closeGovModal()" class="btn" style="background:#d97706;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
+                </div>
+            </div>`;
+        }
+        function renderGovPanel(p) {
+            const f = calc(p); const yr = govYears(); const mod = Number(p.taxMod)||0;
+            return `
+                <div class="card" style="border-color:#f59e0b;">
+                    <div class="block-title" style="color:#fcd34d;">🏛️ ГОСУДАРСТВО (налоги и сборы)</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на клетку → вытяни карту, она зачитает что случилось (только тебе). Налоги растут со временем. Год игры: <b style="color:#fcd34d;">${yr}</b>. Игра не рушится: капы + долг вместо вайпа.</p>
+                    <div style="margin-bottom:10px;">Налоги: база ${p.prof.taxes}$ ${mod>=0?'+':''}${mod}$ = <b style="color:${mod>0?'#ef4444':(mod<0?'#10b981':'#e5e7eb')};">${f.taxes}$/мес</b></div>
+                    <button onclick="openGovModal(${p.id})" class="btn" style="width:100%;background:#d97706;color:#fff;font-weight:800;font-size:14px;">🏛️ ВЫТЯНУТЬ КАРТУ ГОСУДАРСТВА</button>
+                </div>
+            `;
+        }
+
+        // ─── Клетка РЫНОК / МИРОВЫЕ СОБЫТИЯ: ГЛОБАЛЬНО (на ВСЕХ игроков), карту видят
+        // ВСЕ мониторы. Не ломать игру: крахи бьют по СТОИМОСТИ активов (отрастёт), касса
+        // не уходит в минус, налоги капнуты. Эффект применяется ко всем p в state.players. ───
+        const wStocks = (ps, f) => ps.forEach(p => (p.assets||[]).forEach(a => { if (a.type==='STOCK') a.now = Math.max(1, Math.round((a.now||a.price||1)*f)); }));
+        const wOther  = (ps, f) => ps.forEach(p => (p.assets||[]).forEach(a => { if (a.type==='OTHER') a.now = Math.max(1, Math.round((a.now||a.price||1)*f)); }));
+        const wBiz    = (ps, f) => ps.forEach(p => (p.assets||[]).forEach(a => { if (a.type==='BUSINESS') a.cf = Math.max(0, Math.round((a.cf||0)*f)); }));
+        const wCash   = (ps, fn) => ps.forEach(p => { p.savings = Math.max(0, (Number(p.savings)||0) + Math.round(fn(p))); });
+        const wTax    = (ps, d) => ps.forEach(p => { const cap=p.prof.taxes*2; p.taxMod = Math.max(-p.prof.taxes, Math.min(cap, (Number(p.taxMod)||0)+Math.round(d))); });
+        const WORLD_EVENTS = [
+            // 🟢 бумы/хорошее
+            { w:7, emoji:'🚀', title:'Технологический бум',  text:'Биржа взлетела: акции +15% у всех.',                 apply:ps=>wStocks(ps,1.15) },
+            { w:6, emoji:'🤖', title:'Прорыв в AI',          text:'Автоматизация: доход бизнесов +10% у всех.',         apply:ps=>wBiz(ps,1.10) },
+            { w:6, emoji:'📈', title:'Экономический рост',    text:'Подъём: акции +10% у всех.',                          apply:ps=>wStocks(ps,1.10) },
+            { w:5, emoji:'💵', title:'Господдержка/стимул',   text:'Стимулы населению: всем +0.5 зарплаты в кассу.',      apply:ps=>wCash(ps,p=>p.prof.salary*0.5) },
+            { w:5, emoji:'⛽', title:'Сырьевой бум',          text:'Сырьё/ценности дорожают: прочие активы +12%.',       apply:ps=>wOther(ps,1.12) },
+            // 🔴 кризисы
+            { w:7, emoji:'📉', title:'Мировой кризис',        text:'Биржа рухнула: акции −20%. Держи актив — отрастёт.', apply:ps=>wStocks(ps,0.80) },
+            { w:6, emoji:'🦠', title:'Пандемия (вирус)',      text:'Локдаун: доход бизнесов −20% и мед-расход у всех.',   apply:ps=>{ wBiz(ps,0.80); wCash(ps,p=>-p.prof.salary*0.2); } },
+            { w:5, emoji:'⚔️', title:'Военный конфликт',      text:'Нестабильность: акции −10% и военный налог +20$/мес всем.', apply:ps=>{ wStocks(ps,0.90); wTax(ps,20); } },
+            { w:5, emoji:'🔥', title:'Инфляция',              text:'Цены растут: налоги всем +15$/мес.',                  apply:ps=>wTax(ps,15) },
+            { w:5, emoji:'🏦', title:'Банковский кризис',     text:'Банки шатает: с кассы у всех −10% (не в минус).',     apply:ps=>wCash(ps,p=>-(Number(p.savings)||0)*0.10) },
+            { w:5, emoji:'₿', title:'Крах крипты',            text:'Спекулятив падает: прочие активы −25%.',              apply:ps=>wOther(ps,0.75) },
+            { w:4, emoji:'🌪️', title:'Природная катастрофа',  text:'Стихия: всем разовый расход ~0.3 зарплаты.',          apply:ps=>wCash(ps,p=>-p.prof.salary*0.3) },
+            { w:4, emoji:'🔌', title:'Энергокризис',          text:'Дорогая энергия: бизнесы −10%, акции −5%.',           apply:ps=>{ wBiz(ps,0.90); wStocks(ps,0.95); } },
+            // ✨ редкие плюсы
+            { w:3, emoji:'🧬', title:'Прорыв в медицине',     text:'Здоровье и продуктивность: бизнесы +12%, всем +0.2 зарплаты.', apply:ps=>{ wBiz(ps,1.12); wCash(ps,p=>p.prof.salary*0.2); } },
+            { w:3, emoji:'🕊️', title:'Мир и стабильность',    text:'Глобальная стабильность: акции +8% и налоги всем −10$/мес.', apply:ps=>{ wStocks(ps,1.08); wTax(ps,-10); } },
+            { w:3, emoji:'💎', title:'Открытие месторождения', text:'Ресурсный джекпот: прочие активы +20%.',              apply:ps=>wOther(ps,1.20) }
+        ];
+        function openWorldModal(id){ if(!gate(id,'world')) return; state.worldDraw = { pId:id, done:false, result:null }; render(); }
+        function closeWorldModal(){ state.worldDraw = null; render(); }
+        function drawWorldCard(){
+            const m = state.worldDraw; if (!m || m.done) return;
+            const total = WORLD_EVENTS.reduce((s,e)=>s+e.w,0);
+            let rr = Math.random()*total, ev = WORLD_EVENTS[0];
+            for (const e of WORLD_EVENTS) { if ((rr -= e.w) < 0) { ev = e; break; } }
+            ev.apply(state.players);                      // ГЛОБАЛЬНО — на всех игроков
+            const id = Date.now();
+            state.world = { id, emoji:ev.emoji, title:ev.title, text:ev.text };
+            try { localStorage.setItem('v0_world_seen', String(id)); } catch(e){}  // тянущий уже видит
+            m.done = true; m.result = state.world;
+            save(); render();
+        }
+        function maybeShowWorld(){
+            if (!state.world || !state.world.id) return;
+            let seen = 0; try { seen = +(localStorage.getItem('v0_world_seen')||0); } catch(e){}
+            if (state.world.id > seen) {
+                try { localStorage.setItem('v0_world_seen', String(state.world.id)); } catch(e){}
+                state.worldShow = state.world;            // оверлей событием — у ВСЕХ
+            }
+        }
+        function dismissWorldShow(){ state.worldShow = null; render(); }
+        function renderWorldModal(){
+            const m = state.worldDraw; if (!m) return '';
+            if (!m.done) {
+                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:400px;text-align:center;">
+                        <div style="font-size:16px;font-weight:800;color:#5eead4;margin-bottom:14px;">🌍 МИРОВОЕ СОБЫТИЕ — вытяни карту</div>
+                        <div onclick="drawWorldCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#0e7490,#155e75);border:2px solid #22d3ee;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">🌍</div>
+                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Касается ВСЕХ игроков. Карту увидят на всех мониторах.</p>
+                    </div>
+                </div>`;
+            }
+            const dr = m.result;
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:1px solid #22d3ee;border-radius:14px;padding:24px;max-width:420px;text-align:center;">
+                    <div style="font-size:48px;">${dr.emoji}</div>
+                    <div style="font-size:18px;font-weight:800;color:#5eead4;margin:6px 0;">${dr.title}</div>
+                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:14px;">${dr.text}</p>
+                    <p style="color:#67e8f9;font-size:11px;margin-bottom:14px;">🌐 Применено ко ВСЕМ игрокам.</p>
+                    <button onclick="closeWorldModal()" class="btn" style="background:#0891b2;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
+                </div>
+            </div>`;
+        }
+        function renderWorldShow(){
+            const w = state.worldShow; if (!w) return '';
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2100;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:2px solid #22d3ee;border-radius:14px;padding:26px;max-width:420px;text-align:center;box-shadow:0 0 40px rgba(34,211,238,0.3);">
+                    <div style="font-size:12px;color:#67e8f9;letter-spacing:1px;">🌍 МИРОВОЕ СОБЫТИЕ</div>
+                    <div style="font-size:52px;margin-top:6px;">${w.emoji}</div>
+                    <div style="font-size:19px;font-weight:800;color:#5eead4;margin:4px 0;">${w.title}</div>
+                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${w.text}</p>
+                    <button onclick="dismissWorldShow()" class="btn" style="background:#0891b2;color:#fff;font-weight:800;padding:8px 26px;">ОК, понял</button>
+                </div>
+            </div>`;
+        }
+        function renderWorldPanel(p){
+            const w = state.world;
+            return `
+                <div class="card" style="border-color:#22d3ee;">
+                    <div class="block-title" style="color:#5eead4;">🌍 РЫНОК / МИРОВЫЕ СОБЫТИЯ</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Глобальное событие: касается ВСЕХ игроков, карту видят все мониторы. Кризисы, бумы, технологии, пандемии. Попал на клетку → вытяни карту.</p>
+                    ${w ? `<div style="margin-bottom:10px;font-size:12px;color:#cbd5e1;">Последнее: ${w.emoji} <b>${w.title}</b></div>` : ''}
+                    <button onclick="openWorldModal(${p.id})" class="btn" style="width:100%;background:#0891b2;color:#fff;font-weight:800;font-size:14px;">🌍 ВЫТЯНУТЬ МИРОВОЕ СОБЫТИЕ</button>
+                </div>
+            `;
+        }
+
+        // ─── Клетка РАБОТА: вытягиваешь карту → если выпадет, работа МЕНЯЕТСЯ (per-игрок).
+        // Колода: обычный день / премия / повышение / срез ставки / предложение работы
+        // (выбор сменить-остаться) / увольнение (принудительная смена). ───
+        const WORK_EVENTS = [
+            { w:30, kind:'simple', run:(p)=>({emoji:'🛠️',title:'Обычный день',text:'Работа как работа — без изменений.'}) },
+            { w:18, kind:'simple', run:(p)=>{ const b=Math.max(50,Math.round(p.prof.salary*0.2)); p.savings=(Number(p.savings)||0)+b; return {emoji:'💰',title:'Премия/переработка',text:`Доплата +${b}$ в кассу.`}; } },
+            { w:14, kind:'simple', run:(p)=>{ if(!p.skills)p.skills=[]; const cur=p.skills.reduce((s,x)=>s+(x.pct||0),0); if(cur<0.20){ p.skills.push({key:'work_up',name:'Повышение на работе 📈',pct:0.03}); return {emoji:'📈',title:'Повышение',text:'Зарплата +3% (накопительно, кап +20%).'}; } return {emoji:'📈',title:'Повышение',text:'Повысили, но бонус уже на капе +20%.'}; } },
+            { w:8,  kind:'simple', run:(p)=>{ if(!p.skills)p.skills=[]; p.skills.push({key:'work_dn',name:'Срезали ставку 📉',pct:-0.02}); return {emoji:'📉',title:'Срезали ставку',text:'Зарплата −2%. Бывает.'}; } },
+            { w:20, kind:'offer' },
+            { w:10, kind:'fire'  }
+        ];
+        function openWorkModal(id){ if(!gate(id,'work')) return; state.workModal = { pId:id, drawn:null }; render(); }
+        function closeWorkModal(){ state.workModal = null; render(); }
+        function drawWorkCard(){
+            const m = state.workModal; if (!m || m.drawn) return;
+            const p = state.players.find(x => x.id === m.pId); if (!p) return;
+            const total = WORK_EVENTS.reduce((s,e)=>s+e.w,0);
+            let rr = Math.random()*total, ev = WORK_EVENTS[0];
+            for (const e of WORK_EVENTS) { if ((rr -= e.w) < 0) { ev = e; break; } }
+            if (ev.kind === 'offer') {
+                const opts = professionsDB.filter(pr => pr.name !== p.prof.name);
+                const np = opts[Math.floor(Math.random()*opts.length)];
+                m.drawn = { kind:'offer', emoji:'🔀', title:'Предложение новой работы', np,
+                    text:`Зовут на новую работу: ${np.name} · з/п ${np.salary}$ (налог ${np.taxes}$). Сменишь?` };
+                p.notify = `🔀 Работа: предложение — ${np.name}.`;
+            } else if (ev.kind === 'fire') {
+                const opts = professionsDB.filter(pr => pr.name !== p.prof.name);
+                const np = opts[Math.floor(Math.random()*opts.length)];
+                const old = p.prof.name; p.prof = np;
+                m.drawn = { kind:'simple', emoji:'🚪', title:'Увольнение',
+                    text:`Тебя сократили с «${old}». Устроился: ${np.name} · з/п ${np.salary}$. Касса/активы/долги остались.` };
+                p.notify = `🚪 Работа: уволен → ${np.name}.`;
+            } else {
+                const res = ev.run(p);
+                m.drawn = { kind:'simple', ...res };
+                p.notify = `💼 Работа: ${res.title} — ${res.text}`;
+            }
+            save(); render();
+        }
+        function workAccept(){
+            const m = state.workModal; if (!m || !m.drawn || m.drawn.kind !== 'offer') return;
+            const p = state.players.find(x => x.id === m.pId); if (!p) return;
+            const old = p.prof.name; p.prof = m.drawn.np;
+            m.drawn = { kind:'simple', emoji:'🔀', title:'Работа изменена', text:`${old} → ${p.prof.name}. Новая зарплата ${p.prof.salary}$.` };
+            p.notify = `🔀 Работа изменена: ${old} → ${p.prof.name}.`;
+            save(); render();
+        }
+        function workDecline(){
+            const m = state.workModal; if (!m || !m.drawn) return;
+            m.drawn = { kind:'simple', emoji:'🙅', title:'Остался на работе', text:'Ты отказался — остаёшься на текущей работе.' };
+            render();
+        }
+        function renderWorkModal(){
+            const m = state.workModal; if (!m) return '';
+            if (!m.drawn) {
+                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
+                        <div style="font-size:16px;font-weight:800;color:#fca5a5;margin-bottom:14px;">💼 РАБОТА — вытяни карту</div>
+                        <div onclick="drawWorkCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#9f1239,#be123c);border:2px solid #fb7185;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">💼</div>
+                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Если выпадет — работа сменится.</p>
+                    </div>
+                </div>`;
+            }
+            const dr = m.drawn;
+            const buttons = dr.kind === 'offer'
+                ? `<button onclick="workAccept()" class="btn" style="background:#be123c;color:#fff;font-weight:800;padding:8px 18px;margin-right:8px;">Сменить</button><button onclick="workDecline()" class="btn btn-gray" style="padding:8px 18px;">Остаться</button>`
+                : `<button onclick="closeWorkModal()" class="btn" style="background:#be123c;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>`;
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:1px solid #fb7185;border-radius:14px;padding:24px;max-width:420px;text-align:center;">
+                    <div style="font-size:48px;">${dr.emoji}</div>
+                    <div style="font-size:18px;font-weight:800;color:#fca5a5;margin:6px 0;">${dr.title}</div>
+                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
+                    ${buttons}
+                </div>
+            </div>`;
+        }
+        function renderWorkPanel(p){
+            return `
+                <div class="card" style="border-color:#fb7185;">
+                    <div class="block-title" style="color:#fca5a5;">💼 РАБОТА</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на клетку → вытяни карту. Обычно работа как работа, но может выпасть повышение, премия, предложение новой работы (выбор) или увольнение — и работа сменится.</p>
+                    <button onclick="openWorkModal(${p.id})" class="btn" style="width:100%;background:#be123c;color:#fff;font-weight:800;font-size:14px;">💼 ВЫТЯНУТЬ КАРТУ РАБОТЫ</button>
+                </div>
+            `;
+        }
+
+        // ─── Клетка РАСХОДЫ: 30 карт неожиданных трат (только на игрока). Списывает с
+        // кассы; нехватка → долг банку (как везде). m = доля от зарплаты. ───
+        const EXPENSE_CARDS = [
+            {e:'🧓',t:'Мама попросила помочь',m:0.20}, {e:'🚗',t:'Сломалась машина, ремонт',m:0.35},
+            {e:'🦷',t:'Заболел зуб, стоматолог',m:0.18}, {e:'📱',t:'Разбил телефон',m:0.15},
+            {e:'🚿',t:'Прорвало трубу, сантехник',m:0.12}, {e:'🅿️',t:'Штраф за парковку',m:0.05},
+            {e:'🧊',t:'Сломался холодильник',m:0.20}, {e:'🐱',t:'Кот заболел, ветеринар',m:0.10},
+            {e:'🤝',t:'Помог другу деньгами',m:0.15}, {e:'💍',t:'Свадьба друга, подарок',m:0.12},
+            {e:'🎂',t:'Дни рождения, подарки',m:0.08}, {e:'🏠',t:'Залил соседей снизу',m:0.25},
+            {e:'👛',t:'Потерял кошелёк',m:0.10}, {e:'✈️',t:'Срочный билет домой',m:0.30},
+            {e:'💔',t:'Разбил чужое имущество',m:0.18}, {e:'🤧',t:'Простуда, лекарства',m:0.06},
+            {e:'🎒',t:'Сбор в школу/садик',m:0.10}, {e:'💻',t:'Ремонт ноутбука',m:0.14},
+            {e:'🏥',t:'Родственник в больнице',m:0.30}, {e:'👓',t:'Сломались очки',m:0.07},
+            {e:'🚓',t:'Штраф ГАИ',m:0.10}, {e:'🖼️',t:'Протёк потолок, ремонт',m:0.22},
+            {e:'⚰️',t:'Помощь семье (похороны)',m:0.25}, {e:'🔑',t:'Потерял ключи, замена замка',m:0.06},
+            {e:'🧾',t:'Недоплата по налогам',m:0.12}, {e:'⏰',t:'Пеня за просрочку',m:0.08},
+            {e:'⚡',t:'Сгорела проводка',m:0.20}, {e:'🚲',t:'Украли велосипед',m:0.10},
+            {e:'🛂',t:'Срочные документы/виза',m:0.15}, {e:'🍽️',t:'Внезапные гости',m:0.07}
+        ];
+        function openExpenseModal(id){ if(!gate(id,'expense')) return; state.expenseModal = { pId:id, drawn:null }; render(); }
+        function closeExpenseModal(){ state.expenseModal = null; render(); }
+        function drawExpenseCard(){
+            const m = state.expenseModal; if (!m || m.drawn) return;
+            const p = state.players.find(x => x.id === m.pId); if (!p) return;
+            const c = EXPENSE_CARDS[Math.floor(Math.random()*EXPENSE_CARDS.length)];
+            const cost = Math.max(30, Math.round(p.prof.salary * c.m));
+            const fc = Math.min(cost, Math.max(0, Number(p.savings)||0));
+            p.savings = (Number(p.savings)||0) - fc;
+            const rest = cost - fc;
+            if (rest > 0) p.bankLoan = (Number(p.bankLoan)||0) + rest;
+            m.drawn = { emoji:c.e, title:c.t, text:`Неожиданный расход: −${cost}$${rest>0?` (кассы не хватило, ${rest}$ в долг банку)`:' с кассы'}.` };
+            p.notify = `💸 Расход: ${c.t} −${cost}$.`;
+            save(); render();
+        }
+        function renderExpenseModal(){
+            const m = state.expenseModal; if (!m) return '';
+            if (!m.drawn) {
+                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
+                        <div style="font-size:16px;font-weight:800;color:#fdba74;margin-bottom:14px;">💸 РАСХОДЫ — вытяни карту</div>
+                        <div onclick="drawExpenseCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#9a3412,#c2410c);border:2px solid #fb923c;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">💸</div>
+                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Жизнь подкинула трату. Касается только тебя.</p>
+                    </div>
+                </div>`;
+            }
+            const dr = m.drawn;
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:1px solid #fb923c;border-radius:14px;padding:24px;max-width:420px;text-align:center;">
+                    <div style="font-size:48px;">${dr.emoji}</div>
+                    <div style="font-size:18px;font-weight:800;color:#fdba74;margin:6px 0;">${dr.title}</div>
+                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
+                    <button onclick="closeExpenseModal()" class="btn" style="background:#c2410c;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
+                </div>
+            </div>`;
+        }
+        function renderExpensePanel(p){
+            return `
+                <div class="card" style="border-color:#fb923c;">
+                    <div class="block-title" style="color:#fdba74;">💸 РАСХОДЫ (неожиданные)</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Жизнь подкидывает траты: мама попросила, сломалось, заболел... Попал на клетку → вытяни карту, спишется с кассы (нехватка — в долг).</p>
+                    <button onclick="openExpenseModal(${p.id})" class="btn" style="width:100%;background:#c2410c;color:#fff;font-weight:800;font-size:14px;">💸 ВЫТЯНУТЬ КАРТУ РАСХОДА</button>
+                </div>
+            `;
+        }
+
+        // ─── Клетка НАЛОГИ ГОСУДАРСТВУ: 20 карт налогов, ЛЁГКИЕ (не давят). Per-игрок.
+        // Списывает с кассы (нехватка → долг банку). m = доля зарплаты (мелкая). ───
+        const TAX_CARDS = [
+            {e:'🏠',t:'Налог на имущество',m:0.05}, {e:'🚗',t:'Транспортный налог',m:0.05},
+            {e:'💼',t:'Подоходный довзнос',m:0.06}, {e:'🏞️',t:'Земельный налог',m:0.04},
+            {e:'💎',t:'Налог на роскошь',m:0.05}, {e:'♻️',t:'Экологический сбор',m:0.03},
+            {e:'🐕',t:'Налог на питомца',m:0.02}, {e:'💧',t:'Водный налог',m:0.02},
+            {e:'🛣️',t:'Дорожный сбор',m:0.03}, {e:'🏢',t:'Налог на бизнес',m:0.07},
+            {e:'📦',t:'Таможенный сбор',m:0.04}, {e:'🎫',t:'Госпошлина',m:0.03},
+            {e:'🏦',t:'Налог на проценты по вкладу',m:0.04}, {e:'🏥',t:'Соцвзнос (медстраховка)',m:0.05},
+            {e:'👴',t:'Пенсионный взнос',m:0.06}, {e:'📈',t:'Налог на дивиденды',m:0.05},
+            {e:'🧾',t:'НДС-доплата',m:0.06}, {e:'🏘️',t:'Налог на недвижимость',m:0.05},
+            {e:'⛽',t:'Акциз',m:0.03}, {e:'🎰',t:'Налог на прочее',m:0.04}
+        ];
+        function openTaxModal(id){ if(!gate(id,'tax')) return; state.taxModal = { pId:id, drawn:null }; render(); }
+        function closeTaxModal(){ state.taxModal = null; render(); }
+        function drawTaxCard(){
+            const m = state.taxModal; if (!m || m.drawn) return;
+            const p = state.players.find(x => x.id === m.pId); if (!p) return;
+            const c = TAX_CARDS[Math.floor(Math.random()*TAX_CARDS.length)];
+            const cost = Math.max(20, Math.round(p.prof.salary * c.m));
+            const fc = Math.min(cost, Math.max(0, Number(p.savings)||0));
+            p.savings = (Number(p.savings)||0) - fc;
+            const rest = cost - fc;
+            if (rest > 0) p.bankLoan = (Number(p.bankLoan)||0) + rest;
+            m.drawn = { emoji:c.e, title:c.t, text:`Налог государству: −${cost}$${rest>0?` (кассы не хватило, ${rest}$ в долг банку)`:' с кассы'}.` };
+            p.notify = `🏦 Налог: ${c.t} −${cost}$.`;
+            save(); render();
+        }
+        function renderTaxModal(){
+            const m = state.taxModal; if (!m) return '';
+            if (!m.drawn) {
+                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
+                        <div style="font-size:16px;font-weight:800;color:#c4b5fd;margin-bottom:14px;">🏦 НАЛОГИ ГОСУДАРСТВУ — вытяни карту</div>
+                        <div onclick="drawTaxCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#5b21b6,#6d28d9);border:2px solid #a78bfa;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">🏦</div>
+                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Лёгкий налог. Касается только тебя.</p>
+                    </div>
+                </div>`;
+            }
+            const dr = m.drawn;
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:1px solid #a78bfa;border-radius:14px;padding:24px;max-width:420px;text-align:center;">
+                    <div style="font-size:48px;">${dr.emoji}</div>
+                    <div style="font-size:18px;font-weight:800;color:#c4b5fd;margin:6px 0;">${dr.title}</div>
+                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
+                    <button onclick="closeTaxModal()" class="btn" style="background:#6d28d9;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
+                </div>
+            </div>`;
+        }
+        function renderTaxPanel(p){
+            return `
+                <div class="card" style="border-color:#a78bfa;">
+                    <div class="block-title" style="color:#c4b5fd;">🏦 НАЛОГИ ГОСУДАРСТВУ</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Платишь налог государству. 20 видов, лёгкие (не давят). Попал на клетку → вытяни карту, спишется с кассы (нехватка — в долг).</p>
+                    <button onclick="openTaxModal(${p.id})" class="btn" style="width:100%;background:#6d28d9;color:#fff;font-weight:800;font-size:14px;">🏦 ВЫТЯНУТЬ КАРТУ НАЛОГА</button>
+                </div>
+            `;
+        }
+
+        // ─── Клетка СВЯЗИ: 30 карт. Риск/награда — классное партнёрство (партнёр даёт
+        // пассивный доход/кэш) ИЛИ мошенник кинул (потеря) ИЛИ нейтрально (доверие). ───
+        const SVYAZI_CARDS = [
+            // ✅ хорошие (партнёр-доход / кэш)
+            {e:'🤝',t:'Надёжный партнёр',k:'partner',m:0.10}, {e:'💼',t:'Совместный бизнес',k:'partner',m:0.12},
+            {e:'🌟',t:'Влиятельный знакомый',k:'partner',m:0.08}, {e:'🧑‍💼',t:'Ментор помог',k:'cash',m:0.20},
+            {e:'🔗',t:'Полезная связь',k:'cash',m:0.15}, {e:'🏆',t:'Удачное партнёрство',k:'partner',m:0.15},
+            {e:'💡',t:'Партнёр с идеей',k:'partner',m:0.07}, {e:'🤜',t:'Сильный альянс',k:'partner',m:0.10},
+            {e:'🎁',t:'Связи дали бонус',k:'cash',m:0.12}, {e:'📈',t:'Инвестор поверил в тебя',k:'cash',m:0.25},
+            // ❌ плохие (мошенник / потеря)
+            {e:'🕵️',t:'Мошенник кинул на деньги',k:'scam',m:0.25}, {e:'💸',t:'Вложил в человека — пропал',k:'scam',m:0.20},
+            {e:'🎭',t:'Фальшивый партнёр',k:'scam',m:0.15}, {e:'🐍',t:'Подставил «друг»',k:'scam',m:0.18},
+            {e:'📉',t:'Партнёрство развалилось',k:'scam',m:0.10}, {e:'🤥',t:'Обманули с долей',k:'scam',m:0.20},
+            {e:'🪤',t:'Финансовая пирамида',k:'scam',m:0.30}, {e:'💔',t:'Кинули после доверия',k:'scam',m:0.22},
+            {e:'🧾',t:'Партнёр оставил долги',k:'scam',m:0.15}, {e:'🚩',t:'Аферист выманил аванс',k:'scam',m:0.12},
+            // 🤝 нейтральные (доверие/знакомство)
+            {e:'☕',t:'Встреча — строишь доверие',k:'none'}, {e:'📇',t:'Обмен контактами',k:'none'},
+            {e:'🕰️',t:'Долгие переговоры без итога',k:'none'}, {e:'🤔',t:'Присматриваешься к партнёру',k:'none'},
+            {e:'🧩',t:'Связь пригодится позже',k:'none'}, {e:'🙂',t:'Хорошее впечатление',k:'none'},
+            {e:'📞',t:'Полезный номер',k:'none'}, {e:'🌐',t:'Расширил круг общения',k:'none'},
+            {e:'🫱',t:'Доверие растёт',k:'none'}, {e:'🗣️',t:'Завёл знакомство',k:'none'}
+        ];
+        function openSvyazModal(id){ if(!gate(id,'svyaz')) return; state.svyazModal = { pId:id, drawn:null }; render(); }
+        function closeSvyazModal(){ state.svyazModal = null; render(); }
+        function drawSvyazCard(){
+            const m = state.svyazModal; if (!m || m.drawn) return;
+            const p = state.players.find(x => x.id === m.pId); if (!p) return;
+            const c = SVYAZI_CARDS[Math.floor(Math.random()*SVYAZI_CARDS.length)];
+            let text, color;
+            if (c.k === 'partner') {
+                const cf = Math.max(20, Math.round(p.prof.salary * c.m));
+                p.assets = p.assets || [];
+                p.assets.push({ id: Date.now()+Math.floor(Math.random()*1000), type:'BUSINESS', title:'Партнёр: '+c.t, cf, price:0, down:0 });
+                text = `Классное партнёрство! Приносит +${cf}$/мес пассивного дохода.`; color='#34d399';
+            } else if (c.k === 'cash') {
+                const b = Math.max(30, Math.round(p.prof.salary * c.m));
+                p.savings = (Number(p.savings)||0) + b;
+                text = `Связи помогли: +${b}$ в кассу.`; color='#34d399';
+            } else if (c.k === 'scam') {
+                const cost = Math.max(30, Math.round(p.prof.salary * c.m));
+                const fc = Math.min(cost, Math.max(0, Number(p.savings)||0));
+                p.savings = (Number(p.savings)||0) - fc;
+                const rest = cost - fc;
+                if (rest > 0) p.bankLoan = (Number(p.bankLoan)||0) + rest;
+                text = `Тебя кинули: −${cost}$${rest>0?` (кассы не хватило, ${rest}$ в долг банку)`:''}.`; color='#f87171';
+            } else {
+                text = `Пока без результата — строишь доверие, связь может сыграть позже.`; color='#9ca3af';
+            }
+            m.drawn = { emoji:c.e, title:c.t, text, color };
+            p.notify = `🌐 Связи: ${c.t} — ${text}`;
+            save(); render();
+        }
+        function renderSvyazModal(){
+            const m = state.svyazModal; if (!m) return '';
+            if (!m.drawn) {
+                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
+                        <div style="font-size:16px;font-weight:800;color:#6ee7b7;margin-bottom:14px;">🌐 СВЯЗИ — вытяни карту</div>
+                        <div onclick="drawSvyazCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#065f46,#047857);border:2px solid #34d399;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">🌐</div>
+                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Партнёрство, доверие — или мошенник. Только на тебя.</p>
+                    </div>
+                </div>`;
+            }
+            const dr = m.drawn;
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:1px solid ${dr.color};border-radius:14px;padding:24px;max-width:420px;text-align:center;">
+                    <div style="font-size:48px;">${dr.emoji}</div>
+                    <div style="font-size:18px;font-weight:800;color:${dr.color};margin:6px 0;">${dr.title}</div>
+                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
+                    <button onclick="closeSvyazModal()" class="btn" style="background:#047857;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
+                </div>
+            </div>`;
+        }
+        function renderSvyazPanel(p){
+            return `
+                <div class="card" style="border-color:#34d399;">
+                    <div class="block-title" style="color:#6ee7b7;">🌐 СВЯЗИ (партнёрства)</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Строй сеть: классный партнёр даст пассивный доход или кэш, мошенник — кинет, а иногда просто растёт доверие. Попал на клетку → вытяни карту.</p>
+                    <button onclick="openSvyazModal(${p.id})" class="btn" style="width:100%;background:#047857;color:#fff;font-weight:800;font-size:14px;">🌐 ВЫТЯНУТЬ КАРТУ СВЯЗЕЙ</button>
+                </div>
+            `;
+        }
+
+        // ─── Клетка СДЕЛКИ: партнёрства/сделки от других людей. МОШЕННИКИ ЧАЩЕ, чем
+        // хорошие партнёры (15 скам / 7 хорошо / 6 нейтрал). Те же типы, что в Связях. ───
+        const SDELKI_CARDS = [
+            // ✅ хорошие (7)
+            {e:'🤝',t:'Выгодная сделка',k:'partner',m:0.12}, {e:'💼',t:'Совместный проект',k:'partner',m:0.10},
+            {e:'💰',t:'Перепродажа с прибылью',k:'cash',m:0.20}, {e:'📦',t:'Удачная поставка',k:'cash',m:0.15},
+            {e:'🏗️',t:'Долевое строительство',k:'partner',m:0.15}, {e:'🛒',t:'Опт со скидкой',k:'cash',m:0.18},
+            {e:'🤑',t:'Крупный контракт',k:'partner',m:0.18},
+            // ❌ мошенники (15 — ЧАЩЕ всего)
+            {e:'🕵️',t:'Кинули на сделке',k:'scam',m:0.25}, {e:'💸',t:'Предоплата — и пропал',k:'scam',m:0.22},
+            {e:'📉',t:'Сделка-пустышка',k:'scam',m:0.15}, {e:'🎭',t:'Фейковый поставщик',k:'scam',m:0.20},
+            {e:'🐍',t:'Обманул с долей',k:'scam',m:0.20}, {e:'🪤',t:'Развод на инвестицию',k:'scam',m:0.30},
+            {e:'🧾',t:'Поддельные документы',k:'scam',m:0.18}, {e:'🚩',t:'Аванс ушёл мошеннику',k:'scam',m:0.15},
+            {e:'💔',t:'Партнёр сбежал с деньгами',k:'scam',m:0.25}, {e:'📵',t:'Пропал после оплаты',k:'scam',m:0.20},
+            {e:'🤥',t:'Обещал много — обманул',k:'scam',m:0.17}, {e:'🏚️',t:'Купил «актив» — фальшивка',k:'scam',m:0.22},
+            {e:'⚠️',t:'Схема — пирамида',k:'scam',m:0.28}, {e:'🧨',t:'Сделка лопнула, потерял задаток',k:'scam',m:0.12},
+            {e:'🎣',t:'Развели как новичка',k:'scam',m:0.15},
+            // 🤝 нейтральные (6)
+            {e:'🤔',t:'Сделка на переговорах',k:'none'}, {e:'⏳',t:'Думаешь над предложением',k:'none'},
+            {e:'📝',t:'Условия не сошлись',k:'none'}, {e:'☕',t:'Встреча по сделке',k:'none'},
+            {e:'🔍',t:'Проверяешь партнёра',k:'none'}, {e:'🙅',t:'Отказался от рискованной сделки',k:'none'}
+        ];
+        function openSdelkaModal(id){ if(!gate(id,'sdelka')) return; state.sdelkaModal = { pId:id, drawn:null }; render(); }
+        function closeSdelkaModal(){ state.sdelkaModal = null; render(); }
+        function drawSdelkaCard(){
+            const m = state.sdelkaModal; if (!m || m.drawn) return;
+            const p = state.players.find(x => x.id === m.pId); if (!p) return;
+            const c = SDELKI_CARDS[Math.floor(Math.random()*SDELKI_CARDS.length)];
+            let text, color;
+            if (c.k === 'partner') {
+                const cf = Math.max(20, Math.round(p.prof.salary * c.m));
+                p.assets = p.assets || [];
+                p.assets.push({ id: Date.now()+Math.floor(Math.random()*1000), type:'BUSINESS', title:'Сделка: '+c.t, cf, price:0, down:0 });
+                text = `Хорошая сделка! Приносит +${cf}$/мес пассивного дохода.`; color='#34d399';
+            } else if (c.k === 'cash') {
+                const b = Math.max(30, Math.round(p.prof.salary * c.m));
+                p.savings = (Number(p.savings)||0) + b;
+                text = `Прибыль со сделки: +${b}$ в кассу.`; color='#34d399';
+            } else if (c.k === 'scam') {
+                const cost = Math.max(30, Math.round(p.prof.salary * c.m));
+                const fc = Math.min(cost, Math.max(0, Number(p.savings)||0));
+                p.savings = (Number(p.savings)||0) - fc;
+                const rest = cost - fc;
+                if (rest > 0) p.bankLoan = (Number(p.bankLoan)||0) + rest;
+                text = `Мошенник! Потерял −${cost}$${rest>0?` (кассы не хватило, ${rest}$ в долг банку)`:''}.`; color='#f87171';
+            } else {
+                text = `Сделка не состоялась — без потерь и без прибыли.`; color='#9ca3af';
+            }
+            m.drawn = { emoji:c.e, title:c.t, text, color };
+            p.notify = `🤝 Сделка: ${c.t} — ${text}`;
+            save(); render();
+        }
+        function renderSdelkaModal(){
+            const m = state.sdelkaModal; if (!m) return '';
+            if (!m.drawn) {
+                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
+                        <div style="font-size:16px;font-weight:800;color:#f9a8d4;margin-bottom:14px;">🤝 СДЕЛКИ — вытяни карту</div>
+                        <div onclick="drawSdelkaCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#9d174d,#be185d);border:2px solid #f472b6;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">🤝</div>
+                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Сделки от людей. Осторожно — мошенники тут частые!</p>
+                    </div>
+                </div>`;
+            }
+            const dr = m.drawn;
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:1px solid ${dr.color};border-radius:14px;padding:24px;max-width:420px;text-align:center;">
+                    <div style="font-size:48px;">${dr.emoji}</div>
+                    <div style="font-size:18px;font-weight:800;color:${dr.color};margin:6px 0;">${dr.title}</div>
+                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
+                    <button onclick="closeSdelkaModal()" class="btn" style="background:#be185d;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
+                </div>
+            </div>`;
+        }
+        function renderSdelkaPanel(p){
+            return `
+                <div class="card" style="border-color:#f472b6;">
+                    <div class="block-title" style="color:#f9a8d4;">🤝 СДЕЛКИ (от людей)</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Сделки и партнёрства от других. Бывают выгодные, но <b style="color:#f87171;">мошенники тут чаще</b>, чем хорошие партнёры. Попал на клетку → вытяни карту.</p>
+                    <button onclick="openSdelkaModal(${p.id})" class="btn" style="width:100%;background:#be185d;color:#fff;font-weight:800;font-size:14px;">🤝 ВЫТЯНУТЬ КАРТУ СДЕЛКИ</button>
+                </div>
+            `;
+        }
+
+        // ─── Клетка МЕДИЦИНА: 40 карт (28 негатив / 12 позитив). Близко к жизни.
+        // kinds: cost(разовое лечение) / sick(лежишь без работы — потеря зп) / chronic
+        // (постоянный минус к доходу, висит «Здоровье:…») / tax(медрасходы→рост налогов) /
+        // cash(страховка/ЗОЖ→касса) / heal(выздоровел — снять хроническое). ───
+        const MED_CARDS = [
+            // ❌ негатив (28)
+            {e:'🤒',t:'Простуда — лекарства',k:'cost',m:0.06}, {e:'🦷',t:'Зубная боль — лечение',k:'cost',m:0.12},
+            {e:'🤧',t:'Грипп, неделя дома',k:'sick',m:0.20}, {e:'🦴',t:'Перелом — гипс',k:'cost',m:0.18},
+            {e:'🏥',t:'Аппендицит — операция',k:'cost',m:0.30}, {e:'💉',t:'Срочная операция',k:'cost',m:0.35},
+            {e:'🧠',t:'Выгорание — лечение',k:'cost',m:0.15}, {e:'🫀',t:'Проблемы с сердцем',k:'chronic',m:0.06},
+            {e:'🩸',t:'Давление — таблетки',k:'chronic',m:0.04}, {e:'🦠',t:'Инфекция — больница',k:'cost',m:0.22},
+            {e:'🚑',t:'Скорая увезла',k:'cost',m:0.10}, {e:'😷',t:'Заболел — пропустил работу',k:'sick',m:0.25},
+            {e:'🤕',t:'Травма на отдыхе',k:'cost',m:0.18}, {e:'👁️',t:'Упало зрение — очки',k:'cost',m:0.12},
+            {e:'🦵',t:'Болит спина — врач',k:'cost',m:0.08}, {e:'🧬',t:'Хроническая болезнь',k:'chronic',m:0.05},
+            {e:'🍔',t:'Запустил здоровье — диабет',k:'chronic',m:0.05}, {e:'🚬',t:'Вредные привычки — лечение',k:'cost',m:0.14},
+            {e:'🥴',t:'Отравление',k:'cost',m:0.07}, {e:'🧪',t:'Анализы и обследование',k:'cost',m:0.06},
+            {e:'🦷',t:'Имплант зуба',k:'cost',m:0.20}, {e:'💊',t:'Дорогие лекарства',k:'cost',m:0.15},
+            {e:'🏨',t:'Реабилитация',k:'cost',m:0.18}, {e:'⚕️',t:'Платная клиника',k:'cost',m:0.12},
+            {e:'🧾',t:'Медстраховка подорожала',k:'tax'}, {e:'🤰',t:'Осложнение — лечение',k:'cost',m:0.20},
+            {e:'🦟',t:'Вирус в поездке',k:'cost',m:0.10}, {e:'😮‍💨',t:'Лёг в больницу — без работы',k:'sick',m:0.30},
+            // ✅ позитив (12)
+            {e:'💪',t:'Отличное здоровье — спорт окупился',k:'cash',m:0.10}, {e:'🛡️',t:'Страховка покрыла лечение',k:'cash',m:0.15},
+            {e:'🩺',t:'Чекап — всё ок',k:'cash',m:0.05}, {e:'🧘',t:'Профилактика помогла',k:'heal'},
+            {e:'🍎',t:'ЗОЖ — бонус энергии',k:'cash',m:0.08}, {e:'🏃',t:'Марафон — приз за здоровье',k:'cash',m:0.12},
+            {e:'💉',t:'Вакцина защитила',k:'cash',m:0.05}, {e:'🌿',t:'Народное средство помогло',k:'cash',m:0.06},
+            {e:'😴',t:'Хорошо отдохнул — продуктивность',k:'cash',m:0.10}, {e:'🧖',t:'Санаторий по страховке',k:'heal'},
+            {e:'❤️‍🩹',t:'Выздоровел полностью',k:'heal'}, {e:'🩹',t:'Лёгкое выздоровление + выплата',k:'cash',m:0.12}
+        ];
+        function openMedModal(id){ if(!gate(id,'med')) return; state.medModal = { pId:id, drawn:null }; render(); }
+        function closeMedModal(){ state.medModal = null; render(); }
+        function drawMedCard(){
+            const m = state.medModal; if (!m || m.drawn) return;
+            const p = state.players.find(x => x.id === m.pId); if (!p) return;
+            const sal = p.prof.salary;
+            const c = MED_CARDS[Math.floor(Math.random()*MED_CARDS.length)];
+            let text, color='#f87171';
+            const pay = (amount) => { amount=Math.max(0,Math.round(amount)); const fc=Math.min(amount,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amount-fc; if(rest>0)p.bankLoan=(Number(p.bankLoan)||0)+rest; return rest; };
+            if (c.k === 'cost') {
+                const cost=Math.max(20,Math.round(sal*c.m)); const rest=pay(cost);
+                text=`Лечение: −${cost}$${rest>0?` (кассы не хватило, ${rest}$ в долг)`:''}.`;
+            } else if (c.k === 'sick') {
+                const loss=Math.max(30,Math.round(sal*c.m)); const rest=pay(loss);
+                text=`Болел и не работал — потерял зарплату −${loss}$${rest>0?` (${rest}$ в долг)`:''}.`;
+            } else if (c.k === 'chronic') {
+                const cf=Math.max(15,Math.round(sal*c.m)); p.assets=p.assets||[];
+                p.assets.push({ id:Date.now()+Math.floor(Math.random()*1000), type:'OTHER', title:'Здоровье: '+c.t, cf:-cf, now:0, price:0, health:true });
+                text=`Хроническое: −${cf}$/мес из дохода (пока не вылечишь). Следи за здоровьем!`;
+            } else if (c.k === 'tax') {
+                const add=Math.max(10,Math.round(sal*0.02)); const cap=p.prof.taxes*2;
+                p.taxMod=Math.min(cap,(Number(p.taxMod)||0)+add);
+                text=`Медрасходы/страховка выросли: налоги-сборы +${add}$/мес.`;
+            } else if (c.k === 'cash') {
+                const b=Math.max(20,Math.round(sal*c.m)); p.savings=(Number(p.savings)||0)+b; color='#34d399';
+                text=`Здоровье в плюс: +${b}$ в кассу.`;
+            } else { // heal — снять одно хроническое
+                p.assets=p.assets||[]; const idx=p.assets.findIndex(a=>a.health);
+                if (idx>=0){ const rem=p.assets[idx]; p.assets.splice(idx,1); color='#34d399'; text=`Выздоровел! Убрал «${rem.title}» (вернул +${Math.abs(rem.cf)}$/мес дохода).`; }
+                else { const b=Math.max(20,Math.round(sal*0.08)); p.savings=(Number(p.savings)||0)+b; color='#34d399'; text=`Здоров как бык — бонус +${b}$ в кассу.`; }
+            }
+            m.drawn = { emoji:c.e, title:c.t, text, color };
+            p.notify = `⚕️ Медицина: ${c.t} — ${text}`;
+            save(); render();
+        }
+        function renderMedModal(){
+            const m = state.medModal; if (!m) return '';
+            if (!m.drawn) {
+                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
+                        <div style="font-size:16px;font-weight:800;color:#fca5a5;margin-bottom:14px;">⚕️ МЕДИЦИНА — вытяни карту</div>
+                        <div onclick="drawMedCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#991b1b,#b91c1c);border:2px solid #f87171;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">⚕️</div>
+                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Здоровье важно! Запустишь — ударит по игре. Только на тебя.</p>
+                    </div>
+                </div>`;
+            }
+            const dr = m.drawn;
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:1px solid ${dr.color};border-radius:14px;padding:24px;max-width:420px;text-align:center;">
+                    <div style="font-size:48px;">${dr.emoji}</div>
+                    <div style="font-size:18px;font-weight:800;color:${dr.color};margin:6px 0;">${dr.title}</div>
+                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
+                    <button onclick="closeMedModal()" class="btn" style="background:#b91c1c;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
+                </div>
+            </div>`;
+        }
+        function renderMedPanel(p){
+            return `
+                <div class="card" style="border-color:#f87171;">
+                    <div class="block-title" style="color:#fca5a5;">⚕️ МЕДИЦИНА (здоровье)</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Жизненные ситуации со здоровьем: чаще негатив (лечение, болезнь без работы, хроническое), реже плюс (страховка, ЗОЖ, выздоровление). Попал на клетку → вытяни карту.</p>
+                    <button onclick="openMedModal(${p.id})" class="btn" style="width:100%;background:#b91c1c;color:#fff;font-weight:800;font-size:14px;">⚕️ ВЫТЯНУТЬ КАРТУ МЕДИЦИНЫ</button>
+                </div>
+            `;
+        }
+
+        function reg() {
+            const name = (document.getElementById('pName').value || state.nameDraft || '').trim();
+            if (!name || !state.chosenProf) { alert('Укажи имя и вытяни роль!'); return; }
+            const pin = (prompt('Придумай свой PIN (4 цифры) — он нужен, чтобы заходить ТОЛЬКО в свой бланк:') || '').trim();
+            if (!/^\d{4}$/.test(pin)) { alert('PIN должен быть из 4 цифр. Регистрация отменена.'); return; }
+            const pr = state.chosenProf;
+            const newId = Date.now();
+            try { localStorage.setItem('via_me', JSON.stringify({id:newId, pin})); } catch(e){}
+            state.players.push({
+                id: newId, name, pin, prof: pr, holdings: {},
+                children: 0, bankLoan: 0, savings: pr.savings,
+                isM: false, isE: pr.initEdu===0, isA: false, isCC: false, isR: false,
+                mLeft: pr.initMortgage, eLeft: pr.initEdu, aLeft: pr.initAuto,
+                ccLeft: pr.initCC, rLeft: pr.initRetail,
+                assets: [], skills: [], lifeSkills: {}, taxMod: 0, jail: 0, allow: null
+            });
+            state.chosenProf = null; state.nameDraft = ''; save(newId); render();
+        }
+
+        function openPlayer(id) {
+            const p = state.players.find(x=>x.id===id);
+            // админ (вошёл по 7777) видит любой бланк без PIN
+            if (!state.isAdmin && p && p.pin) {
+                let saved=null;
+                try { const me=JSON.parse(localStorage.getItem('via_me')||'{}'); if(me.id===id) saved=me.pin; } catch(e){}
+                if (saved !== p.pin) {
+                    const entered = (prompt('PIN для входа в бланк «'+p.name+'»:')||'').trim();
+                    if (entered !== p.pin) { alert('Неверный PIN — это чужой бланк.'); return; }
+                    try { localStorage.setItem('via_me', JSON.stringify({id, pin:entered})); } catch(e){}
+                }
+            }
+            state.currentPlayerId = id; state.view='player'; render();
+        }
+        function login() {
+            if (document.getElementById('pass').value === '7777') { state.view='admin'; state.isAdmin=true; state.err=''; }
+            else state.err = 'Неверный код доступа';
+            render();
+        }
+
+        function sendAsset() {
+            const type = document.getElementById('aType').value;
+            const title = document.getElementById('aT').value.trim();
+            if (!title) { alert('Введи название актива!'); return; }
+            const details = { type, title };
+            const p = state.players.find(pl => pl.id == state.currentPlayerId);
+
+            if (type === 'STOCK') {
+                const price = Number(document.getElementById('aPrice').value);
+                const qty = Number(document.getElementById('aQty').value);
+                const now = Number(document.getElementById('aNow').value);
+                const div = Number(document.getElementById('aDiv').value) || 0;
+                if (!price || !qty) { alert('Укажи цену покупки и количество!'); return; }
+                if (div < 0 || div > 50) { alert('Дивиденды должны быть от 0 до 50%'); return; }
+                details.price = price; details.qty = qty; details.now = now || price;
+                details.div = div;
+                details.cf = Math.round(price * qty * div / 100);  // месячный дивиденд от полной стоимости пакета
+            } else if (type === 'ESTATE' || type === 'BUSINESS') {
+                const down = Number(document.getElementById('aDown').value);
+                const price = Number(document.getElementById('aPrice').value);
+                const cf = Number(document.getElementById('aF').value);
+                if (!down || !price) { alert('Укажи первый взнос и цену!'); return; }
+                details.down = down; details.price = price; details.cf = cf || 0;
+            } else {  // OTHER — монеты/золото/антиквариат, БЕЗ дохода (только цена)
+                const price = Number(document.getElementById('aPrice').value);
+                const now = Number(document.getElementById('aNow').value);
+                if (!price) { alert('Укажи цену покупки!'); return; }
+                details.price = price;
+                details.now = now || price;
+                details.cf = 0;  // дохода нет — только прибыль при продаже
+            }
+
+            state.deals.push({ id: uid(), pId: p.id, pName: p.name, type:'BUY_ASSET', details, status:'PENDING' });
+            save(); render();
+        }
+
+        function reqLoan() {
+            const amt = Number(document.getElementById('loanAmount').value);
+            if (!amt || amt < 1000) { alert('Минимальная сумма $1000. Кратно тысяче.'); return; }
+            const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            state.deals.push({ id: uid(), pId: p.id, pName: p.name, type:'TAKE_LOAN', details:{amount: amt}, status:'PENDING' });
+            save(); render();
+        }
+
+        function payBank() {
+            const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            state.deals.push({ id: uid(), pId: p.id, pName: p.name, type:'PAY_BANK', details:{}, status:'PENDING' });
+            save(); render();
+        }
+
+        function send(type, details={}) {
+            const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            state.deals.push({ id: uid(), pId: p.id, pName: p.name, type, details, status:'PENDING' });
+            save(); render();
+        }
+
+        function sellStock(aId, title) {
+            const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            const asset = p.assets.find(a => a.id == aId);
+            if (!asset) return;
+            const sellQty = Number(document.getElementById('sellQty_'+aId).value);
+            if (!sellQty || sellQty < 1) { alert('Введи количество для продажи!'); return; }
+            if (sellQty > asset.qty) { alert(`Можно продать максимум ${asset.qty} шт!`); return; }
+            state.deals.push({
+                id: uid(), pId: p.id, pName: p.name,
+                type: 'SELL_STOCK',
+                details: { aId, title, sellQty, totalQty: asset.qty, price: asset.now || asset.price, buyPrice: asset.price },
+                status: 'PENDING'
+            });
+            save(); render();
+        }
+
+        function appr(dId) {
+            const d = state.deals.find(dl => dl.id == dId); if (!d) return;
+            state.players = state.players.map(p => {
+                if (p.id != d.pId) return p;
+                if (d.type === 'BUY_ASSET') p.assets.push({ ...d.details, id: Date.now() });
+                else if (d.type === 'SELL_ASSET') p.assets = p.assets.filter(a => a.id != d.details.aId);
+                else if (d.type === 'SELL_MARKET') {
+                    const dd = d.details;
+                    if (p.holdings && p.holdings[dd.assetId]) {
+                        const sq = Math.min(dd.qty, p.holdings[dd.assetId].qty);
+                        p.savings = Math.round(((p.savings || 0) + sq * dd.price) * 100) / 100;
+                        p.holdings[dd.assetId].qty -= sq;
+                        if (p.holdings[dd.assetId].qty <= 0) delete p.holdings[dd.assetId];
+                    }
+                }
+                else if (d.type === 'SELL_STOCK') {
+                    const dd = d.details;
+                    const total = dd.sellQty * dd.price;
+                    p.savings = (p.savings || 0) + total;
+                    p.assets = p.assets.map(a => {
+                        if (a.id != dd.aId) return a;
+                        const newQty = a.qty - dd.sellQty;
+                        if (newQty <= 0) return null;
+                        return { ...a, qty: newQty, cf: Math.round(a.price * newQty * (a.div||0) / 100) };
+                    }).filter(Boolean);
+                }
+                else if (d.type === 'PAY_MORTGAGE') { p.isM = true; p.mLeft = 0; }
+                else if (d.type === 'PAY_EDU') { p.isE = true; p.eLeft = 0; }
+                else if (d.type === 'PAY_AUTO') { p.isA = true; p.aLeft = 0; }
+                else if (d.type === 'PAY_CC') { p.isCC = true; p.ccLeft = 0; }
+                else if (d.type === 'PAY_RETAIL') { p.isR = true; p.rLeft = 0; }
+                else if (d.type === 'CASINO_WIN') {
+                    p.savings = Math.round(((p.savings||0) + d.details.payout) * 100) / 100;
+                    p.notify = '🎉 ПОЗДРАВЛЯЕМ! Ведущий подтвердил твой выигрыш +' + d.details.payout + '$! 👑 Касса пополнена.';
+                }
+                else if (d.type === 'PAY_BANK') p.bankLoan = 0;
+                else if (d.type === 'TAKE_LOAN') { p.bankLoan += d.details.amount; p.savings += d.details.amount; }
+                return p;
+            });
+            state.deals = state.deals.filter(dl => dl.id != dId);
+            save(); render();
+        }
+
+        function rejl(dId) { state.deals = state.deals.filter(dl => dl.id != dId); save(); render(); }
+        function chChild(id, v) { state.players = state.players.map(p => p.id==id ? {...p, children: Math.max(0, p.children+v)} : p); save(); render(); }
+        function chSavings(id, v) { state.players = state.players.map(p => p.id==id ? {...p, savings: Number(v)||0} : p); save(id); render(); }
+        function chBankLoan(id, v) { const n = Math.max(0, Number(v)||0); state.players = state.players.map(p => p.id==id ? {...p, bankLoan: n} : p); save(id); render(); }
+        // Ведущий закрывает/убирает актив игрока (акцию с биржи или карточный)
+        function admRemoveHolding(pid, hid) {
+            const p = state.players.find(x => x.id == pid); if (!p) return;
+            const nm = (p.holdings && p.holdings[hid] && p.holdings[hid].name) || 'этот актив';
+            if (!confirm('Закрыть позицию «' + nm + '» у игрока ' + p.name + '? (акции пропадут)')) return;
+            state.players = state.players.map(pl => {
+                if (pl.id != pid) return pl;
+                const h = {...(pl.holdings || {})}; delete h[hid];
+                return {...pl, holdings: h};
+            });
+            save(pid); render();
+        }
+        function admRemoveAsset(pid, aid) {
+            const p = state.players.find(x => x.id == pid); if (!p) return;
+            if (!confirm('Убрать этот актив у игрока ' + p.name + '?')) return;
+            state.players = state.players.map(pl => pl.id != pid ? pl : {...pl, assets: (pl.assets || []).filter(a => a.id != aid)});
+            save(pid); render();
+        }
+        // ПРОДАТЬ позицию: деньги по текущей цене → в кассу игрока, позиция закрывается
+        function admSellHolding(pid, hid) {
+            const p = state.players.find(x => x.id == pid); if (!p) return;
+            const h = (p.holdings || {})[hid]; if (!h) return;
+            const pr = curPrice(hid) || 0;
+            const proceeds = Math.round(pr * (h.qty || 0));
+            if (!confirm('Продать «' + (h.name || 'актив') + '»: ' + (h.qty||0) + ' шт × ' + pr + '$ = ' + proceeds + '$ → в кассу ' + p.name + '?')) return;
+            state.players = state.players.map(pl => {
+                if (pl.id != pid) return pl;
+                const nh = {...(pl.holdings || {})}; delete nh[hid];
+                return {...pl, holdings: nh, savings: Math.round(((pl.savings || 0) + proceeds) * 100) / 100};
+            });
+            save(pid); render();
+        }
+        function admSellAsset(pid, aid) {
+            const p = state.players.find(x => x.id == pid); if (!p) return;
+            const a = (p.assets || []).find(x => x.id == aid); if (!a) return;
+            const proceeds = Math.round(a.type === 'STOCK' ? (a.qty || 0) * (a.now || a.price || 0) : (a.price || 0));
+            if (!confirm('Продать «' + (a.title || 'актив') + '» за ' + proceeds + '$ → в кассу ' + p.name + '?')) return;
+            state.players = state.players.map(pl => pl.id != pid ? pl
+                : {...pl, assets: (pl.assets || []).filter(x => x.id != aid), savings: Math.round(((pl.savings || 0) + proceeds) * 100) / 100});
+            save(pid); render();
+        }
+        function setTaxPct(id, v) { const n = Math.max(0, Number(v)||0); state.players = state.players.map(p => p.id==id ? {...p, taxPct: n} : p); save(); render(); }
+
+        // ─── БАЗА КАРТОЧЕК ПАССИВА (ведущий выдаёт — пассив появляется автоматически) ───
+        // Реальная колода Рината. cost = цена входа/взнос; cf = чистый месячный поток.
+        const CARDS = [
+            // 🟦 Малые активы
+            {name:'🟦 Парковочное место', type:'BUSINESS', cost:1200, cf:150},
+            {name:'🟦 Вендинговый автомат', type:'BUSINESS', cost:2000, cf:200},
+            {name:'🟦 Ларёк мини-маркет', type:'BUSINESS', cost:2500, cf:220},
+            {name:'🟦 Сдача гаража', type:'ESTATE', cost:1800, cf:170},
+            {name:'🟦 Автомат с водой', type:'BUSINESS', cost:1500, cf:180},
+            {name:'🟦 Мастерская ремонт телефонов', type:'BUSINESS', cost:3000, cf:250},
+            {name:'🟦 Онлайн-магазин (маркетплейс)', type:'BUSINESS', cost:2000, cf:200},
+            {name:'🟦 Прокат самокатов', type:'BUSINESS', cost:2700, cf:230},
+            {name:'🟦 Кофе с собой (мини-стойка)', type:'BUSINESS', cost:3000, cf:250},
+            // 🟧 Квартиры (cost = аванс/вход)
+            {name:'🟧 Однушка в спальном р-не', type:'ESTATE', cost:8000, cf:300},
+            {name:'🟧 Однушка у метро', type:'ESTATE', cost:12000, cf:450},
+            {name:'🟧 Двушка в новостройке', type:'ESTATE', cost:18000, cf:600},
+            {name:'🟧 Двушка в центре', type:'ESTATE', cost:22000, cf:850},
+            {name:'🟧 Трёшка для семьи', type:'ESTATE', cost:26000, cf:1000},
+            {name:'🟧 Апарт у бизнес-центра', type:'ESTATE', cost:28000, cf:1100},
+            {name:'🟧 Премиум-апартаменты', type:'ESTATE', cost:35000, cf:1300},
+            // ⬜ Стартапы без дохода (cf 0)
+            {name:'⬜ Старт: шоурум', type:'BUSINESS', cost:5000, cf:0},
+            {name:'⬜ Старт: бренд одежды', type:'BUSINESS', cost:4000, cf:0},
+            {name:'⬜ Старт: кофейня «Жана»', type:'BUSINESS', cost:6000, cf:0},
+            {name:'⬜ Старт: опт товаров', type:'BUSINESS', cost:8000, cf:0},
+            {name:'⬜ Старт: мобильная мастерская', type:'BUSINESS', cost:3500, cf:0},
+            {name:'⬜ Старт: пункт выдачи', type:'BUSINESS', cost:4500, cf:0},
+            {name:'⬜ Старт: студия красоты', type:'BUSINESS', cost:6000, cf:0},
+            {name:'⬜ Старт: автосервис', type:'BUSINESS', cost:7000, cf:0},
+            {name:'⬜ Старт: рекламное агентство', type:'BUSINESS', cost:5000, cf:0},
+            {name:'⬜ Старт: доставка еды', type:'BUSINESS', cost:6500, cf:0},
+            // 🟩 Депозиты/облигации (cf ≈ % от минимума)
+            {name:'🟩 Депозит стандарт (+2%)', type:'STOCK', cost:2000, cf:40},
+            {name:'🟩 Депозит годовой (+3%)', type:'STOCK', cost:3000, cf:90},
+            {name:'🟩 Депозит премиальный (+4%)', type:'STOCK', cost:5000, cf:200},
+            {name:'🟩 Гос. облигации (+1%)', type:'STOCK', cost:1500, cf:15},
+            {name:'🟩 Корп. облигации (+2%)', type:'STOCK', cost:3000, cf:60},
+            // ⚠️ Средние/сомнительные (чистый поток)
+            {name:'⚠️ Мини-кафе на окраине', type:'BUSINESS', cost:40000, cf:500},
+            {name:'⚠️ Автосервис без репутации', type:'BUSINESS', cost:50000, cf:1000},
+            {name:'⚠️ Овощная точка на рынке', type:'BUSINESS', cost:30000, cf:500},
+            {name:'⚠️ Салон красоты (низкий трафик)', type:'BUSINESS', cost:60000, cf:700},
+            {name:'⚠️ Магазин одежды No Name', type:'BUSINESS', cost:40000, cf:700},
+            {name:'⚠️ Прачечная самообслуживания', type:'BUSINESS', cost:50000, cf:800},
+            {name:'⚠️ Ларёк со шаурмой', type:'BUSINESS', cost:30000, cf:500},
+            // 🟩 Крупный бизнес (цена входа)
+            {name:'🟩 Автомойка Premium (6 постов)', type:'BUSINESS', cost:85000, cf:2500},
+            {name:'🟩 Клиника Health+', type:'BUSINESS', cost:150000, cf:5000},
+            {name:'🟩 Ресторан премиум-класса', type:'BUSINESS', cost:220000, cf:7000},
+            {name:'🟩 Строительная компания', type:'BUSINESS', cost:100000, cf:3000},
+            {name:'🟩 Линия по напиткам', type:'BUSINESS', cost:180000, cf:6000},
+            {name:'🟩 Магазин техники TechCenter', type:'BUSINESS', cost:130000, cf:4000},
+            {name:'🟩 Гостиница 20 номеров', type:'BUSINESS', cost:300000, cf:8000},
+            {name:'🟩 Сеть кофеен (3 точки)', type:'BUSINESS', cost:160000, cf:5500},
+            {name:'🟩 Логистический склад', type:'BUSINESS', cost:250000, cf:7500},
+            {name:'🟩 Офисное здание (мини-БЦ)', type:'ESTATE', cost:400000, cf:12000},
+            // 🟩 Крупные 500к (взнос → чистый поток)
+            {name:'🟩 ТРЦ малый (500к)', type:'ESTATE', cost:100000, cf:5000},
+            {name:'🟩 Отель 40 номеров (500к)', type:'ESTATE', cost:120000, cf:6000},
+            {name:'🟩 Ресторан «Флагман» (500к)', type:'BUSINESS', cost:100000, cf:6500},
+            {name:'🟩 Завод напитков (500к)', type:'BUSINESS', cost:130000, cf:8000},
+            {name:'🟩 Оптбаза+склад (600к)', type:'BUSINESS', cost:150000, cf:9000},
+            // 🟧 Крупные 2 млн
+            {name:'🟧 Медцентр «Профи+» (2млн)', type:'BUSINESS', cost:700000, cf:48000},
+            {name:'🟧 Торгово-офисный центр (2млн)', type:'ESTATE', cost:800000, cf:65000},
+            // 🟨 Крупные 5-10 млн
+            {name:'🟨 Завод бытовой техники (5млн)', type:'BUSINESS', cost:1500000, cf:95000},
+            {name:'🟨 Сеть 50 кофеен (5.5млн)', type:'BUSINESS', cost:2000000, cf:120000},
+            {name:'🟩 Мегапроект CITY TOWER (10млн)', type:'ESTATE', cost:3000000, cf:210000},
+            // 👑 Карьерные (прокачка себя)
+            {name:'👑 Гуру профессии', type:'BUSINESS', cost:100000, cf:25000},
+            {name:'👑 Собственный бренд', type:'BUSINESS', cost:150000, cf:30000},
+            {name:'👑 Элитный наставник', type:'BUSINESS', cost:120000, cf:20000},
+            {name:'👑 Мировой чемпион / Звезда', type:'BUSINESS', cost:200000, cf:40000},
+            {name:'👑 Легенда профессии', type:'BUSINESS', cost:250000, cf:50000},
+            // ❌ Плохие объекты (минусовой поток)
+            {name:'❌ Заброшенный склад', type:'ESTATE', cost:60000, cf:-4000},
+            {name:'❌ Ресторан в неудачном месте', type:'BUSINESS', cost:80000, cf:-4000},
+            {name:'❌ Объект без разрешений', type:'ESTATE', cost:100000, cf:-9000},
+            {name:'❌ Низкосортный мини-отель', type:'ESTATE', cost:120000, cf:-6000},
+            {name:'❌ Помещение без арендатора', type:'ESTATE', cost:150000, cf:-9600},
+        ];
+        function giveCard(pId, idx) {
+            const c = CARDS[Number(idx)]; if (!c) return;
+            state.players = state.players.map(p => {
+                if (p.id != pId) return p;
+                const assets = (p.assets || []).concat([{ title: c.name, type: c.type, price: c.cost, down: c.cost, cf: c.cf, fromCard: true }]);
+                return { ...p, assets };
+            });
+            save(); render();
+        }
+
+        // ─── МИНУС-КАРТОЧКИ (реальная колода Рината: мошенники / платежи / потеря налички) ───
+        // hit=сразу минус $ с кассы; hitPct=сразу минус % кассы; monthly=+$ в расход навсегда; taxAdd=+$ налог; taxPctAdd=+% налог
+        const MINUS_CARDS = [
+            {name:'🕵 Мошенники: фейк-инвестпроект', hit:300, monthly:40},
+            {name:'🕵 Мошенники: взломали карту', hit:200, monthly:25},
+            {name:'🕵 Мошенники: поддельный ремонтник', hit:250, monthly:30},
+            {name:'🏠 Аренда квартиры', monthly:1000},
+            {name:'💡 Коммунальные услуги', monthly:150},
+            {name:'📱 Телефон и интернет', monthly:60},
+            {name:'💊 Медицина и лекарства', monthly:120},
+            {name:'💳 Кредитная карта (платёж)', monthly:80},
+            {name:'🍔 Питание и продукты', monthly:400},
+            {name:'⛽ Транспорт и бензин', monthly:200},
+            {name:'👕 Одежда и уход', monthly:120},
+            {name:'📺 Подписки и сервисы', monthly:50},
+            {name:'🍺 Алкоголь/сигареты/развлечения', monthly:180},
+            {name:'🛍 Импульсивные покупки', monthly:90},
+            {name:'🚗 Штраф за парковку', monthly:50},
+            {name:'🏥 Медицинская страховка', monthly:70},
+            {name:'💻 Потерял деньги в интернете', monthly:40},
+            {name:'📉 Осторожный инвестор (комиссии)', monthly:30},
+            {name:'🏦 Лишний кредитный процент', monthly:60},
+            {name:'🦷 Лечение зубов', monthly:90},
+            {name:'🔧 Ремонт телефона', monthly:35},
+            {name:'☕ Кофе на ноутбук', monthly:50},
+            {name:'🏠 Страховка имущества', monthly:80},
+            {name:'💡 Повышение коммуналки', monthly:60},
+            {name:'🧾 Налог фиксированный +200$', taxAdd:200},
+            {name:'🧾 Налоговая корректировка +100$', taxAdd:100},
+            {name:'💎 Налог на роскошь +2%', taxPctAdd:2},
+            {name:'👛 Потерял кошелёк (−10% кассы)', hitPct:10},
+            {name:'🚌 Украли в транспорте (−15% кассы)', hitPct:15},
+        ];
+        function minusEffect(c) {
+            const a = [];
+            if (c.hit) a.push('−' + c.hit + '$ сразу');
+            if (c.hitPct) a.push('−' + c.hitPct + '% кассы сразу');
+            if (c.monthly) a.push('+' + c.monthly + '$/мес расход');
+            if (c.taxAdd) a.push('+' + c.taxAdd + '$ налог');
+            if (c.taxPctAdd) a.push('+' + c.taxPctAdd + '% налог');
+            return a.join(' · ');
+        }
+        function giveMinus(pId, idx) {
+            const c = MINUS_CARDS[Number(idx)]; if (!c) return;
+            state.players = state.players.map(p => {
+                if (p.id != pId) return p;
+                const np = { ...p };
+                const cash = Number(np.savings) || 0;
+                np.savings = Math.round((cash - (c.hit || 0) - (c.hitPct ? cash * c.hitPct / 100 : 0)) * 100) / 100;
+                if (c.monthly) np.expMod = (Number(np.expMod) || 0) + c.monthly;
+                if (c.taxAdd) np.taxMod = (Number(np.taxMod) || 0) + c.taxAdd;
+                if (c.taxPctAdd) np.taxPct = (Number(np.taxPct) || 0) + c.taxPctAdd;
+                return np;
+            });
+            save(); render();
+        }
+        // ─── ТЮРЬМА (ведущий): сажает игрока на N ходов; игрок пропускает ходы ───
+        function setJail(id, n) { state.players = state.players.map(p => p.id==id ? {...p, jail: Math.max(0, Math.round(n))} : p); save(); render(); }
+        function jailDec(id) { state.players = state.players.map(p => p.id==id ? {...p, jail: Math.max(0, (Number(p.jail)||0)-1)} : p); save(); render(); }
+        function jailFree(id) { state.players = state.players.map(p => p.id==id ? {...p, jail: 0} : p); save(); render(); }
+        // ─── РАЗРЕШЕНИЯ: кнопки клеток у игрока закрыты, пока ведущий не откроет КОНКРЕТНУЮ
+        // клетку (p.allow = ключ). gate() проверяет+СЪЕДАЕТ разрешение (одноразовое). ───
+        const ALLOW_LABEL = { career:'🎯 Карьера', skill:'💡 Навык', gov:'🏛️ Государство', world:'🌍 Мировое событие', work:'💼 Работа', expense:'💸 Расходы', tax:'🏦 Налоги', svyaz:'🌐 Связи', sdelka:'🤝 Сделки', med:'⚕️ Медицина' };
+        function setAllow(id, key) { state.players = state.players.map(p => p.id==id ? {...p, allow:key} : p); save(); render(); }
+        function gate(id, key) {
+            const p = state.players.find(x => x.id === id);
+            if (!p) return false;
+            if (p.allow !== key) { alert('🔒 Жди — ведущий должен ОТКРЫТЬ тебе эту клетку.'); return false; }
+            p.allow = null; save();   // одноразовое: разрешение потрачено
+            return true;
+        }
+
+        function deletePlayer(id, name) {
+            if (!confirm(`Удалить игрока "${name}" полностью?\n\nВсе его активы, долги и заявки также будут удалены. Это действие необратимо.`)) return;
+            state.players = state.players.filter(p => p.id != id);
+            state.deals = state.deals.filter(d => d.pId != id);  // clean up pending deals too
+            save(); render();
+        }
+
+        function clearAllPlayers() {
+            if (!confirm(`ОЧИСТКА СТОЛА: удалить ВСЕХ ${state.players.length} игроков и все заявки?\n\nЭто действие необратимо.`)) return;
+            if (!confirm('Точно? Это удалит ВСЁ.')) return;
+            state.players = [];
+            state.deals = [];
+            save(); render();
+        }
+
+        // ═══════ SYNC между вкладками — 4 канала надёжности ═══════
+        // 1) BroadcastChannel — мгновенный, работает в file:// для same-origin
+        if (bc) {
+            bc.addEventListener('message', () => { reloadFromStorage(); safeRerender(); });
+        }
+        // 2) storage event (резерв)
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'v0_players' || e.key === 'v0_deals') { reloadFromStorage(); safeRerender(); }
+        });
+        // 3) focus / visibilitychange — когда возвращаешься на вкладку
+        window.addEventListener('focus', () => { reloadFromStorage(); safeRerender(); });
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) { reloadFromStorage(); safeRerender(); }
+        });
+        // 4) ГАРАНТИРОВАННЫЙ polling localStorage (только в file:// режиме)
+        if (!SERVER_MODE) {
+            lastDataHash = dataHash();
+            setInterval(() => {
+                const h = dataHash();
+                if (h !== lastDataHash) {
+                    lastDataHash = h;
+                    reloadFromStorage();
+                    safeRerender();
+                }
+            }, 1500);
+        }
+
+        // Запуск: сначала подтягиваем серверные данные (если SERVER_MODE), потом рендерим
+        (async () => {
+            if (SERVER_MODE) {
+                await pollServer();
+                startSSE();                      // мгновенный push — главный канал
+                setInterval(pollServer, 3000);   // страховка на случай обрыва провода
+            }
+            render();
+            if (document.getElementById('assetFields')) renderAssetForm();
+        })();
+    </script>
+</body>
+</html>

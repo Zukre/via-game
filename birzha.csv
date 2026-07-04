@@ -1,0 +1,59 @@
+AssetID,Название,Тип Актива,Минимальная цена ,Текущая цена ,Средняя цена ,Максимальная Цена ,Volatility,Характер рынка,PriceChange,PriceChangePct,TrendAuto,MarketPhaseAuto
+1,BTC,Crypto,10000,20000,50000,150000,8,Chaotic,20000,20000,Flat,Range
+2,ETH,Crypto,200,5000,8000,20000,9,Adaptive,5000,5000,Flat,Range
+3,AAPL,Stock,5,40,200,500,3,Stable,40,40,Flat,Range
+4,TSLA,Stock,11,70,300,800,6,Aggressive,70,70,Flat,Range
+5,Gold,Metals,700,1200,2200,5000,1,Stable,1200,1200,Flat,Range
+6,Platina,Metals,700,200,400,2000,2,Adaptive,200,200,Flat,Range
+7,Corn(Кукуруза),Сommodities,"0,8","1,2",8,50,2,,"1,2","1,2",Flat,Range
+8,APXM (MEME),Crypto,2,12,90,7000,70,,12,12,Flat,Range
+9,ZEN,Crypto,10,46,150,5000,65,,46,46,Flat,Range
+10,SkyLogistics,Stock,12,18,40,200,4,,18,18,Flat,Range
+11,TechCorp,Stock,15,22,45,500,5,,22,22,Flat,Range
+12,DFP,Stock,5,500,100,10000,6,,500,500,Flat,Range
+13,SoY(Соя),Commodities,1,25,10,200,3,,25,25,Flat,Range
+14,FastFood,Stock,5,8,55,180,4,,8,8,Flat,Range
+15,BiogenLabs,Stock,5,10,35,700,6,,10,10,Flat,Range
+16,EcopowerEnergy,Stock,4,9,50,500,5,,9,9,Flat,Range
+17,Wheat(Пшеница),Commodities,1,8,20,150,2,,8,8,Flat,Range
+18,TechMobile Corp,Stock,5,200,45,400,4,,200,200,Flat,Range
+19,CloudxTech,Stock,8,14,200,900,5,,14,14,Flat,Range
+20,Dilco Energy,Stock,5,8,70,500,5,,8,8,Flat,Range
+21,CryptoCorp,Crypto,8,15,90,1500,20,,15,15,Flat,Range
+22,ReTailOne,Stock,5,7,30,200,3,,7,7,Flat,Range
+23,MetanetSocial,Stock,2,7,60,300,5,,7,7,Flat,Range
+24,KSP Holdings,Stock,3,30,100,300,4,,30,30,Flat,Range
+25,Airsky Aviation,Stock,6,11,40,120,3,,11,11,Flat,Range
+26,Metaflare(FLR),Crypto,1,8,50,3500,40,,8,8,Flat,Range
+27,BankPro,Stock,7,10,200,600,1,,10,10,Flat,Range
+28,CleanWater Sys,Stock,3,7,80,250,4,,7,7,Flat,Range
+29,BuildPro Construct,Stock,4,8,280,400,3,,8,8,Flat,Range
+30,MeDiline Health,Stock,5,9,45,200,5,,9,9,Flat,Range
+31,GreenFarm Co,Stock,4,7,100,350,7,,7,7,Flat,Range
+32,MegaStore Retail,Stock,4,6,50,400,5,,6,6,Flat,Range
+33,TechVision,Stock,6,12,90,700,7,,12,12,Flat,Range
+34,CyberNEt,Stock,30,42,240,600,5,,42,42,Flat,Range
+35,GreenPower,Stock,9,14,28,90,4,,14,14,Flat,Range
+36,MedLife,Stock,20,31,80,200,3,,31,31,Flat,Range
+37,Alum,Metal,30,50,150,500,2,,50,50,Flat,Range
+38,Freightlogistics,Stock,4,7,200,700,7,,7,7,Flat,Range
+39,StreamFlix Media,Stock,7,13,400,1000,8,,13,13,Flat,Range
+40,Voltage AI VAI,Stock,4,22,500,8000,6,,22,22,Flat,Range
+41,MetalWorkIndustries,Stock,3,6,220,400,5,,6,6,Flat,Range
+42,BNB,Crypto,189,220,400,1200,6,,220,220,Flat,Range
+43,XRP,Crypto,"0,5",2,8,20,5,,2,2,Flat,Range
+44,RetaliOne,Stock,5,12,50,140,3,,12,12,Flat,Range
+45,OilcoEnergy,Stock,4,30,30,170,5,,30,30,Flat,Range
+46,CryptoCorp,Crypto,4,100,50,130,7,,100,100,Flat,Range
+47,Wheat,Commodities,1,4,15,33,2,,4,4,Flat,Range
+48,Soybeans,Commotities,2,6,22,66,2,,6,6,Flat,Range
+49,AirSky,Stock,4,11,50,100,3,,11,11,Flat,Range
+50,Solana,Crypto,50,118,300,600,6,,118,118,Flat,Range
+51,Avalanche,Crypto,10,40,200,500,6,,40,40,Flat,Range
+52,DogeCoin,Crypto,"0,0001","0,078","0,5",2,8,,"0,078","0,078",Flat,Range
+53,AiCorp,Stock,10,22,80,1000,5,,22,22,Flat,Range
+54,Silver,Metal,1,60,30,150,2,,60,60,Flat,Range
+,,,,,,,,,,,Flat,Range
+,,,,,,,,,,,Flat,Range
+,,,,,,,,,,,Flat,Range
+,,,,,,,,,,,Flat,Range
