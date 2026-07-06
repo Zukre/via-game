@@ -16,6 +16,7 @@ import http.server
 import json
 import os
 import queue
+import random
 import socketserver
 import threading
 import time
@@ -41,6 +42,38 @@ LOCK = threading.Lock()
 SUBS_LOCK = threading.Lock()
 SUBSCRIBERS = set()   # набор queue.Queue — по одному на подключённый браузер
 APPLIED_TX = set()    # txid уже начисленных зарплат — защита от двойного клика/ретрая сети
+TRACK_LEN = 29        # клеток на поле (позиции 0..28)
+# позиция клетки (0..28) → что авто-открывается игроку при приземлении.
+# '__BUY__' = открыть окно покупки акций ДЛЯ ВСЕХ; None = ничего (ведущий решает: зарплата/тюрьма/дети и т.п.).
+CELL_ALLOW = [
+    None, 'career', '__BUY__', 'skill', None, None, 'expense', '__BUY__', 'sdelka', 'gov', None, '__JAIL__',
+    'work', 'expense', 'tax', None,
+    None, 'sdelka', '__BUY__', 'skill', 'svyaz', 'expense', None, '__BUY__', 'sdelka', None,
+    'sdelka', 'gov', 'med'
+]
+TURN_SECONDS = 120    # ход длится 2 минуты (мягкий таймер: предупреждает, ведущий передаёт сам)
+BUY_SECONDS = 60      # окно покупки акций — 1 минута для всех (жёсткое авто-закрытие)
+JAIL_TURNS = 3        # клетка Тюрьма сажает на 3 хода (ведущий может поправить в пульте)
+IMPACT_MULT = 2.0     # жёсткость ликвидности: (объём$/liq)×MULT = сдвиг цены ($5k в $10k liq → +100%)
+BUY_MOVE_CAP = 2.0    # один трейд двигает цену вверх не больше +200%
+SELL_MOVE_CAP = 0.7   # и вниз не больше −70% за трейд (иначе цена в ноль)
+
+
+def sync_board_roster():
+    """Держим board.order в согласии с игроками: добавляем новых (клетка 0), убираем ушедших,
+    позиции существующих сохраняем. Вызывать ВНУТРИ LOCK."""
+    b = DATA.setdefault('board', {'order': [], 'turnIdx': 0, 'positions': {}, 'levels': {}, 'lastRoll': None})
+    ids = [p['id'] for p in DATA.get('players', []) if 'id' in p]
+    idset = set(str(i) for i in ids)
+    for pid in ids:
+        if pid not in b['order']:
+            b['order'].append(pid)
+        b['positions'].setdefault(str(pid), 0)
+        b['levels'].setdefault(str(pid), 0)
+    b['order'] = [pid for pid in b['order'] if str(pid) in idset]
+    b['positions'] = {k: v for k, v in b['positions'].items() if k in idset}
+    b['levels'] = {k: v for k, v in b['levels'].items() if k in idset}
+    b['turnIdx'] = (b['turnIdx'] % len(b['order'])) if b['order'] else 0
 
 
 def broadcast():
@@ -65,11 +98,37 @@ def load_data():
             return json.loads(DATA_FILE.read_text(encoding='utf-8'))
         except Exception:
             pass
-    return {'players': [], 'deals': [], 'market': None, 'world': None}
+    return {'players': [], 'deals': [], 'market': None, 'world': None,
+            'board': {'order': [], 'turnIdx': 0, 'positions': {}, 'levels': {}, 'lastRoll': None}}
+
+
+_dirty = False
 
 
 def save_data(d):
-    DATA_FILE.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding='utf-8')
+    # ОТЛОЖЕННАЯ запись: помечаем стейт «грязным», фоновый флашер пишет на диск пачкой ~1с.
+    # Убирает лаг от записи на КАЖДЫЙ POST — мутация в памяти и broadcast остаются мгновенными.
+    global _dirty
+    _dirty = True
+
+
+def _flush_now():
+    global _dirty
+    with LOCK:
+        body = json.dumps(DATA, ensure_ascii=False, indent=2)
+        _dirty = False
+    DATA_FILE.write_text(body, encoding='utf-8')
+
+
+def data_flusher():
+    """Фоновый поток: раз в секунду сбрасывает стейт на диск, если менялся."""
+    while True:
+        time.sleep(1.0)
+        if _dirty:
+            try:
+                _flush_now()
+            except Exception as e:
+                print('flusher error:', e)
 
 
 DATA = load_data()
@@ -77,6 +136,22 @@ DATA = load_data()
 if via_market and not DATA.get('market'):
     DATA['market'] = via_market.init_market()
     save_data(DATA)
+# board может отсутствовать в старом via_data.json — заводим
+if not DATA.get('board'):
+    DATA['board'] = {'order': [], 'turnIdx': 0, 'positions': {}, 'levels': {}, 'lastRoll': None}
+    save_data(DATA)
+# сразу посадить уже загруженных игроков на поле
+sync_board_roster()
+save_data(DATA)
+# ликвидность стакана могла отсутствовать у активов из старого via_data.json — проставляем по типу
+if via_market and DATA.get('market') and DATA['market'].get('assets'):
+    _liq_changed = False
+    for _a in DATA['market']['assets']:
+        if not _a.get('liq'):
+            _a['liq'] = via_market.asset_liq(_a.get('type'), _a.get('vol'))
+            _liq_changed = True
+    if _liq_changed:
+        save_data(DATA)
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -97,6 +172,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+
+    def _send_json(self, obj, code=200):
+        body = json.dumps(obj, ensure_ascii=False).encode('utf-8')
+        self.send_response(code)
+        self._cors()
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -218,6 +301,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             'market': DATA.get('market'),   # рынок не трогаем при апдейте бланков
                             'world': new.get('world', DATA.get('world')),  # мировое событие — broadcast всем
                         }
+                    sync_board_roster()   # держим поле в согласии с ростером игроков
                     save_data(DATA)
                     broadcast()   # мгновенно рассылаем изменение всем браузерам
                 self.send_response(200)
@@ -268,6 +352,132 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(str(e).encode())
             return
+        if self.path == '/turn/roll':
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw)
+                pid = req.get('pid')
+                val = req.get('value')
+                with LOCK:
+                    sync_board_roster()
+                    b = DATA['board']
+                    if pid is None and b['order']:
+                        pid = b['order'][b['turnIdx']]
+                    order_str = [str(x) for x in b['order']]
+                    if str(pid) not in order_str:
+                        raise ValueError('player not on board')
+                    # ведущий выбрал этого игрока — подсветим его как «ходит»
+                    b['turnIdx'] = order_str.index(str(pid))
+                    value = int(val) if val else random.randint(1, 6)
+                    value = max(1, min(6, value))
+                    cur = int(b['positions'].get(str(pid), 0))
+                    newpos = (cur + value) % TRACK_LEN
+                    if newpos < cur:                      # прошли старт (клетку 0)
+                        b['levels'][str(pid)] = min(4, int(b['levels'].get(str(pid), 0)) + 1)
+                    b['positions'][str(pid)] = newpos
+                    b['lastRoll'] = {'pid': pid, 'value': value}
+                    # Ф2/Ф3: авто-открытие карточки по клетке + окно покупки + таймер хода
+                    key = CELL_ALLOW[newpos] if 0 <= newpos < len(CELL_ALLOW) else None
+                    if key == '__BUY__':
+                        b['buyWindowEndsAt'] = time.time() + BUY_SECONDS   # покупка открыта ВСЕМ 1 мин
+                    elif key == '__JAIL__':
+                        for pl in DATA['players']:
+                            if pl.get('id') == pid:
+                                if int(pl.get('jail') or 0) == 0:           # был на свободе → считаем посадку
+                                    pl['jailCount'] = int(pl.get('jailCount') or 0) + 1
+                                pl['jail'] = random.randint(1, 3)          # клетка Тюрьма — сажаем на 1-3 хода (по-разному)
+                                pl['allow'] = None
+                                break
+                    elif key:
+                        for pl in DATA['players']:
+                            if pl.get('id') == pid:
+                                pl['allow'] = key                          # авто-открыть карточку ходящему
+                                break
+                    b['turnEndsAt'] = time.time() + TURN_SECONDS            # 2 минуты на ход
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True, 'pid': pid, 'value': value, 'pos': newpos})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path == '/turn/next':
+            try:
+                with LOCK:
+                    sync_board_roster()
+                    b = DATA['board']
+                    # уходящий ходящий, если в тюрьме, отбыл этот ход — уменьшаем срок
+                    if b['order']:
+                        cur_pid = b['order'][b['turnIdx']]
+                        for pl in DATA['players']:
+                            if pl.get('id') == cur_pid and int(pl.get('jail') or 0) > 0:
+                                pl['jail'] = int(pl['jail']) - 1
+                                break
+                    if b['order']:
+                        b['turnIdx'] = (b['turnIdx'] + 1) % len(b['order'])
+                    b['lastRoll'] = None
+                    b['turnEndsAt'] = time.time() + TURN_SECONDS   # 2 минуты новому ходящему
+                    save_data(DATA)
+                    broadcast()
+                    idx = b['turnIdx']
+                self._send_json({'ok': True, 'turnIdx': idx})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path == '/turn/timer':
+            # ведущий перезапускает таймер хода (не передавая ход)
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw)
+                secs = int(req.get('secs') or TURN_SECONDS)
+                with LOCK:
+                    DATA.setdefault('board', {})['turnEndsAt'] = time.time() + max(5, secs)
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path == '/market/impact':
+            # Ликвидность/стакан: крупная сделка двигает цену ДЛЯ ВСЕХ. Возвращает цену исполнения (avgFill).
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw)
+                aid = str(req.get('assetId'))
+                side = req.get('side')
+                qty = float(req.get('qty') or 0)
+                with LOCK:
+                    mkt = DATA.get('market') or {}
+                    a = next((x for x in mkt.get('assets', []) if str(x.get('id')) == aid), None)
+                    if a is None or qty <= 0:
+                        raise ValueError('asset not found or qty<=0')
+                    P = float(a['price'])
+                    liq = float(a.get('liq') or 500000) or 500000
+                    move = (qty * P) / liq * IMPACT_MULT      # сдвиг цены от объёма относительно стакана
+                    if side == 'sell':
+                        move = min(move, SELL_MOVE_CAP)
+                        avg_fill = P * (1 - move / 2)          # выходишь ХУЖЕ витрины (провал стакана)
+                        new_price = P * (1 - move)
+                    else:
+                        move = min(move, BUY_MOVE_CAP)
+                        avg_fill = P * (1 + move / 2)          # платишь ДОРОЖЕ витрины (ешь стакан)
+                        new_price = P * (1 + move)
+                    lo = float(a.get('min') or 0)
+                    hi = float(a.get('max') or (new_price * 10))
+                    new_price = max(lo, min(hi, new_price))
+                    a['price'] = round(new_price, 4 if new_price < 1 else 2)
+                    a.setdefault('history', []).append(a['price'])
+                    if len(a['history']) > 120:
+                        a['history'] = a['history'][-120:]
+                    avg_fill = round(max(lo, avg_fill), 4 if avg_fill < 1 else 2)
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True, 'avgFill': avg_fill, 'newPrice': a['price'], 'move': round(move, 4)})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
         self.send_response(404)
         self._cors()
         self.end_headers()
@@ -290,6 +500,21 @@ def market_ticker():
                     DATA['market'] = via_market.init_market()
                 events = via_market.tick_market(DATA['market'])
                 DATA['market']['events_last'] = events
+                # КРУПНОЕ рыночное событие → большой попап ВСЕМ игрокам (state.world)
+                big = None
+                for e in events:
+                    if e.get('kind') == 'КРАХ' and e.get('pct', 0) <= -55:
+                        big = e
+                    elif e.get('kind') == 'БУМ' and e.get('pct', 0) >= 120:
+                        big = e
+                if big:
+                    wid = int(time.time() * 1000)
+                    if big['kind'] == 'КРАХ':
+                        DATA['world'] = {'id': wid, 'emoji': '💥', 'title': 'ОБВАЛ РЫНКА',
+                                         'text': f"«{big['name']}» рухнул на {big['pct']}%! Рынок трясёт — проверь свои активы."}
+                    else:
+                        DATA['world'] = {'id': wid, 'emoji': '🚀', 'title': 'БУМ НА РЫНКЕ',
+                                         'text': f"«{big['name']}» взлетел на +{big['pct']}%! Рынок в эйфории."}
                 save_data(DATA)
                 broadcast()   # мгновенно: живые цены рынка у всех
         except Exception as e:
@@ -297,6 +522,7 @@ def market_ticker():
 
 
 def main():
+    threading.Thread(target=data_flusher, daemon=True).start()   # фоновая запись на диск пачкой
     if via_market:
         threading.Thread(target=market_ticker, daemon=True).start()
         n = len((DATA.get('market') or {}).get('assets', []))
@@ -323,6 +549,10 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         print('\nVIA server остановлен.')
+        try:
+            _flush_now()   # дописать последние изменения перед выходом
+        except Exception:
+            pass
         server.shutdown()
 
 

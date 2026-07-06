@@ -6,21 +6,26 @@
     <title>VIA GAME</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root{ --lx-gold:#d9b877; --lx-gold-br:#efd8a3; --lx-gold-ln:rgba(217,184,119,.20);
+               --lx-panel:#14171e; --lx-panel2:#171b23; --lx-ink:#0d1016; --lx-line:#242833;
+               --lx-text:#f3efe6; --lx-muted:#9c988e; --lx-em:#5cb08b; --lx-rose:#cf9a9a; }
         body {
-            background: #0b0f19;
-            color: #f1f5f9;
+            background:
+              radial-gradient(1100px 560px at 50% -12%, rgba(217,184,119,.06), transparent 62%),
+              #0a0c10;
+            color: var(--lx-text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             padding: 18px;
         }
         .container { max-width: 1080px; margin: 0 auto; }
 
         .card {
-            background: #111827;
-            border: 1px solid #1f2937;
-            border-radius: 12px;
-            padding: 22px;
-            margin-bottom: 18px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            background: linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));
+            border: 1px solid var(--lx-line);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 34px rgba(0,0,0,0.35);
         }
 
         .flex-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -38,26 +43,26 @@
         .val-amber { color: #fbbf24; font-size: 24px; font-weight: 800; }
 
         .block-title {
-            font-size: 13px;
-            font-weight: 700;
-            color: #9ca3af;
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--lx-muted);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid #1f2937;
+            letter-spacing: 0.16em;
+            border-bottom: 1px solid var(--lx-gold-ln);
             padding-bottom: 10px;
             margin-bottom: 14px;
         }
 
         .inp {
-            background: #030712;
-            border: 1px solid #374151;
-            border-radius: 8px;
-            padding: 10px 12px;
-            color: white;
+            background: var(--lx-ink);
+            border: 1px solid var(--lx-line);
+            border-radius: 10px;
+            padding: 11px 13px;
+            color: var(--lx-text);
             width: 100%;
             font-size: 14px;
         }
-        .inp:focus { border-color: #3b82f6; outline: none; }
+        .inp:focus { border-color: var(--lx-gold-ln); outline: none; box-shadow:0 0 0 3px rgba(217,184,119,.08); }
         select.inp { cursor: pointer; }
 
         .btn {
@@ -70,11 +75,12 @@
             transition: all 0.18s;
         }
         .btn-blue { background: #2563eb; color: white; }
-        .btn-green { background: #059669; color: white; width: 100%; padding: 13px; font-size: 14px; }
+        .btn-green { background: linear-gradient(180deg,var(--lx-gold-br),var(--lx-gold)); color:#20180a; width: 100%; padding: 13px; font-size: 14px; box-shadow:0 8px 22px rgba(217,184,119,.20); }
         .btn-amber { background: #d97706; color: white; }
         .btn-orange { background: #ea580c; color: white; font-size: 11px; text-transform: uppercase; padding: 6px 12px; }
-        .btn-gray { background: #374151; color: #d1d5db; }
-        .btn:hover { filter: brightness(1.2); }
+        .btn-gray { background: var(--lx-panel); color: var(--lx-text); border:1px solid var(--lx-line); }
+        .btn-gray:hover { border-color: var(--lx-gold-ln); color: var(--lx-gold-br); filter:none; }
+        .btn:hover { filter: brightness(1.08); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .row-item {
@@ -82,11 +88,11 @@
             justify-content: space-between;
             align-items: center;
             padding: 11px 13px;
-            background: #030712;
-            border-radius: 8px;
+            background: var(--lx-ink);
+            border-radius: 10px;
             margin-bottom: 7px;
             font-size: 13.5px;
-            border: 1px solid #1f2937;
+            border: 1px solid var(--lx-line);
         }
         .strike { text-decoration: line-through; opacity: 0.35; }
 
@@ -136,6 +142,26 @@
             font-weight: bold;
             font-size: 13px;
         }
+        /* ─── ПОЛЕ (движок хода) ─── */
+        .board-wrap{position:relative; width:100%; max-width:560px; margin:0 auto; aspect-ratio:1536/1024;
+            border-radius:14px; overflow:hidden; border:1px solid rgba(217,184,119,.28);
+            box-shadow:0 16px 46px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.4);}
+        .board-field{position:absolute; inset:0; background:url('via_field.png') center/100% 100% no-repeat; background-color:#0a0f1e;}
+        .board-field::after{content:""; position:absolute; inset:0; box-shadow:inset 0 0 70px rgba(0,0,0,.45); pointer-events:none;}
+        .tok{position:absolute; width:3.4%; aspect-ratio:1; border-radius:50%; transform:translate(-50%,-50%);
+            border:2px solid rgba(255,255,255,.85); box-shadow:0 2px 8px rgba(0,0,0,.55),0 0 12px currentColor; z-index:5;
+            transition:left .55s cubic-bezier(.34,1.1,.64,1), top .55s cubic-bezier(.34,1.1,.64,1);}
+        .tok.turn{z-index:6; box-shadow:0 2px 8px rgba(0,0,0,.55),0 0 18px 3px currentColor, 0 0 0 2px rgba(239,216,163,.9);}
+        .tok.turn::after{content:""; position:absolute; inset:-40%; border-radius:50%; border:2px solid currentColor; opacity:.5; animation:tokping 1.5s ease-out infinite;}
+        @keyframes tokping{0%{transform:scale(.6);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+        @keyframes tokbob{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(-50%,-72%)}}
+        .glow{position:absolute; width:8.5%; aspect-ratio:1; transform:translate(-50%,-50%); border-radius:16px;
+            pointer-events:none; z-index:4; box-shadow:0 0 0 3px currentColor,0 0 28px 6px currentColor; animation:glowlp 1.1s ease-in-out infinite;}
+        @keyframes glowlp{0%,100%{opacity:.55}50%{opacity:1}}
+        .pchip{display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:20px;
+            background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); font-size:12px; margin:3px;}
+        .pchip.turn{border-color:#fff; box-shadow:0 0 14px rgba(255,255,255,.3); transform:scale(1.06);}
+        .pchip .dot{width:11px;height:11px;border-radius:50%;box-shadow:0 0 8px currentColor;}
     </style>
 </head>
 <body>
@@ -213,6 +239,7 @@
 
         let state = {
             view: 'lobby',
+            board: null,   // состояние поля (движок хода) — всегда свежее с сервера
             players: SERVER_MODE ? [] : (JSON.parse(localStorage.getItem('v0_players')) || []),
             deals: SERVER_MODE ? [] : (JSON.parse(localStorage.getItem('v0_deals')) || []),
             currentPlayerId: null,
@@ -293,6 +320,7 @@
             // рынок и мировые события — всегда актуальные
             if (j.market) state.market = j.market;   // живые цены рынка
             state.world = j.world || null;           // мировое событие (broadcast)
+            state.board = j.board || null;           // поле (движок хода) — всегда свежее
             // players/deals НЕ затираем, пока наш свежий POST (покупка/заявка) не долетел —
             // иначе обновление стирает только что созданную заявку/покупку игрока.
             if (Date.now() - lastSaveT > 2200) {
@@ -348,6 +376,15 @@
                      otherExp, childExp, bankPay, totalExp, flow, target,
                      win: passive >= target };
         }
+        // 5 УРОВНЕЙ «Путь свободы» (центр поля): по доле пассив/расходы. L5 = свобода (пассив ≥ расходов).
+        function playerLevel(f){
+            const r = f.totalExp>0 ? f.passive/f.totalExp : (f.passive>0?1:0);
+            if(r>=1)    return {n:5, name:'Наследие',        d:'Абсолютная свобода'};
+            if(r>=0.75) return {n:4, name:'Инвестор',        d:'Капитал работает на тебя'};
+            if(r>=0.50) return {n:3, name:'Предприниматель', d:'Создаёшь систему'};
+            if(r>=0.25) return {n:2, name:'Растёшь',         d:'Развиваешь навыки и активы'};
+            return                 {n:1, name:'Работник',    d:'Стабильность и опыт'};
+        }
 
         function hasPendingFor(pId) {
             return state.deals.some(d => d.pId == pId && d.status === 'PENDING');
@@ -381,20 +418,24 @@
 
         function renderLobby(app) {
             app.innerHTML = `
-                <div class="card" style="max-width: 600px; margin: 30px auto;">
-                    <h2 style="text-align:center; margin-bottom:25px; font-weight:900; letter-spacing:2px; color:#3b82f6;">V I A</h2>
-                    <p style="text-align:center; color:#9ca3af; margin-top:-20px; margin-bottom:25px; font-size:12px;">Бланк настольной игры. Цель — добиться пассивного дохода ≥ 7× расходов.</p>
+                <div class="card" style="max-width: 460px; margin: 26px auto;">
+                    <div style="text-align:center; margin-bottom:18px;">
+                        <div style="font-family:Georgia,'Times New Roman',serif; font-size:26px; color:var(--lx-gold-br); font-weight:600; letter-spacing:.03em;">RINATVERSE</div>
+                        <div style="font-size:9px; letter-spacing:.4em; text-transform:uppercase; color:var(--lx-muted); font-weight:700; margin-top:5px;">Private · Клуб VIA</div>
+                        <div style="font-family:Georgia,serif; font-size:20px; font-weight:600; margin-top:16px;">Создай свой путь к свободе</div>
+                        <p style="color:var(--lx-muted); font-size:12px; margin-top:6px;">Вступаешь в клуб. Начнёшь работником — куда придёшь, решаешь сам. Цель — пассив ≥ расходов.</p>
+                    </div>
 
-                    <div style="border-bottom:1px solid #1f2937; padding-bottom:20px; margin-bottom:20px;">
-                        <p class="block-title" style="color:#10b981; border:none; margin:0; padding:0; margin-bottom:10px;">Регистрация игрока</p>
-                        <input type="text" id="pName" placeholder="Введите имя игрока" class="inp" style="margin-bottom:12px;" value="${state.nameDraft || ''}" oninput="state.nameDraft = this.value;">
-                        <div class="flex-between" style="margin-bottom:15px;">
-                            <button onclick="roll()" class="btn btn-blue">🎲 Вытянуть роль</button>
-                            <div style="background:#030712; padding:11px; border-radius:8px; width:100%; text-align:center; font-weight:bold; border:1px solid #1f2937; font-size:13px;">
-                                ${state.chosenProf ? state.chosenProf.name + ' · з/п ' + state.chosenProf.salary + '$' : 'Нажмите кнопку слева'}
+                    <div style="border-bottom:1px solid var(--lx-gold-ln); padding-bottom:20px; margin-bottom:20px;">
+                        <p style="font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--lx-muted); font-weight:700; margin-bottom:8px;">Как тебя зовут</p>
+                        <input type="text" id="pName" placeholder="Имя игрока" class="inp" style="margin-bottom:14px; font-family:Georgia,serif; font-size:15px;" value="${state.nameDraft || ''}" oninput="state.nameDraft = this.value;">
+                        <div style="display:flex; gap:10px; align-items:stretch; margin-bottom:15px;">
+                            <button onclick="roll()" class="btn btn-gray" style="flex:0 0 auto; white-space:nowrap;">🎲 Роль</button>
+                            <div style="flex:1; min-width:0; background:var(--lx-ink); border:1px solid ${state.chosenProf?'var(--lx-gold-ln)':'var(--lx-line)'}; border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:10px;">
+                                ${state.chosenProf ? `<span style="font-size:20px;">💼</span><span style="min-width:0;"><b style="font-family:Georgia,serif; font-size:15px;">${state.chosenProf.name}</b><br><span style="font-size:11px; color:var(--lx-gold);">Уровень 1 · Работник · з/п ${state.chosenProf.salary}$</span></span>` : '<span style="color:var(--lx-muted); font-size:12.5px;">Нажми «Роль» — профессия выпадет картой</span>'}
                             </div>
                         </div>
-                        <button onclick="reg()" class="btn btn-green">Создать бланк</button>
+                        <button onclick="reg()" class="btn btn-green">Вступить в игру →</button>
                     </div>
 
                     <div style="margin-bottom:20px;">
@@ -407,7 +448,7 @@
                                 return `
                                 <div class="player-card flex-between" onclick="openPlayer(${p.id})">
                                     <div>
-                                        <b>👤 ${p.name}</b> <span style="color:#9ca3af; font-size:13px;">— ${p.prof.name}</span>
+                                        <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${playerColor(p.id)};border:1px solid #0f172a;box-shadow:0 0 6px ${playerColor(p.id)};vertical-align:middle;margin-right:6px;"></span><b>${p.name}</b> <span style="color:#9ca3af; font-size:13px;">— ${p.prof.name} · <b style="color:${playerColor(p.id)};">${playerColorName(p.id)}</b></span>
                                         <div style="font-size:11px; color:#6b7280; margin-top:3px;">Поток ${f.flow}$ · Пассив ${f.passive}$${pendCount>0 ? ' · ⏳ '+pendCount+' заявок' : ''}</div>
                                     </div>
                                     <span style="color:#3b82f6; font-weight:bold; font-size:13px;">Открыть →</span>
@@ -415,11 +456,11 @@
                             }).join('')}
                     </div>
 
-                    <div style="border-top:1px solid #1f2937; padding-top:20px;">
-                        <p class="block-title" style="color:#ef4444; border:none; margin:0; padding:0; margin-bottom:10px;">Пульт ведущего</p>
-                        <div class="flex-between">
-                            <input type="password" id="pass" placeholder="Пароль администратора" class="inp" style="padding:10px;">
-                            <button onclick="login()" class="btn" style="background:#ef4444; color:white;">Управлять</button>
+                    <div style="border-top:1px solid var(--lx-gold-ln); padding-top:20px;">
+                        <p style="font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--lx-muted); font-weight:700; margin-bottom:10px;">Пульт ведущего</p>
+                        <div style="display:flex; gap:10px;">
+                            <input type="password" id="pass" placeholder="Пароль ведущего" class="inp" style="padding:11px;">
+                            <button onclick="login()" class="btn btn-gray" style="flex:0 0 auto; white-space:nowrap;">Управлять</button>
                         </div>
                         ${state.err ? `<p style="color:#ef4444; font-size:12px; margin-top:8px; font-weight:bold;">${state.err}</p>` : ''}
                     </div>
@@ -428,9 +469,10 @@
         }
 
         function renderAssetForm() {
-            const t = document.getElementById('aType').value;
+            const sel = document.getElementById('aType');
             const target = document.getElementById('assetFields');
-            if (!target) return;
+            if (!sel || !target) return;   // ручной ввод убран — форма может отсутствовать
+            const t = sel.value;
             if (t === 'STOCK') {
                 target.innerHTML = `
                     <input type="text" id="aT" placeholder="Тикер / Название акции" class="inp">
@@ -460,35 +502,65 @@
         function assetById(id){ const m=state.market; return (m&&m.assets)?m.assets.find(x=>String(x.id)===String(id)):null; }
         function curPrice(id){ const a=assetById(id); return a?a.price:null; }
         function portfolioValue(p){ let v=0; if(p&&p.holdings){for(const id in p.holdings){const pr=curPrice(id); if(pr) v+=pr*p.holdings[id].qty;}} return v; }
-        function buyAsset(id){
+        // Окно покупки: открывается на 1 мин, когда кто-то встаёт на клетку «Акции/Крипта» (для ВСЕХ).
+        function buyWindowOpen(){ const b=state.board; return !!(b && b.buyWindowEndsAt && b.buyWindowEndsAt*1000 > Date.now()); }
+        async function buyAsset(id){
             const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(id);
             if(!p||!a) return;
+            if((Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только лудка (казино).'); return; }
+            if(SERVER_MODE && !buyWindowOpen()){
+                alert('🔒 Покупка сейчас закрыта.\nОна открывается на 1 минуту для всех, когда кто-то встаёт на клетку «Акции / Крипта».');
+                return;
+            }
             const q=parseInt((prompt('Сколько штук «'+a.name+'» купить? Цена сейчас '+a.price+'$')||'0'),10);
             if(!q||q<1) return;
-            const cost=q*a.price;
-            if(p.savings<cost){ alert('Не хватает кассы.\nНужно '+Math.round(cost)+'$, есть '+Math.round(p.savings)+'$'); return; }
+            const p0=a.price;                       // витрина ДО сделки
+            let fill=p0;                            // цена исполнения (со стаканом)
+            if(SERVER_MODE){
+                try{
+                    const r=await fetch('/market/impact',{method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({assetId:id,side:'buy',qty:q})});
+                    const j=await r.json(); if(j&&j.avgFill) fill=j.avgFill;   // сервер двинул цену для всех
+                }catch(e){ console.warn('impact:',e); }
+            }
+            const cost=Math.round(q*fill*100)/100;
+            if(p.savings<cost){ alert('Не хватает кассы.\nПри таком объёме стакан поднял цену до ~'+fill+'$/шт — нужно '+Math.round(cost)+'$, есть '+Math.round(p.savings)+'$.'); return; }
             p.savings=Math.round((p.savings-cost)*100)/100;
+            const bst=pstat(p); bst.buys++; bst.buyAmt=Math.round((bst.buyAmt+cost)*100)/100;
             p.holdings=p.holdings||{};
             const h=p.holdings[id]||{qty:0,avg:0,name:a.name};
-            h.avg=(h.avg*h.qty + a.price*q)/(h.qty+q); h.qty+=q; h.name=a.name;
+            h.avg=(h.avg*h.qty + fill*q)/(h.qty+q); h.qty+=q; h.name=a.name;
             p.holdings[id]=h; save(); render();
-            alert('✅ Куплено '+q+' «'+a.name+'» по '+a.price+'$  (−'+Math.round(cost)+'$)');
+            const moved = Math.abs(fill-p0)>0.0001 ? ('\n📈 Твой объём двинул рынок: витрина была '+p0+'$, ты взял по ~'+fill+'$/шт.') : '';
+            alert('✅ Куплено '+q+' «'+a.name+'» по ~'+fill+'$  (−'+Math.round(cost)+'$)'+moved);
         }
-        function sellAsset(id){
+        async function sellAsset(id){
             const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(id);
             if(!p||!a||!p.holdings||!p.holdings[id]) return;
+            // в тюрьме продажа акций РАЗРЕШЕНА (Ринат): сидельцу доступны казино и продажа акций
             const have=p.holdings[id].qty;
             const q=parseInt((prompt('Сколько штук «'+a.name+'» продать? Есть '+have+', цена '+a.price+'$')||'0'),10);
             if(!q||q<1) return;
             if(q>have){ alert('У тебя только '+have+' шт.'); return; }
-            // ПРОДАЖА только через одобрение ведущего. Цена фиксируется на момент заявки.
+            const p0=a.price;                       // витрина ДО продажи
+            let fill=p0;
+            if(SERVER_MODE){
+                try{
+                    const r=await fetch('/market/impact',{method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({assetId:id,side:'sell',qty:q})});
+                    const j=await r.json(); if(j&&j.avgFill) fill=j.avgFill;   // сервер просадил цену для всех
+                }catch(e){ console.warn('impact:',e); }
+            }
+            const sst=pstat(p); sst.sells++; sst.sellAmt=Math.round((sst.sellAmt+q*fill)*100)/100;
+            // ПРОДАЖА через одобрение ведущего. Цена исполнения (со стаканом) зафиксирована.
             state.deals.push({
                 id: uid(), pId: p.id, pName: p.name, type: 'SELL_MARKET',
-                details: { assetId: id, assetName: a.name, qty: q, price: a.price, total: Math.round(q*a.price) },
+                details: { assetId: id, assetName: a.name, qty: q, price: fill, total: Math.round(q*fill) },
                 status: 'PENDING'
             });
             save(); render();
-            alert('📨 Заявка на продажу отправлена ведущему.\n'+q+' «'+a.name+'» по '+a.price+'$ (+'+Math.round(q*a.price)+'$).\nПосле одобрения деньги придут в кассу.');
+            const moved = Math.abs(fill-p0)>0.0001 ? ('\n📉 Твой объём просадил рынок: витрина была '+p0+'$, выход по ~'+fill+'$/шт.') : '';
+            alert('📨 Заявка на продажу ведущему.\n'+q+' «'+a.name+'» по ~'+fill+'$ (+'+Math.round(q*fill)+'$).'+moved+'\nПосле одобрения деньги придут в кассу.');
         }
         function renderMarketPanel(p){
             const m=state.market;
@@ -510,6 +582,7 @@
             }
             return `<div class="card">
                 <div class="block-title">📈 Биржа · Год ${m.game_year||1}</div>
+                <div id="buyTimer" style="display:none;text-align:center;background:#064e3b;color:#d1fae5;padding:6px 10px;border-radius:8px;font-weight:800;margin-bottom:8px;"></div>
                 ${alertHtml}
                 <div style="font-size:13px;color:#a7f3d0;margin-bottom:8px;">💼 Портфель: <b>${Math.round(portfolioValue(p))} $</b> &nbsp;·&nbsp; 💰 Касса: <b>${Math.round(p.savings)} $</b></div>
                 <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Мои активы</div>
@@ -526,6 +599,8 @@
         // но на дистанции жадный проигрывает ВСЁ. Это и есть урок «лёгких денег в казино нет».
         // Дать банку доить сильнее (к 60%) → уменьшай числа (напр. {6:2}); мягче → увеличивай. Позже — ползунок в пульте.
         const CASINO_PAYOUT = { 6: 3, 5: 1.5 };
+        // копилка статистики игрока (карточка-дашборд копит все действия для анализа)
+        function pstat(p){ if(!p.stats) p.stats={casinoPlays:0,casinoWins:0,casinoLosses:0,casinoWon:0,casinoLost:0,buys:0,buyAmt:0,sells:0,sellAmt:0,salaryCount:0,salaryTotal:0}; return p.stats; }
         function gambleRoll(){
             const p=state.players.find(x=>x.id==state.currentPlayerId);
             if(!p) return;
@@ -536,19 +611,20 @@
             const roll=1+Math.floor(Math.random()*6);
             // ставка списывается СРАЗУ (committed). Проигрыш мгновенный.
             p.savings=Math.round((p.savings-bet)*100)/100;
+            const st=pstat(p); st.casinoPlays++;
             const mult = CASINO_PAYOUT[roll] || 0;
             if(mult > 0){
-                const payout=Math.round(bet*mult*100)/100;   // возврат (включает ставку), вернётся при одобрении ведущего
-                state.deals.push({
-                    id: uid(), pId: p.id, pName: p.name, type:'CASINO_WIN',
-                    details:{ bet, roll, payout }, status:'PENDING'
-                });
+                const payout=Math.round(bet*mult*100)/100;   // возврат (включает ставку)
+                p.savings=Math.round((p.savings+payout)*100)/100;   // МГНОВЕННО: если выиграл — выиграл (без одобрения)
+                st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(payout-bet))*100)/100;
+                p.notify='🎰🎉 ВЫИГРЫШ ×'+mult+'! +'+Math.round(payout-bet)+'$ чистыми (вернулось '+payout+'$).';
                 save(); render();
                 const msg = roll===6
-                    ? '🎰🎉 ШЕСТЁРКА!!! ДЖЕКПОТ ×'+mult+' → '+payout+'$! 👑⭐'
-                    : '🎲✨ Пятёрка! Малый выигрыш ×'+mult+' → '+payout+'$. Фартит!';
-                alert(msg+'\n📨 Заявка ушла ведущему — как одобрит, выигрыш упадёт в кассу!');
+                    ? '🎰🎉 ШЕСТЁРКА!!! ДЖЕКПОТ ×'+mult+' → +'+payout+'$ СРАЗУ в кассу! 👑⭐'
+                    : '🎲✨ Пятёрка! Выигрыш ×'+mult+' → +'+payout+'$ сразу в кассу!';
+                alert(msg);
             } else {
+                st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
                 const near=['Так близко! 😤','Ещё чуть-чуть! 🎲','Удача уже рядом — чувствуешь? 🔥','Не сдавайся, фортуна любит упорных! 💪','В следующий раз точно шестёрка! 😏'];
                 save(); render();
                 alert('🎲 Выпало '+roll+'... '+near[Math.floor(Math.random()*near.length)]+'\n−'+bet+'$. Казино не спешит отдавать. Рискни ещё разок!');
@@ -558,9 +634,18 @@
         function giveSalary(id){
             const p=state.players.find(x=>x.id==id); if(!p) return;
             const f=calc(p);
+            const _st=pstat(p); _st.salaryCount++; _st.salaryTotal=Math.round((_st.salaryTotal+f.flow)*100)/100;   // копилка
             if (SERVER_MODE) {
                 // Сервер-авторитет: начисление применяет сервер (атомарно под LOCK) и рассылает всем.
-                // Локально кассу НЕ трогаем и save() НЕ зовём — иначе свой же полный бланк затрёт зарплату (баг).
+                // ОПТИМИСТИЧНО обновляем и локальный экран той же суммой — иначе экран ведущего остаётся
+                // устаревшим (антизатирание 2.2с), и следующая правка (налог/касса) пошлёт старую сумму
+                // и ЗАТРЁТ зарплату. Сервер применит ровно то же (broadcast заменит, не удвоит).
+                state.players = state.players.map(x => x.id==id
+                    ? {...x, savings: Math.round(((Number(x.savings)||0) + f.flow)*100)/100,
+                       notify: (f.flow>=0
+                         ? '💵 ЗАРПЛАТА! Ведущий начислил +'+f.flow+'$ (месячный поток). Касса пополнена! 🎉'
+                         : '💸 Месяц в минус: '+f.flow+'$ (расходы выше дохода). Управляй потоком!')} : x);
+                render();
                 fetch('/salary', {
                     method:'POST', headers:{'Content-Type':'application/json'},
                     body: JSON.stringify({ pid: id, flow: f.flow, txid: uid() })
@@ -609,59 +694,71 @@
 
             app.innerHTML = `
                 ${p.notify ? `<div style="background:linear-gradient(90deg,#10b981,#059669);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>${p.notify}</span><button onclick="clearNotify()" class="btn" style="background:#fff;color:#059669;flex:0 0 auto;">ОК</button></div>` : ''}
-                ${(Number(p.jail)||0)>0 ? `<div style="background:linear-gradient(90deg,#7f1d1d,#991b1b);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-weight:800;text-align:center;">🔒 ТЫ В ТЮРЬМЕ — осталось ${p.jail} ход(ов). Пропускаешь ход! <button onclick="jailDec(${p.id})" class="btn" style="background:#fff;color:#991b1b;margin-left:8px;">Отбыл ход (−1)</button></div>` : ''}
+                ${(Number(p.jail)||0)>0 ? `<div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fff;padding:16px 14px;border-radius:12px;margin-bottom:10px;text-align:center;border:2px solid #fca5a5;box-shadow:0 0 22px rgba(239,68,68,.45);">
+                    <div style="font-size:22px;font-weight:900;letter-spacing:1px;">🔒 ТЫ В ТЮРЬМЕ</div>
+                    <div style="font-size:13px;margin:6px 0 6px;">Сидишь ещё <b>${p.jail}</b> ход(ов). Работают только <b style="color:#c4b5fd;">🎰 КАЗИНО</b> и <b style="color:#6ee7b7;">📈 ПРОДАЖА АКЦИЙ</b>. Остальное закрыто — жди, пока ходы дойдут до тебя.</div>
+                    <div style="font-size:12px;margin-bottom:10px;color:#fecaca;">🔢 За игру ты сидел <b>${Number(p.jailCount)||1}</b> раз(а). Откуп сейчас <b style="color:#fde68a;">${jailBuyoutPct(p)}%</b> кассы (каждый раз +10%).</div>
+                    <button onclick="jailDec(${p.id})" class="btn" style="background:#fff;color:#991b1b;font-weight:800;">Отбыл ход (−1)</button>
+                    <button onclick="jailBuyout(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;margin-left:6px;font-weight:800;">💸 Откупиться (−${jailBuyoutPct(p)}%)</button>
+                </div>` : ''}
+                ${(()=>{ const b=state.board; if(!b||!b.order||!b.order.length) return '';
+                    const tp=b.order[b.turnIdx];
+                    if(tp==p.id) return `<div style="background:linear-gradient(90deg,#1d4ed8,#2563eb);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:800;text-align:center;">🎯 ТВОЙ ХОД! Действуй.</div>`;
+                    const tn=(state.players.find(x=>x.id==tp)||{}).name||'игрок';
+                    return `<div style="background:#3f1d1d;color:#fecaca;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">⏳ Сейчас ходит <b>${tn}</b> — жди свой ход. Твои действия отключены (только казино и общее окно покупки).</div>`;
+                })()}
                 ${p.allow ? `<div style="background:linear-gradient(90deg,#065f46,#047857);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">✅ Ведущий ОТКРЫЛ клетку: ${ALLOW_LABEL[p.allow]||p.allow}. Жми её кнопку и тяни карту.</div>` : `<div style="background:#1f2937;color:#9ca3af;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-size:12px;text-align:center;">🔒 Клетки закрыты. Попал на клетку → жди, пока ведущий откроет её тебе.</div>`}
-                <div class="card flex-between" style="background:#1f2937;">
+                <button onclick="startScan()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;font-size:15px;padding:14px;margin-bottom:12px;box-shadow:0 10px 26px rgba(217,184,119,.22);">📷 Сканировать карту</button>
+                <div class="card flex-between">
                     <div>
-                        <h2 style="font-size:21px; font-weight:800;">${p.name}</h2>
+                        <h2 style="font-size:21px; font-weight:800;"><span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${playerColor(p.id)};border:1px solid #0f172a;box-shadow:0 0 8px ${playerColor(p.id)};vertical-align:middle;margin-right:7px;"></span>${p.name} <span style="font-size:13px;color:${playerColor(p.id)};font-weight:800;">(${playerColorName(p.id)})</span></h2>
                         <p style="color:#10b981; font-weight:bold; font-size:13px; margin-top:3px;">${p.prof.name} · Зарплата ${f.salary}$${f.skillBonus>0?` <span style="color:#a5b4fc;">(база ${p.prof.salary}$ +${Math.round(f.skillBonus*100)}% навыки)</span>`:''}</p>
                     </div>
                     <button onclick="state.view='lobby';render();" class="btn btn-gray">← В лобби</button>
                 </div>
 
-                <div class="grid-3">
-                    <div class="stat-box stat-blue">
-                        <span style="font-size:11px; color:#9ca3af; font-weight:700; text-transform:uppercase;">Пассивный доход</span>
-                        <div class="val-blue">+${f.passive} $</div>
+                ${(()=>{ const pct=f.totalExp>0?Math.min(100,Math.round(f.passive/f.totalExp*100)):0;
+                  const free=f.passive>=f.totalExp; const need=Math.max(0,f.totalExp-f.passive);
+                  const nAssets=(p.assets||[]).filter(a=>Number(a.cf||0)>0).length;
+                  const lvl=playerLevel(f);
+                  return `
+                <!-- ЛЮКС-ГЕРОЙ БЛАНКА (RINATVERSE Private) -->
+                <div style="background:linear-gradient(180deg,#171b23,#14171e);border:1px solid #242833;border-radius:16px;padding:16px 18px;margin-bottom:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);">
+                  <div style="display:flex;align-items:flex-end;justify-content:space-between;">
+                    <div>
+                      <div style="font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#9c988e;font-weight:700;">Касса</div>
+                      <div style="font-family:Georgia,'Times New Roman',serif;font-size:34px;font-weight:600;line-height:1;margin-top:6px;">${p.savings} <span style="color:#d9b877;font-size:20px;font-family:system-ui;">$</span></div>
                     </div>
-                    <div class="stat-box stat-rose">
-                        <span style="font-size:11px; color:#9ca3af; font-weight:700; text-transform:uppercase;">Общий расход</span>
-                        <div class="val-rose">${f.totalExp} $</div>
+                    <div style="text-align:right;">
+                      <span style="font-family:ui-monospace,monospace;font-weight:700;font-size:13px;color:${f.flow>=0?'#5cb08b':'#cf9a9a'};background:${f.flow>=0?'rgba(92,176,139,.12)':'rgba(207,154,154,.12)'};padding:5px 10px;border-radius:999px;white-space:nowrap;">${f.flow>=0?'▲ +':'▼ '}${f.flow} / мес</span>
+                      <div style="font-size:10px;color:#9c988e;margin-top:4px;">чистый поток</div>
                     </div>
-                    <div class="stat-box stat-emerald">
-                        <span style="font-size:11px; color:#a7f3d0; font-weight:700; text-transform:uppercase;">Месячный поток</span>
-                        <div class="val-emerald">${f.flow} $</div>
+                  </div>
+                  <div style="margin-top:14px;padding:13px 14px;border-radius:12px;background:#0d1016;border:1px solid #242833;">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;">
+                      <span style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9c988e;font-weight:700;">${free?'🏆 Финансовая свобода':'Путь к свободе'}</span>
+                      <span style="font-family:Georgia,serif;font-size:20px;color:#efd8a3;font-weight:600;">${pct}%</span>
                     </div>
-                </div>
-
-                <div class="grid-2">
-                    <div class="stat-box stat-amber">
-                        <span style="font-size:11px; color:#fcd34d; font-weight:700; text-transform:uppercase;">💰 Сбережения (касса)</span>
-                        <div class="val-amber">${p.savings} $</div>
-                        <p style="font-size:11px; color:#9ca3af; margin-top:6px;">Стартовая касса + кредиты + поток (правит ведущий)</p>
+                    <div style="font-size:11px;color:var(--lx-gold);font-weight:700;margin-top:6px;">Уровень ${lvl.n} · ${lvl.name} <span style="color:#6d6a62;font-weight:400;">— ${lvl.d}</span></div>
+                    <div style="height:7px;border-radius:5px;background:#0a0c10;border:1px solid #23272f;margin:10px 0 8px;overflow:hidden;">
+                      <div style="height:100%;width:${pct}%;border-radius:5px;background:linear-gradient(90deg,#b48f4e,#d9b877 60%,#efd8a3);box-shadow:0 0 12px rgba(217,184,119,.4);"></div>
                     </div>
-                    <div class="stat-box" style="background:rgba(67,56,202,0.15); border-color:#6366f1;">
-                        <span style="font-size:11px; color:#a5b4fc; font-weight:700; text-transform:uppercase;">🏦 Кредит банка</span>
-                        <div style="color:#818cf8; font-size:24px; font-weight:800;">${p.bankLoan} $</div>
-                        <p style="font-size:11px; color:#9ca3af; margin-top:6px;">Платёж ${f.bankPay}$/мес (10% от долга)</p>
-                    </div>
-                </div>
+                    <div style="font-size:11.5px;color:#9c988e;">${free?'Пассив покрыл расходы — ты вне крысиных бегов! 🎉':`Пассив <b style="color:#efd8a3;">${f.passive}$/мес</b> из расходов <b style="color:#efd8a3;">${f.totalExp}$</b>. До свободы ещё <b style="color:#efd8a3;">${need}$/мес</b> пассива.`}</div>
+                  </div>
+                  <div style="margin-top:12px;">
+                    <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;"><span style="color:#cdc8bd;">💼 Зарплата</span><span style="font-family:ui-monospace,monospace;font-weight:700;color:#5cb08b;">+${f.salary}</span></div>
+                    <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;border-top:1px solid #242833;"><span style="color:#cdc8bd;">🏠 Пассивный доход <span style="color:#6d6a62;font-size:11px;">· ${nAssets} актив(ов)</span></span><span style="font-family:ui-monospace,monospace;font-weight:700;color:#5cb08b;">+${f.passive}</span></div>
+                    <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;border-top:1px solid #242833;"><span style="color:#cdc8bd;">💸 Расходы <span style="color:#6d6a62;font-size:11px;">· налоги, кредит, жизнь</span></span><span style="font-family:ui-monospace,monospace;font-weight:700;color:#cf9a9a;">−${f.totalExp}</span></div>
+                    <div style="display:flex;justify-content:space-between;padding:11px 0 2px;font-size:14px;border-top:1px solid rgba(217,184,119,.18);"><span style="color:#f3efe6;font-weight:600;">Денежный поток / мес</span><span style="font-family:ui-monospace,monospace;font-weight:700;color:#efd8a3;font-size:15px;">${f.flow>=0?'+':''}${f.flow}</span></div>
+                    ${p.bankLoan>0?`<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:12px;color:#9c988e;"><span>🏦 Кредит банка</span><span style="font-family:ui-monospace,monospace;">${p.bankLoan}$ · платёж ${f.bankPay}$/мес</span></div>`:''}
+                  </div>
+                </div>`; })()}
 
                 ${renderMarketPanel(p)}
 
                 <div class="card">
-                    <div class="block-title">🛒 Покупка актива</div>
-                    <p style="font-size:11px; color:#9ca3af; margin-bottom:10px;">Акции и фонды покупаются выше — в бирже. Здесь — недвижимость, бизнес и прочее.</p>
-                    <div style="margin-bottom:12px;">
-                        <select id="aType" class="inp" onchange="renderAssetForm()">
-                            <option value="ESTATE">🏠 Недвижимость</option>
-                            <option value="BUSINESS">💼 Бизнес</option>
-                            <option value="OTHER">📦 Прочее</option>
-                        </select>
-                    </div>
-                    <div id="assetFields" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-bottom:12px;"></div>
-                    <button onclick="sendAsset()" ${hasP?'disabled':''} class="btn btn-green">Отправить на одобрение ведущему</button>
-                    ${hasP ? `<div class="pending-alert">⏳ Заявка отправлена. Бланк ожидает решения ведущего...</div>` : ''}
+                    <div class="block-title">🛒 Активы</div>
+                    <p style="font-size:12px; color:#9ca3af;">Недвижимость, бизнес и прочее добавляются <b style="color:#22d3ee;">автоматически</b> — отсканируй QR карты кнопкой «📷 Сканировать карту». Купленное появится ниже в списке активов.</p>
                 </div>
 
                 ${renderLuckPanel(p)}
@@ -683,6 +780,8 @@
                 ${renderSvyazModal()}
                 ${renderSdelkaPanel(p)}
                 ${renderSdelkaModal()}
+                ${renderMarketModal()}
+                ${renderCardPreview()}
                 ${renderMedPanel(p)}
                 ${renderMedModal()}
 
@@ -718,16 +817,23 @@
                                             </div>
                                         `;
                                     }
+                                    const _price = Number(a.price||0), _liab = Number(a.liab||0), _cf = Number(a.cf||0);
+                                    const _sale = Math.max(0, _price - _liab);
+                                    const _typeLbl = a.type==='ESTATE'?'Недвижимость':a.type==='BUSINESS'?'Бизнес':'Актив';
                                     return `
-                                        <div class="row-item">
-                                            <span>
+                                        <div class="row-item" style="display:block; padding:12px;">
+                                            <div class="flex-between" style="margin-bottom:8px;">
                                                 <b>${a.title}</b>
-                                                <span class="badge ${a.type==='ESTATE'?'b-amber':a.type==='BUSINESS'?'b-green':'b-rose'}">${a.type}</span>
-                                            </span>
-                                            <div class="flex-between">
-                                                <b style="color:#10b981; margin-right:10px;">+${a.cf}$/мес</b>
-                                                <button onclick="send('SELL_ASSET', {aId:${a.id}, title:'${a.title.replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-gray" style="padding:3px 8px; font-size:11px;">Продать</button>
+                                                <span class="badge ${a.type==='ESTATE'?'b-amber':a.type==='BUSINESS'?'b-green':'b-rose'}">${_typeLbl}</span>
                                             </div>
+                                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; font-size:12px; margin-bottom:10px;">
+                                                <div style="color:#9ca3af;">Цена покупки: <b style="color:#e5e7eb;">${_price}$</b></div>
+                                                <div style="color:#9ca3af;">Ипотека: <b style="color:${_liab>0?'#f87171':'#6b7280'};">${_liab}$</b></div>
+                                                <div style="color:#9ca3af;">Пассив/доход: <b style="color:${_cf>0?'#10b981':_cf<0?'#f87171':'#6b7280'};">${_cf>0?'+':''}${_cf}$/мес</b></div>
+                                                <div style="color:#9ca3af;">При продаже: <b style="color:#fbbf24;">${_sale}$</b></div>
+                                            </div>
+                                            ${a.note?`<div style="font-size:11px; color:#fbbf24; margin-bottom:8px;">⚡ ${a.note}</div>`:''}
+                                            <button onclick="send('SELL_ASSET', {aId:${a.id}, title:'${a.title.replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-gray" style="padding:4px 12px; font-size:11px;">📤 Продать (${_sale}$)</button>
                                         </div>
                                     `;
                                 }).join('')}
@@ -804,8 +910,213 @@
             `;
         }
 
+        // ─── ПОЛЕ / ДВИЖОК ХОДА (в пульте ведущего) ───
+        const TRACK=[
+         {n:'Зарплата',x:4.0,y:8.5},{n:'Карьера',x:12.4,y:8.5},{n:'Акции-Крипта',x:20.7,y:8.5},
+         {n:'Навык',x:29.0,y:8.5},{n:'Дети',x:37.3,y:8.5},{n:'Рынок',x:45.6,y:8.5},
+         {n:'Расходы',x:53.9,y:8.5},{n:'Акции-Крипта',x:62.2,y:8.5},{n:'Сделки',x:70.5,y:8.5},
+         {n:'Государство',x:78.8,y:8.5},{n:'Рынок',x:87.5,y:8.5},{n:'Тюрьма',x:96.0,y:8.5},
+         {n:'Работа',x:96.0,y:28},{n:'Расходы',x:96.0,y:46},{n:'Налоги',x:96.0,y:64},
+         {n:'Чёрный рынок',x:96.0,y:91},
+         {n:'Зарплата',x:88.0,y:91},{n:'Сделки',x:79.3,y:91},{n:'Акции-Крипта',x:70.6,y:91},
+         {n:'Навык',x:61.9,y:91},{n:'Связи',x:53.2,y:91},{n:'Расходы',x:44.5,y:91},
+         {n:'Рынок',x:35.8,y:91},{n:'Акции-Крипта',x:27.1,y:91},{n:'Сделки',x:18.4,y:91},
+         {n:'Золотой билет',x:4.0,y:91},
+         {n:'Сделки',x:4.0,y:64},{n:'Государство',x:4.0,y:46},{n:'Медицина',x:4.0,y:28}
+        ];
+        // Цвета по ОЧЕРЕДИ создания бланка (Ринат): 1-й Красный, 2-й Синий, 3-й Зелёный, 4-й Чёрный, дальше…
+        const TOK_COLORS=['#ef4444','#3b82f6','#22c55e','#111827','#f97316','#eab308','#a855f7','#ec4899','#f8fafc','#9ca3af','#06b6d4','#92400e'];
+        const COLOR_NAMES=['Красный','Синий','Зелёный','Чёрный','Оранжевый','Жёлтый','Фиолетовый','Розовый','Белый','Серый','Бирюзовый','Коричневый'];
+        function colorIndex(pid){ const b=state.board; const i=(b&&b.order)?b.order.indexOf(pid):-1; return (i<0?0:i)%TOK_COLORS.length; }
+        function playerColor(pid){ return TOK_COLORS[colorIndex(pid)]; }
+        function playerColorName(pid){ return COLOR_NAMES[colorIndex(pid)]; }
+        function boardColor(b,pid){ const i=b.order.indexOf(pid); return TOK_COLORS[(i<0?0:i)%TOK_COLORS.length]; }
+        function renderBoard(){
+            const b=state.board;
+            if(!b || !b.order || !b.order.length){
+                return `<div class="card" style="text-align:center;color:#6b7280;">🗺️ Поле появится, как только за столом будут игроки.</div>`;
+            }
+            const nameOf=id=>{const p=state.players.find(x=>x.id==id);return p?p.name:('#'+id);};
+            const turnPid=b.order[b.turnIdx];
+            const byCell={}; b.order.forEach(pid=>{const c=b.positions[String(pid)]||0;(byCell[c]=byCell[c]||[]).push(pid);});
+            let toks='';
+            b.order.forEach(pid=>{
+                const cell=b.positions[String(pid)]||0; const c=TRACK[cell]||TRACK[0];
+                const grp=byCell[cell]; const k=grp.indexOf(pid); const off=(k-(grp.length-1)/2)*3.2;
+                const col=boardColor(b,pid); const isTurn=(pid===turnPid);
+                toks+=`<div class="tok${isTurn?' turn':''}" style="left:${c.x+off}%;top:${c.y}%;color:${col};background:${col};"></div>`;
+            });
+            const tc=TRACK[b.positions[String(turnPid)]||0]||TRACK[0]; const tcol=boardColor(b,turnPid);
+            const glow=`<div class="glow" style="left:${tc.x}%;top:${tc.y}%;color:${tcol};"></div>`;
+            const chips=b.order.map(pid=>`<span class="pchip${pid===turnPid?' turn':''}"><span class="dot" style="background:${boardColor(b,pid)}"></span>${nameOf(pid)}</span>`).join('');
+            const opts=b.order.map(pid=>`<option value="${pid}" ${pid===turnPid?'selected':''}>${nameOf(pid)}</option>`).join('');
+            const cellName=(TRACK[b.positions[String(turnPid)]||0]||{}).n||'';
+            const roll=b.lastRoll?` · выпало <b style="color:#fbbf24">${b.lastRoll.value}</b>`:'';
+            return `
+            <div class="card">
+                <div class="block-title" style="color:#e7b95a;">🗺️ Поле — движок хода</div>
+                <div id="buyTimer" style="display:none;text-align:center;background:#064e3b;color:#d1fae5;padding:6px 10px;border-radius:8px;font-weight:800;margin-bottom:8px;"></div>
+                <div style="text-align:center;margin-bottom:8px;color:#e9eefb;font-weight:800;">
+                    🎲 Ходит: <span style="color:${tcol}">${nameOf(turnPid)}</span> · клетка <b>${cellName}</b>${roll}
+                    &nbsp; <span id="turnTimer" style="color:#93c5fd;"></span>
+                </div>
+                <div style="display:flex;gap:12px;align-items:flex-start;justify-content:center;flex-wrap:wrap;">
+                    <div class="board-wrap" style="margin:0;flex:1 1 340px;"><div class="board-field"></div>${glow}${toks}</div>
+                    <div style="display:flex;flex-direction:column;gap:10px;flex:0 0 auto;min-width:150px;">
+                        <div style="background:var(--lx-ink);border:1px solid var(--lx-gold-ln);border-radius:12px;padding:14px 12px;text-align:center;">
+                            <div style="font-size:10px;color:var(--lx-muted);font-weight:800;letter-spacing:.14em;text-transform:uppercase;">⏱ Ход · 2 мин</div>
+                            <div id="turnTimerBig" style="font-size:34px;font-weight:900;color:var(--lx-gold-br);line-height:1.1;font-family:Georgia,serif;">—</div>
+                        </div>
+                        <div id="buyTimerBox" style="background:var(--lx-ink);border:1px solid #234436;border-radius:12px;padding:14px 12px;text-align:center;display:none;">
+                            <div style="font-size:10px;color:#7fd3ad;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">🛒 Покупка · 1 мин</div>
+                            <div id="buyTimerBig" style="font-size:34px;font-weight:900;color:#5cb08b;line-height:1.1;font-family:Georgia,serif;">—</div>
+                            <div style="font-size:10px;color:#7fd3ad;">акции / сделки — всем</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align:center;margin:8px 0;">${chips}</div>
+                <div style="display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:6px;">
+                    <select id="boardPid" class="inp" style="width:auto;padding:9px;">${opts}</select>
+                    <input id="dieVal" type="number" min="1" max="6" placeholder="1–6" style="width:70px;padding:9px;border-radius:8px;border:1px solid #374151;background:#0b1020;color:#fff;text-align:center;font-weight:700;">
+                    <button onclick="boardRoll(true)" class="btn btn-blue" style="font-weight:800;">▶ Пойти</button>
+                    <button onclick="boardRoll(false)" class="btn btn-gray" title="Апп сам кинет кубик за игрока">🎲 Апп кинет</button>
+                    <button onclick="boardNext()" class="btn btn-gray">Ход дальше ▶</button>
+                    <button onclick="boardResetTimer()" class="btn btn-gray" title="Перезапустить 2 минуты хода">🔄 Сброс таймера</button>
+                    <button onclick="hostDrawWorld()" class="btn" style="background:linear-gradient(90deg,#0891b2,#22d3ee);color:#fff;font-weight:800;" title="Раз в круг: тянет мировое событие, применяет ко ВСЕМ и показывает на всех экранах">🌍 Событие круга</button>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:8px;border-top:1px solid #1f2937;padding-top:8px;">
+                    <button onclick="toggleAutoPlay()" class="btn" style="background:${(state.autoPlay&&state.autoPlay.on)?'#b91c1c':'#7c3aed'};color:#fff;font-weight:800;">${(state.autoPlay&&state.autoPlay.on)?'⏸ Стоп автопрогон':'🤖 Автопрогон ботов'}</button>
+                    <span style="font-size:12px;color:#9ca3af;">скорость:</span>
+                    <select onchange="setAutoSpeed(this.value)" class="inp" style="width:auto;padding:7px;">
+                        <option value="1200" ${(state.autoPlay&&state.autoPlay.speed==1200)?'selected':''}>Быстро</option>
+                        <option value="2500" ${(!state.autoPlay||!state.autoPlay.speed||state.autoPlay.speed==2500)?'selected':''}>Средне</option>
+                        <option value="5000" ${(state.autoPlay&&state.autoPlay.speed==5000)?'selected':''}>Медленно</option>
+                    </select>
+                </div>
+            </div>`;
+        }
+        function boardRoll(usePhysical){
+            const sel=document.getElementById('boardPid'); const pid=sel?Number(sel.value):null;
+            if(!pid){ alert('Выбери игрока.'); return; }
+            let value;
+            if(usePhysical){
+                const el=document.getElementById('dieVal'); value=Math.max(1,Math.min(6,parseInt(el&&el.value,10)||0));
+                if(!value){ alert('Впиши, сколько выпало на кубике (1–6).'); return; }
+            }
+            fetch('/turn/roll',{method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(value?{pid,value}:{pid})}).catch(e=>console.warn('roll:',e));
+        }
+        function boardNext(){
+            fetch('/turn/next',{method:'POST',headers:{'Content-Type':'application/json'}}).catch(e=>console.warn('next:',e));
+        }
+        function boardResetTimer(){ fetch('/turn/timer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secs:120})}).catch(e=>console.warn('timer:',e)); }
+        // ─── ТАЙМЕРЫ (Ф3): ход 2 мин мягкий, окно покупки 1 мин жёсткое ───
+        function fmtLeft(endsAtSec){ const s=Math.max(0,Math.round(endsAtSec - Date.now()/1000)); const m=Math.floor(s/60); return m>0 ? (m+':'+String(s%60).padStart(2,'0')) : (s+'с'); }
+        let _buyWasOpen=false;
+        function tickTimers(){
+            const b=state.board; if(!b) return;
+            const tt=document.getElementById('turnTimer');
+            if(tt && b.turnEndsAt){ const left=b.turnEndsAt - Date.now()/1000;
+                tt.textContent = left>0 ? ('⏱ '+fmtLeft(b.turnEndsAt)) : '⏱ ВРЕМЯ ВЫШЛО!';
+                tt.style.color = left>0 ? (left<20?'#f59e0b':'#93c5fd') : '#ef4444';
+            }
+            const open=buyWindowOpen();
+            const bt=document.getElementById('buyTimer');
+            if(bt){ bt.textContent = open ? ('🟢 Покупка открыта ВСЕМ: '+fmtLeft(b.buyWindowEndsAt)) : ''; bt.style.display = open?'block':'none'; }
+            // большие боковые таймеры у поля
+            const ttb=document.getElementById('turnTimerBig');
+            if(ttb){ if(b.turnEndsAt){ const left=b.turnEndsAt-Date.now()/1000; ttb.textContent = left>0?fmtLeft(b.turnEndsAt):'ВРЕМЯ!'; ttb.style.color = left>0?(left<20?'#f59e0b':'#93c5fd'):'#ef4444'; } else ttb.textContent='—'; }
+            const btbox=document.getElementById('buyTimerBox'); if(btbox) btbox.style.display = open?'block':'none';
+            const btb=document.getElementById('buyTimerBig'); if(btb && open) btb.textContent = fmtLeft(b.buyWindowEndsAt);
+            if(_buyWasOpen && !open){ _buyWasOpen=false; safeRerender(); }   // окно закрылось → перерисовать, запереть покупку
+            if(open) _buyWasOpen=true;
+        }
+        setInterval(tickTimers, 1000);
+
+        // ─── 🤖 АВТОПРОГОН БОТОВ (видимая имитация игры для проверки; ускоренная скорость) ───
+        function autoToast(msg, color){
+            let el=document.getElementById('autoToast');
+            if(!el){ el=document.createElement('div'); el.id='autoToast';
+                el.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;background:#0b1020;border:2px solid #334155;color:#e9eefb;padding:10px 18px;border-radius:10px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:90vw;text-align:center;';
+                document.body.appendChild(el); }
+            el.style.borderColor=color||'#334155'; el.textContent=msg;
+        }
+        function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+        async function autoBuyStock(p){
+            const m=state.market; if(!m||!m.assets) return;
+            const affordable=m.assets.filter(a=>a.price<=p.savings);
+            if(!affordable.length) return;
+            const a=affordable[Math.floor(Math.random()*affordable.length)];
+            const q=Math.max(1, Math.floor((p.savings*0.3)/a.price));
+            let fill=a.price;
+            try{ const r=await fetch('/market/impact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assetId:a.id,side:'buy',qty:q})}); const j=await r.json(); if(j&&j.avgFill) fill=j.avgFill; }catch(e){}
+            const cost=Math.round(q*fill*100)/100; if(cost>p.savings) return;
+            p.savings=Math.round((p.savings-cost)*100)/100;
+            const st=pstat(p); st.buys++; st.buyAmt=Math.round((st.buyAmt+cost)*100)/100;
+            p.holdings=p.holdings||{}; const h=p.holdings[a.id]||{qty:0,avg:0,name:a.name};
+            h.avg=(h.avg*h.qty+fill*q)/(h.qty+q); h.qty+=q; h.name=a.name; p.holdings[a.id]=h;
+            save(p.id); autoToast('🛒 '+p.name+' купил '+q+'×'+a.name+' по ~'+fill+'$', '#10b981');
+        }
+        function autoGamble(p){
+            const bet=Math.max(50,Math.round((Number(p.savings)||0)*0.1)); if(bet>p.savings) return;
+            p.savings=Math.round((p.savings-bet)*100)/100;
+            const st=pstat(p); st.casinoPlays++;
+            const roll=1+Math.floor(Math.random()*6); const mult=CASINO_PAYOUT[roll]||0;
+            if(mult>0){ const win=Math.round(bet*mult*100)/100; p.savings=Math.round((p.savings+win)*100)/100;
+                st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(win-bet))*100)/100;
+                autoToast('🎰 '+p.name+' лудит: '+roll+' → +'+win+'$', '#a855f7'); }
+            else { st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
+                autoToast('🎰 '+p.name+' лудит: '+roll+' → −'+bet+'$', '#ef4444'); }
+            save(p.id);
+        }
+        // упрощённый авто-резолв события клетки для бота (живые игроки — через карточки-модалки)
+        const AUTO_EVENT={ career:['🎯 Карьера',0.05], skill:['💡 Навык',0.03], gov:['🏛️ Государство',-0.06],
+            world:['🌍 Мир.событие',-0.04], work:['💼 Работа',0.04], expense:['💸 Расходы',-0.08],
+            tax:['🏦 Налоги',-0.05], svyaz:['🌐 Связи',0.06], sdelka:['🤝 Сделки',0.07], med:['⚕️ Медицина',-0.05] };
+        function autoResolveCard(p, key){
+            const ev=AUTO_EVENT[key]; if(!ev){ p.allow=null; save(p.id); return; }
+            const delta=Math.round((Number(p.savings)||0)*ev[1]);
+            p.savings=Math.round(((Number(p.savings)||0)+delta)*100)/100; p.allow=null;
+            autoToast(ev[0]+': '+p.name+' '+(delta>=0?'+':'')+delta+'$', delta>=0?'#10b981':'#ef4444'); save(p.id);
+        }
+        async function autoResolveCell(pid){
+            const pp=state.players.find(x=>x.id==pid); if(!pp) return;
+            if(buyWindowOpen()){ await autoBuyStock(pp); return; }
+            if(pp.allow){ autoResolveCard(pp, pp.allow); return; }
+        }
+        let _autoTimer=null;
+        async function autoStep(){
+            if(!state.autoPlay || !state.autoPlay.on) return;
+            const speed=state.autoPlay.speed||2500;
+            const b=state.board;
+            if(b && b.order && b.order.length){
+                const pid=b.order[b.turnIdx]; const p=state.players.find(x=>x.id==pid);
+                if(p){
+                    if((Number(p.jail)||0)>0){ autoGamble(p); await sleep(speed*0.6); boardNext(); }
+                    else {
+                        const val=1+Math.floor(Math.random()*6);
+                        try{ await fetch('/turn/roll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid,value:val})}); }catch(e){}
+                        await sleep(speed*0.6); await autoResolveCell(pid); await sleep(speed*0.4); boardNext();
+                    }
+                } else { boardNext(); }
+            }
+            if(state.autoPlay && state.autoPlay.on) _autoTimer=setTimeout(autoStep, 300);
+        }
+        function toggleAutoPlay(){
+            state.autoPlay=state.autoPlay||{on:false,speed:2500};
+            state.autoPlay.on=!state.autoPlay.on; render();
+            if(state.autoPlay.on){ autoToast('🤖 Автопрогон ботов запущен', '#3b82f6'); autoStep(); }
+            else { autoToast('⏸ Автопрогон остановлен', '#6b7280'); if(_autoTimer) clearTimeout(_autoTimer); }
+        }
+        function setAutoSpeed(ms){ state.autoPlay=state.autoPlay||{on:false,speed:2500}; state.autoPlay.speed=Number(ms)||2500; render(); }
+
         function renderAdmin(app) {
             const pending = state.deals.filter(d => d.status === 'PENDING');
+            // ходящий игрок — наверх списка и с подсветкой, чтоб ведущий не искал
+            const turnPid = (state.board && state.board.order && state.board.order.length) ? state.board.order[state.board.turnIdx] : null;
+            const orderedPlayers = (turnPid != null)
+                ? [state.players.find(p => p.id == turnPid), ...state.players.filter(p => p.id != turnPid)].filter(Boolean)
+                : state.players;
             const dealLabel = {
                 BUY_ASSET: 'ПОКУПКА АКТИВА',
                 SELL_ASSET: 'ПРОДАЖА АКТИВА',
@@ -833,6 +1144,8 @@
                         <button onclick="state.view='lobby';render();" class="btn btn-gray">← В лобби</button>
                     </div>
                 </div>
+
+                ${renderBoard()}
 
                 <div class="grid-2">
                     <div class="card">
@@ -891,8 +1204,9 @@
                         <div class="block-title">👥 Игроки за столом</div>
                         ${state.players.length === 0
                             ? '<p style="color:#4b5563; text-align:center; padding:20px 0; font-size:13px;">Игроки не зарегистрированы</p>'
-                            : state.players.map(p => {
+                            : orderedPlayers.map(p => {
                                 const f = calc(p);
+                                const isTurn = (turnPid != null && p.id == turnPid);   // ходящий сейчас
                                 // Сводка долгов
                                 const debts = [];
                                 if (!p.isM && p.mLeft > 0) debts.push(`ипотека ${p.mLeft}$`);
@@ -904,11 +1218,12 @@
                                 const debtTotal = (p.isM?0:p.mLeft) + (p.isE?0:p.eLeft) + (p.isA?0:p.aLeft) + (p.isCC?0:p.ccLeft) + (p.isR?0:p.rLeft) + p.bankLoan;
 
                                 return `
-                                <div style="background:#030712; padding:13px; border-radius:8px; margin-bottom:12px; border:1px solid #1f2937; font-size:13px;">
+                                <div style="background:${isTurn?'#0b1a2e':'#030712'}; padding:13px; border-radius:8px; margin-bottom:12px; border:${isTurn?'3px solid '+playerColor(p.id):'1px solid #1f2937'}; ${isTurn?'box-shadow:0 0 18px '+playerColor(p.id)+';':''} font-size:13px;">
+                                    ${isTurn?`<div style="text-align:center;font-weight:900;color:${playerColor(p.id)};margin-bottom:8px;font-size:13px;letter-spacing:.5px;">🎲 ХОДИТ СЕЙЧАС</div>`:''}
                                     <div class="flex-between" style="border-bottom:1px solid #1f2937; padding-bottom:7px; margin-bottom:8px;">
                                         <div>
-                                            <b style="font-size:14px;">${p.name}</b>
-                                            <span style="color:#6b7280; font-weight:normal; font-size:12px;"> · ${p.prof.name}</span>
+                                            <span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:${playerColor(p.id)};border:1px solid #0f172a;box-shadow:0 0 6px ${playerColor(p.id)};vertical-align:middle;margin-right:5px;"></span><b style="font-size:14px;">${p.name}</b>
+                                            <span style="color:#6b7280; font-weight:normal; font-size:12px;"> · ${p.prof.name} · <b style="color:${playerColor(p.id)};">${playerColorName(p.id)}</b></span>
                                         </div>
                                         <div style="display:flex; gap:6px; align-items:center;">
                                             <span style="color:${f.flow>=0?'#10b981':'#ef4444'}; font-weight:bold;">${f.flow>=0?'+':''}${f.flow}$/мес</span>
@@ -927,6 +1242,13 @@
                                             💰 Касса:
                                             <input type="number" value="${p.savings}" onchange="chSavings(${p.id},this.value)" style="width:90px; background:#111827; color:#fbbf24; border:1px solid #374151; padding:3px; border-radius:4px; text-align:right; font-weight:bold;">
                                         </div>
+                                    </div>
+
+                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; background:#1a1206; border:1px solid #7c5e13; border-radius:6px; padding:7px 9px; flex-wrap:wrap;">
+                                        <span style="font-size:13px; color:#fbbf24; white-space:nowrap;">💰 Правка кассы:</span>
+                                        <input id="bankAmt${p.id}" type="number" placeholder="сумма" style="width:100px; background:#111827; color:#fbbf24; border:1px solid #7c5e13; padding:3px; border-radius:4px; text-align:right; font-weight:bold;">
+                                        <button onclick="bankAdjust(${p.id},1)" class="btn" style="background:#047857; color:#fff; padding:3px 12px; font-weight:800;">＋ Прибавить</button>
+                                        <button onclick="bankAdjust(${p.id},-1)" class="btn" style="background:#b91c1c; color:#fff; padding:3px 12px; font-weight:800;">− Отнять</button>
                                     </div>
 
                                     <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; background:#0c1424; border:1px solid #1e3a5f; border-radius:6px; padding:7px 9px;">
@@ -956,7 +1278,7 @@
 
                                     <!-- ТЮРЬМА (ведущий) -->
                                     <div style="background:#1c1917; border:1px solid #44403c; border-radius:6px; padding:8px; margin-bottom:8px;">
-                                        <div style="font-size:12px; color:#d6d3d1; margin-bottom:6px;">🔒 Тюрьма: ${(Number(p.jail)||0)>0?`<b style="color:#f87171;">сидит, осталось ${p.jail} ход(ов)</b>`:'<span style="color:#6b7280;">на свободе</span>'}</div>
+                                        <div style="font-size:12px; color:#d6d3d1; margin-bottom:6px;">🔒 Тюрьма: ${(Number(p.jail)||0)>0?`<b style="color:#f87171;">сидит, осталось ${p.jail} ход(ов)</b>`:'<span style="color:#6b7280;">на свободе</span>'} · <span style="color:#fbbf24;">за игру сидел ${Number(p.jailCount)||0} раз</span> ${(Number(p.jail)||0)>0?`(откуп ${jailBuyoutPct(p)}%)`:''}</div>
                                         <div style="display:flex; gap:6px; flex-wrap:wrap;">
                                             <button onclick="setJail(${p.id},2)" class="btn" style="background:#7c2d12; color:#fed7aa; padding:3px 8px; font-size:11px;">🔒 2 хода</button>
                                             <button onclick="setJail(${p.id},3)" class="btn" style="background:#7c2d12; color:#fed7aa; padding:3px 8px; font-size:11px;">🔒 3 хода</button>
@@ -981,6 +1303,16 @@
                                         💵 Зарплата ${p.prof.salary}$ · 📈 Пассив <b style="color:#10b981;">${f.passive}$</b> · 📉 Расход <b style="color:#ef4444;">${f.totalExp}$</b>
                                         <br>🎯 До победы: <b style="color:${f.win?'#10b981':'#fbbf24'};">${f.win?'ПОБЕДА!':`${f.target-f.passive}$ пассива`}</b>
                                     </div>
+
+                                    <!-- ДАШБОРД-АНАЛИТИКА (копится всю игру, для разбора игрока) -->
+                                    ${(()=>{ const s=pstat(p); const net=Math.round((s.casinoWon-s.casinoLost)*100)/100; return `<details style="margin-bottom:6px;">
+                                        <summary style="cursor:pointer; font-size:12px; color:#a78bfa; font-weight:bold; padding:4px 0;">🧠 Аналитика игрока (копится)</summary>
+                                        <div style="padding:6px 8px; font-size:11px; color:#cbd5e1; line-height:1.8; background:#0c1424; border-radius:6px;">
+                                            🎰 Казино: сыграл <b>${s.casinoPlays}</b> · выиграл <b style="color:#34d399;">${s.casinoWins}</b> (+${s.casinoWon}$) · проиграл <b style="color:#f87171;">${s.casinoLosses}</b> (−${s.casinoLost}$) · итог <b style="color:${net>=0?'#34d399':'#f87171'};">${net>=0?'+':''}${net}$</b><br>
+                                            🛒 Покупок акций: <b>${s.buys}</b> на <b>${s.buyAmt}$</b> &nbsp;·&nbsp; 📈 Продаж: <b>${s.sells}</b> на <b>${s.sellAmt}$</b><br>
+                                            💵 Зарплату получал <b>${s.salaryCount}</b> раз, всего <b>${s.salaryTotal}$</b>
+                                        </div>
+                                    </details>`; })()}
 
                                     <!-- ПОРТФЕЛЬ АКТИВОВ -->
                                     <details style="margin-bottom:6px;">
@@ -1289,7 +1621,33 @@
             // ✨ редкие плюсы
             { w:3, emoji:'🧬', title:'Прорыв в медицине',     text:'Здоровье и продуктивность: бизнесы +12%, всем +0.2 зарплаты.', apply:ps=>{ wBiz(ps,1.12); wCash(ps,p=>p.prof.salary*0.2); } },
             { w:3, emoji:'🕊️', title:'Мир и стабильность',    text:'Глобальная стабильность: акции +8% и налоги всем −10$/мес.', apply:ps=>{ wStocks(ps,1.08); wTax(ps,-10); } },
-            { w:3, emoji:'💎', title:'Открытие месторождения', text:'Ресурсный джекпот: прочие активы +20%.',              apply:ps=>wOther(ps,1.20) }
+            { w:3, emoji:'💎', title:'Открытие месторождения', text:'Ресурсный джекпот: прочие активы +20%.',              apply:ps=>wOther(ps,1.20) },
+            // 🟢 ещё бумы
+            { w:5, emoji:'🌾', title:'Рекордный урожай',       text:'Изобилие: прочие активы +15% у всех.',                apply:ps=>wOther(ps,1.15) },
+            { w:5, emoji:'🏗️', title:'Строительный бум',       text:'Стройка кипит: доход бизнесов +12% у всех.',          apply:ps=>wBiz(ps,1.12) },
+            { w:4, emoji:'💊', title:'Фарма-прорыв',           text:'Новые лекарства: акции +10% у всех.',                 apply:ps=>wStocks(ps,1.10) },
+            { w:5, emoji:'🎉', title:'Потребительский бум',     text:'Люди тратят: доход бизнесов +15% у всех.',            apply:ps=>wBiz(ps,1.15) },
+            { w:5, emoji:'🌐', title:'Интернет-бум',           text:'Цифра растёт: акции +12% у всех.',                    apply:ps=>wStocks(ps,1.12) },
+            { w:4, emoji:'🏦', title:'Снижение ставки ЦБ',     text:'Дешёвые деньги: акции +8% и налоги всем −10$/мес.',   apply:ps=>{ wStocks(ps,1.08); wTax(ps,-10); } },
+            { w:4, emoji:'💰', title:'Приток инвестиций',       text:'Инвесторы верят: прочие активы +15% у всех.',         apply:ps=>wOther(ps,1.15) },
+            { w:5, emoji:'☀️', title:'Туристический сезон',     text:'Поток клиентов: доход бизнесов +10% у всех.',         apply:ps=>wBiz(ps,1.10) },
+            { w:3, emoji:'🪙', title:'Крипто-ралли',           text:'Крипта в космос: прочие активы +25% у всех.',         apply:ps=>wOther(ps,1.25) },
+            { w:4, emoji:'⛽', title:'Нефть подешевела',        text:'Энергия дешевле: всем +0.3 зарплаты в кассу.',        apply:ps=>wCash(ps,p=>p.prof.salary*0.3) },
+            { w:2, emoji:'🛰️', title:'Космический прорыв',      text:'Технологии будущего: акции +18% у всех.',             apply:ps=>wStocks(ps,1.18) },
+            { w:2, emoji:'🧠', title:'Революция в биотехе',     text:'Прорыв: бизнесы +15% и всем +0.2 зарплаты.',          apply:ps=>{ wBiz(ps,1.15); wCash(ps,p=>p.prof.salary*0.2); } },
+            // 🔴 ещё кризисы
+            { w:5, emoji:'🌊', title:'Наводнение',             text:'Стихия: всем разовый расход ~0.25 зарплаты.',         apply:ps=>wCash(ps,p=>-p.prof.salary*0.25) },
+            { w:5, emoji:'📵', title:'Кибератака на банки',    text:'Взлом систем: с кассы у всех −8% (не в минус).',      apply:ps=>wCash(ps,p=>-(Number(p.savings)||0)*0.08) },
+            { w:5, emoji:'🛢️', title:'Скачок цен на нефть',    text:'Дорогая энергия: налоги/расход всем +15$/мес.',       apply:ps=>wTax(ps,15) },
+            { w:5, emoji:'🏭', title:'Спад производства',       text:'Заводы стоят: доход бизнесов −15% у всех.',           apply:ps=>wBiz(ps,0.85) },
+            { w:6, emoji:'💸', title:'Инфляция разогналась',    text:'Цены летят: налоги всем +20$/мес.',                   apply:ps=>wTax(ps,20) },
+            { w:4, emoji:'🪙', title:'Крипто-обвал',           text:'Спекулятив рухнул: прочие активы −30% у всех.',       apply:ps=>wOther(ps,0.70) },
+            { w:5, emoji:'🔒', title:'Санкции',                text:'Изоляция: акции −12% и бизнесы −8% у всех.',          apply:ps=>{ wStocks(ps,0.88); wBiz(ps,0.92); } },
+            { w:4, emoji:'🌡️', title:'Засуха',                 text:'Неурожай: прочие активы −20% у всех.',                apply:ps=>wOther(ps,0.80) },
+            { w:5, emoji:'📊', title:'Дефолт по облигациям',    text:'Долговой кризис: с кассы у всех −12% (не в минус).',   apply:ps=>wCash(ps,p=>-(Number(p.savings)||0)*0.12) },
+            { w:4, emoji:'⚡', title:'Массовый блэкаут',        text:'Нет света: доход бизнесов −10% у всех.',              apply:ps=>wBiz(ps,0.90) },
+            { w:5, emoji:'🏠', title:'Ипотечный кризис',        text:'Пузырь лопнул: акции −15% у всех.',                   apply:ps=>wStocks(ps,0.85) },
+            { w:4, emoji:'🧫', title:'Новый штамм вируса',      text:'Снова локдаун: бизнесы −12% и мед-расход у всех.',    apply:ps=>{ wBiz(ps,0.88); wCash(ps,p=>-p.prof.salary*0.15); } }
         ];
         function openWorldModal(id){ if(!gate(id,'world')) return; state.worldDraw = { pId:id, done:false, result:null }; render(); }
         function closeWorldModal(){ state.worldDraw = null; render(); }
@@ -1303,6 +1661,16 @@
             state.world = { id, emoji:ev.emoji, title:ev.title, text:ev.text };
             try { localStorage.setItem('v0_world_seen', String(id)); } catch(e){}  // тянущий уже видит
             m.done = true; m.result = state.world;
+            save(); render();
+        }
+        // ВЕДУЩИЙ: раз в круг тянет мировое событие — применяется ко ВСЕМ и транслируется на все экраны.
+        function hostDrawWorld(){
+            const total = WORLD_EVENTS.reduce((s,e)=>s+e.w,0);
+            let rr = Math.random()*total, ev = WORLD_EVENTS[0];
+            for (const e of WORLD_EVENTS) { if ((rr -= e.w) < 0) { ev = e; break; } }
+            ev.apply(state.players);                      // ГЛОБАЛЬНО — на всех игроков
+            state.world = { id: Date.now(), emoji:ev.emoji, title:ev.title, text:ev.text };
+            // seen НЕ отмечаем — ведущий тоже увидит оверлей вместе со всеми
             save(); render();
         }
         function maybeShowWorld(){
@@ -1656,32 +2024,43 @@
 
         // ─── Клетка СДЕЛКИ: партнёрства/сделки от других людей. МОШЕННИКИ ЧАЩЕ, чем
         // хорошие партнёры (15 скам / 7 хорошо / 6 нейтрал). Те же типы, что в Связях. ───
-        const SDELKI_CARDS = [
-            // ✅ хорошие (7)
-            {e:'🤝',t:'Выгодная сделка',k:'partner',m:0.12}, {e:'💼',t:'Совместный проект',k:'partner',m:0.10},
-            {e:'💰',t:'Перепродажа с прибылью',k:'cash',m:0.20}, {e:'📦',t:'Удачная поставка',k:'cash',m:0.15},
-            {e:'🏗️',t:'Долевое строительство',k:'partner',m:0.15}, {e:'🛒',t:'Опт со скидкой',k:'cash',m:0.18},
-            {e:'🤑',t:'Крупный контракт',k:'partner',m:0.18},
-            // ❌ мошенники (15 — ЧАЩЕ всего)
-            {e:'🕵️',t:'Кинули на сделке',k:'scam',m:0.25}, {e:'💸',t:'Предоплата — и пропал',k:'scam',m:0.22},
-            {e:'📉',t:'Сделка-пустышка',k:'scam',m:0.15}, {e:'🎭',t:'Фейковый поставщик',k:'scam',m:0.20},
-            {e:'🐍',t:'Обманул с долей',k:'scam',m:0.20}, {e:'🪤',t:'Развод на инвестицию',k:'scam',m:0.30},
-            {e:'🧾',t:'Поддельные документы',k:'scam',m:0.18}, {e:'🚩',t:'Аванс ушёл мошеннику',k:'scam',m:0.15},
-            {e:'💔',t:'Партнёр сбежал с деньгами',k:'scam',m:0.25}, {e:'📵',t:'Пропал после оплаты',k:'scam',m:0.20},
-            {e:'🤥',t:'Обещал много — обманул',k:'scam',m:0.17}, {e:'🏚️',t:'Купил «актив» — фальшивка',k:'scam',m:0.22},
-            {e:'⚠️',t:'Схема — пирамида',k:'scam',m:0.28}, {e:'🧨',t:'Сделка лопнула, потерял задаток',k:'scam',m:0.12},
-            {e:'🎣',t:'Развели как новичка',k:'scam',m:0.15},
-            // 🤝 нейтральные (6)
-            {e:'🤔',t:'Сделка на переговорах',k:'none'}, {e:'⏳',t:'Думаешь над предложением',k:'none'},
-            {e:'📝',t:'Условия не сошлись',k:'none'}, {e:'☕',t:'Встреча по сделке',k:'none'},
-            {e:'🔍',t:'Проверяешь партнёра',k:'none'}, {e:'🙅',t:'Отказался от рискованной сделки',k:'none'}
+        // МЕЛКИЕ сделки: быстро, малые суммы (доля зарплаты), больше мошенников — динамика
+        const SDELKI_SMALL = [
+            {e:'💰',t:'Перепродажа',k:'cash',m:0.08}, {e:'📦',t:'Мелкая поставка',k:'cash',m:0.06},
+            {e:'🤝',t:'Небольшой партнёр',k:'partner',m:0.05}, {e:'🛒',t:'Опт по мелочи',k:'cash',m:0.07},
+            {e:'💼',t:'Подработка на стороне',k:'cash',m:0.05}, {e:'🧰',t:'Ремонт под ключ',k:'cash',m:0.06},
+            {e:'🕵️',t:'Кинули по мелочи',k:'scam',m:0.06}, {e:'💸',t:'Мелкий развод',k:'scam',m:0.08},
+            {e:'🎭',t:'Фейк-поставщик',k:'scam',m:0.07}, {e:'🐍',t:'Обманул с долей',k:'scam',m:0.05},
+            {e:'🧾',t:'Липовые документы',k:'scam',m:0.06}, {e:'🎣',t:'Развели как новичка',k:'scam',m:0.07},
+            {e:'🤔',t:'Сделка на переговорах',k:'none'}, {e:'📝',t:'Условия не сошлись',k:'none'},
+            {e:'☕',t:'Встреча по сделке',k:'none'}, {e:'🙅',t:'Отказался от рискованной',k:'none'}
         ];
-        function openSdelkaModal(id){ if(!gate(id,'sdelka')) return; state.sdelkaModal = { pId:id, drawn:null }; render(); }
+        // КРУПНЫЕ сделки: БИЗНЕСЫ (цена+доход+обязательства, купить если хватает денег) + крупные cash/scam
+        const SDELKI_BIG = [
+            {e:'🏭',t:'Завод',k:'business',price:9000,cf:1000,liab:5000},
+            {e:'🏢',t:'Офисный центр',k:'business',price:13000,cf:1400,liab:8000},
+            {e:'🍔',t:'Сеть кафе',k:'business',price:5500,cf:700,liab:2800},
+            {e:'🏗️',t:'Девелопмент',k:'business',price:16000,cf:1900,liab:10000},
+            {e:'🚚',t:'Логистика',k:'business',price:6500,cf:800,liab:3200},
+            {e:'🏨',t:'Мини-отель',k:'business',price:11000,cf:1250,liab:6500},
+            {e:'⛽',t:'Заправка',k:'business',price:8000,cf:950,liab:4500},
+            {e:'💰',t:'Крупная перепродажа',k:'cash',m:0.40}, {e:'🤑',t:'Жирный контракт',k:'cash',m:0.35},
+            {e:'🪤',t:'Крупный развод на инвестицию',k:'scam',m:0.45}, {e:'⚠️',t:'Схема-пирамида',k:'scam',m:0.50},
+            {e:'💔',t:'Партнёр сбежал с деньгами',k:'scam',m:0.40}
+        ];
+        function openSdelkaModal(id, deck){ if(!gate(id,'sdelka')) return; state.sdelkaModal = { pId:id, deck:(deck==='big'?'big':'small'), drawn:null }; render(); }
+        function openSdelkaSmall(id){ openSdelkaModal(id,'small'); }
+        function openSdelkaBig(id){ openSdelkaModal(id,'big'); }
         function closeSdelkaModal(){ state.sdelkaModal = null; render(); }
         function drawSdelkaCard(){
             const m = state.sdelkaModal; if (!m || m.drawn) return;
             const p = state.players.find(x => x.id === m.pId); if (!p) return;
-            const c = SDELKI_CARDS[Math.floor(Math.random()*SDELKI_CARDS.length)];
+            const deck = (m.deck==='big') ? SDELKI_BIG : SDELKI_SMALL;
+            const c = deck[Math.floor(Math.random()*deck.length)];
+            if (c.k === 'business') {
+                m.drawn = { kind:'business', card:c };   // ОФЕР — игрок решает купить (проверка денег в buyDeal)
+                render(); return;
+            }
             let text, color;
             if (c.k === 'partner') {
                 const cf = Math.max(20, Math.round(p.prof.salary * c.m));
@@ -1706,6 +2085,36 @@
             p.notify = `🤝 Сделка: ${c.t} — ${text}`;
             save(); render();
         }
+        function buyDeal(){
+            const m = state.sdelkaModal; if (!m || !m.drawn || m.drawn.kind!=='business') return;
+            const p = state.players.find(x => x.id === m.pId); if (!p) return;
+            const c = m.drawn.card;
+            if ((Number(p.savings)||0) < c.price){ alert('🔒 Не хватает денег. Нужно '+c.price+'$, есть '+Math.round(Number(p.savings)||0)+'$ — нельзя.'); return; }
+            p.savings = Math.round(((Number(p.savings)||0) - c.price)*100)/100;
+            if (c.k === 'flip') {                       // купил и сразу перепродал (разовый кэш)
+                p.savings = Math.round(((Number(p.savings)||0) + c.income)*100)/100;
+                const net = c.income - c.price;
+                m.drawn = { emoji:c.e, title:(net>=0?'Перепродал: ':'Не окупилось: ')+c.t, text:`Купил за ${c.price}$, продал за ${c.income}$ → ${net>=0?'+':''}${net}$.`, color: net>=0?'#34d399':'#f87171' };
+                p.notify = `♻️ Перепродажа «${c.t}»: ${net>=0?'+':''}${net}$.`;
+            } else if (c.k === 'risk') {                 // займ/ставка: бросок ≥thr → вернут income, иначе 0
+                const roll = 1+Math.floor(Math.random()*6);
+                if (roll >= c.thr) {
+                    p.savings = Math.round(((Number(p.savings)||0) + c.income)*100)/100;
+                    m.drawn = { emoji:'🎲', title:'Повезло! '+c.t, text:`Выпало ${roll} (нужно ≥${c.thr}) → вернулось ${c.income}$. Итог ${c.income-c.price>=0?'+':''}${c.income-c.price}$.`, color:'#34d399' };
+                    p.notify = `🎲 «${c.t}»: выпало ${roll} — повезло, +${c.income}$.`;
+                } else {
+                    m.drawn = { emoji:'💔', title:'Не вернули: '+c.t, text:`Выпало ${roll} (нужно ≥${c.thr}) → ${c.price}$ потеряны.`, color:'#f87171' };
+                    p.notify = `💔 «${c.t}»: выпало ${roll} — ${c.price}$ пропали.`;
+                }
+            } else {                                     // пассивный актив (доход/мес)
+                p.assets = p.assets || [];
+                const saleVal = c.val || c.price;   // стоимость при продаже (у недвижки = цена покупки, не аванс)
+                p.assets.push({ id: Date.now()+Math.floor(Math.random()*1000), type:'BUSINESS', title:c.t, cf:c.cf, price:saleVal, liab:c.liab||0, down:0, note:c.note });
+                m.drawn = { emoji:c.e, title:'Куплено: '+c.t, text:`Твой актив! +${c.cf}$/мес пассива.${(c.liab||0)>0?` Обязательства ${c.liab}$ спишутся при продаже.`:''}`, color:'#34d399' };
+                p.notify = `🏢 Куплен актив «${c.t}»: +${c.cf}$/мес${(c.liab||0)>0?`, обязательства ${c.liab}$`:''}.`;
+            }
+            save(); render();
+        }
         function renderSdelkaModal(){
             const m = state.sdelkaModal; if (!m) return '';
             if (!m.drawn) {
@@ -1714,6 +2123,33 @@
                         <div style="font-size:16px;font-weight:800;color:#f9a8d4;margin-bottom:14px;">🤝 СДЕЛКИ — вытяни карту</div>
                         <div onclick="drawSdelkaCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#9d174d,#be185d);border:2px solid #f472b6;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">🤝</div>
                         <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Сделки от людей. Осторожно — мошенники тут частые!</p>
+                    </div>
+                </div>`;
+            }
+            if (m.drawn.kind === 'business') {
+                const c = m.drawn.card;
+                const isFlip = c.k==='flip', isRisk = c.k==='risk';
+                const hdr = isFlip?'Перепродажа: '+c.t : isRisk?'Рискованная сделка: '+c.t : 'Актив на продажу: '+c.t;
+                const info = isFlip
+                    ? `Купи за <b style="color:#fbbf24;">${c.price}$</b> → сразу продашь за <b style="color:#34d399;">${c.income}$</b> (${c.income-c.price>=0?'+':''}${c.income-c.price}$)`
+                    : isRisk
+                    ? `Ставка <b style="color:#fbbf24;">${c.price}$</b> · шанс вернуть <b style="color:#34d399;">${c.income}$</b> (бросок ≥${c.thr})`
+                    : `Цена <b style="color:#fbbf24;">${c.price}$</b> · доход <b style="color:#34d399;">+${c.cf}$/мес</b>${(c.liab||0)>0?` · обязательства <b style="color:#f87171;">${c.liab}$</b>`:''}`;
+                const desc = (isFlip?'Разовая перепродажа — купил и тут же продал.'
+                    : isRisk?'Рискованно: кубик решит — вернутся деньги или пропадут.'
+                    : 'Платишь и получаешь пассив. Продашь потом — кэш минус обязательства.')
+                    + (c.note?`<br><span style="color:#fbbf24;">⚡ ${c.note}</span>`:'');
+                const btn = isRisk?`🎲 Рискнуть ${c.price}$` : isFlip?`♻️ Купить и продать (${c.price}$)` : `💰 Купить за ${c.price}$`;
+                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:#0f172a;border:2px solid #f472b6;border-radius:14px;padding:24px;max-width:420px;text-align:center;">
+                        <div style="font-size:48px;">${c.e}</div>
+                        <div style="font-size:18px;font-weight:800;color:#f9a8d4;margin:6px 0;">${hdr}</div>
+                        <p style="color:#e5e7eb;font-size:14px;margin:10px 0;">${info}</p>
+                        <p style="color:#94a3b8;font-size:12px;margin-bottom:14px;">${desc}</p>
+                        <div style="display:flex;gap:8px;justify-content:center;">
+                            <button onclick="buyDeal()" class="btn" style="background:#059669;color:#fff;font-weight:800;padding:8px 20px;">${btn}</button>
+                            <button onclick="closeSdelkaModal()" class="btn btn-gray" style="padding:8px 20px;">Пропустить</button>
+                        </div>
                     </div>
                 </div>`;
             }
@@ -1731,8 +2167,11 @@
             return `
                 <div class="card" style="border-color:#f472b6;">
                     <div class="block-title" style="color:#f9a8d4;">🤝 СДЕЛКИ (от людей)</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Сделки и партнёрства от других. Бывают выгодные, но <b style="color:#f87171;">мошенники тут чаще</b>, чем хорошие партнёры. Попал на клетку → вытяни карту.</p>
-                    <button onclick="openSdelkaModal(${p.id})" class="btn" style="width:100%;background:#be185d;color:#fff;font-weight:800;font-size:14px;">🤝 ВЫТЯНУТЬ КАРТУ СДЕЛКИ</button>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Мелкие — быстро и по мелочи (мошенники чаще). Крупные — бизнесы за цену с доходом и обязательствами.</p>
+                    <div style="display:flex;gap:8px;">
+                        <button onclick="openSdelkaModal(${p.id},'small')" class="btn" style="flex:1;background:#be185d;color:#fff;font-weight:800;font-size:14px;">🤝 Мелкая сделка</button>
+                        <button onclick="openSdelkaModal(${p.id},'big')" class="btn" style="flex:1;background:#9d174d;color:#fff;font-weight:800;font-size:14px;">🏢 Крупная (бизнес)</button>
+                    </div>
                 </div>
             `;
         }
@@ -1834,8 +2273,8 @@
         function reg() {
             const name = (document.getElementById('pName').value || state.nameDraft || '').trim();
             if (!name || !state.chosenProf) { alert('Укажи имя и вытяни роль!'); return; }
-            const pin = (prompt('Придумай свой PIN (4 цифры) — он нужен, чтобы заходить ТОЛЬКО в свой бланк:') || '').trim();
-            if (!/^\d{4}$/.test(pin)) { alert('PIN должен быть из 4 цифр. Регистрация отменена.'); return; }
+            const pin = (prompt('Придумай свой PIN (3 или 4 цифры) — чтобы быстро заходить ТОЛЬКО в свой бланк:') || '').trim();
+            if (!/^\d{3,4}$/.test(pin)) { alert('PIN должен быть из 3 или 4 цифр. Регистрация отменена.'); return; }
             const pr = state.chosenProf;
             const newId = Date.now();
             try { localStorage.setItem('via_me', JSON.stringify({id:newId, pin})); } catch(e){}
@@ -1845,11 +2284,568 @@
                 isM: false, isE: pr.initEdu===0, isA: false, isCC: false, isR: false,
                 mLeft: pr.initMortgage, eLeft: pr.initEdu, aLeft: pr.initAuto,
                 ccLeft: pr.initCC, rLeft: pr.initRetail,
-                assets: [], skills: [], lifeSkills: {}, taxMod: 0, jail: 0, allow: null
+                assets: [], skills: [], lifeSkills: {}, taxMod: 0, jail: 0, jailCount: 0, allow: null,
+                stats: { casinoPlays:0, casinoWins:0, casinoLosses:0, casinoWon:0, casinoLost:0, buys:0, buyAmt:0, sells:0, sellAmt:0, salaryCount:0, salaryTotal:0 }
             });
             state.chosenProf = null; state.nameDraft = ''; save(newId); render();
         }
 
+        // ─── РЕАЛЬНЫЕ КАРТЫ РИНАТА: колода «Малые активы» (пассивы: заплатил вход → получаешь доход; продажа = стоимость минус обязательства) ───
+        // pay = сколько платишь при покупке; val = стоимость при продаже; cf = доход/мес; liab = обязательства (ипотека)
+        const ASSET_CARDS = [
+            {id:1,  t:'Парковочное место',        pay:1200,  val:1200,   cf:150,  liab:0},
+            {id:2,  t:'Вендинговый автомат',      pay:2000,  val:2000,   cf:200,  liab:0},
+            {id:3,  t:'Ларёк «Мини-маркет»',      pay:2500,  val:2500,   cf:220,  liab:0},
+            {id:4,  t:'Сдача гаража',             pay:1800,  val:1800,   cf:170,  liab:0},
+            {id:5,  t:'Автомат с водой',          pay:1500,  val:1500,   cf:180,  liab:0},
+            {id:6,  t:'Мини-мастерская (ремонт телефонов)', pay:3000, val:3000, cf:250, liab:0},
+            {id:7,  t:'Онлайн-магазин на маркетплейсе', pay:2000, val:2000, cf:200, liab:0},
+            {id:8,  t:'Прокат самокатов',         pay:2700,  val:2700,   cf:230,  liab:0},
+            {id:9,  t:'Продажа кофе с собой',     pay:3000,  val:3000,   cf:250,  liab:0},
+            {id:10, t:'Малый семейный бизнес',    pay:7000,  val:7000,   cf:180,  liab:0},
+            {id:11, t:'Однушка в спальном районе',pay:8000,  val:40000,  cf:300,  liab:32000},
+            {id:12, t:'Однушка у метро',          pay:12000, val:55000,  cf:350,  liab:43000},
+            {id:13, t:'Двушка в новостройке',     pay:18000, val:75000,  cf:400,  liab:57000},
+            {id:14, t:'Двушка в центре',          pay:22000, val:90000,  cf:550,  liab:68000},
+            {id:15, t:'Трёшка для семьи',         pay:26000, val:110000, cf:700,  liab:84000},
+            {id:16, t:'Апартаменты возле бизнес-центра', pay:28000, val:130000, cf:900, liab:102000},
+            {id:17, t:'Премиум-апартаменты',      pay:35000, val:160000, cf:1000, liab:125000},
+            // коллекционные — пассивный доход/мес
+            {id:18, t:'Редкая монета «Чёрный Орёл»', pay:2000, val:2000, cf:50, liab:0},
+            {id:19, t:'Раритетная купюра 1918 года', pay:1200, val:1200, cf:30, liab:0},
+            {id:20, t:'Участок земли под дачу',   pay:3500, val:3500, cf:40, liab:0},
+            {id:21, t:'Старая машина на разбор',  pay:900,  val:900,  cf:20, liab:0},
+            // ФЛИП — купил и сразу перепродал (разовый кэш)
+            {id:22, t:'Продажа старой техники (ТВ, ПК)', pay:700,  k:'flip', income:500},
+            {id:23, t:'Раритетная фигурка LEGO',  pay:1800, k:'flip', income:1900},
+            {id:24, t:'Бабушкины украшения / антиквариат', pay:2500, k:'flip', income:3000},
+            // РИСК — займ/ставка, бросок кубика ≥thr → вернут income, иначе 0
+            {id:25, t:'Подруга просит в долг',    pay:1000, k:'risk', income:1000, thr:4},
+            {id:26, t:'Сестра жены просит помочь', pay:1500, k:'risk', income:2500, thr:4},
+            {id:27, t:'Друг детства — вложиться в идею', pay:800, k:'risk', income:1800, thr:4},
+            // +25 новых мелких сделок (6июл)
+            {id:28, t:'Кофейный автомат в бизнес-центре', pay:2200, val:2200, cf:210, liab:0},
+            {id:29, t:'Пункт выдачи заказов',        pay:3500, val:3500, cf:280, liab:0},
+            {id:30, t:'Мойка ковров',                pay:2800, val:2800, cf:220, liab:0},
+            {id:31, t:'Автомат «Хватайка»',          pay:1600, val:1600, cf:160, liab:0},
+            {id:32, t:'Табачная лавка',              pay:2400, val:2400, cf:200, liab:0},
+            {id:33, t:'Точка шаурмы у вокзала',      pay:3200, val:3200, cf:260, liab:0},
+            {id:34, t:'Прокат велосипедов',          pay:2500, val:2500, cf:210, liab:0},
+            {id:35, t:'Швейная мастерская',          pay:3000, val:3000, cf:240, liab:0},
+            {id:36, t:'Зооуголок',                   pay:2700, val:2700, cf:220, liab:0},
+            {id:37, t:'Цветочный киоск',             pay:1800, val:1800, cf:170, liab:0},
+            {id:38, t:'Мини-пекарня на дому',        pay:2600, val:2600, cf:230, liab:0},
+            {id:39, t:'Мастерская ремонта обуви',    pay:1500, val:1500, cf:140, liab:0},
+            {id:40, t:'Печать фото и визиток',       pay:2000, val:2000, cf:180, liab:0},
+            {id:41, t:'Аренда самокатов у парка',    pay:2900, val:2900, cf:240, liab:0},
+            {id:42, t:'Кальянная точка',             pay:3400, val:3400, cf:270, liab:0},
+            {id:43, t:'Винтажные часы',              pay:2200, val:2200, cf:45,  liab:0},
+            {id:44, t:'Коллекция марок',             pay:1400, val:1400, cf:35,  liab:0},
+            {id:45, t:'Ретро-приставка',             pay:900,  val:900,  cf:25,  liab:0},
+            {id:46, t:'Комната в общежитии',         pay:6000, val:30000, cf:250, liab:24000},
+            {id:47, t:'Гараж-бокс',                  pay:5000, val:22000, cf:200, liab:17000},
+            {id:48, t:'Дачный домик',                pay:9000, val:45000, cf:320, liab:36000},
+            {id:49, t:'Перепродажа хайп-кроссовок',  pay:1200, k:'flip', income:1600},
+            {id:50, t:'Флип старого мотоцикла',      pay:2000, k:'flip', income:2400},
+            {id:51, t:'Кум просит на бизнес',        pay:1500, k:'risk', income:3000, thr:5},
+            {id:52, t:'Ставка на друга-блогера',     pay:1000, k:'risk', income:2200, thr:4},
+        ];
+        // ─── КОЛОДА «Чёрный рынок» — криминал/риск. crime: +get, бросок ≤catch → −penalty; bet: −invest, бросок ≥win → +payout; instant: разовый эффект (+ note для длящегося, ведущий ведёт вручную) ───
+        const BLACK_CARDS = [
+            {id:1,  t:'Быстрые деньги из криминала', k:'crime', get:15000, catch:1, penalty:25000},
+            {id:2,  t:'Сомнительный инвестор',       k:'bet',   invest:10000, win:6, payout:20000},
+            {id:3,  t:'Мошенники с документами',     k:'instant', get:0, note:'Продать текущий актив +20%, но бросок 1-4 → сделка аннулируется, актив исчезает (веди вручную).'},
+            {id:4,  t:'Поддельные криптомонеты',     k:'bet',   invest:5000, win:4, payout:15000},
+            {id:5,  t:'Скупщик краденого телефона',  k:'instant', get:2000, note:'Следующее событие прими как НЕГАТИВНОЕ (веди вручную).'},
+            {id:6,  t:'Продажа «серых» гаджетов',    k:'crime', get:5000, catch:3, penalty:8000},
+            {id:7,  t:'Фальшивые купюры',            k:'instant', get:3000, note:'Потрать в этот же ход, иначе −6000$ (веди вручную).'},
+            {id:8,  t:'Чёрная аренда недвижимости',  k:'instant', get:0, note:'+20% дохода с одного объекта этот круг, но 0$ в следующий (веди вручную).'},
+            {id:9,  t:'Продажа контрафакта',         k:'crime', get:7000, catch:3, penalty:4000},
+            {id:10, t:'Теневая крипто-обменка',      k:'bet',   invest:5000, win:4, payout:12000},
+            {id:11, t:'Взятка проверяющему',         k:'instant', get:0, note:'Игнор любого штрафа этот круг, но +300$/мес расход навсегда (веди вручную).'},
+            {id:12, t:'Теневая перевозка',           k:'instant', get:1000, note:'Пропусти следующий ход (веди вручную).'},
+            {id:13, t:'Серый ремонт недвижимости',   k:'instant', get:0, note:'50/50: объект +10% или −10% стоимости (веди вручную).'},
+            {id:14, t:'Покупка документов',          k:'instant', get:0, note:'Продать объект по мин.цене +15%, но бросок 1-3 → аннулируется, объект исчезает (веди вручную).'},
+            {id:15, t:'«Левый охранник»',            k:'instant', get:-1000, note:'1 раз отменить негатив бизнеса, но +150$/мес расход след.круг (веди вручную).'},
+            {id:16, t:'Контрабандный товар',         k:'crime', get:6000, catch:3, penalty:9000},
+            {id:17, t:'Серый обмен валюты',          k:'bet',   invest:5000, win:5, payout:5500},
+            {id:18, t:'«Крыша района»',              k:'instant', get:-2000, note:'Защита 2 круга (мошенники/кражи/штрафы/проверки), потом ещё −2000$ (веди вручную).'},
+        ];
+        function resolveBlackCard(pid, card){
+            const p = state.players.find(x=>x.id==pid); if(!p) return;
+            let title, text, color;
+            if(card.k==='crime'){
+                p.savings = Math.round(((Number(p.savings)||0)+card.get)*100)/100;
+                const roll=1+Math.floor(Math.random()*6);
+                if(roll<=card.catch){ p.savings=Math.round(((Number(p.savings)||0)-card.penalty)*100)/100;
+                    title='🚔 Поймали: '+card.t; text=`+${card.get}$, но выпало ${roll} → штраф −${card.penalty}$. Итог ${card.get-card.penalty}$.`; color='#f87171'; }
+                else { title='😈 Пронесло: '+card.t; text=`+${card.get}$ и не поймали (выпало ${roll}).`; color='#34d399'; }
+            } else if(card.k==='bet'){
+                if((Number(p.savings)||0) < card.invest){ alert('🔒 Не хватает на вложение '+card.invest+'$.'); return; }
+                p.savings=Math.round(((Number(p.savings)||0)-card.invest)*100)/100;
+                const roll=1+Math.floor(Math.random()*6);
+                if(roll>=card.win){ p.savings=Math.round(((Number(p.savings)||0)+card.payout)*100)/100;
+                    title='🎲 Повезло: '+card.t; text=`Вложил ${card.invest}$, выпало ${roll} → вернулось ${card.payout}$ (${card.payout-card.invest>=0?'+':''}${card.payout-card.invest}$).`; color='#34d399'; }
+                else { title='💀 Слив: '+card.t; text=`Вложил ${card.invest}$, выпало ${roll} → сгорело.`; color='#f87171'; }
+            } else {
+                if(card.get) p.savings=Math.round(((Number(p.savings)||0)+card.get)*100)/100;
+                title='🖤 '+card.t; text=(card.get?`${card.get>=0?'+':''}${card.get}$. `:'')+(card.note||''); color= (card.get||0)>=0?'#a78bfa':'#f87171';
+            }
+            p.notify = `🖤 Чёрный рынок: ${card.t} — ${text}`;
+            state.sdelkaModal = { pId:pid, drawn:{ emoji:'🖤', title, text, color } };
+            save(); render();
+        }
+        // ─── КОЛОДА «Крупные сделки» — недвижка/бизнес: pay=взнос, val=цена объекта(продажа), liab=ипотека, cf=ЧИСТЫЙ ПОТОК/мес (может быть минус). note — длящаяся особенность (ведущий ведёт вручную) ───
+        const BIG_CARDS = [
+            {id:1,  t:'Заброшенный склад',                pay:60000,   val:180000,   liab:120000,  cf:-4000},
+            {id:2,  t:'Ресторан в неудачном месте',       pay:80000,   val:250000,   liab:170000,  cf:-4000},
+            {id:3,  t:'Строительный объект без разрешений',pay:100000,  val:300000,   liab:200000,  cf:-9000},
+            {id:4,  t:'Низкосортный мини-отель',          pay:120000,  val:350000,   liab:230000,  cf:-6000},
+            {id:5,  t:'Коммерческое помещение без арендатора', pay:150000, val:400000, liab:250000, cf:-9600},
+            {id:6,  t:'Медцентр «ПРОФИ+»',                pay:700000,  val:2000000,  liab:1300000, cf:48000},
+            {id:7,  t:'Торгово-офисный центр',            pay:800000,  val:2200000,  liab:1400000, cf:65000},
+            {id:8,  t:'Завод бытовой техники',            pay:1500000, val:5000000,  liab:3500000, cf:95000},
+            {id:9,  t:'Сеть 50 кофеен «City Coffee»',     pay:2000000, val:5500000,  liab:3500000, cf:120000},
+            {id:10, t:'Мегапроект «CITY TOWER»',          pay:3000000, val:10000000, liab:7000000, cf:210000},
+            {id:11, t:'ТРЦ — Малый Торговый Центр',       pay:100000,  val:500000,   liab:400000,  cf:5000},
+            {id:12, t:'Отель на 40 номеров',              pay:120000,  val:520000,   liab:400000,  cf:6000},
+            {id:13, t:'Ресторан «Флагман»',               pay:100000,  val:480000,   liab:380000,  cf:6500},
+            {id:14, t:'Производство напитков (завод)',     pay:130000,  val:550000,   liab:420000,  cf:8000},
+            {id:15, t:'Оптовая база + логистический склад',pay:150000,  val:600000,   liab:450000,  cf:9000},
+            {id:16, t:'Мини-кафе на окраине',             pay:40000,   val:120000,   liab:80000,   cf:500},
+            {id:17, t:'Автосервис без репутации',         pay:50000,   val:150000,   liab:100000,  cf:1000},
+            {id:18, t:'Овощная точка на рынке',           pay:30000,   val:90000,    liab:60000,   cf:500},
+            {id:19, t:'Салон красоты (низкий трафик)',    pay:60000,   val:200000,   liab:140000,  cf:700},
+            {id:20, t:'Магазин одежды «No Name»',         pay:40000,   val:130000,   liab:90000,   cf:700},
+            {id:21, t:'Прачечная самообслуживания',       pay:50000,   val:160000,   liab:110000,  cf:800},
+            {id:22, t:'Ларёк со шаурмой',                 pay:30000,   val:100000,   liab:70000,   cf:500},
+            // цена входа + доход/мес (без ипотеки)
+            {id:23, t:'Сеть кофеен (3 точки)',            pay:160000,  val:160000,   liab:0, cf:5500},
+            {id:24, t:'Логистический склад',              pay:250000,  val:250000,   liab:0, cf:7500},
+            {id:25, t:'Офисные помещения (аренда)',       pay:400000,  val:400000,   liab:0, cf:12000},
+            // карьерные «прокачки» — доход/круг, длящаяся особенность (ведущий)
+            {id:26, t:'«Гуру своей профессии»',   pay:100000, val:100000, liab:0, cf:25000, note:'Доход/круг. Больше не покупаешь крупные сделки (ведущий).'},
+            {id:27, t:'«Собственный бренд»',      pay:150000, val:150000, liab:0, cf:30000, note:'Доход/круг. Все сделки исчезают — бренд важнее (ведущий).'},
+            {id:28, t:'«Элитный наставник»',      pay:120000, val:120000, liab:0, cf:20000, note:'Доход/круг. Раз в игру дать игроку +5000$; не участвуешь в сделках (ведущий).'},
+            {id:29, t:'«Мировой чемпион / Звезда»',pay:200000, val:200000, liab:0, cf:40000, note:'Доход/круг. Больше не покупаешь активы (ведущий).'},
+            {id:30, t:'«Легенда своей профессии»', pay:250000, val:250000, liab:0, cf:50000, note:'Доход/круг. Карьера сама приносит всё.'},
+            // премиум-объекты: цена входа задана, доход НЕТ в карте → cf 0, ведущий задаёт
+            {id:31, t:'Обменный центр «CashPoint»',      pay:550000,  val:550000,  liab:0, cf:0, note:'Стабильный спрос 24/7. Доход задаёт ведущий.'},
+            {id:32, t:'Таксопарк «CityRide»',            pay:600000,  val:600000,  liab:0, cf:0, note:'Большой оборот, обслуживание авто. Доход задаёт ведущий.'},
+            {id:33, t:'Разработка ПО «SoftX»',           pay:750000,  val:750000,  liab:0, cf:0, note:'Высокий рост, нужны инвестиции. Доход задаёт ведущий.'},
+            {id:34, t:'Производственный цех «SteelBuild»',pay:950000,  val:950000,  liab:0, cf:0, note:'Зависит от сырья и заказов. Доход задаёт ведущий.'},
+            {id:35, t:'Центр логистики «MegaHub»',       pay:1200000, val:1200000, liab:0, cf:0, note:'Огромная пропускная способность. Доход задаёт ведущий.'},
+            // +25 новых крупных сделок (6июл) — pay=взнос, val=цена, liab=ипотека, cf=чистый поток/мес
+            {id:36, t:'Автомойка премиум',            pay:90000,   val:300000,  liab:210000,  cf:7000},
+            {id:37, t:'Фитнес-клуб',                  pay:120000,  val:400000,  liab:280000,  cf:9000},
+            {id:38, t:'Сеть пекарен (5 точек)',       pay:200000,  val:700000,  liab:500000,  cf:15000},
+            {id:39, t:'Складской комплекс',           pay:250000,  val:800000,  liab:550000,  cf:18000},
+            {id:40, t:'Медлаборатория',               pay:180000,  val:600000,  liab:420000,  cf:14000},
+            {id:41, t:'Автосалон б/у',                pay:300000,  val:1000000, liab:700000,  cf:22000},
+            {id:42, t:'Частный детсад',               pay:100000,  val:350000,  liab:250000,  cf:6000},
+            {id:43, t:'Хостел на 60 мест',            pay:140000,  val:500000,  liab:360000,  cf:8000},
+            {id:44, t:'Ресторан у набережной',        pay:220000,  val:750000,  liab:530000,  cf:16000},
+            {id:45, t:'IT-аутсорс компания',          pay:160000,  val:550000,  liab:390000,  cf:20000},
+            {id:46, t:'Тепличное хозяйство',          pay:130000,  val:450000,  liab:320000,  cf:5000},
+            {id:47, t:'Кинотеатр 3 зала',             pay:400000,  val:1400000, liab:1000000, cf:24000},
+            {id:48, t:'Районный ТРЦ',                 pay:700000,  val:2500000, liab:1800000, cf:55000},
+            {id:49, t:'Бизнес-центр класса B',        pay:900000,  val:3200000, liab:2300000, cf:70000},
+            {id:50, t:'Логистический хаб XL',         pay:1200000, val:4500000, liab:3300000, cf:110000},
+            {id:51, t:'Аквапарк (провал сезона)',     pay:350000,  val:1200000, liab:850000,  cf:-8000},
+            {id:52, t:'Отель без ремонта',            pay:150000,  val:500000,  liab:350000,  cf:-5000},
+            {id:53, t:'Простаивающий завод',          pay:500000,  val:1800000, liab:1300000, cf:-12000},
+            {id:54, t:'Ночной клуб (проблемы)',       pay:200000,  val:700000,  liab:500000,  cf:-4000},
+            {id:55, t:'Салон элитных авто (неликвид)', pay:400000, val:1500000, liab:1100000, cf:-10000},
+            {id:56, t:'Крипто-ферма (майнинг)',       pay:250000,  val:900000,  liab:650000,  cf:30000},
+            {id:57, t:'Завод напитков',               pay:550000,  val:2000000, liab:1450000, cf:45000},
+            {id:58, t:'Сеть заправок',                pay:800000,  val:3000000, liab:2200000, cf:65000},
+            {id:59, t:'Мед-центр премиум',            pay:700000,  val:2600000, liab:1900000, cf:60000},
+            {id:60, t:'Авиа-карго логистика',         pay:1500000, val:6000000, liab:4500000, cf:130000},
+        ];
+        // ─── КОЛОДА «Пассивы» — РАСХОДЫ/обязательства. cash=разовая потеря$, pct=% наличных разом, exp=+прочие расходы/мес(навсегда), tax=+фикс налог, taxPct=+% налога, note=особенность(ведущий) ───
+        const PASSIVE_CARDS = [
+            {id:1,  t:'Фейковый инвестпроект',      cash:300, exp:40},
+            {id:2,  t:'Взломали карту',             cash:200, exp:25},
+            {id:3,  t:'Поддельный ремонтник',       cash:250, exp:30},
+            {id:4,  t:'Аренда квартиры',            exp:1000},
+            {id:5,  t:'Коммунальные услуги',        exp:150},
+            {id:6,  t:'Телефон и интернет',         exp:60},
+            {id:7,  t:'Медицина и лекарства',       exp:120},
+            {id:8,  t:'Кредитная карта',            exp:80},
+            {id:9,  t:'Питание и продукты',         exp:400},
+            {id:10, t:'Транспорт и бензин',         exp:200},
+            {id:11, t:'Одежда и уход',              exp:120},
+            {id:12, t:'Подписки и сервисы',         exp:50},
+            {id:13, t:'Налоги',                     tax:200, note:'Вариант: 10% от дохода или фикс 200$/круг (ведущий выберет).'},
+            {id:14, t:'Алкоголь, сигареты, развлечения', exp:180},
+            {id:15, t:'Лишние расходы (импульсивные покупки)', exp:100},
+            {id:16, t:'Пролил кофе на ноутбук',     exp:50},
+            {id:17, t:'Обязательная страховка имущества', exp:80},
+            {id:18, t:'Повышение коммунальных тарифов', exp:60},
+            {id:19, t:'Пассивный налог на роскошь', taxPct:2},
+            {id:20, t:'Ремонт телефона',            exp:35},
+            {id:21, t:'Лечение зубов',              exp:90},
+            {id:22, t:'Лишний кредитный процент',   exp:60},
+            {id:23, t:'Налоговая корректировка',    tax:100},
+            {id:24, t:'Осторожный инвестор',        exp:30},
+            {id:25, t:'Медицинская страховка',      exp:70},
+            {id:26, t:'Потерял кошелёк',            pct:10},
+            {id:27, t:'Украли деньги в транспорте', pct:15},
+            {id:28, t:'«Покупка Яхты»',             cash:20000, exp:3500, note:'Нельзя продать 3 круга — рынок заморожен (ведущий).'},
+            {id:29, t:'«Элитный Мотоцикл Limited Edition»', cash:15000, exp:1200, note:'При «Событии» кубик 1 → ещё −1000$ ремонт (ведущий).'},
+            {id:30, t:'«Спортивный Суперкар»',      cash:40000, exp:2800, note:'На штрафах/налогах платишь ×2 (ведущий).'},
+        ];
+        function resolvePassiveCard(pid, card){
+            const p = state.players.find(x=>x.id==pid); if(!p) return;
+            const parts=[];
+            if(card.pct){ const loss=Math.round((Number(p.savings)||0)*card.pct/100); p.savings=Math.round(((Number(p.savings)||0)-loss)*100)/100; parts.push(`−${loss}$ (${card.pct}% наличных)`); }
+            if(card.cash){ p.savings=Math.round(((Number(p.savings)||0)-card.cash)*100)/100; parts.push(`−${card.cash}$ сразу`); }
+            if(card.exp){ p.expMod=(Number(p.expMod)||0)+card.exp; parts.push(`+${card.exp}$/мес к расходам`); }
+            if(card.tax){ p.taxMod=(Number(p.taxMod)||0)+card.tax; parts.push(`+${card.tax}$ к налогам`); }
+            if(card.taxPct){ p.taxPct=(Number(p.taxPct)||0)+card.taxPct; parts.push(`+${card.taxPct}% к налогам`); }
+            const text = (parts.join(', ')||'нет эффекта') + (card.note?`. ${card.note}`:'');
+            p.notify = `📕 Пассив «${card.t}»: ${text}`;
+            state.sdelkaModal = { pId:pid, drawn:{ emoji:'📕', title:'📕 '+card.t, text, color:'#f87171' } };
+            save(); render();
+        }
+        // ─── КОЛОДА «Рынок» — событие ПРОДАЖИ: спрос вырос → рынок выкупает твой объект по цене price (минус ипотека). blocked=продажа заморожена. note=особое ───
+        const MARKET_CARDS = [
+            {id:1,t:'Ларёк со шаурмой',price:125000},{id:2,t:'Вендинговый автомат',price:26000},
+            {id:3,t:'Комната в аренду',price:80000},{id:4,t:'Мини-мастерская',price:62000},
+            {id:5,t:'Маленький шоурум',price:88000},{id:6,t:'EcoMarket',price:310000},
+            {id:7,t:'Автомойка',price:195000},{id:8,t:'Кофейня на углу',price:280000},
+            {id:9,t:'Склады',price:720000},{id:10,t:'Барбершоп',price:180000},
+            {id:11,t:'Ателье',price:140000},{id:12,t:'Дом под аренду',price:320000},
+            {id:13,t:'Производство мебели',price:860000},{id:14,t:'Земельный участок',price:210000},
+            {id:15,t:'Ресторан «Флагман»',price:600000},{id:16,t:'Логистический склад',price:780000},
+            {id:17,t:'Отель на 40 номеров',price:680000},{id:18,t:'Сеть кофеен',price:650000},
+            {id:19,t:'Торгово-офисный центр',price:2800000},{id:20,t:'Барбершоп',price:180000},
+            {id:21,t:'Ателье',price:145000},{id:22,t:'Кофейная тележка',price:95000},
+            {id:23,t:'Мини-отель',price:72000},{id:24,t:'Небольшая доставка',price:115000},
+            {id:25,t:'Таксопарк',price:780000},{id:26,t:'Обменный центр',price:630000},
+            {id:27,t:'Производственный цех',price:1050000},{id:28,t:'Логистический хаб',price:1350000},
+            {id:29,t:'Земельный участок',price:340000},{id:30,t:'Мини-магазинчик',price:135000},
+            {id:31,t:'Ремонт обуви',price:72000},{id:32,t:'Комната в общежитии',price:108000},
+            {id:33,t:'Старый киоск',blocked:true},{id:34,t:'Мини-шоурум',price:95000},
+            {id:35,t:'Апарт-комплекс',price:960000},{id:36,t:'Завод металлоконструкций',price:1900000},
+            {id:37,t:'Парк аттракционов',blocked:true},{id:38,t:'Дом в пригороде',price:720000},
+            {id:39,t:'Точка общепита',price:580000},{id:40,t:'Небольшая автомойка',price:82000},
+            {id:41,t:'Барбершоп',price:190000},{id:42,t:'Грузчики-доставка',price:110000},
+            {id:43,t:'Ремонт электроники',price:78000},{id:44,t:'Торговая палатка',blocked:true},
+            {id:45,t:'Мини-гостиница',price:650000},{id:46,t:'Крупная автомойка',price:980000},
+            {id:47,t:'Производственный цех',price:1500000},{id:48,t:'Земельный участок',price:360000},
+            {id:49,t:'Ресторан',price:720000},{id:50,t:'Домашняя мини-пекарня',price:118000},
+            {id:51,t:'Пункт выдачи заказов',price:140000},{id:52,t:'Мини-бар',price:165000},
+            {id:53,t:'Микро-фотостудия',price:92000},{id:54,t:'Уличная палатка',blocked:true},
+            {id:55,t:'Мини-отель',price:720000},{id:56,t:'Крупный автосервис',price:1200000},
+            {id:57,t:'Торговый склад',price:1350000},{id:58,t:'Ночной клуб',price:580000},
+            {id:59,t:'Земельный участок',price:390000},
+            {id:60,t:'Теневой перепродавец недвижимости',note:'Выкупить свой объект у рынка со скидкой 20%, но чёрная карта/кубик 1-3 → теряешь объект (ведущий).'},
+            // +рынок под НОВЫЕ мелкие сделки (спрос вырос → продай по хорошей цене)
+            {id:61,t:'Кофейный автомат в бизнес-центре',price:2900},{id:62,t:'Пункт выдачи заказов',price:4600},
+            {id:63,t:'Мойка ковров',price:3700},{id:64,t:'Автомат «Хватайка»',price:2100},
+            {id:65,t:'Табачная лавка',price:3100},{id:66,t:'Точка шаурмы у вокзала',price:4200},
+            {id:67,t:'Прокат велосипедов',price:3300},{id:68,t:'Швейная мастерская',price:3900},
+            {id:69,t:'Зооуголок',price:3500},{id:70,t:'Цветочный киоск',price:2400},
+            {id:71,t:'Мини-пекарня на дому',price:3400},{id:72,t:'Мастерская ремонта обуви',price:2000},
+            {id:73,t:'Печать фото и визиток',price:2600},{id:74,t:'Аренда самокатов у парка',price:3800},
+            {id:75,t:'Кальянная точка',price:4500},{id:76,t:'Винтажные часы',price:3000},
+            {id:77,t:'Коллекция марок',price:2000},{id:78,t:'Ретро-приставка',price:1400},
+            {id:79,t:'Комната в общежитии',price:34000},{id:80,t:'Гараж-бокс',price:25000},
+            {id:81,t:'Дачный домик',price:50000},
+            // +рынок под НОВЫЕ крупные сделки
+            {id:82,t:'Автомойка премиум',price:330000},{id:83,t:'Фитнес-клуб',price:440000},
+            {id:84,t:'Сеть пекарен (5 точек)',price:760000},{id:85,t:'Складской комплекс',price:870000},
+            {id:86,t:'Медлаборатория',price:650000},{id:87,t:'Автосалон б/у',price:1080000},
+            {id:88,t:'Частный детсад',price:380000},{id:89,t:'Хостел на 60 мест',price:540000},
+            {id:90,t:'Ресторан у набережной',price:810000},{id:91,t:'IT-аутсорс компания',price:600000},
+            {id:92,t:'Тепличное хозяйство',price:480000},{id:93,t:'Кинотеатр 3 зала',price:1500000},
+            {id:94,t:'Районный ТРЦ',price:2700000},{id:95,t:'Бизнес-центр класса B',price:3400000},
+            {id:96,t:'Логистический хаб XL',price:4800000},{id:97,t:'Аквапарк (провал сезона)',price:1100000},
+            {id:98,t:'Отель без ремонта',price:460000},{id:99,t:'Простаивающий завод',price:1600000},
+            {id:100,t:'Ночной клуб (проблемы)',price:640000},{id:101,t:'Салон элитных авто (неликвид)',price:1400000},
+            {id:102,t:'Крипто-ферма (майнинг)',price:980000},{id:103,t:'Завод напитков',price:2150000},
+            {id:104,t:'Сеть заправок',price:3200000},{id:105,t:'Мед-центр премиум',price:2800000},
+            {id:106,t:'Авиа-карго логистика',price:6500000},
+        ];
+        function resolveMarketCard(pid, card){ state.marketModal = { pId:pid, card }; state.view='player'; render(); }
+        function closeMarketModal(){ state.marketModal=null; render(); }
+        function sellMarketAsset(){
+            const m=state.marketModal; if(!m) return;
+            const p=state.players.find(x=>x.id==m.pId); if(!p) return;
+            const c=m.card;
+            const norm=s=>String(s||'').toLowerCase().replace(/[«»"'`().,\-—:]/g,'').replace(/\s+/g,' ').trim();
+            const key=norm(c.t);
+            const idx=(p.assets||[]).findIndex(a=>{ const at=norm(a.title); return at && key && (at.includes(key)||key.includes(at)); });
+            if(idx<0){ alert('У тебя нет объекта «'+c.t+'» в бланке. Если он есть — продай через пульт ведущего.'); return; }
+            const a=p.assets[idx];
+            const net=Math.round((c.price-(Number(a.liab)||0))*100)/100;
+            p.savings=Math.round(((Number(p.savings)||0)+net)*100)/100;
+            p.assets.splice(idx,1);
+            p.notify=`🔥 Продал «${a.title}» на рынке за ${c.price}$ (− ипотека ${a.liab||0}$ = ${net}$).`;
+            state.marketModal=null;
+            state.sdelkaModal={pId:m.pId, drawn:{emoji:'🔥',title:'Продано на рынке!',text:`«${a.title}» → +${net}$ (цена ${c.price}$ − ипотека ${a.liab||0}$).`,color:'#34d399'}};
+            save(); render();
+        }
+        function renderMarketModal(){
+            const m=state.marketModal; if(!m) return '';
+            const c=m.card;
+            let body;
+            if(c.note){
+                body=`<div style="font-size:44px;">🏷️</div><div style="font-size:17px;font-weight:800;color:#fbbf24;margin:6px 0;">${c.t}</div>
+                    <p style="color:#e5e7eb;font-size:13px;margin:10px 0;">${c.note}</p>
+                    <button onclick="closeMarketModal()" class="btn btn-gray" style="padding:8px 20px;">Понятно</button>`;
+            } else if(c.blocked){
+                body=`<div style="font-size:44px;">🚫</div><div style="font-size:17px;font-weight:800;color:#f87171;margin:6px 0;">${c.t}</div>
+                    <p style="color:#e5e7eb;font-size:13px;margin:10px 0;">Продажа этого объекта <b>заморожена</b> (снос / реконструкция / нет покупателя). Сейчас продать нельзя.</p>
+                    <button onclick="closeMarketModal()" class="btn btn-gray" style="padding:8px 20px;">Закрыть</button>`;
+            } else {
+                body=`<div style="font-size:44px;">🔥</div><div style="font-size:17px;font-weight:800;color:#fbbf24;margin:6px 0;">Рынок: спрос на «${c.t}» вырос!</div>
+                    <p style="color:#e5e7eb;font-size:14px;margin:10px 0;">Рынок готов выкупить твой объект за <b style="color:#34d399;">${c.price}$</b> (минус ипотека, если есть).</p>
+                    <p style="color:#94a3b8;font-size:12px;margin-bottom:14px;">Если этот объект есть в твоём бланке — жми «Продать».</p>
+                    <div style="display:flex;gap:8px;justify-content:center;">
+                        <button onclick="sellMarketAsset()" class="btn" style="background:#059669;color:#fff;font-weight:800;padding:8px 20px;">🔥 Продать за ${c.price}$</button>
+                        <button onclick="closeMarketModal()" class="btn btn-gray" style="padding:8px 20px;">Пропустить</button>
+                    </div>`;
+            }
+            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#0f172a;border:2px solid #fbbf24;border-radius:14px;padding:24px;max-width:420px;text-align:center;">${body}</div></div>`;
+        }
+        // ─── КОЛОДА «События» — жизненные события. cash=разовые +/−$, salary=+к зарплате навсегда, roll='ruletka'/'sluhi'=кубик, biz=есть бизнес +200/нет +500, note=мультиплеер/особое (ведущий) ───
+        const EVENT_CARDS = [
+            {id:1,t:'Премия на работе',cash:2000},
+            {id:2,t:'Удачная неделя в бизнесе',note:'Один твой актив приносит ×2 доход этот круг (ведущий).'},
+            {id:3,t:'Финансовая удача',cash:1500},
+            {id:4,t:'Старый долг вернули',cash:3000},
+            {id:5,t:'Счастливая сделка',note:'Продай одну мелкую сделку по верхней цене рынка (нужна рыночная карта; иначе пропуск).'},
+            {id:6,t:'Поломка машины',cash:-1200},
+            {id:7,t:'Медицинские расходы',cash:-800},
+            {id:8,t:'Увеличение налогов',cash:-300,note:'Все игроки платят −300 этот круг.'},
+            {id:9,t:'Потеря дохода',note:'Один твой актив приносит 0$ этот круг (ведущий).'},
+            {id:10,t:'Ошибка бухгалтера',cash:-1000},
+            {id:11,t:'Подарок от родственника',cash:500,note:'Игрок слева даёт тебе 500$ (ведущий проследит).'},
+            {id:12,t:'Рулетка удачи',roll:'ruletka'},
+            {id:13,t:'Настроение рынка',note:'Все ДЕРЖАТЬ/ПРОДАВАТЬ. Большинство держат → все +300, продают → все −300 (ведущий).'},
+            {id:14,t:'Поддержка друзей',note:'Возьми у любого игрока 500$ в долг (обязан дать), возврат через 3 круга (ведущий).'},
+            {id:15,t:'Финансовая паника',cash:-200,note:'Все игроки платят −200.'},
+            {id:16,t:'Выигрыш в мини-лотерею',cash:1000},
+            {id:17,t:'Удачная реклама',biz:true},
+            {id:18,t:'Рост зарплаты',salary:300},
+            {id:19,t:'Старый актив ожил',note:'Один твой актив +50% дохода этот круг (ведущий).'},
+            {id:20,t:'Новый клиент',cash:2500},
+            {id:21,t:'Повышение коммунальных платежей',cash:-300,note:'Все игроки платят −300.'},
+            {id:22,t:'Утеря кошелька',cash:-600},
+            {id:23,t:'Штраф за парковку',cash:-400},
+            {id:24,t:'Падение доходов',note:'Один мелкий бизнес −50% дохода этот круг (ведущий).'},
+            {id:25,t:'Бюрократия',note:'Пропусти половину своего дохода этот круг (ведущий).'},
+            {id:26,t:'Финансовая дуэль',note:'Выбери игрока, оба кубик: выше → +300, ниже → −300 (ведущий).'},
+            {id:27,t:'Добровольный сбор',note:'Все кроме тебя кидают 200$ в фонд, ты забираешь весь фонд (ведущий).'},
+            {id:28,t:'День добрых дел',cash:-300,note:'Подари 300$ любому игроку.'},
+            {id:29,t:'Маленькая афера',cash:100,note:'Забери у любого игрока 100$ (ведущий).'},
+            {id:30,t:'Паника в чате',note:'Все 👍/👎: большинство 👍 → +200, 👎 → −200 (ведущий).'},
+            {id:31,t:'Подработка с чаевыми',cash:900},
+            {id:32,t:'Момент удачи',cash:1300},
+            {id:33,t:'Семейная помощь',cash:2000},
+            {id:34,t:'Лёгкая экономия',cash:300,note:'Прочие расходы −300 этот круг.'},
+            {id:35,t:'Потеря клиента',note:'Один твой бизнес −300$ этот круг (ведущий).'},
+            {id:36,t:'Мелкое ЧП дома',cash:-500},
+            {id:37,t:'Непредвиденная поездка',cash:-700},
+            {id:38,t:'Долгий день',note:'В этом круге не можешь покупать активы (ведущий).'},
+            {id:39,t:'Неделя без продаж',note:'Один твой мелкий актив 0$ этот круг (ведущий).'},
+            {id:40,t:'Обмен подарками',cash:-300,note:'Отдай 300$ игроку, он даёт карту события из сброса (ведущий).'},
+            {id:41,t:'Дружеская поддержка',cash:100,note:'Игрок слева даёт тебе 100$ (ведущий).'},
+            {id:42,t:'Слухи в офисе',roll:'sluhi'},
+            {id:43,t:'Благотворительность',cash:-200,note:'Отдай 200$, в конце круга получи +300$ (ведущий).'},
+            {id:44,t:'Конфликт с коллегой',note:'С игроком справа оба кубик, у кого меньше → −200 (ведущий).'},
+        ];
+        function resolveEventCard(pid, card){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            const parts=[]; let delta=0;
+            if(card.roll==='ruletka'){ const r=1+Math.floor(Math.random()*6); delta=r<=2?-300:r<=4?0:600; parts.push(`кубик ${r} → ${delta>=0?'+':''}${delta}$`); }
+            else if(card.roll==='sluhi'){ const r=1+Math.floor(Math.random()*6); delta=r<=2?-100:r<=4?0:200; parts.push(`кубик ${r} → ${delta>=0?'+':''}${delta}$`); }
+            else if(card.biz){ const has=(p.assets||[]).some(a=>a.type==='BUSINESS'); delta=has?200:500; parts.push(has?'+200$ (есть бизнес)':'+500$ (нет бизнеса)'); }
+            if(typeof card.cash==='number'){ delta+=card.cash; parts.push(`${card.cash>=0?'+':''}${card.cash}$`); }
+            if(delta) p.savings=Math.round(((Number(p.savings)||0)+delta)*100)/100;
+            if(card.salary){ p.prof.salary=(Number(p.prof.salary)||0)+card.salary; parts.push(`+${card.salary}$/мес к зарплате навсегда`); }
+            const color=delta>0?'#34d399':delta<0?'#f87171':'#a78bfa';
+            const text=(parts.join(', ')||'—')+(card.note?`. ${card.note}`:'');
+            p.notify=`🎫 Событие «${card.t}»: ${text}`;
+            state.sdelkaModal={pId:pid, drawn:{emoji:'🎫', title:'🎫 '+card.t, text, color}};
+            save(); render();
+        }
+        // ─── 📷 QR-КАРТЫ: скан открывает и АВТО-применяет карту залогиненному игроку (ничего вводить не надо) ───
+        const QR_CARD = {
+            expense: ['expense', 'openExpenseModal', 'drawExpenseCard'],
+            sdelka:       ['sdelka', 'openSdelkaSmall', 'drawSdelkaCard'],
+            sdelka_small: ['sdelka', 'openSdelkaSmall', 'drawSdelkaCard'],
+            sdelka_big:   ['sdelka', 'openSdelkaBig',   'drawSdelkaCard'],
+            gov:     ['gov',     'openGovModal',     'drawGovCard'],
+            world:   ['world',   'openWorldModal',   'drawWorldCard'],
+            work:    ['work',    'openWorkModal',    'drawWorkCard'],
+            tax:     ['tax',     'openTaxModal',     'drawTaxCard'],
+            svyaz:   ['svyaz',   'openSvyazModal',   'drawSvyazCard'],
+            med:     ['med',     'openMedModal',     'drawMedCard'],
+        };
+        // ЗОЛОТОЙ БИЛЕТ — счастливая клетка: бросок кубика → растущая награда (6 = ДЖЕКПОТ)
+        function resolveGoldenTicket(pid){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            const roll=1+Math.floor(Math.random()*6);
+            const REW={1:1000,2:3000,3:6000,4:9000,5:15000,6:30000};
+            const win=REW[roll];
+            p.savings=Math.round(((Number(p.savings)||0)+win)*100)/100;
+            const jack=roll===6;
+            p.notify=`🎫 Золотой билет: выпало ${roll} → ${jack?'🎰 ДЖЕКПОТ ':''}+${win}$!`;
+            state.sdelkaModal={pId:pid, drawn:{emoji:jack?'🎰':'🎫', title:jack?'ДЖЕКПОТ!':'Золотой билет', text:`Выпало ${roll} → в кассу +${win}$.${jack?' Крупная удача!':''}`, color:'#efd8a3'}};
+            save(); render();
+        }
+        // ДЕТИ — +1 ребёнок → растут ежемесячные расходы (childCost из профессии)
+        function resolveChild(pid){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            p.children=(Number(p.children)||0)+1;
+            const cc=Number(p.prof&&p.prof.childCost)||0;
+            p.notify=`👶 Пополнение в семье! Теперь детей: ${p.children}. Расходы +${cc}$/мес.`;
+            state.sdelkaModal={pId:pid, drawn:{emoji:'👶', title:'Пополнение в семье!', text:`Теперь у тебя ${p.children} ребёнок(а). Расходы на детей растут: +${cc}$/мес каждый круг.`, color:'#b98bff'}};
+            save(); render();
+        }
+        // ── ПРЕДПРОСМОТР КАРТЫ при скане: карточка со всеми данными → «Применить» ──
+        function closeCardPreview(){ state.cardPreview=null; render(); }
+        function applyCardPreview(){ const cp=state.cardPreview; state.cardPreview=null; if(cp&&cp.apply) cp.apply(); }
+        function showCardPreview(pid, type){
+            var cp=null;
+            if(String(type).startsWith('black_')){ var c=BLACK_CARDS.find(x=>x.id===parseInt(type.slice(6),10)); if(!c){alert('Нет карты: '+type);return;}
+                var d='',ln=[];
+                if(c.k==='crime'){ d='Быстрые криминальные деньги — но с риском, что поймают.'; ln=[['Получишь сразу','+'+c.get+'$','#5cb08b'],['Если бросок ≤'+c.catch,'−'+c.penalty+'$','#cf9a9a']]; }
+                else if(c.k==='bet'){ d='Рискованное вложение на удачу.'; ln=[['Вложишь','−'+c.invest+'$','#cf9a9a'],['Если бросок ≥'+c.win,'+'+c.payout+'$','#5cb08b']]; }
+                else { d=c.note||'Разовый эффект.'; if(c.get) ln=[['Эффект',(c.get>=0?'+':'')+c.get+'$', c.get>=0?'#5cb08b':'#cf9a9a']]; }
+                cp={emoji:'🖤',tag:'Чёрный рынок',title:c.t,desc:d,lines:ln,color:'#b98bff',apply:function(){resolveBlackCard(pid,c);}};
+            } else if(String(type).startsWith('passive_')){ var v=PASSIVE_CARDS.find(x=>x.id===parseInt(type.slice(8),10)); if(!v){alert('Нет карты: '+type);return;}
+                var l2=[]; if(v.cash)l2.push(['Разовая потеря','−'+v.cash+'$','#cf9a9a']); if(v.pct)l2.push(['Потеря наличных','−'+v.pct+'%','#cf9a9a']);
+                if(v.exp)l2.push(['К расходам навсегда','+'+v.exp+'$/мес','#cf9a9a']); if(v.tax)l2.push(['К налогам','+'+v.tax+'$','#cf9a9a']); if(v.taxPct)l2.push(['К налогам','+'+v.taxPct+'%','#cf9a9a']);
+                cp={emoji:'📕',tag:'Пассив · расход',title:v.t,desc:v.note||'Расход или обязательство.',lines:l2,color:'#cf9a9a',apply:function(){resolvePassiveCard(pid,v);}};
+            } else if(String(type).startsWith('event_')){ var e=EVENT_CARDS.find(x=>x.id===parseInt(type.slice(6),10)); if(!e){alert('Нет карты: '+type);return;}
+                var d3='',l3=[];
+                if(e.roll==='ruletka'){d3='Крути рулетку удачи!';l3=[['Бросок 1-2','−300$','#cf9a9a'],['3-4','0$','#9c988e'],['5-6','+600$','#5cb08b']];}
+                else if(e.roll==='sluhi'){d3='Слухи в офисе — бросай кубик.';l3=[['Бросок 1-2','−100$','#cf9a9a'],['3-4','0$','#9c988e'],['5-6','+200$','#5cb08b']];}
+                else if(e.biz){d3='Удачная реклама.';l3=[['Есть бизнес','+200$','#5cb08b'],['Нет бизнеса','+500$','#5cb08b']];}
+                else { if(typeof e.cash==='number')l3.push(['Разово',(e.cash>=0?'+':'')+e.cash+'$', e.cash>=0?'#5cb08b':'#cf9a9a']); if(e.salary)l3.push(['К зарплате навсегда','+'+e.salary+'$','#5cb08b']); d3=e.note||''; }
+                cp={emoji:'🎫',tag:'Событие',title:e.t,desc:d3,lines:l3,color:'#efd8a3',apply:function(){resolveEventCard(pid,e);}};
+            } else if(type==='ticket'){ cp={emoji:'🎫',tag:'Золотой билет',title:'Золотой билет',desc:'Счастливая клетка! Бросай кубик — награда растёт, шестёрка = джекпот.',lines:[['Бросок 1','+1000$','#5cb08b'],['Бросок 5','+15000$','#5cb08b'],['Бросок 6 · ДЖЕКПОТ','+30000$','#efd8a3']],color:'#efd8a3',apply:function(){resolveGoldenTicket(pid);}};
+            } else if(type==='child'){ var pp=state.players.find(x=>x.id==pid); var cc=(pp&&pp.prof&&pp.prof.childCost)||0;
+                cp={emoji:'👶',tag:'Дети',title:'Пополнение в семье',desc:'У тебя будет ребёнок! Радость — но и расходы растут каждый круг.',lines:[['Детей станет',(((pp&&pp.children)||0)+1)+'',''],['Расходы','+'+cc+'$/мес','#cf9a9a']],color:'#b98bff',apply:function(){resolveChild(pid);}};
+            }
+            if(cp){ state.cardPreview=cp; state.view='player'; render(); }
+        }
+        function renderCardPreview(){
+            var c=state.cardPreview; if(!c) return '';
+            var lines=(c.lines||[]).map(function(l,i){return '<div style="display:flex;justify-content:space-between;padding:9px 12px;font-size:12.5px;'+(i>0?'border-top:1px solid var(--lx-line);':'')+'"><span style="color:#9c988e;">'+l[0]+'</span><span style="font-family:ui-monospace,monospace;font-weight:700;color:'+(l[2]||'#f3efe6')+';">'+l[1]+'</span></div>';}).join('');
+            return '<div style="position:fixed;inset:0;background:rgba(6,8,12,.88);z-index:2200;display:flex;align-items:center;justify-content:center;padding:16px;">'+
+              '<div style="width:340px;max-width:100%;background:linear-gradient(180deg,#171b23,#0d1016);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 30px -8px '+(c.color||'#d9b877')+';">'+
+                '<div style="height:4px;background:linear-gradient(90deg,transparent,'+(c.color||'#efd8a3')+',transparent);"></div>'+
+                '<div style="padding:22px 20px;text-align:center;">'+
+                  '<div style="font-size:44px;">'+(c.emoji||'🃏')+'</div>'+
+                  '<div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:'+(c.color||'#d9b877')+';font-weight:800;margin-top:6px;">'+(c.tag||'')+'</div>'+
+                  '<div style="font-family:Georgia,serif;font-size:20px;font-weight:600;margin:6px 0 10px;">'+(c.title||'')+'</div>'+
+                  (c.desc?'<p style="font-size:13px;color:#c3cde3;line-height:1.5;margin-bottom:12px;">'+c.desc+'</p>':'')+
+                  (lines?'<div style="text-align:left;border:1px solid var(--lx-line);border-radius:12px;overflow:hidden;margin-bottom:14px;">'+lines+'</div>':'')+
+                  '<div style="display:flex;gap:8px;">'+
+                    '<button onclick="applyCardPreview()" class="btn btn-green" style="flex:1;">✓ Применить</button>'+
+                    '<button onclick="closeCardPreview()" class="btn btn-gray" style="flex:0 0 auto;">Закрыть</button>'+
+                  '</div>'+
+                '</div>'+
+              '</div>'+
+            '</div>';
+        }
+        function applyQRCard(type){
+            const pid = state.currentPlayerId;
+            if(!pid){ state.pendingQR = type; alert('📷 Карта отсканирована. Сначала войди под своим бланком — карта применится сама.'); render(); return; }
+            if(type==='ticket'){ showCardPreview(pid,type); return; }
+            if(type==='child'){ showCardPreview(pid,type); return; }
+            // РЕАЛЬНАЯ карта-актив (Малые активы): скан asset_<id> → офер покупки ИМЕННО этой карты
+            if(String(type).startsWith('asset_')){
+                const aid = parseInt(String(type).slice(6),10);
+                const card = ASSET_CARDS.find(c=>c.id===aid);
+                if(!card){ alert('Нет такой карты-актива: '+type); return; }
+                state.players = state.players.map(x=>x.id==pid ? {...x, allow:'sdelka'} : x);
+                state.view='player';
+                state.sdelkaModal = { pId:pid, deck:'big', drawn:{ kind:'business', card:{ e:'🏢', t:card.t, price:card.pay, val:card.val, cf:card.cf, liab:card.liab, k:card.k, income:card.income, thr:card.thr } } };
+                render();
+                return;
+            }
+            // КРУПНЫЕ СДЕЛКИ: скан big_<id> → офер покупки именно этой крупной сделки
+            if(String(type).startsWith('big_')){
+                const gid = parseInt(String(type).slice(4),10);
+                const card = BIG_CARDS.find(c=>c.id===gid);
+                if(!card){ alert('Нет такой крупной сделки: '+type); return; }
+                state.players = state.players.map(x=>x.id==pid ? {...x, allow:'sdelka'} : x);
+                state.view='player';
+                state.sdelkaModal = { pId:pid, deck:'big', drawn:{ kind:'business', card:{ e:'🏢', t:card.t, price:card.pay, val:card.val, cf:card.cf, liab:card.liab, note:card.note } } };
+                render();
+                return;
+            }
+            // ЧЁРНЫЙ РЫНОК: скан → предпросмотр карты → применить
+            if(String(type).startsWith('black_')){ showCardPreview(pid,type); return; }
+            // ПАССИВЫ: скан → предпросмотр карты → применить
+            if(String(type).startsWith('passive_')){ showCardPreview(pid,type); return; }
+            // РЫНОК: скан market_<id> → предложение продать объект по рыночной цене
+            if(String(type).startsWith('market_')){
+                const mid = parseInt(String(type).slice(7),10);
+                const card = MARKET_CARDS.find(c=>c.id===mid);
+                if(!card){ alert('Нет такой карты рынка: '+type); return; }
+                state.view='player';
+                resolveMarketCard(pid, card);
+                return;
+            }
+            // СОБЫТИЯ: скан → предпросмотр карты → применить
+            if(String(type).startsWith('event_')){ showCardPreview(pid,type); return; }
+            const spec = QR_CARD[type];
+            if(!spec){ alert('Неизвестная карта в QR: '+type); return; }
+            const [key, openName, drawName] = spec;
+            state.players = state.players.map(x=>x.id==pid ? {...x, allow:key} : x);  // карту выдал ведущий = доверенно
+            state.view='player'; render();
+            window[openName](pid);   // пройдёт gate (allow=key), откроет модалку
+            window[drawName]();      // авто-тянет и применяет эффект
+        }
+        // ─── 📷 ВСТРОЕННЫЙ СКАНЕР QR (камера прямо в игре, не выходя в отдельное приложение) ───
+        let _scanStream=null, _scanRAF=null, _scanOverlay=null;
+        async function startScan(){
+            if(!('BarcodeDetector' in window)){
+                alert('Твой браузер не умеет сканировать внутри игры. Наведи на QR обычной камерой телефона — карта тоже откроется.');
+                return;
+            }
+            let stream;
+            try{ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}}); }
+            catch(e){ alert('Камера недоступна: '+(e.message||e)); return; }
+            _scanStream=stream;
+            _scanOverlay=document.createElement('div');   // оверлей ВНЕ render — broadcast не снесёт видео
+            _scanOverlay.style.cssText='position:fixed;inset:0;z-index:5000;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;';
+            const video=document.createElement('video'); video.setAttribute('playsinline',''); video.muted=true;
+            video.style.cssText='width:100%;max-width:460px;border-radius:12px;border:2px solid #22d3ee;';
+            const hint=document.createElement('div'); hint.textContent='📷 Наведи на QR-код карты'; hint.style.cssText='color:#fff;font-weight:800;margin-bottom:12px;font-size:16px;';
+            const btn=document.createElement('button'); btn.textContent='✕ Закрыть'; btn.onclick=stopScan;
+            btn.style.cssText='margin-top:16px;padding:12px 28px;border:none;border-radius:10px;background:#ef4444;color:#fff;font-weight:800;font-size:15px;';
+            _scanOverlay.appendChild(hint); _scanOverlay.appendChild(video); _scanOverlay.appendChild(btn);
+            document.body.appendChild(_scanOverlay);
+            video.srcObject=stream; try{ await video.play(); }catch(e){}
+            const det=new BarcodeDetector({formats:['qr_code']});
+            const tick=async()=>{
+                if(!_scanStream) return;
+                try{ const codes=await det.detect(video); if(codes&&codes.length){ const raw=codes[0].rawValue||''; stopScan(); handleScannedQR(raw); return; } }catch(e){}
+                _scanRAF=requestAnimationFrame(tick);
+            };
+            _scanRAF=requestAnimationFrame(tick);
+        }
+        function stopScan(){
+            if(_scanRAF){ cancelAnimationFrame(_scanRAF); _scanRAF=null; }
+            if(_scanStream){ _scanStream.getTracks().forEach(t=>t.stop()); _scanStream=null; }
+            if(_scanOverlay){ _scanOverlay.remove(); _scanOverlay=null; }
+        }
+        function handleScannedQR(raw){
+            let card=null;
+            try{ card=new URL(raw).searchParams.get('card'); }catch(e){}
+            if(!card && /^[a-z_]+$/i.test((raw||'').trim())) card=(raw||'').trim();
+            if(!card){ alert('Это не карта VIA: '+raw); return; }
+            applyQRCard(card);
+        }
         function openPlayer(id) {
             const p = state.players.find(x=>x.id===id);
             // админ (вошёл по 7777) видит любой бланк без PIN
@@ -1863,6 +2859,7 @@
                 }
             }
             state.currentPlayerId = id; state.view='player'; render();
+            if(state.pendingQR){ const t=state.pendingQR; state.pendingQR=null; applyQRCard(t); }   // отсканированная карта применяется сама
         }
         function login() {
             if (document.getElementById('pass').value === '7777') { state.view='admin'; state.isAdmin=true; state.err=''; }
@@ -1988,6 +2985,16 @@
         function rejl(dId) { state.deals = state.deals.filter(dl => dl.id != dId); save(); render(); }
         function chChild(id, v) { state.players = state.players.map(p => p.id==id ? {...p, children: Math.max(0, p.children+v)} : p); save(); render(); }
         function chSavings(id, v) { state.players = state.players.map(p => p.id==id ? {...p, savings: Number(v)||0} : p); save(id); render(); }
+        // Правка кассы ведущим: вбить сумму рядом и прибавить (+1) или отнять (−1). Всё авто-сохраняется.
+        function bankAdjust(id, sign){
+            const el=document.getElementById('bankAmt'+id);
+            const amt=Math.round((Number(el&&el.value)||0)*100)/100;
+            if(!amt){ alert('Впиши сумму рядом с кассой.'); return; }
+            state.players = state.players.map(p => p.id==id
+                ? {...p, savings: Math.round(((Number(p.savings)||0)+sign*amt)*100)/100} : p);
+            if(el) el.value='';
+            save(id); render();
+        }
         function chBankLoan(id, v) { const n = Math.max(0, Number(v)||0); state.players = state.players.map(p => p.id==id ? {...p, bankLoan: n} : p); save(id); render(); }
         // Ведущий закрывает/убирает актив игрока (акцию с биржи или карточный)
         function admRemoveHolding(pid, hid) {
@@ -2024,8 +3031,13 @@
         function admSellAsset(pid, aid) {
             const p = state.players.find(x => x.id == pid); if (!p) return;
             const a = (p.assets || []).find(x => x.id == aid); if (!a) return;
-            const proceeds = Math.round(a.type === 'STOCK' ? (a.qty || 0) * (a.now || a.price || 0) : (a.price || 0));
-            if (!confirm('Продать «' + (a.title || 'актив') + '» за ' + proceeds + '$ → в кассу ' + p.name + '?')) return;
+            const gross = Math.round(a.type === 'STOCK' ? (a.qty || 0) * (a.now || a.price || 0) : (a.price || 0));
+            const liab = Math.round(Number(a.liab) || 0);   // обязательства бизнеса гасятся при продаже
+            const proceeds = gross - liab;
+            const msg = liab > 0
+                ? 'Продать «' + (a.title || 'актив') + '»: ' + gross + '$ − обязательства ' + liab + '$ = ' + proceeds + '$ → в кассу ' + p.name + '?'
+                : 'Продать «' + (a.title || 'актив') + '» за ' + proceeds + '$ → в кассу ' + p.name + '?';
+            if (!confirm(msg)) return;
             state.players = state.players.map(pl => pl.id != pid ? pl
                 : {...pl, assets: (pl.assets || []).filter(x => x.id != aid), savings: Math.round(((pl.savings || 0) + proceeds) * 100) / 100});
             save(pid); render();
@@ -2182,9 +3194,31 @@
             save(); render();
         }
         // ─── ТЮРЬМА (ведущий): сажает игрока на N ходов; игрок пропускает ходы ───
-        function setJail(id, n) { state.players = state.players.map(p => p.id==id ? {...p, jail: Math.max(0, Math.round(n))} : p); save(); render(); }
+        // При посадке в тюрьму (0→>0) считаем jailCount (сколько раз сидел за игру)
+        function setJail(id, n) {
+            state.players = state.players.map(p => {
+                if (p.id != id) return p;
+                const wasFree = (Number(p.jail)||0) === 0;
+                const nn = Math.max(0, Math.round(n));
+                const jc = (wasFree && nn>0) ? (Number(p.jailCount)||0)+1 : (Number(p.jailCount)||0);
+                return {...p, jail: nn, jailCount: jc};
+            });
+            save(); render();
+        }
         function jailDec(id) { state.players = state.players.map(p => p.id==id ? {...p, jail: Math.max(0, (Number(p.jail)||0)-1)} : p); save(); render(); }
         function jailFree(id) { state.players = state.players.map(p => p.id==id ? {...p, jail: 0} : p); save(); render(); }
+        // Откуп РАСТЁТ: 1-й раз 30%, 2-й 40%, 3-й 50%… +10% за каждое попадание (до 90%). Ведущий тоже может «Освободить».
+        function jailBuyoutPct(p){ const times = Math.max(1, Number(p.jailCount)||1); return Math.min(90, 30 + (times-1)*10); }
+        function jailBuyout(id) {
+            const p = state.players.find(x => x.id == id); if (!p) return;
+            const times = Math.max(1, Number(p.jailCount)||1);
+            const pct = jailBuyoutPct(p);
+            const cost = Math.round((Number(p.savings)||0) * pct / 100);
+            if (!confirm(`Откупиться из тюрьмы за ${pct}% кассы (−${cost}$)? Это ${times}-й раз в тюрьме — чем чаще сидишь, тем дороже. Выйдешь сразу.`)) return;
+            state.players = state.players.map(x => x.id==id
+                ? {...x, savings: Math.round(((Number(x.savings)||0) - cost)*100)/100, jail: 0} : x);
+            save(id); render();
+        }
         // ─── РАЗРЕШЕНИЯ: кнопки клеток у игрока закрыты, пока ведущий не откроет КОНКРЕТНУЮ
         // клетку (p.allow = ключ). gate() проверяет+СЪЕДАЕТ разрешение (одноразовое). ───
         const ALLOW_LABEL = { career:'🎯 Карьера', skill:'💡 Навык', gov:'🏛️ Государство', world:'🌍 Мировое событие', work:'💼 Работа', expense:'💸 Расходы', tax:'🏦 Налоги', svyaz:'🌐 Связи', sdelka:'🤝 Сделки', med:'⚕️ Медицина' };
@@ -2192,6 +3226,7 @@
         function gate(id, key) {
             const p = state.players.find(x => x.id === id);
             if (!p) return false;
+            if ((Number(p.jail)||0) > 0) { alert('🔒 Ты в тюрьме — доступна только лудка (казино). Отбывай ходы или откупись.'); return false; }
             if (p.allow !== key) { alert('🔒 Жди — ведущий должен ОТКРЫТЬ тебе эту клетку.'); return false; }
             p.allow = null; save();   // одноразовое: разрешение потрачено
             return true;
@@ -2246,7 +3281,10 @@
                 startSSE();                      // мгновенный push — главный канал
                 setInterval(pollServer, 3000);   // страховка на случай обрыва провода
             }
+            const _qr = new URLSearchParams(location.search).get('card');
+            if (_qr) { state.pendingQR = _qr; }   // пришли по QR-ссылке ?card=<тип>
             render();
+            if (state.pendingQR && state.currentPlayerId) applyQRCard(state.pendingQR);
             if (document.getElementById('assetFields')) renderAssetForm();
         })();
     </script>
