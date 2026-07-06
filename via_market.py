@@ -36,6 +36,17 @@ MAX_GAME_YEARS = 300       # длинная живая партия: рынок 
 # годовой рост якоря по типу (акции мягко вверх; крипта/металл/сырьё ~флэт)
 TYPE_GROWTH = {"stock": 0.03, "crypto": 0.00, "metal": 0.02, "commodity": 0.00}
 
+# ЛИКВИДНОСТЬ СТАКАНА в $ по типу (Ринат 5июл): акции и золото/металл — ОГРОМНЫЕ стаканы,
+# цена еле идёт даже на крупной сделке; крипта — МЕЛКИЕ стаканы, летит в космос.
+# Сдвиг цены при сделке = (объём$ / liq) × IMPACT_MULT (жёстко: $5k в $10k → +100%).
+TYPE_LIQ = {"stock": 2_000_000, "metal": 3_000_000, "commodity": 500_000, "crypto": 40_000}
+
+def asset_liq(typ, vol):
+    liq = TYPE_LIQ.get(typ, 500_000)
+    if typ == "crypto":
+        liq *= 12.0 / max(float(vol or 0) or 12.0, 12.0)   # чем волатильнее (мемкоин) — тем тоньше стакан
+    return round(liq)
+
 
 def _num(s, default=0.0):
     if s is None: return default
@@ -77,7 +88,7 @@ def load_assets(path=CSV_PATH):
             "id": (r.get("AssetID") or name).strip(), "name": name, "type": typ,
             "price": round(cur, 2), "price0": round(cur, 2), "min": pmin,
             "avg0": pavg, "avg": pavg, "max": pmax,
-            "vol": vol, "history": [round(cur, 2)],
+            "vol": vol, "liq": asset_liq(typ, vol), "history": [round(cur, 2)],
         })
     return assets
 
