@@ -11085,8 +11085,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <button onclick="boardRoll(true)" class="btn btn-blue" style="font-weight:800;">▶ Пойти</button>
                     <button onclick="boardRoll(false)" class="btn btn-gray" title="Апп сам кинет кубик за игрока">🎲 Апп кинет</button>
                     <button onclick="boardNext()" class="btn btn-gray">Ход дальше ▶</button>
-                    <button onclick="boardResetTimer()" class="btn btn-gray" title="Перезапустить 2 минуты хода">🔄 Сброс таймера</button>
                     <button onclick="hostDrawWorld()" class="btn" style="background:linear-gradient(90deg,#0891b2,#22d3ee);color:#fff;font-weight:800;" title="Раз в круг: тянет мировое событие, применяет ко ВСЕМ и показывает на всех экранах">🌍 Событие круга</button>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:8px;border-top:1px solid var(--lx-gold-ln);padding-top:8px;">
+                    <span style="font-size:11px;color:var(--lx-muted);font-weight:700;text-transform:uppercase;letter-spacing:.12em;">⏱ Таймер хода:</span>
+                    <button onclick="boardStartTimer()" class="btn btn-gray" title="Запустить/перезапустить таймер хода (2 мин)">▶ Пуск</button>
+                    <button onclick="boardStopTimer()" class="btn btn-gray" title="Полностью остановить таймер хода">⏸ Стоп</button>
+                    <span style="font-size:11px;color:var(--lx-muted);font-weight:700;text-transform:uppercase;letter-spacing:.12em;margin-left:6px;">🛒 Таймер акций:</span>
+                    <button onclick="boardStartBuy()" class="btn btn-gray" title="Открыть окно покупки акций/сделок на 1 мин ВСЕМ">▶ Пуск</button>
+                    <button onclick="boardStopBuy()" class="btn btn-gray" title="Закрыть окно покупки">⏹ Стоп</button>
                 </div>
                 <div style="display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:8px;border-top:1px solid #1f2937;padding-top:8px;">
                     <button onclick="toggleAutoPlay()" class="btn" style="background:${(state.autoPlay&&state.autoPlay.on)?'#b91c1c':'#7c3aed'};color:#fff;font-weight:800;">${(state.autoPlay&&state.autoPlay.on)?'⏸ Стоп автопрогон':'🤖 Автопрогон ботов'}</button>
@@ -11113,7 +11120,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function boardNext(){
             fetch('/turn/next',{method:'POST',headers:{'Content-Type':'application/json'}}).catch(e=>console.warn('next:',e));
         }
-        function boardResetTimer(){ fetch('/turn/timer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secs:120})}).catch(e=>console.warn('timer:',e)); }
+        function boardStartTimer(){ fetch('/turn/timer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secs:120})}).catch(e=>console.warn('timer:',e)); }
+        function boardStopTimer(){ fetch('/turn/timer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secs:0})}).catch(e=>console.warn('timer:',e)); }
+        function boardStartBuy(){ fetch('/turn/buy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secs:60})}).catch(e=>console.warn('buy:',e)); }
+        function boardStopBuy(){ fetch('/turn/buy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secs:0})}).catch(e=>console.warn('buy:',e)); }
+        function boardResetTimer(){ boardStartTimer(); }   // старое имя = запуск (совместимость)
         // ─── ТАЙМЕРЫ (Ф3): ход 2 мин мягкий, окно покупки 1 мин жёсткое ───
         function fmtLeft(endsAtSec){ const s=Math.max(0,Math.round(endsAtSec - Date.now()/1000)); const m=Math.floor(s/60); return m>0 ? (m+':'+String(s%60).padStart(2,'0')) : (s+'с'); }
         let _buyWasOpen=false;

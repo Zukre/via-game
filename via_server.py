@@ -458,14 +458,31 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({'error': str(e)}, 400)
             return
         if self.path == '/turn/timer':
-            # ведущий перезапускает таймер хода (не передавая ход)
+            # ведущий управляет таймером хода: secs>0 = запустить/перезапустить, secs<=0 = СТОП (убрать таймер)
             n = int(self.headers.get('Content-Length', 0) or 0)
             raw = self.rfile.read(n).decode('utf-8') if n else '{}'
             try:
                 req = json.loads(raw)
-                secs = int(req.get('secs') or TURN_SECONDS)
+                secs = int(req.get('secs', TURN_SECONDS))
                 with LOCK:
-                    DATA.setdefault('board', {})['turnEndsAt'] = time.time() + max(5, secs)
+                    b = DATA.setdefault('board', {})
+                    b['turnEndsAt'] = None if secs <= 0 else (time.time() + max(5, secs))
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path == '/turn/buy':
+            # ведущий управляет окном ПОКУПКИ (акции/сделки): secs>0 = открыть ВСЕМ, secs<=0 = закрыть
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw)
+                secs = int(req.get('secs', BUY_SECONDS))
+                with LOCK:
+                    b = DATA.setdefault('board', {})
+                    b['buyWindowEndsAt'] = None if secs <= 0 else (time.time() + max(5, secs))
                     save_data(DATA)
                     broadcast()
                 self._send_json({'ok': True})
