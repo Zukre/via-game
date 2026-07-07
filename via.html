@@ -10334,38 +10334,43 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
     <script>
         // ─── ПРОФЕССИИ для VIA ───
+        // ─── ПРОФЕССИИ РИНАТА (цифры с его карт «Карты профессий РИНАТ ГАЙМ»; способности/пенсии — позже) ───
         const professionsDB = [
-            { id: 1, name: 'Дворник 🧹', salary: 1840, taxes: 280,
-              mortgagePay: 200, eduPay: 0, autoPay: 190, ccPay: 50, retailPay: 30, otherExp: 300, childCost: 70, savings: 660,
-              initMortgage: 20000, initEdu: 0, initAuto: 7000, initCC: 1000, initRetail: 800 },
+            { id: 1, name: 'Брокер 📈', salary: 10500, taxes: 2100,
+              mortgagePay: 1900, eduPay: 0, autoPay: 850, ccPay: 600, retailPay: 400, otherExp: 3200, childCost: 200, savings: 4000,
+              initMortgage: 110000, initEdu: 0, initAuto: 28000, initCC: 20000, initRetail: 22000 },
 
-            { id: 2, name: 'Охранник 🛡️', salary: 1380, taxes: 200,
-              mortgagePay: 180, eduPay: 0, autoPay: 100, ccPay: 60, retailPay: 50, otherExp: 200, childCost: 60, savings: 400,
-              initMortgage: 18000, initEdu: 0, initAuto: 4000, initCC: 1500, initRetail: 1200 },
+            { id: 2, name: 'Врач 🩺', salary: 11000, taxes: 2200,
+              mortgagePay: 1800, eduPay: 1000, autoPay: 700, ccPay: 600, retailPay: 500, otherExp: 3000, childCost: 200, savings: 4000,
+              initMortgage: 120000, initEdu: 50000, initAuto: 30000, initCC: 25000, initRetail: 25000 },
 
-            { id: 3, name: 'Полицейский 👮‍♂️', salary: 2070, taxes: 250,
-              mortgagePay: 550, eduPay: 80, autoPay: 200, ccPay: 60, retailPay: 50, otherExp: 250, childCost: 120, savings: 750,
-              initMortgage: 55000, initEdu: 6000, initAuto: 12000, initCC: 2000, initRetail: 1500 },
+            { id: 3, name: 'Дипломат 🌍', salary: 10000, taxes: 2000,
+              mortgagePay: 1800, eduPay: 0, autoPay: 900, ccPay: 700, retailPay: 400, otherExp: 3200, childCost: 200, savings: 3500,
+              initMortgage: 110000, initEdu: 0, initAuto: 28000, initCC: 18000, initRetail: 20000 },
 
-            { id: 4, name: 'Программист 💻', salary: 5175, taxes: 700,
-              mortgagePay: 1200, eduPay: 100, autoPay: 220, ccPay: 90, retailPay: 80, otherExp: 1000, childCost: 160, savings: 1200,
-              initMortgage: 120000, initEdu: 12000, initAuto: 11000, initCC: 3000, initRetail: 2000 },
+            { id: 4, name: 'Кинопродюсер 🎬', salary: 9500, taxes: 1900,
+              mortgagePay: 1800, eduPay: 0, autoPay: 750, ccPay: 600, retailPay: 450, otherExp: 3300, childCost: 200, savings: 3500,
+              initMortgage: 140000, initEdu: 0, initAuto: 30000, initCC: 22000, initRetail: 15000 },
 
-            { id: 5, name: 'Юрист ⚖️', salary: 4830, taxes: 600,
-              mortgagePay: 1100, eduPay: 120, autoPay: 300, ccPay: 100, retailPay: 80, otherExp: 750, childCost: 160, savings: 1500,
-              initMortgage: 110000, initEdu: 13000, initAuto: 14000, initCC: 4000, initRetail: 2200 },
+            { id: 5, name: 'Нарко-Барон 😈', salary: 9000, taxes: 1800,
+              mortgagePay: 1700, eduPay: 0, autoPay: 900, ccPay: 600, retailPay: 500, otherExp: 3300, childCost: 200, savings: 5000,
+              initMortgage: 40000, initEdu: 0, initAuto: 45000, initCC: 20000, initRetail: 30000 },
 
-            { id: 6, name: 'Врач 🩺', salary: 3680, taxes: 600,
-              mortgagePay: 900, eduPay: 300, autoPay: 350, ccPay: 70, retailPay: 100, otherExp: 350, childCost: 170, savings: 800,
-              initMortgage: 90000, initEdu: 30000, initAuto: 15000, initCC: 3500, initRetail: 2500 },
+            { id: 6, name: 'Стартапер 🚀', salary: 8000, taxes: 1600,
+              mortgagePay: 1200, eduPay: 0, autoPay: 600, ccPay: 500, retailPay: 400, otherExp: 3300, childCost: 180, savings: 2500,
+              initMortgage: 25000, initEdu: 0, initAuto: 0, initCC: 15000, initRetail: 12000 },
 
-            { id: 7, name: 'Инфобизнесмен 🚀', salary: 7475, taxes: 1000,
-              mortgagePay: 1300, eduPay: 80, autoPay: 300, ccPay: 120, retailPay: 100, otherExp: 2500, childCost: 160, savings: 2500,
-              initMortgage: 130000, initEdu: 8000, initAuto: 18000, initCC: 5000, initRetail: 3000 },
+            { id: 7, name: 'Топ-Менеджер 🏢', salary: 13000, taxes: 2600,
+              mortgagePay: 2400, eduPay: 0, autoPay: 950, ccPay: 800, retailPay: 500, otherExp: 4000, childCost: 250, savings: 6000,
+              initMortgage: 240000, initEdu: 0, initAuto: 60000, initCC: 25000, initRetail: 20000 },
 
-            { id: 8, name: 'Кинопродюсер 🎬', salary: 10925, taxes: 1900,
-              mortgagePay: 1800, eduPay: 120, autoPay: 400, ccPay: 200, retailPay: 200, otherExp: 3300, childCost: 170, savings: 5000,
-              initMortgage: 180000, initEdu: 12000, initAuto: 22000, initCC: 8000, initRetail: 5000 }
+            { id: 8, name: 'Фермер 🌾', salary: 7500, taxes: 1500,
+              mortgagePay: 1200, eduPay: 0, autoPay: 800, ccPay: 500, retailPay: 300, otherExp: 2900, childCost: 150, savings: 2500,
+              initMortgage: 35000, initEdu: 0, initAuto: 45000, initCC: 18000, initRetail: 9000 },
+
+            { id: 9, name: 'Юрист ⚖️', salary: 12000, taxes: 2400,
+              mortgagePay: 2200, eduPay: 1400, autoPay: 900, ccPay: 700, retailPay: 500, otherExp: 3300, childCost: 200, savings: 4000,
+              initMortgage: 140000, initEdu: 70000, initAuto: 35000, initCC: 20000, initRetail: 25000 }
         ];
 
         // ─── КАРЬЕРА: 10 навыков (d10). pct = прибавка к зарплате; кап суммарно +20%. ───
