@@ -185,6 +185,11 @@
             background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); font-size:12px; margin:3px;}
         .pchip.turn{border-color:#fff; box-shadow:0 0 14px rgba(255,255,255,.3); transform:scale(1.06);}
         .pchip .dot{width:11px;height:11px;border-radius:50%;box-shadow:0 0 8px currentColor;}
+        /* ─── ЛЮКС-ПЕРЕОДЕВАНИЕ ПАНЕЛЕЙ ДЕЙСТВИЙ (Карьера/Навык/Государство/Рынок/Работа/Расходы/Налоги/Связи/Медицина): убираем кислотные цвета ─── */
+        .card[style*="border-color:#"]{ border-color:var(--lx-line) !important; }
+        .card > .block-title[style*="color:#"]{ color:var(--lx-muted) !important; border-bottom-color:var(--lx-gold-ln) !important; }
+        .card .btn[style*="width:100%"]{ background:linear-gradient(180deg,var(--lx-gold-br),var(--lx-gold)) !important; color:#20180a !important; border:0 !important; box-shadow:0 8px 22px rgba(217,184,119,.18) !important; }
+        .card .btn[style*="width:100%"]:hover{ filter:brightness(1.04); }
     </style>
 </head>
 <body>
@@ -10824,9 +10829,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${(Number(p.jail)||0)>0 ? `<div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fff;padding:16px 14px;border-radius:12px;margin-bottom:10px;text-align:center;border:2px solid #fca5a5;box-shadow:0 0 22px rgba(239,68,68,.45);">
                     <div style="font-size:22px;font-weight:900;letter-spacing:1px;">🔒 ТЫ В ТЮРЬМЕ</div>
                     <div style="font-size:13px;margin:6px 0 6px;">Сидишь ещё <b>${p.jail}</b> ход(ов). Работают только <b style="color:#c4b5fd;">🎰 КАЗИНО</b> и <b style="color:#6ee7b7;">📈 ПРОДАЖА АКЦИЙ</b>. Остальное закрыто — жди, пока ходы дойдут до тебя.</div>
-                    <div style="font-size:12px;margin-bottom:10px;color:#fecaca;">🔢 За игру ты сидел <b>${Number(p.jailCount)||1}</b> раз(а). Откуп сейчас <b style="color:#fde68a;">${jailBuyoutPct(p)}%</b> кассы (каждый раз +10%).</div>
-                    <button onclick="jailDec(${p.id})" class="btn" style="background:#fff;color:#991b1b;font-weight:800;">Отбыл ход (−1)</button>
-                    <button onclick="jailBuyout(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;margin-left:6px;font-weight:800;">💸 Откупиться (−${jailBuyoutPct(p)}%)</button>
+                    <div style="font-size:12px;margin-bottom:10px;color:#fecaca;">🔢 За игру ты сидел <b>${Number(p.jailCount)||1}</b> раз(а). Срок уходит сам, когда ходы доходят до тебя — ничего нажимать не надо. Хочешь выйти сразу — откупись.</div>
+                    <button onclick="jailBuyout(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;">💸 Откупиться (−${jailBuyoutPct(p)}%)</button>
                 </div>` : ''}
                 ${(()=>{ const b=state.board; if(!b||!b.order||!b.order.length) return '';
                     const tp=b.order[b.turnIdx];
