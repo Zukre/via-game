@@ -8,7 +8,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         :root{ --lx-gold:#d9b877; --lx-gold-br:#efd8a3; --lx-gold-ln:rgba(217,184,119,.20);
                --lx-panel:#14171e; --lx-panel2:#171b23; --lx-ink:#0d1016; --lx-line:#242833;
-               --lx-text:#f3efe6; --lx-muted:#9c988e; --lx-em:#5cb08b; --lx-rose:#cf9a9a; }
+               --lx-text:#f3efe6; --lx-muted:#9c988e; --lx-faint:#6d6a62; --lx-em:#5cb08b; --lx-rose:#cf9a9a; }
         body {
             background:
               radial-gradient(1100px 560px at 50% -12%, rgba(217,184,119,.06), transparent 62%),
@@ -190,6 +190,33 @@
         .card > .block-title[style*="color:#"]{ color:var(--lx-muted) !important; border-bottom-color:var(--lx-gold-ln) !important; }
         .card .btn[style*="width:100%"]{ background:linear-gradient(180deg,var(--lx-gold-br),var(--lx-gold)) !important; color:#20180a !important; border:0 !important; box-shadow:0 8px 22px rgba(217,184,119,.18) !important; }
         .card .btn[style*="width:100%"]:hover{ filter:brightness(1.04); }
+        /* ─── КАЗИНО: атмосфера (фетр, барабаны, свет) ─── */
+        .casino-felt{position:relative; overflow:hidden;
+            border:1px solid var(--lx-gold-ln) !important;
+            background:
+              radial-gradient(120% 80% at 50% 0%, rgba(217,184,119,.08), transparent 52%),
+              radial-gradient(90% 130% at 50% 130%, rgba(38,102,66,.42), transparent 62%),
+              repeating-linear-gradient(135deg, rgba(255,255,255,.012) 0 3px, transparent 3px 6px),
+              linear-gradient(180deg,#123120,#0a1a12) !important;
+            box-shadow:0 18px 46px rgba(0,0,0,.55), inset 0 0 46px rgba(0,0,0,.4), 0 0 32px -12px var(--lx-gold) !important;}
+        .casino-lights{position:absolute; top:0; left:0; right:0; height:4px;
+            background:repeating-linear-gradient(90deg, var(--lx-gold-br) 0 5px, rgba(217,184,119,.15) 5px 12px);
+            animation:marquee 1.1s linear infinite;}
+        @keyframes marquee{to{background-position:12px 0}}
+        .reels{display:flex; gap:9px; justify-content:center; margin:12px 0; padding:12px 10px; border-radius:14px;
+            background:#0a120d; border:1px solid var(--lx-gold-ln); box-shadow:inset 0 4px 18px rgba(0,0,0,.7), inset 0 0 0 1px rgba(0,0,0,.5);}
+        .reel{width:clamp(44px,17%,64px); aspect-ratio:.82; border-radius:10px; display:grid; place-items:center;
+            font-size:clamp(22px,6.5vw,32px); background:linear-gradient(180deg,#182219,#0b110d);
+            border:1px solid rgba(217,184,119,.25); box-shadow:inset 0 3px 12px rgba(0,0,0,.7);
+            animation:reelglow 1.8s ease-in-out infinite;}
+        .reel:nth-child(2){animation-delay:.3s} .reel:nth-child(3){animation-delay:.6s}
+        @keyframes reelglow{0%,100%{filter:brightness(.92)}50%{filter:brightness(1.28) drop-shadow(0 0 7px rgba(217,184,119,.55))}}
+        .casino-spin{border:1px solid var(--lx-gold) !important; color:#f7e6c8 !important; font-weight:900 !important;
+            background:linear-gradient(180deg,#b6433f,#8c2c2a) !important;
+            box-shadow:0 8px 22px rgba(140,44,42,.45), inset 0 1px 0 rgba(255,255,255,.18), 0 0 16px -4px rgba(217,184,119,.5) !important;
+            text-shadow:0 1px 2px rgba(0,0,0,.4); letter-spacing:.04em;}
+        .casino-spin:hover{filter:brightness(1.08)}
+        .suit-r{color:#d98a8a} .suit-b{color:#cdc8bd}
     </style>
 </head>
 <body>
@@ -10793,16 +10820,23 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(); render();
         }
         function renderLuckPanel(p){
-            return `<div class="card" style="border:2px solid #a855f7;background:linear-gradient(135deg,rgba(168,85,247,0.18),rgba(236,72,153,0.10));">
-                <div class="block-title" style="color:#e9d5ff;font-size:18px;letter-spacing:.5px;">🎰 ИСПЫТАЙ УДАЧУ</div>
-                <p style="font-size:15px;color:#f5d0fe;font-weight:800;margin-bottom:2px;">Удача любит смелых! 🍀</p>
-                <p style="font-size:13px;color:#e9d5ff;margin-bottom:8px;">Выпадет <b style="color:#fbbf24;">6</b> — джекпот <b style="color:#34d399;">×${CASINO_PAYOUT[6]}</b>! Выпадет <b style="color:#fbbf24;">5</b> — <b style="color:#34d399;">×${CASINO_PAYOUT[5]}</b>. Иначе ставка сгорает. 🚀<br>Кто не рискует — тот не пьёт шампанское 🍾</p>
-                <div style="display:flex;gap:8px;">
-                    <input id="betAmt" type="number" min="1" placeholder="твоя ставка, $" style="flex:1;padding:12px;border-radius:10px;border:1px solid #a855f7;background:#0b1020;color:#fff;font-size:16px;font-weight:700;">
-                    <button onclick="gambleRoll()" class="btn" style="background:linear-gradient(90deg,#a855f7,#ec4899);color:#fff;font-weight:900;font-size:15px;padding:12px 18px;box-shadow:0 0 14px rgba(236,72,153,.5);">🎲 БРОСИТЬ!</button>
+            return `<div class="card casino-felt">
+                <div class="casino-lights"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;">
+                    <div>
+                        <div style="font-size:9px;letter-spacing:.26em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Private Casino · только в игре</div>
+                        <div style="font-family:Georgia,'Times New Roman',serif;font-size:23px;font-weight:600;color:var(--lx-gold-br);letter-spacing:.03em;line-height:1;">Казино «VIA» 🎰</div>
+                    </div>
+                    <div style="font-size:19px;letter-spacing:2px;white-space:nowrap;"><span class="suit-r">♥</span><span class="suit-b">♠</span><span class="suit-r">♦</span><span class="suit-b">♣</span></div>
                 </div>
-                <p style="font-size:13px;color:#fcd34d;font-weight:700;margin-top:8px;text-align:center;">🔥 Чувствуешь — сегодня ТВОЙ день? Фортуна ждёт дерзких! 😏</p>
-                <p style="font-size:11px;color:#9ca3af;margin-top:4px;text-align:center;">Твоя касса: <b>${Math.round(p.savings)} $</b></p>
+                <div class="reels"><div class="reel">🍒</div><div class="reel">💎</div><div class="reel">🎰</div></div>
+                <p style="font-size:12.5px;color:#d8e6dd;text-align:center;margin-bottom:12px;line-height:1.5;">
+                    🎯 <b style="color:var(--lx-gold-br);">6</b> → ДЖЕКПОТ <b style="color:#efd8a3;">×${CASINO_PAYOUT[6]}</b> &nbsp;·&nbsp; <b style="color:var(--lx-gold-br);">5</b> → <b style="color:#efd8a3;">×${CASINO_PAYOUT[5]}</b> &nbsp;·&nbsp; иначе ставка сгорает 🔥</p>
+                <div style="display:flex;gap:8px;">
+                    <input id="betAmt" type="number" min="1" placeholder="ставка, $" class="inp" style="flex:1;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;">
+                    <button onclick="gambleRoll()" class="btn casino-spin" style="flex:0 0 auto;font-size:15px;padding:12px 22px;">🎲 КРУТИТЬ</button>
+                </div>
+                <p style="font-size:11px;color:#a9b8ae;margin-top:11px;text-align:center;">Кто не рискует — тот не пьёт шампанское 🍾 · твоя касса: <b style="color:var(--lx-gold-br);">${Math.round(p.savings)} $</b></p>
             </div>`;
         }
 
@@ -11424,56 +11458,46 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                         </div>
                                     </div>
 
-                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; background:#1a1206; border:1px solid #7c5e13; border-radius:6px; padding:7px 9px; flex-wrap:wrap;">
-                                        <span style="font-size:13px; color:#fbbf24; white-space:nowrap;">💰 Правка кассы:</span>
-                                        <input id="bankAmt${p.id}" type="number" placeholder="сумма" style="width:100px; background:#111827; color:#fbbf24; border:1px solid #7c5e13; padding:3px; border-radius:4px; text-align:right; font-weight:bold;">
-                                        <button onclick="bankAdjust(${p.id},1)" class="btn" style="background:#047857; color:#fff; padding:3px 12px; font-weight:800;">＋ Прибавить</button>
-                                        <button onclick="bankAdjust(${p.id},-1)" class="btn" style="background:#b91c1c; color:#fff; padding:3px 12px; font-weight:800;">− Отнять</button>
+                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:7px; background:var(--lx-ink); border:1px solid var(--lx-line); border-radius:9px; padding:8px 10px; flex-wrap:wrap;">
+                                        <span style="font-size:12px; color:var(--lx-muted); font-weight:700; white-space:nowrap;">💰 Касса:</span>
+                                        <input id="bankAmt${p.id}" type="number" placeholder="сумма" style="width:100px; background:#0a0c10; color:var(--lx-gold-br); border:1px solid var(--lx-line); padding:5px; border-radius:8px; text-align:right; font-weight:bold; font-family:ui-monospace,monospace;">
+                                        <button onclick="bankAdjust(${p.id},1)" class="btn" style="background:rgba(92,176,139,.16); color:#7fd3ad; border:1px solid #234436; padding:5px 12px; font-weight:700;">＋</button>
+                                        <button onclick="bankAdjust(${p.id},-1)" class="btn" style="background:rgba(207,154,154,.14); color:#e0a3a3; border:1px solid #4c2b2b; padding:5px 12px; font-weight:700;">−</button>
                                     </div>
 
-                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; background:#0c1424; border:1px solid #1e3a5f; border-radius:6px; padding:7px 9px;">
-                                        <span style="font-size:13px; color:#93c5fd; white-space:nowrap;">🏦 Кредит банка:</span>
-                                        <input type="number" value="${Number(p.bankLoan)||0}" min="0" step="100" onchange="chBankLoan(${p.id},this.value)" style="width:100px; background:#111827; color:#93c5fd; border:1px solid #1e3a5f; padding:3px; border-radius:4px; text-align:right; font-weight:bold;">
-                                        <span style="font-size:11px; color:#6b7280; white-space:nowrap;">→ ${Math.round((Number(p.bankLoan)||0)*0.10)}$/мес расход</span>
+                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:7px; background:var(--lx-ink); border:1px solid var(--lx-line); border-radius:9px; padding:8px 10px;">
+                                        <span style="font-size:12px; color:var(--lx-muted); font-weight:700; white-space:nowrap;">🏦 Кредит:</span>
+                                        <input type="number" value="${Number(p.bankLoan)||0}" min="0" step="100" onchange="chBankLoan(${p.id},this.value)" style="width:100px; background:#0a0c10; color:var(--lx-text); border:1px solid var(--lx-line); padding:5px; border-radius:8px; text-align:right; font-weight:bold; font-family:ui-monospace,monospace;">
+                                        <span style="font-size:11px; color:var(--lx-faint); white-space:nowrap;">→ ${Math.round((Number(p.bankLoan)||0)*0.10)}$/мес расход</span>
                                     </div>
 
-                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; background:#1c1017; border:1px solid #4c1d24; border-radius:6px; padding:7px 9px;">
-                                        <span style="font-size:13px; color:#fca5a5;">🧾 Налог игроку:</span>
-                                        <input type="number" value="${Number(p.taxPct)||0}" min="0" step="1" onchange="setTaxPct(${p.id},this.value)" style="width:70px; background:#111827; color:#fca5a5; border:1px solid #4c1d24; padding:3px; border-radius:4px; text-align:right; font-weight:bold;">
-                                        <span style="font-size:12px; color:#9ca3af;">% от дохода → +${Math.round(f.income*(Number(p.taxPct)||0)/100)}$/мес к расходу</span>
+                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:7px; background:var(--lx-ink); border:1px solid var(--lx-line); border-radius:9px; padding:8px 10px;">
+                                        <span style="font-size:12px; color:var(--lx-muted); font-weight:700;">🧾 Налог:</span>
+                                        <input type="number" value="${Number(p.taxPct)||0}" min="0" step="1" onchange="setTaxPct(${p.id},this.value)" style="width:64px; background:#0a0c10; color:var(--lx-text); border:1px solid var(--lx-line); padding:5px; border-radius:8px; text-align:right; font-weight:bold; font-family:ui-monospace,monospace;">
+                                        <span style="font-size:11px; color:var(--lx-faint);">% дохода → +${Math.round(f.income*(Number(p.taxPct)||0)/100)}$/мес</span>
                                     </div>
 
-                                    <div style="display:flex; gap:6px; margin-bottom:8px; background:#0c1f16; border:1px solid #14532d; border-radius:6px; padding:7px 9px; align-items:center;">
-                                        <span style="font-size:13px; color:#6ee7b7; white-space:nowrap;">💎 Карточка:</span>
-                                        <select id="card_${p.id}" class="inp" style="flex:1; padding:4px; font-size:12px; min-width:0;">${CARDS.map((c,i)=>`<option value="${i}">${c.name} · ${c.cost}$ · +${c.cf}$/мес</option>`).join('')}</select>
-                                        <button onclick="giveCard(${p.id}, document.getElementById('card_${p.id}').value)" class="btn" style="background:#047857; color:#fff; padding:4px 10px; font-size:12px; white-space:nowrap;">➕ Выдать пассив</button>
-                                    </div>
-                                    <div style="display:flex; gap:6px; margin-bottom:8px; background:#1f0c0c; border:1px solid #532626; border-radius:6px; padding:7px 9px; align-items:center;">
-                                        <span style="font-size:13px; color:#fca5a5; white-space:nowrap;">➖ Минус:</span>
-                                        <select id="minus_${p.id}" class="inp" style="flex:1; padding:4px; font-size:12px; min-width:0;">${MINUS_CARDS.map((c,i)=>`<option value="${i}">${c.name} · ${minusEffect(c)}</option>`).join('')}</select>
-                                        <button onclick="giveMinus(${p.id}, document.getElementById('minus_${p.id}').value)" class="btn" style="background:#991b1b; color:#fff; padding:4px 10px; font-size:12px; white-space:nowrap;">➖ Отнять</button>
-                                    </div>
+                                    <!-- Карточка/Минус убраны: игроки сканируют карты сами, ведущему выдавать не нужно -->
 
                                     <button onclick="giveSalary(${p.id})" class="btn" style="width:100%; background:#059669; color:#fff; font-weight:800; margin-bottom:8px; font-size:14px;">💵 ВЫДАТЬ ЗАРПЛАТУ (${f.flow>=0?'+':''}${f.flow}$)</button>
 
                                     <!-- ТЮРЬМА (ведущий) -->
-                                    <div style="background:#1c1917; border:1px solid #44403c; border-radius:6px; padding:8px; margin-bottom:8px;">
-                                        <div style="font-size:12px; color:#d6d3d1; margin-bottom:6px;">🔒 Тюрьма: ${(Number(p.jail)||0)>0?`<b style="color:#f87171;">сидит, осталось ${p.jail} ход(ов)</b>`:'<span style="color:#6b7280;">на свободе</span>'} · <span style="color:#fbbf24;">за игру сидел ${Number(p.jailCount)||0} раз</span> ${(Number(p.jail)||0)>0?`(откуп ${jailBuyoutPct(p)}%)`:''}</div>
+                                    <div style="background:var(--lx-ink); border:1px solid var(--lx-line); border-radius:9px; padding:9px 10px; margin-bottom:7px;">
+                                        <div style="font-size:11px; color:var(--lx-muted); font-weight:700; text-transform:uppercase; letter-spacing:.1em; margin-bottom:7px;">🔒 Тюрьма — ${(Number(p.jail)||0)>0?`<span style="color:#e0a3a3;">сидит ${p.jail} ход(ов)</span>`:'<span style="color:var(--lx-faint);">на свободе</span>'} · сидел ${Number(p.jailCount)||0} раз</div>
                                         <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                                            <button onclick="setJail(${p.id},2)" class="btn" style="background:#7c2d12; color:#fed7aa; padding:3px 8px; font-size:11px;">🔒 2 хода</button>
-                                            <button onclick="setJail(${p.id},3)" class="btn" style="background:#7c2d12; color:#fed7aa; padding:3px 8px; font-size:11px;">🔒 3 хода</button>
-                                            <button onclick="setJail(${p.id},1)" class="btn btn-gray" style="padding:3px 8px; font-size:11px;">🔒 1 ход</button>
-                                            <button onclick="jailDec(${p.id})" class="btn btn-gray" style="padding:3px 8px; font-size:11px;">−1 ход</button>
-                                            <button onclick="jailFree(${p.id})" class="btn" style="background:#065f46; color:#a7f3d0; padding:3px 8px; font-size:11px;">Освободить</button>
+                                            <button onclick="setJail(${p.id},2)" class="btn btn-gray" style="padding:5px 10px; font-size:11px;">2 хода</button>
+                                            <button onclick="setJail(${p.id},3)" class="btn btn-gray" style="padding:5px 10px; font-size:11px;">3 хода</button>
+                                            <button onclick="setJail(${p.id},1)" class="btn btn-gray" style="padding:5px 10px; font-size:11px;">1 ход</button>
+                                            <button onclick="jailFree(${p.id})" class="btn" style="background:rgba(92,176,139,.16); color:#7fd3ad; border:1px solid #234436; padding:5px 12px; font-size:11px;">Освободить</button>
                                         </div>
                                     </div>
 
                                     <!-- РАЗРЕШЕНИЕ КЛЕТОК (ведущий открывает игроку одну клетку на раз) -->
-                                    <div style="background:#0c1a2b; border:1px solid #1e3a5f; border-radius:6px; padding:8px; margin-bottom:8px;">
-                                        <div style="font-size:12px; color:#93c5fd; margin-bottom:6px;">🎫 Открыта клетка: ${p.allow?`<b style="color:#34d399;">${ALLOW_LABEL[p.allow]||p.allow}</b>`:'<span style="color:#6b7280;">закрыто (все кнопки заблокированы)</span>'}</div>
+                                    <div style="background:var(--lx-ink); border:1px solid var(--lx-line); border-radius:9px; padding:9px 10px; margin-bottom:7px;">
+                                        <div style="font-size:11px; color:var(--lx-muted); font-weight:700; text-transform:uppercase; letter-spacing:.1em; margin-bottom:7px;">🎫 Открыта клетка — ${p.allow?`<span style="color:var(--lx-gold-br);">${ALLOW_LABEL[p.allow]||p.allow}</span>`:'<span style="color:var(--lx-faint);">закрыто</span>'}</div>
                                         <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                                            ${Object.keys(ALLOW_LABEL).map(k=>`<button onclick="setAllow(${p.id},'${k}')" class="btn" style="background:${p.allow===k?'#047857':'#1e3a5f'}; color:#dbeafe; padding:2px 6px; font-size:10px;">${ALLOW_LABEL[k]}</button>`).join('')}
-                                            <button onclick="setAllow(${p.id},null)" class="btn btn-gray" style="padding:2px 6px; font-size:10px;">✖ Закрыть</button>
+                                            ${Object.keys(ALLOW_LABEL).map(k=>`<button onclick="setAllow(${p.id},'${k}')" class="btn" style="background:${p.allow===k?'linear-gradient(180deg,#efd8a3,#d9b877)':'var(--lx-panel)'}; color:${p.allow===k?'#20180a':'var(--lx-text)'}; border:1px solid var(--lx-line); padding:4px 9px; font-size:10.5px;">${ALLOW_LABEL[k]}</button>`).join('')}
+                                            <button onclick="setAllow(${p.id},null)" class="btn btn-gray" style="padding:4px 9px; font-size:10.5px;">✖ Закрыть</button>
                                         </div>
                                     </div>
                                     ${p.notify?`<div style="background:#111827; border-left:3px solid #34d399; padding:6px 8px; border-radius:4px; font-size:11px; color:#d1d5db; margin-bottom:8px;">📋 ${p.notify}</div>`:''}
