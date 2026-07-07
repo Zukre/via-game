@@ -12394,6 +12394,48 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             state.chosenProf = null; state.nameDraft = ''; save(newId); render();
         }
 
+        // ─── ИНВЕСТИЦИИ (карты Рината: депозиты 🟩 / облигации 🟦 / рискованные 🟥) — вкладываешь сумму, получаешь % каждый круг ───
+        const INVEST_CARDS = [
+            {id:1,  t:'Сберегательный счёт',                   kind:'deposit', rate:2,   min:5000},
+            {id:2,  t:'Банковский депозит «Стабильный доход»', kind:'deposit', rate:3,   min:1000},
+            {id:3,  t:'Страховой накопительный план',          kind:'deposit', rate:4,   min:15000},
+            {id:4,  t:'Государственный фонд',                  kind:'deposit', rate:5,   min:10000},
+            {id:5,  t:'Гос. облигации',                        kind:'bond',    rate:1,   min:1500},
+            {id:6,  t:'Муниципальные облигации',               kind:'bond',    rate:1.5, min:2000},
+            {id:7,  t:'Корпоративные облигации',               kind:'bond',    rate:2,   min:3000},
+            {id:8,  t:'Крипто-фонд',                           kind:'risk',    rate:10,  min:1000, risk:30, loss:'all'},
+            {id:9,  t:'Чёрный фонд доходности',                kind:'risk',    rate:15,  min:2000, risk:40, loss:'half'},
+            {id:10, t:'Инвестиции в сырьё',                    kind:'risk',    rate:20,  min:5000, risk:50, loss:'all'},
+        ];
+        function resolveInvest(pid, iv){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            let amt=parseInt(((prompt('Сколько вложить в «'+iv.t+'»? Минимум '+iv.min+'$:', iv.min))||'').replace(/[^0-9]/g,''))||iv.min;
+            if(amt<iv.min) amt=iv.min;
+            if((Number(p.savings)||0) < amt){ alert('Не хватает денег: нужно '+amt+'$, у тебя '+Math.round(Number(p.savings)||0)+'$'); return; }
+            p.savings=Math.round(((Number(p.savings)||0)-amt)*100)/100;
+            p.assets=p.assets||[];
+            if(iv.risk){
+                const r=Math.random()*100;
+                if(r<iv.risk){
+                    if(iv.loss==='all'){
+                        p.notify='🟥 «'+iv.t+'»: риск сыграл против — потеряно всё вложение '+amt+'$!';
+                        state.sdelkaModal={pId:pid,drawn:{emoji:'💥',title:'Вложение сгорело',text:'«'+iv.t+'»: выпал риск ('+iv.risk+'%). Потеряно '+amt+'$.',color:'#cf9a9a'}};
+                        save(); render(); return;
+                    } else {
+                        const keep=Math.round(amt/2), cfh=Math.round(keep*iv.rate/100);
+                        p.assets.push({title:iv.t+' (половина)', val:keep, cf:cfh, liab:0});
+                        p.notify='⚠️ «'+iv.t+'»: потеряна половина ('+Math.round(amt/2)+'$). Осталось '+keep+'$ → +'+cfh+'$/круг.';
+                        state.sdelkaModal={pId:pid,drawn:{emoji:'⚠️',title:'Потеря половины',text:'Риск: потеряна половина ('+Math.round(amt/2)+'$). Осталось вложено '+keep+'$ → доход +'+cfh+'$/круг.',color:'#cf9a9a'}};
+                        save(); render(); return;
+                    }
+                }
+            }
+            const cf=Math.round(amt*iv.rate/100);
+            p.assets.push({title:iv.t, val:amt, cf:cf, liab:0});
+            p.notify='✅ Вложено '+amt+'$ в «'+iv.t+'» → +'+cf+'$/круг.';
+            state.sdelkaModal={pId:pid,drawn:{emoji:(iv.kind==='bond'?'🟦':'🟩'),title:'Вложение оформлено',text:'Вложено '+amt+'$ в «'+iv.t+'». Доход +'+cf+'$ каждый круг ('+iv.rate+'%).'+(iv.term?' Срок ~'+iv.term+' кругов.':''),color:'#5cb08b'}};
+            save(); render();
+        }
         // ─── РЕАЛЬНЫЕ КАРТЫ РИНАТА: колода «Малые активы» (пассивы: заплатил вход → получаешь доход; продажа = стоимость минус обязательства) ───
         // pay = сколько платишь при покупке; val = стоимость при продаже; cf = доход/мес; liab = обязательства (ипотека)
         const ASSET_CARDS = [
@@ -12453,6 +12495,36 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             {id:50, t:'Флип старого мотоцикла',      pay:2000, k:'flip', income:2400},
             {id:51, t:'Кум просит на бизнес',        pay:1500, k:'risk', income:3000, thr:5},
             {id:52, t:'Ставка на друга-блогера',     pay:1000, k:'risk', income:2200, thr:4},
+            // ── РЕАЛЬНЫЕ КАРТЫ РИНАТА: Квартиры (аванс=вход, val=цена, liab=ипотека) ──
+            {id:53, t:'Квартира — Однушка в спальном районе', pay:8000,  val:40000,  cf:300,  liab:32000},
+            {id:54, t:'Квартира — Однушка у метро',           pay:12000, val:55000,  cf:450,  liab:43000},
+            {id:55, t:'Квартира — Двушка в новостройке',      pay:18000, val:75000,  cf:600,  liab:57000},
+            {id:56, t:'Квартира — Двушка в центре',           pay:22000, val:90000,  cf:850,  liab:68000},
+            {id:57, t:'Квартира — Трёшка для семьи',          pay:26000, val:110000, cf:1000, liab:84000},
+            {id:58, t:'Квартира — Премиум-апартаменты',       pay:35000, val:160000, cf:1300, liab:125000},
+            {id:59, t:'Квартира — Апартаменты у бизнес-центра', pay:28000, val:130000, cf:1100, liab:102000},
+            // ── РЕАЛЬНЫЕ КАРТЫ РИНАТА: Малые активы (вход → доход/мес) ──
+            {id:60, t:'Парковочное место',                    pay:1200, val:1200, cf:150, liab:0},
+            {id:61, t:'Вендинговый автомат',                  pay:2000, val:2000, cf:200, liab:0},
+            {id:62, t:'Ларёк «Мини-маркет»',                  pay:2500, val:2500, cf:220, liab:0},
+            {id:63, t:'Сдача гаража',                         pay:1800, val:1800, cf:170, liab:0},
+            {id:64, t:'Парковочное место у бизнес-центра',    pay:1200, val:1200, cf:150, liab:0},
+            {id:65, t:'Автомат с водой',                      pay:1500, val:1500, cf:180, liab:0},
+            {id:66, t:'Мини-мастерская (ремонт телефонов)',   pay:3000, val:3000, cf:250, liab:0},
+            {id:67, t:'Онлайн-магазин на маркетплейсе',       pay:2000, val:2000, cf:200, liab:0},
+            {id:68, t:'Прокат самокатов',                     pay:2700, val:2700, cf:230, liab:0},
+            {id:69, t:'Продажа кофе с собой (мини-стойка)',    pay:3000, val:3000, cf:250, liab:0},
+            // ── РЕАЛЬНЫЕ КАРТЫ РИНАТА: Бизнесы без дохода (вход, доход появится позже) ──
+            {id:70, t:'Открытие шоурума',                     pay:5000, val:5000, cf:0, liab:0},
+            {id:71, t:'Старт онлайн-бренда одежды',           pay:4000, val:4000, cf:0, liab:0},
+            {id:72, t:'Открытие кофейни «Жана»',              pay:6000, val:6000, cf:0, liab:0},
+            {id:73, t:'Бизнес по продаже товаров оптом',      pay:8000, val:8000, cf:0, liab:0},
+            {id:74, t:'Мобильная мастерская',                 pay:3500, val:3500, cf:0, liab:0},
+            {id:75, t:'Логистический пункт',                  pay:4500, val:4500, cf:0, liab:0},
+            {id:76, t:'Мини-студия красоты',                  pay:6000, val:6000, cf:0, liab:0},
+            {id:77, t:'Старт автосервиса',                    pay:7000, val:7000, cf:0, liab:0},
+            {id:78, t:'Локальное рекламное агентство',        pay:5000, val:5000, cf:0, liab:0},
+            {id:79, t:'Бизнес по доставке еды',               pay:6500, val:6500, cf:0, liab:0},
         ];
         // ─── КОЛОДА «Чёрный рынок» — криминал/риск. crime: +get, бросок ≤catch → −penalty; bet: −invest, бросок ≥win → +payout; instant: разовый эффект (+ note для длящегося, ведущий ведёт вручную) ───
         const BLACK_CARDS = [
@@ -12836,6 +12908,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             } else if(type==='ticket'){ cp={emoji:'🎫',tag:'Золотой билет',title:'Золотой билет',desc:'Счастливая клетка! Бросай кубик — награда растёт, шестёрка = джекпот.',lines:[['Бросок 1','+1000$','#5cb08b'],['Бросок 5','+15000$','#5cb08b'],['Бросок 6 · ДЖЕКПОТ','+30000$','#efd8a3']],color:'#efd8a3',apply:function(){resolveGoldenTicket(pid);}};
             } else if(type==='child'){ var pp=state.players.find(x=>x.id==pid); var cc=(pp&&pp.prof&&pp.prof.childCost)||0;
                 cp={emoji:'👶',tag:'Дети',title:'Пополнение в семье',desc:'У тебя будет ребёнок! Радость — но и расходы растут каждый круг.',lines:[['Детей станет',(((pp&&pp.children)||0)+1)+'',''],['Расходы','+'+cc+'$/мес','#cf9a9a']],color:'#b98bff',apply:function(){resolveChild(pid);}};
+            } else if(String(type).startsWith('invest_')){ var iv=INVEST_CARDS.find(x=>x.id===parseInt(type.slice(7),10)); if(!iv){alert('Нет карты: '+type);return;}
+                var tg = iv.kind==='deposit'?'Депозит':(iv.kind==='bond'?'Облигация':'Рискованное вложение');
+                var cl = iv.kind==='risk'?'#cf9a9a':(iv.kind==='bond'?'#8fb3e0':'#5cb08b');
+                var em = iv.kind==='risk'?'🟥':(iv.kind==='bond'?'🟦':'🟩');
+                var ln=[['Доход','+'+iv.rate+'% каждый круг','#5cb08b'],['Минимум',iv.min+'$','']];
+                if(iv.term) ln.push(['Срок','~'+iv.term+' кругов','']);
+                if(iv.risk) ln.push(['Риск',iv.risk+'% — '+(iv.loss==='all'?'потерять всё':'потерять половину'),'#cf9a9a']);
+                cp={emoji:em,tag:tg,title:iv.t,desc:'Вложи сумму (от '+iv.min+'$) — получай +'+iv.rate+'% каждый круг.'+(iv.risk?' Но есть риск потери!':' Без риска.'),lines:ln,color:cl,apply:function(){resolveInvest(pid,iv);}};
             }
             if(cp){ state.cardPreview=cp; state.view='player'; render(); }
         }
@@ -12864,6 +12944,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!pid){ state.pendingQR = type; alert('📷 Карта отсканирована. Сначала войди под своим бланком — карта применится сама.'); render(); return; }
             if(type==='ticket'){ showCardPreview(pid,type); return; }
             if(type==='child'){ showCardPreview(pid,type); return; }
+            if(String(type).startsWith('invest_')){ showCardPreview(pid,type); return; }   // депозиты/облигации/рискованные (мелкие сделки)
             // РЕАЛЬНАЯ карта-актив (Малые активы): скан asset_<id> → офер покупки ИМЕННО этой карты
             if(String(type).startsWith('asset_')){
                 const aid = parseInt(String(type).slice(6),10);
