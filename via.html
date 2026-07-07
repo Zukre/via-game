@@ -143,11 +143,34 @@
             font-size: 13px;
         }
         /* ─── ПОЛЕ (движок хода) ─── */
-        .board-wrap{position:relative; width:100%; max-width:560px; margin:0 auto; aspect-ratio:1536/1024;
-            border-radius:14px; overflow:hidden; border:1px solid rgba(217,184,119,.28);
-            box-shadow:0 16px 46px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.4);}
-        .board-field{position:absolute; inset:0; background:url('via_field.png') center/100% 100% no-repeat; background-color:#0a0f1e;}
-        .board-field::after{content:""; position:absolute; inset:0; box-shadow:inset 0 0 70px rgba(0,0,0,.45); pointer-events:none;}
+        .board-wrap{position:relative; width:100%; max-width:640px; margin:0 auto; aspect-ratio:1.46;
+            border-radius:16px; overflow:hidden; border:1px solid rgba(217,184,119,.28);
+            background:linear-gradient(180deg,#121620,#0d1016);
+            box-shadow:0 16px 46px rgba(0,0,0,.6), inset 0 0 60px rgba(0,0,0,.4);}
+        /* ── ЦИФРОВОЕ ПОЛЕ: клетки собраны в коде ── */
+        :root{ --c-salary:#d9b877; --c-career:#6f9ceb; --c-stock:#5ec6d0; --c-skill:#6bbf9f;
+               --c-kids:#d99abf; --c-market:#e0a86a; --c-expense:#cf8a8a; --c-deal:#7fbf8f;
+               --c-gov:#a68fd0; --c-jail:#8a9099; --c-work:#d4b06a; --c-tax:#cf7a7a;
+               --c-black:#5b616b; --c-svyaz:#d99abf; --c-med:#6bbf9f; --c-ticket:#efd8a3; }
+        .dcell{position:absolute; border:1px solid var(--lx-line); border-radius:7px; overflow:hidden;
+            background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));
+            display:flex; flex-direction:column; align-items:center; padding:4px 2px 3px; text-align:center; transition:box-shadow .3s;}
+        .dcell .dstrip{position:absolute; top:0; left:0; right:0; height:3px; background:var(--cc);}
+        .dcell .dic{font-size:clamp(9px,1.7vw,17px); margin-top:3px; line-height:1; filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
+        .dcell .dnm{font-size:clamp(5px,.92vw,9px); font-weight:700; margin-top:2px; line-height:1.02; text-transform:uppercase; color:var(--lx-text); letter-spacing:.01em;}
+        .dcell.corner{background:linear-gradient(180deg,#1b1f28,#0e1218); border-color:var(--lx-gold-ln);}
+        .dcell.corner .dic{font-size:clamp(12px,2.4vw,22px);}
+        .dcell.corner .dnm{color:var(--lx-gold-br);}
+        .dcell.dactive{box-shadow:0 0 0 2px var(--lx-gold-br), 0 0 18px 3px rgba(217,184,119,.45); z-index:6;}
+        .dcenter{position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:6px;}
+        .dcenter .dring{width:min(24vw,210px); aspect-ratio:1; border-radius:50%; display:grid; place-items:center;
+            background:radial-gradient(circle at 50% 42%, rgba(217,184,119,.10), transparent 62%);
+            border:1px solid var(--lx-gold-ln); box-shadow:inset 0 0 34px rgba(0,0,0,.5);}
+        .dcenter .dvia{font-family:Georgia,serif; font-size:clamp(15px,3.6vw,34px); color:var(--lx-gold-br); font-weight:600; letter-spacing:.05em; line-height:.95;}
+        .dcenter .dcf{font-size:clamp(6px,1.1vw,11px); letter-spacing:.5em; text-transform:uppercase; color:var(--lx-muted); margin-top:3px;}
+        .dcenter .dpath{margin-top:9px; font-size:clamp(6px,1.0vw,10px); color:#cdc8bd; line-height:1.6;}
+        .dcenter .dpath b{color:var(--lx-gold-br);}
+        .dcenter .dlbl{font-size:8px; letter-spacing:.26em; text-transform:uppercase; color:var(--lx-gold); font-weight:700; margin-bottom:4px;}
         .tok{position:absolute; width:3.4%; aspect-ratio:1; border-radius:50%; transform:translate(-50%,-50%);
             border:2px solid rgba(255,255,255,.85); box-shadow:0 2px 8px rgba(0,0,0,.55),0 0 12px currentColor; z-index:5;
             transition:left .55s cubic-bezier(.34,1.1,.64,1), top .55s cubic-bezier(.34,1.1,.64,1);}
@@ -11015,18 +11038,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
 
         // ─── ПОЛЕ / ДВИЖОК ХОДА (в пульте ведущего) ───
+        // Координаты клеток (в % от картинки поля 1536×1024) — выверены по сетке, ровно по центрам
         const TRACK=[
-         {n:'Зарплата',x:4.0,y:8.5},{n:'Карьера',x:12.4,y:8.5},{n:'Акции-Крипта',x:20.7,y:8.5},
-         {n:'Навык',x:29.0,y:8.5},{n:'Дети',x:37.3,y:8.5},{n:'Рынок',x:45.6,y:8.5},
-         {n:'Расходы',x:53.9,y:8.5},{n:'Акции-Крипта',x:62.2,y:8.5},{n:'Сделки',x:70.5,y:8.5},
-         {n:'Государство',x:78.8,y:8.5},{n:'Рынок',x:87.5,y:8.5},{n:'Тюрьма',x:96.0,y:8.5},
-         {n:'Работа',x:96.0,y:28},{n:'Расходы',x:96.0,y:46},{n:'Налоги',x:96.0,y:64},
-         {n:'Чёрный рынок',x:96.0,y:91},
-         {n:'Зарплата',x:88.0,y:91},{n:'Сделки',x:79.3,y:91},{n:'Акции-Крипта',x:70.6,y:91},
-         {n:'Навык',x:61.9,y:91},{n:'Связи',x:53.2,y:91},{n:'Расходы',x:44.5,y:91},
-         {n:'Рынок',x:35.8,y:91},{n:'Акции-Крипта',x:27.1,y:91},{n:'Сделки',x:18.4,y:91},
-         {n:'Золотой билет',x:4.0,y:91},
-         {n:'Сделки',x:4.0,y:64},{n:'Государство',x:4.0,y:46},{n:'Медицина',x:4.0,y:28}
+         // верхний ряд (12), слева→направо, y=8.6
+         {n:'Зарплата',x:5.0,y:8.6},{n:'Карьера',x:13.1,y:8.6},{n:'Акции-Крипта',x:21.2,y:8.6},
+         {n:'Навык',x:29.4,y:8.6},{n:'Дети',x:37.5,y:8.6},{n:'Рынок',x:45.6,y:8.6},
+         {n:'Расходы',x:53.8,y:8.6},{n:'Акции-Крипта',x:61.9,y:8.6},{n:'Сделки',x:70.0,y:8.6},
+         {n:'Государство',x:78.1,y:8.6},{n:'Рынок',x:86.3,y:8.6},{n:'Тюрьма',x:94.6,y:8.6},
+         // правый столбец (3), сверху→вниз, x=94.6
+         {n:'Работа',x:94.6,y:29.0},{n:'Расходы',x:94.6,y:46.0},{n:'Налоги',x:94.6,y:63.0},
+         // нижний-правый угол
+         {n:'Чёрный рынок',x:94.6,y:90.6},
+         // нижний ряд (справа→налево), y=90.6
+         {n:'Зарплата',x:85.7,y:90.6},{n:'Сделки',x:76.8,y:90.6},{n:'Акции-Крипта',x:67.9,y:90.6},
+         {n:'Навык',x:59.0,y:90.6},{n:'Связи',x:50.1,y:90.6},{n:'Расходы',x:41.2,y:90.6},
+         {n:'Рынок',x:32.3,y:90.6},{n:'Акции-Крипта',x:23.4,y:90.6},{n:'Сделки',x:14.5,y:90.6},
+         // нижний-левый угол
+         {n:'Золотой билет',x:5.0,y:90.6},
+         // левый столбец (3), снизу→вверх, x=5.0
+         {n:'Сделки',x:5.0,y:63.0},{n:'Государство',x:5.0,y:46.0},{n:'Медицина',x:5.0,y:29.0}
         ];
         // Цвета по ОЧЕРЕДИ создания бланка (Ринат): 1-й Красный, 2-й Синий, 3-й Зелёный, 4-й Чёрный, дальше…
         const TOK_COLORS=['#ef4444','#3b82f6','#22c55e','#111827','#f97316','#eab308','#a855f7','#ec4899','#f8fafc','#9ca3af','#06b6d4','#92400e'];
@@ -11035,6 +11065,28 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function playerColor(pid){ return TOK_COLORS[colorIndex(pid)]; }
         function playerColorName(pid){ return COLOR_NAMES[colorIndex(pid)]; }
         function boardColor(b,pid){ const i=b.order.indexOf(pid); return TOK_COLORS[(i<0?0:i)%TOK_COLORS.length]; }
+        // ─── ЦИФРОВОЕ ПОЛЕ: иконка+тип по индексу (порядок = TRACK) + раскладка клеток по кольцу ───
+        const CELL_META=[
+          {i:'💵',t:'salary'},{i:'📈',t:'career'},{i:'₿',t:'stock'},{i:'🧠',t:'skill'},{i:'👶',t:'kids'},
+          {i:'🛒',t:'market'},{i:'💸',t:'expense'},{i:'₿',t:'stock'},{i:'🤝',t:'deal'},{i:'🏛️',t:'gov'},
+          {i:'🌍',t:'market'},{i:'🔒',t:'jail'},{i:'💼',t:'work'},{i:'🚗',t:'expense'},{i:'🧾',t:'tax'},
+          {i:'🖤',t:'black'},{i:'💵',t:'salary'},{i:'🤝',t:'deal'},{i:'₿',t:'stock'},{i:'🧠',t:'skill'},
+          {i:'🌐',t:'svyaz'},{i:'💸',t:'expense'},{i:'🛒',t:'market'},{i:'₿',t:'stock'},{i:'🤝',t:'deal'},
+          {i:'🎫',t:'ticket'},{i:'🤝',t:'deal'},{i:'🏛️',t:'gov'},{i:'⚕️',t:'med'}
+        ];
+        const BCS=12.5, BCH=17.0;
+        const _topW=(100-2*BCS)/10, _botW=(100-2*BCS)/9, _sideH=(100-2*BCH)/3;
+        function cellBox(i){
+          if(i===0)        return {l:0,               t:0,        w:BCS,  h:BCH, corner:1};
+          if(i>=1&&i<=10)  return {l:BCS+(i-1)*_topW, t:0,        w:_topW,h:BCH};
+          if(i===11)       return {l:100-BCS,         t:0,        w:BCS,  h:BCH, corner:1};
+          if(i>=12&&i<=14) return {l:100-BCS,         t:BCH+(i-12)*_sideH, w:BCS, h:_sideH};
+          if(i===15)       return {l:100-BCS,         t:100-BCH,  w:BCS,  h:BCH, corner:1};
+          if(i>=16&&i<=24) return {l:100-BCS-(i-16+1)*_botW, t:100-BCH, w:_botW, h:BCH};
+          if(i===25)       return {l:0,               t:100-BCH,  w:BCS,  h:BCH, corner:1};
+          return {l:0, t:100-BCH-(i-26+1)*_sideH, w:BCS, h:_sideH};
+        }
+        function cellCenter(i){ const p=cellBox(i); return {x:p.l+p.w/2, y:p.t+p.h/2}; }
         function renderBoard(){
             const b=state.board;
             if(!b || !b.order || !b.order.length){
@@ -11045,13 +11097,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const byCell={}; b.order.forEach(pid=>{const c=b.positions[String(pid)]||0;(byCell[c]=byCell[c]||[]).push(pid);});
             let toks='';
             b.order.forEach(pid=>{
-                const cell=b.positions[String(pid)]||0; const c=TRACK[cell]||TRACK[0];
-                const grp=byCell[cell]; const k=grp.indexOf(pid); const off=(k-(grp.length-1)/2)*3.2;
+                const cell=b.positions[String(pid)]||0; const q=cellCenter(cell);
+                const grp=byCell[cell]; const k=grp.indexOf(pid); const off=(k-(grp.length-1)/2)*3.0;
                 const col=boardColor(b,pid); const isTurn=(pid===turnPid);
-                toks+=`<div class="tok${isTurn?' turn':''}" style="left:${c.x+off}%;top:${c.y}%;color:${col};background:${col};"></div>`;
+                toks+=`<div class="tok${isTurn?' turn':''}" style="left:${q.x+off}%;top:${q.y}%;color:${col};background:${col};"></div>`;
             });
-            const tc=TRACK[b.positions[String(turnPid)]||0]||TRACK[0]; const tcol=boardColor(b,turnPid);
-            const glow=`<div class="glow" style="left:${tc.x}%;top:${tc.y}%;color:${tcol};"></div>`;
+            const tcol=boardColor(b,turnPid);
+            const turnCellIdx=b.positions[String(turnPid)]||0;
+            // цифровые клетки поля
+            let cellsHtml='';
+            TRACK.forEach((c,i)=>{ const p=cellBox(i); const m=CELL_META[i]||{i:'',t:'deal'}; const act=(i===turnCellIdx);
+                cellsHtml+=`<div class="dcell${p.corner?' corner':''}${act?' dactive':''}" style="left:${p.l}%;top:${p.t}%;width:${p.w}%;height:${p.h}%;--cc:var(--c-${m.t})"><div class="dstrip"></div><div class="dic">${m.i}</div><div class="dnm">${c.n}</div></div>`;
+            });
+            const centerHtml=`<div class="dcenter" style="left:${BCS}%;top:${BCH}%;right:${BCS}%;bottom:${BCH}%;"><div class="dring"><div><div class="dvia">VIA</div><div class="dcf">Cash Flow</div></div></div><div class="dlbl">Путь свободы</div><div class="dpath"><b>5</b> Наследие · <b>4</b> Инвестор · <b>3</b> Предприниматель<br><b>2</b> Растёшь · <b>1</b> Работник</div></div>`;
             const chips=b.order.map(pid=>`<span class="pchip${pid===turnPid?' turn':''}"><span class="dot" style="background:${boardColor(b,pid)}"></span>${nameOf(pid)}</span>`).join('');
             const opts=b.order.map(pid=>`<option value="${pid}" ${pid===turnPid?'selected':''}>${nameOf(pid)}</option>`).join('');
             const cellName=(TRACK[b.positions[String(turnPid)]||0]||{}).n||'';
@@ -11065,7 +11123,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     &nbsp; <span id="turnTimer" style="color:#93c5fd;"></span>
                 </div>
                 <div style="display:flex;gap:12px;align-items:flex-start;justify-content:center;flex-wrap:wrap;">
-                    <div class="board-wrap" style="margin:0;flex:1 1 340px;"><div class="board-field"></div>${glow}${toks}</div>
+                    <div class="board-wrap" style="margin:0;flex:1 1 380px;">${cellsHtml}${centerHtml}${toks}</div>
                     <div style="display:flex;flex-direction:column;gap:10px;flex:0 0 auto;min-width:150px;">
                         <div style="background:var(--lx-ink);border:1px solid var(--lx-gold-ln);border-radius:12px;padding:14px 12px;text-align:center;">
                             <div style="font-size:10px;color:var(--lx-muted);font-weight:800;letter-spacing:.14em;text-transform:uppercase;">⏱ Ход · 2 мин</div>
@@ -11115,7 +11173,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 if(!value){ alert('Впиши, сколько выпало на кубике (1–6).'); return; }
             }
             fetch('/turn/roll',{method:'POST',headers:{'Content-Type':'application/json'},
-                body:JSON.stringify(value?{pid,value}:{pid})}).catch(e=>console.warn('roll:',e));
+                body:JSON.stringify(value?{pid,value}:{pid})})
+                .then(r=>r.json())
+                .then(j=>{ if(j && j.salaryDue>0){ for(let i=0;i<j.salaryDue;i++) setTimeout(()=>giveSalary(pid), 450 + i*450); } })  // прошёл клетку «Зарплата» → авто-начисление потока
+                .catch(e=>console.warn('roll:',e));
         }
         function boardNext(){
             fetch('/turn/next',{method:'POST',headers:{'Content-Type':'application/json'}}).catch(e=>console.warn('next:',e));

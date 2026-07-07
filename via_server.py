@@ -66,6 +66,7 @@ SUBS_LOCK = threading.Lock()
 SUBSCRIBERS = set()   # набор queue.Queue — по одному на подключённый браузер
 APPLIED_TX = set()    # txid уже начисленных зарплат — защита от двойного клика/ретрая сети
 TRACK_LEN = 29        # клеток на поле (позиции 0..28)
+SALARY_CELLS = {0, 16}  # клетки «Зарплата» — при проходе/приземлении АВТО-начисляем месячный поток
 # позиция клетки (0..28) → что авто-открывается игроку при приземлении.
 # '__BUY__' = открыть окно покупки акций ДЛЯ ВСЕХ; None = ничего (ведущий решает: зарплата/тюрьма/дети и т.п.).
 CELL_ALLOW = [
@@ -398,6 +399,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     newpos = (cur + value) % TRACK_LEN
                     if newpos < cur:                      # прошли старт (клетку 0)
                         b['levels'][str(pid)] = min(4, int(b['levels'].get(str(pid), 0)) + 1)
+                    # АВТО-ЗАРПЛАТА: сколько клеток «Зарплата» пройдено/задето за этот ход
+                    salary_due = 0
+                    _p = cur
+                    for _ in range(value):
+                        _p = (_p + 1) % TRACK_LEN
+                        if _p in SALARY_CELLS:
+                            salary_due += 1
                     b['positions'][str(pid)] = newpos
                     b['lastRoll'] = {'pid': pid, 'value': value}
                     # Ф2/Ф3: авто-открытие карточки по клетке + окно покупки + таймер хода
@@ -420,7 +428,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     b['turnEndsAt'] = time.time() + TURN_SECONDS            # 2 минуты на ход
                     save_data(DATA)
                     broadcast()
-                self._send_json({'ok': True, 'pid': pid, 'value': value, 'pos': newpos})
+                self._send_json({'ok': True, 'pid': pid, 'value': value, 'pos': newpos, 'salaryDue': salary_due})
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return
