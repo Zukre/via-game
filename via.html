@@ -10514,6 +10514,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             } catch(e) {}
         }
 
+        // Множитель ПОБЕДЫ: пассив ≥ WIN_MULT × расходы = финансовая свобода/выигрыш.
+        // Меняешь ЭТО число — меняется ВЕЗДЕ (условие победы, путь к свободе, уровни). Ринат 10июл.
+        const WIN_MULT = 20;
         function calc(p) {
             if (!p) return {};
             const skillBonus = Math.min(0.20, (p.skills || []).reduce((s, sk) => s + (Number(sk.pct) || 0), 0));
@@ -10534,7 +10537,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
             const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay;
             const flow = income - totalExp;
-            const target = totalExp * 20;   // ПОБЕДА (Ринат 10июл): пассив ≥ 20× расходов — тогда выход/выигрыш
+            const target = totalExp * WIN_MULT;   // ПОБЕДА: пассив ≥ WIN_MULT × расходов (см. WIN_MULT выше)
 
             return { salary, baseSalary, skillBonus, passive, income, taxes, mortgagePay, eduPay, autoPay, ccPay, retailPay,
                      otherExp, childExp, bankPay, totalExp, flow, target,
@@ -10542,7 +10545,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         // 5 УРОВНЕЙ «Путь свободы» (центр поля): по доле пассив/расходы. L5 = свобода (пассив ≥ расходов).
         function playerLevel(f){
-            const r = f.totalExp>0 ? f.passive/f.totalExp : (f.passive>0?1:0);
+            const r = f.target>0 ? f.passive/f.target : (f.passive>0?1:0);
             if(r>=1)    return {n:5, name:'Наследие',        d:'Абсолютная свобода'};
             if(r>=0.75) return {n:4, name:'Инвестор',        d:'Капитал работает на тебя'};
             if(r>=0.50) return {n:3, name:'Предприниматель', d:'Создаёшь систему'};
@@ -10890,8 +10893,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <button onclick="state.view='lobby';render();" class="btn btn-gray">← В лобби</button>
                 </div>
 
-                ${(()=>{ const pct=f.totalExp>0?Math.min(100,Math.round(f.passive/f.totalExp*100)):0;
-                  const free=f.passive>=f.totalExp; const need=Math.max(0,f.totalExp-f.passive);
+                ${(()=>{ const pct=f.target>0?Math.min(100,Math.round(f.passive/f.target*100)):0;
+                  const free=f.passive>=f.target; const need=Math.max(0,f.target-f.passive);
                   const nAssets=(p.assets||[]).filter(a=>Number(a.cf||0)>0).length;
                   const lvl=playerLevel(f);
                   return `
@@ -10916,7 +10919,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="height:7px;border-radius:5px;background:#0a0c10;border:1px solid #23272f;margin:10px 0 8px;overflow:hidden;">
                       <div style="height:100%;width:${pct}%;border-radius:5px;background:linear-gradient(90deg,#b48f4e,#d9b877 60%,#efd8a3);box-shadow:0 0 12px rgba(217,184,119,.4);"></div>
                     </div>
-                    <div style="font-size:11.5px;color:#9c988e;">${free?'Пассив покрыл расходы — ты вне крысиных бегов! 🎉':`Пассив <b style="color:#efd8a3;">${f.passive}$/мес</b> из расходов <b style="color:#efd8a3;">${f.totalExp}$</b>. До свободы ещё <b style="color:#efd8a3;">${need}$/мес</b> пассива.`}</div>
+                    <div style="font-size:11.5px;color:#9c988e;">${free?`Пассив в ${WIN_MULT}× перекрыл расходы — ты СВОБОДЕН! 🎉`:`Пассив <b style="color:#efd8a3;">${f.passive}$/мес</b>. Цель свободы — пассив <b style="color:#efd8a3;">${f.target}$/мес</b> (расходы ${f.totalExp}$ × ${WIN_MULT}). До свободы ещё <b style="color:#efd8a3;">${need}$/мес</b> пассива.`}</div>
                   </div>
                   <div style="margin-top:12px;">
                     <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;"><span style="color:#cdc8bd;">💼 Зарплата</span><span style="font-family:ui-monospace,monospace;font-weight:700;color:#5cb08b;">+${f.salary}</span></div>
@@ -11070,7 +11073,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
                 <div class="card win-box ${f.win ? 'win-active' : ''}">
                     <div style="font-size:12px; color:#9ca3af; font-weight:700; text-transform:uppercase; margin-bottom:5px;">🏆 Условие победы</div>
-                    <p style="font-size:13px; color:#cbd5e1; margin-bottom:10px;">Пассивный доход ≥ Расходы × 7</p>
+                    <p style="font-size:13px; color:#cbd5e1; margin-bottom:10px;">Пассивный доход ≥ Расходы × ${WIN_MULT}</p>
                     <div style="font-size:20px; font-weight:800; font-family:monospace;">
                         <span style="color:#3b82f6;">${f.passive} $</span>
                         <span style="color:#6b7280;"> ${f.win?'≥':'<'} </span>
