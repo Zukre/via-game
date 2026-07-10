@@ -324,6 +324,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             'deals': new.get('deals', []),
                             'market': DATA.get('market'),   # рынок не трогаем при апдейте бланков
                             'world': new.get('world', DATA.get('world')),  # мировое событие — broadcast всем
+                            'board': DATA.get('board'),     # ⚠️ СОХРАНЯЕМ поле! иначе sync создаст пустое и все шашки прыгнут на старт
                         }
                     sync_board_roster()   # держим поле в согласии с ростером игроков
                     save_data(DATA)
