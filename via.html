@@ -10534,7 +10534,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
             const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay;
             const flow = income - totalExp;
-            const target = totalExp * 7;
+            const target = totalExp * 20;   // ПОБЕДА (Ринат 10июл): пассив ≥ 20× расходов — тогда выход/выигрыш
 
             return { salary, baseSalary, skillBonus, passive, income, taxes, mortgagePay, eduPay, autoPay, ccPay, retailPay,
                      otherExp, childExp, bankPay, totalExp, flow, target,
@@ -10680,6 +10680,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!q||q<1) return;
             const p0=a.price;                       // витрина ДО сделки
             let fill=p0;                            // цена исполнения (со стаканом)
+            lastSaveT=Date.now();                   // защита от гонки: пока идёт сделка, push не подменяет state.players
             if(SERVER_MODE){
                 try{
                     const r=await fetch('/market/impact',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -10708,6 +10709,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(q>have){ alert('У тебя только '+have+' шт.'); return; }
             const p0=a.price;                       // витрина ДО продажи
             let fill=p0;
+            lastSaveT=Date.now();                   // защита от гонки: пока идёт сделка, push не подменяет state.players
             if(SERVER_MODE){
                 try{
                     const r=await fetch('/market/impact',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -10715,16 +10717,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     const j=await r.json(); if(j&&j.avgFill) fill=j.avgFill;   // сервер просадил цену для всех
                 }catch(e){ console.warn('impact:',e); }
             }
-            const sst=pstat(p); sst.sells++; sst.sellAmt=Math.round((sst.sellAmt+q*fill)*100)/100;
-            // ПРОДАЖА через одобрение ведущего. Цена исполнения (со стаканом) зафиксирована.
-            state.deals.push({
-                id: uid(), pId: p.id, pName: p.name, type: 'SELL_MARKET',
-                details: { assetId: id, assetName: a.name, qty: q, price: fill, total: Math.round(q*fill) },
-                status: 'PENDING'
-            });
+            const proceeds=Math.round(q*fill*100)/100;
+            const sst=pstat(p); sst.sells++; sst.sellAmt=Math.round((sst.sellAmt+proceeds)*100)/100;
+            // АВТО-ПРОДАЖА (Ринат 10июл): деньги СРАЗУ в кассу, БЕЗ одобрения ведущего и без заявки.
+            // Продал — заработал, актив списался. Зеркально покупке.
+            const h=p.holdings[id];
+            h.qty-=q;
+            if(h.qty<=0) delete p.holdings[id];
+            p.savings=Math.round((p.savings+proceeds)*100)/100;
             save(); render();
             const moved = Math.abs(fill-p0)>0.0001 ? ('\n📉 Твой объём просадил рынок: витрина была '+p0+'$, выход по ~'+fill+'$/шт.') : '';
-            alert('📨 Заявка на продажу ведущему.\n'+q+' «'+a.name+'» по ~'+fill+'$ (+'+Math.round(q*fill)+'$).'+moved+'\nПосле одобрения деньги придут в кассу.');
+            alert('✅ Продано '+q+' «'+a.name+'» по ~'+fill+'$  (+'+Math.round(proceeds)+'$ в кассу)'+moved);
         }
         function renderMarketPanel(p){
             const m=state.market;
