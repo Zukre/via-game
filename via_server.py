@@ -29,27 +29,91 @@ except Exception:
     via_market = None
 
 # ── Мировые события: идут ПО КРУГУ ХОДОВ (раз за круг у «якоря»), НЕ авто ──
+# Каждое мировое событие РЕАЛЬНО двигает биржу И БИЗНЕСЫ у ВСЕХ (4-й элемент = эффект).
+# Ключи-типы биржи: stock (акции), crypto (крипта), metal (металлы), commodity (сырьё).
+# Ключ 'biz' = сдвиг денежного потока бизнесов/активов игроков (пассивный доход). Значение = доля.
 WORLD_EVENTS = [
-    ('🌍', 'Мировой кризис', 'Экономика замедлилась — будь осторожен с крупными сделками этот круг.'),
-    ('🛢️', 'Скачок цен на нефть', 'Топливо дорожает, бизнесы тратят больше. Следи за расходами.'),
-    ('🏦', 'Банки снизили ставки', 'Кредиты подешевели — хороший момент занять на актив.'),
-    ('🔔', 'ЦБ поднял ставку', 'Кредиты дороже, платежи по долгам растут. Гаси займы.'),
-    ('📈', 'Экономический бум', 'Рынки растут, бизнесы приносят больше. Отличный круг для инвестиций.'),
-    ('📉', 'Рецессия', 'Спад в экономике — активы могут просесть. Держи запас наличных.'),
-    ('🏗️', 'Строительный бум', 'Недвижимость дорожает — твои объекты в цене.'),
-    ('🦠', 'Новая эпидемия', 'Мир на паузе. Расходы на медицину растут у всех.'),
-    ('💻', 'Технопрорыв', 'Новые технологии — крипта и IT-бизнесы на подъёме.'),
-    ('🪙', 'Крипто-лихорадка', 'Все скупают монеты. Курс скачет — момент рискнуть или зафиксировать.'),
-    ('🌾', 'Урожайный год', 'Продукты дешевеют, жизнь легче. Расходы чуть ниже этот круг.'),
-    ('⚡', 'Энергокризис', 'Электричество дорожает — бизнесы под давлением.'),
-    ('🛒', 'Потребительский бум', 'Люди тратят — бизнесы и магазины приносят больше.'),
-    ('💱', 'Валютный шторм', 'Курсы штормит. Тем, кто в долларе — повезло.'),
-    ('🌐', 'Открылись новые рынки', 'Новые возможности для сделок — ищи выгоду.'),
-    ('🏭', 'Промышленный подъём', 'Заводы и логистика на подъёме — крупный бизнес в плюсе.'),
+    ('🌍', 'Мировой кризис', 'Экономика замедлилась — рынки и бизнесы падают у всех.', {'stock': -0.10, 'crypto': -0.12, 'metal': 0.04, 'commodity': -0.05, 'biz': -0.08}),
+    ('🛢️', 'Скачок цен на нефть', 'Топливо дорожает — сырьё вверх, бизнес под давлением.', {'commodity': 0.14, 'stock': -0.04, 'biz': -0.04}),
+    ('🏦', 'Банки снизили ставки', 'Дешёвые деньги — рынки и бизнесы растут.', {'stock': 0.06, 'crypto': 0.05, 'biz': 0.05}),
+    ('🔔', 'ЦБ поднял ставку', 'Деньги дорогие — рисковые активы и бизнесы просели.', {'stock': -0.05, 'crypto': -0.07, 'biz': -0.05}),
+    ('📈', 'Экономический бум', 'Рынки и бизнесы растут по всему фронту.', {'stock': 0.09, 'crypto': 0.08, 'metal': 0.04, 'commodity': 0.05, 'biz': 0.09}),
+    ('📉', 'Рецессия', 'Спад в экономике — активы и бизнесы просели у всех.', {'stock': -0.09, 'crypto': -0.08, 'metal': 0.03, 'commodity': -0.04, 'biz': -0.09}),
+    ('🏗️', 'Строительный бум', 'Стройка тянет металлы, сырьё и бизнесы вверх.', {'metal': 0.10, 'commodity': 0.08, 'stock': 0.03, 'biz': 0.06}),
+    ('🦠', 'Новая эпидемия', 'Мир на паузе — акции и бизнесы вниз, металлы в убежище.', {'stock': -0.07, 'crypto': -0.04, 'metal': 0.06, 'biz': -0.06}),
+    ('💻', 'Технопрорыв', 'Крипта, IT и бизнесы на подъёме.', {'crypto': 0.14, 'stock': 0.06, 'biz': 0.06}),
+    ('🪙', 'Крипто-лихорадка', 'Все скупают монеты — крипта взлетела.', {'crypto': 0.22, 'stock': 0.02, 'biz': 0.02}),
+    ('🌾', 'Урожайный год', 'Продукты дешевеют — расходы ниже, бизнесы легче дышат.', {'commodity': -0.08, 'stock': 0.02, 'biz': 0.04}),
+    ('⚡', 'Энергокризис', 'Энергия дорожает — сырьё вверх, бизнесы вниз.', {'commodity': 0.12, 'stock': -0.05, 'biz': -0.06}),
+    ('🛒', 'Потребительский бум', 'Люди тратят — бизнесы в жирном плюсе.', {'stock': 0.07, 'commodity': 0.03, 'biz': 0.10}),
+    ('💱', 'Валютный шторм', 'Курсы штормит — металлы в цене, бизнес слегка вниз.', {'metal': 0.08, 'crypto': -0.05, 'stock': -0.02, 'biz': -0.02}),
+    ('🌐', 'Открылись новые рынки', 'Новые возможности — рынок и бизнесы в плюсе.', {'stock': 0.06, 'crypto': 0.05, 'commodity': 0.04, 'biz': 0.06}),
+    ('🏭', 'Промышленный подъём', 'Заводы и логистика тянут рынок и бизнесы вверх.', {'stock': 0.07, 'metal': 0.06, 'commodity': 0.05, 'biz': 0.07}),
 ]
+_TYPE_RU = {'stock': 'Акции', 'crypto': 'Крипта', 'metal': 'Металлы', 'commodity': 'Сырьё', 'biz': 'Бизнесы'}
+def _fx_text(fx):
+    parts = ['%s %s%d%%' % (_TYPE_RU.get(t, t), '+' if v > 0 else '', round(v * 100)) for t, v in fx.items() if v]
+    return ' · '.join(parts)
+def apply_market_shock(fx):
+    """Разово двигает цены на бирже по типам активов (эффект мирового события). Вызывать ВНУТРИ LOCK."""
+    mkt = DATA.get('market') or {}
+    for a in mkt.get('assets', []):
+        pct = fx.get(a.get('type'), 0)
+        if not pct:
+            continue
+        lo = float(a.get('min') or 0)
+        hi = float(a.get('max') or (float(a['price']) * 10))
+        new = float(a['price']) * (1 + pct)
+        new = max(lo, min(hi, new))
+        a['price'] = round(new, 4 if new < 1 else 2)
+        a.setdefault('history', []).append(a['price'])
+        if len(a['history']) > 120:
+            a['history'] = a['history'][-120:]
+def apply_business_shock(pct):
+    """Разово двигает денежный поток (cf) бизнесов/активов ВСЕХ игроков. Вызывать ВНУТРИ LOCK."""
+    if not pct:
+        return
+    for p in DATA.get('players', []):
+        for a in p.get('assets', []):
+            try:
+                cf = float(a.get('cf') or 0)
+            except (TypeError, ValueError):
+                continue
+            if cf:
+                a['cf'] = round(cf * (1 + pct), 2)
+
+def _num(v):
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+def calc_flow(p):
+    """Серверное зеркало клиентского calc(): месячный ЧИСТЫЙ поток = доход − расходы.
+    Используется для АВТО-начисления зарплаты при проходе клетки «Зарплата»."""
+    prof = p.get('prof') or {}
+    skill_bonus = min(0.20, sum(_num(s.get('pct')) for s in (p.get('skills') or [])))
+    salary = round(_num(prof.get('salary')) * (1 + skill_bonus))
+    passive = sum(_num(a.get('cf')) for a in (p.get('assets') or []))
+    income = salary + passive
+    tax_disc = min(90.0, max(0.0, _num(p.get('taxDiscPct'))))   # 🔒 тюрьма: «продавил силой» → скидка к налогам
+    taxes = (max(0.0, _num(prof.get('taxes')) + _num(p.get('taxMod'))) + round(income * _num(p.get('taxPct')) / 100)) * (1 - tax_disc / 100)
+    mortgage = 0 if p.get('isM') else _num(prof.get('mortgagePay'))
+    edu = 0 if p.get('isE') else _num(prof.get('eduPay'))
+    auto = 0 if p.get('isA') else _num(prof.get('autoPay'))
+    cc = 0 if p.get('isCC') else _num(prof.get('ccPay'))
+    retail = 0 if p.get('isR') else _num(prof.get('retailPay'))
+    exp_up = _num(p.get('otherExpPct')) + _num(p.get('jailPress'))   # 🔒 тюрьма: штраф «сломлен» + давление сидки
+    other = (_num(prof.get('otherExp')) + _num(p.get('expMod'))) * (1 + exp_up / 100)
+    child = _num(p.get('children')) * _num(prof.get('childCost'))
+    bank = round(_num(p.get('bankLoan')) * 0.10)
+    total_exp = taxes + mortgage + edu + auto + cc + retail + other + child + bank
+    return round(income - total_exp, 2)
 def pick_world_event():
     e = random.choice(WORLD_EVENTS)
-    return {'id': int(time.time() * 1000), 'emoji': e[0], 'title': e[1], 'text': e[2]}
+    fx = e[3] if len(e) > 3 else {}
+    return {'id': int(time.time() * 1000), 'emoji': e[0], 'title': e[1], 'text': e[2],
+            'fx': fx, 'fxtext': _fx_text(fx)}
 
 # 2026-05-31: PORT from env so it runs on any free cloud host (Render/Railway/etc.).
 # Locally still defaults to 8080. Cloud hosts inject $PORT.
@@ -409,6 +473,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             salary_due += 1
                     b['positions'][str(pid)] = newpos
                     b['lastRoll'] = {'pid': pid, 'value': value}
+                    # АВТО-ЗАРПЛАТА НА СЕРВЕРЕ (Ринат 10июл): прошёл клетку «Зарплата» → поток СРАЗУ в кассу,
+                    # без пульта ведущего и без клиента. Начисляем flow за каждую пройденную клетку зарплаты.
+                    if salary_due > 0:
+                        for pl in DATA['players']:
+                            if pl.get('id') == pid:
+                                flow = calc_flow(pl)
+                                total = round(flow * salary_due, 2)
+                                pl['savings'] = round(_num(pl.get('savings')) + total, 2)
+                                st = pl.setdefault('stats', {})
+                                st['salaryCount'] = int(st.get('salaryCount') or 0) + salary_due
+                                st['salaryTotal'] = round(_num(st.get('salaryTotal')) + total, 2)
+                                pl['notify'] = (
+                                    '💵 ЗАРПЛАТА! Прошёл клетку зарплаты — начислено +%s$ (месячный поток). Касса пополнена! 🎉' % total
+                                    if total >= 0 else
+                                    '💸 Месяц в минус: %s$ (расходы выше дохода). Управляй потоком!' % total)
+                                break
                     # Ф2/Ф3: авто-открытие карточки по клетке + окно покупки + таймер хода
                     key = CELL_ALLOW[newpos] if 0 <= newpos < len(CELL_ALLOW) else None
                     if key == '__BUY__':
@@ -418,6 +498,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             if pl.get('id') == pid:
                                 if int(pl.get('jail') or 0) == 0:           # был на свободе → считаем посадку
                                     pl['jailCount'] = int(pl.get('jailCount') or 0) + 1
+                                    pl['jailPending'] = True               # запуск выбора под давлением (2 окна) у игрока
                                 pl['jail'] = random.randint(1, 3)          # клетка Тюрьма — сажаем на 1-3 хода (по-разному)
                                 pl['allow'] = None
                                 break
@@ -452,6 +533,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         for pl in DATA['players']:
                             if pl.get('id') == cur_pid and int(pl.get('jail') or 0) > 0:
                                 pl['jail'] = int(pl['jail']) - 1
+                                # давление сидки: +1% к прочим расходам за каждый пройденный ход (кап +10%), «здоровье падает»
+                                pl['jailPress'] = min(10, int(pl.get('jailPress') or 0) + 1)
                                 break
                     if b['order']:
                         b['turnIdx'] = (b['turnIdx'] + 1) % len(b['order'])
@@ -462,7 +545,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         tsa = int(b.get('turnsSinceAnchor', 0)) + 1
                         b['turnsSinceAnchor'] = tsa
                         if b['turnIdx'] == anchor and tsa >= n:
-                            DATA['world'] = pick_world_event()
+                            we = pick_world_event()
+                            DATA['world'] = we
+                            _fx = we.get('fx') or {}
+                            apply_market_shock(_fx)                    # событие двигает биржу у всех
+                            apply_business_shock(_fx.get('biz', 0))    # и денежный поток бизнесов игроков
                             b['anchorIdx'] = (anchor + 1) % n
                             b['turnsSinceAnchor'] = 0
                     b['lastRoll'] = None
@@ -515,6 +602,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 aid = str(req.get('assetId'))
                 side = req.get('side')
                 qty = float(req.get('qty') or 0)
+                commit = req.get('commit', True)   # False = только КОТИРОВКА (dry-run), рынок НЕ двигаем
                 with LOCK:
                     mkt = DATA.get('market') or {}
                     a = next((x for x in mkt.get('assets', []) if str(x.get('id')) == aid), None)
@@ -534,14 +622,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     lo = float(a.get('min') or 0)
                     hi = float(a.get('max') or (new_price * 10))
                     new_price = max(lo, min(hi, new_price))
-                    a['price'] = round(new_price, 4 if new_price < 1 else 2)
-                    a.setdefault('history', []).append(a['price'])
-                    if len(a['history']) > 120:
-                        a['history'] = a['history'][-120:]
+                    new_price = round(new_price, 4 if new_price < 1 else 2)
                     avg_fill = round(max(lo, avg_fill), 4 if avg_fill < 1 else 2)
-                    save_data(DATA)
-                    broadcast()
-                self._send_json({'ok': True, 'avgFill': avg_fill, 'newPrice': a['price'], 'move': round(move, 4)})
+                    if commit:
+                        # реальная сделка — двигаем цену для ВСЕХ и сохраняем
+                        a['price'] = new_price
+                        a.setdefault('history', []).append(a['price'])
+                        if len(a['history']) > 120:
+                            a['history'] = a['history'][-120:]
+                        save_data(DATA)
+                        broadcast()
+                        price_out = a['price']
+                    else:
+                        # КОТИРОВКА: прогноз цены, но рынок НЕ тронут (ни save, ни broadcast)
+                        price_out = new_price
+                self._send_json({'ok': True, 'avgFill': avg_fill, 'newPrice': price_out, 'move': round(move, 4), 'committed': bool(commit)})
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return
@@ -567,6 +662,7 @@ def market_ticker():
                     DATA['market'] = via_market.init_market()
                 events = via_market.tick_market(DATA['market'])
                 DATA['market']['events_last'] = events
+                DATA['market']['nextTickAt'] = time.time() + via_market.TICK_SECONDS   # для видимого отсчёта у игроков
                 # Рыночные крах/бум БОЛЬШЕ НЕ кидают авто-попап на весь экран.
                 # Мировые события идут строго по кругу ходов (см. /turn/next).
                 # Цены двигаются как обычно, крах/бум видно в самой бирже.
