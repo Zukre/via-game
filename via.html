@@ -13470,12 +13470,23 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
         function payBank() {
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            const owe = Number(p.bankLoan) || 0, cash = Number(p.savings) || 0;
+            if (owe <= 0) { alert('Кредита банка нет — гасить нечего.'); return; }
+            if (cash < owe) { alert('🚫 Не хватает кассы, чтобы закрыть кредит банка: нужно '+fmtN(owe)+'$, а у тебя '+fmtN(cash)+'$.'); return; }
+            if (!confirm('Закрыть кредит банка за '+fmtN(owe)+'$? Спишется с кассы (у тебя '+fmtN(cash)+'$).')) return;
             state.deals.push({ id: uid(), pId: p.id, pName: p.name, type:'PAY_BANK', details:{}, status:'PENDING' });
             save(); render();
         }
 
         function send(type, details={}) {
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            // Погашение долга стоит денег — сразу проверяем кассу, не гоняя заявку к ведущему впустую.
+            if (DEBT_FIELD[type]) {
+                const owe = Number(p[DEBT_FIELD[type]]) || 0;
+                const cash = Number(p.savings) || 0;
+                if (owe > 0 && cash < owe) { alert('🚫 Не хватает кассы, чтобы закрыть этот долг: нужно '+fmtN(owe)+'$, а у тебя '+fmtN(cash)+'$. Заработай и погаси.'); return; }
+                if (owe > 0 && !confirm('Закрыть долг за '+fmtN(owe)+'$? Спишется с кассы (у тебя '+fmtN(cash)+'$). Ежемесячный платёж исчезнет.')) return;
+            }
             state.deals.push({ id: uid(), pId: p.id, pName: p.name, type, details, status:'PENDING' });
             save(); render();
         }
@@ -13496,8 +13507,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(); render();
         }
 
+        // Какое поле долга закрывает заявка на погашение (для списания с кассы).
+        const DEBT_FIELD = { PAY_MORTGAGE:'mLeft', PAY_EDU:'eLeft', PAY_AUTO:'aLeft', PAY_CC:'ccLeft', PAY_RETAIL:'rLeft', PAY_BANK:'bankLoan' };
         function appr(dId) {
             const d = state.deals.find(dl => dl.id == dId); if (!d) return;
+            // ПОГАШЕНИЕ ДОЛГА СТОИТ ДЕНЕГ: проверяем кассу игрока ПЕРЕД одобрением. Не хватает — не одобряем.
+            if (DEBT_FIELD[d.type]) {
+                const pl = state.players.find(x => x.id == d.pId);
+                const owe = pl ? (Number(pl[DEBT_FIELD[d.type]]) || 0) : 0;
+                const cash = pl ? (Number(pl.savings) || 0) : 0;
+                if (owe > 0 && cash < owe) {
+                    alert('🚫 У «'+(pl?pl.name:'игрок')+'» не хватает кассы на погашение: нужно '+fmtN(owe)+'$, есть '+fmtN(cash)+'$. Заявка НЕ одобрена — пусть заработает и подаст снова.');
+                    return;   // заявка остаётся в списке, долг не тронут
+                }
+            }
             state.players = state.players.map(p => {
                 if (p.id != d.pId) return p;
                 if (d.type === 'BUY_ASSET') p.assets.push({ ...d.details, id: Date.now() });
@@ -13522,16 +13545,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         return { ...a, qty: newQty, cf: Math.round(a.price * newQty * (a.div||0) / 100) };
                     }).filter(Boolean);
                 }
-                else if (d.type === 'PAY_MORTGAGE') { p.isM = true; p.mLeft = 0; }
-                else if (d.type === 'PAY_EDU') { p.isE = true; p.eLeft = 0; }
-                else if (d.type === 'PAY_AUTO') { p.isA = true; p.aLeft = 0; }
-                else if (d.type === 'PAY_CC') { p.isCC = true; p.ccLeft = 0; }
-                else if (d.type === 'PAY_RETAIL') { p.isR = true; p.rLeft = 0; }
+                else if (d.type === 'PAY_MORTGAGE') { const owe=Number(p.mLeft)||0; p.savings=Math.round(((p.savings||0)-owe)*100)/100; p.isM = true; p.mLeft = 0; p.notify='🏠 Ипотека закрыта: −'+fmtN(owe)+'$ с кассы. Ежемесячный платёж снят.'; }
+                else if (d.type === 'PAY_EDU') { const owe=Number(p.eLeft)||0; p.savings=Math.round(((p.savings||0)-owe)*100)/100; p.isE = true; p.eLeft = 0; p.notify='🎓 Кредит на образование закрыт: −'+fmtN(owe)+'$ с кассы.'; }
+                else if (d.type === 'PAY_AUTO') { const owe=Number(p.aLeft)||0; p.savings=Math.round(((p.savings||0)-owe)*100)/100; p.isA = true; p.aLeft = 0; p.notify='🚗 Авто-кредит закрыт: −'+fmtN(owe)+'$ с кассы.'; }
+                else if (d.type === 'PAY_CC') { const owe=Number(p.ccLeft)||0; p.savings=Math.round(((p.savings||0)-owe)*100)/100; p.isCC = true; p.ccLeft = 0; p.notify='💳 Долг по картам закрыт: −'+fmtN(owe)+'$ с кассы.'; }
+                else if (d.type === 'PAY_RETAIL') { const owe=Number(p.rLeft)||0; p.savings=Math.round(((p.savings||0)-owe)*100)/100; p.isR = true; p.rLeft = 0; p.notify='🛍️ Розничный долг закрыт: −'+fmtN(owe)+'$ с кассы.'; }
                 else if (d.type === 'CASINO_WIN') {
                     p.savings = Math.round(((p.savings||0) + d.details.payout) * 100) / 100;
                     p.notify = '🎉 ПОЗДРАВЛЯЕМ! Ведущий подтвердил твой выигрыш +' + d.details.payout + '$! 👑 Касса пополнена.';
                 }
-                else if (d.type === 'PAY_BANK') p.bankLoan = 0;
+                else if (d.type === 'PAY_BANK') { const owe=Number(p.bankLoan)||0; p.savings=Math.round(((p.savings||0)-owe)*100)/100; p.bankLoan = 0; p.notify='🏦 Кредит банка закрыт: −'+fmtN(owe)+'$ с кассы.'; }
                 else if (d.type === 'TAKE_LOAN') { p.bankLoan += d.details.amount; p.savings += d.details.amount; }
                 return p;
             });
