@@ -10702,6 +10702,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function fmtN(n){ return (Math.round(Number(n)||0)).toLocaleString('ru-RU'); }
         // Проценты: большие (мемы +240 000%) с разрядами, мелкие с десятой.
         function fmtPct(chg){ const s=chg>=0?'+':''; return Math.abs(chg)>=1000 ? s+fmtN(Math.round(chg))+'%' : s+chg.toFixed(1)+'%'; }
+        // Цена: дешёвые мемы (0.0012) показываем с нужными знаками, а не «0».
+        function fmtPrice(v){ v=Number(v)||0; if(v>=1000) return fmtN(Math.round(v)); if(v>=1) return v.toFixed(2); const s=v.toFixed(v<0.0001?8:(v<0.01?6:4)); return s.replace(/0+$/,'').replace(/\.$/,''); }
         // 🔒 АНТИ-ОБМАН: карта конкретного объекта (asset_/big_) закрепляется за купившим.
         // Владелец пишется в p.ownedCards (синхрится через broadcast игроков) → другой её отсканить не может.
         function cardOwner(token){ for(const pl of (state.players||[])){ if((pl.ownedCards||[]).includes(token)) return pl; } return null; }
@@ -10711,7 +10713,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const FEE_STEP = 0.002;   // +0.2% за каждую совершённую сделку в игре (растёт у скальперов)
         const FEE_CAP  = 0.06;    // потолок 6%
         function tradeFeePct(p){ const s=p.stats||{}; const n=(Number(s.buys)||0)+(Number(s.sells)||0); return Math.min(FEE_CAP, FEE_BASE + n*FEE_STEP); }
-        function logTrade(p,side,name,qty,price,gross,fee){ p.trades=p.trades||[]; p.trades.push({t:Date.now(),side,name,qty,price:Math.round(price*100)/100,gross:Math.round(gross),fee:Math.round(fee)}); if(p.trades.length>120) p.trades=p.trades.slice(-120); }
+        function logTrade(p,side,name,qty,price,gross,fee){ p.trades=p.trades||[]; p.trades.push({t:Date.now(),side,name,qty,price:Math.round((Number(price)||0)*1e6)/1e6,gross:Math.round(gross),fee:Math.round(fee)}); if(p.trades.length>120) p.trades=p.trades.slice(-120); }
         // Открыть красивое окно покупки (в стиле игры) для актива id.
         function openBuyModal(id){
             const a=assetById(id); if(!a) return;
@@ -10746,7 +10748,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function buyEstHtml(q,price,cost,fee,total,cash){
             if(!q||q<1) return '<span style="color:#6b7280;">Выбери количество кнопкой или впиши вручную.</span>';
-            return `Количество: <b>${fmtN(q)} шт</b> × ${price.toFixed(price<1?4:2)}$<br>Стоимость: <b>${fmtN(Math.round(cost))}$</b> + комиссия брокера <b style="color:#fbbf24;">${fmtN(Math.round(fee))}$</b><br>Итого списание: <b style="color:${total<=cash?'#34d399':'#f87171'};">${fmtN(Math.round(total))}$</b>`;
+            return `Количество: <b>${fmtN(q)} шт</b> × ${fmtPrice(price)}$<br>Стоимость: <b>${fmtN(Math.round(cost))}$</b> + комиссия брокера <b style="color:#fbbf24;">${fmtN(Math.round(fee))}$</b><br>Итого списание: <b style="color:${total<=cash?'#34d399':'#f87171'};">${fmtN(Math.round(total))}$</b>`;
         }
         function renderBuyModal(){
             const bm=state.buyModal; if(!bm) return '';
@@ -10763,7 +10765,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
                             <div><div style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Покупка на бирже</div>
                             <div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#f3efe6;line-height:1.1;">${a.name}</div>
-                            <div style="font-size:12px;color:${chg>=0?'#10b981':'#f43f5e'};font-weight:700;margin-top:2px;">${price.toFixed(price<1?4:2)}$ · ${chg>=0?'▲':'▼'} ${fmtPct(chg)}</div></div>
+                            <div style="font-size:12px;color:${chg>=0?'#10b981':'#f43f5e'};font-weight:700;margin-top:2px;">${fmtPrice(price)}$ · ${chg>=0?'▲':'▼'} ${fmtPct(chg)}</div></div>
                             <button onclick="closeBuyModal()" class="btn btn-gray" style="flex:0 0 auto;">✕</button>
                         </div>
                         <div style="font-size:12px;color:#9c988e;margin:14px 0 8px;">💰 Касса: <b style="color:var(--lx-gold-br);">${fmtN(p.savings)} $</b> &nbsp;·&nbsp; комиссия брокера ${(tradeFeePct(p)*100).toFixed(1)}%</div>
@@ -10897,6 +10899,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const MARKET_TABS = [['stock','📈 Акции'],['crypto','🪙 Крипта'],['meme','🚀 МЕМ'],['metal','🥇 Металлы'],['comm','🌾 Сырьё']];
         function assetCat(a){ const t=a.type; if(t==='metal')return'metal'; if(t==='commodity')return'comm'; if(t==='crypto')return (Number(a.vol)||0)>=40?'meme':'crypto'; return 'stock'; }
         function setMarketTab(t){ state.marketTab=t; render(); }
+        // 🏆 Лидерборд биржи: игроки по убыванию суммы, вложенной в рынок (портфель по текущим ценам).
+        function renderInvestorBoard(){
+            const ranked=(state.players||[]).map(pl=>({pl, val:Math.round(portfolioValue(pl))})).filter(x=>x.val>0).sort((a,b)=>b.val-a.val);
+            if(!ranked.length) return '';
+            const rows=ranked.map((x,i)=>{
+                const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
+                const me=x.pl.id==state.currentPlayerId;
+                return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;font-size:12px;border-top:1px solid #16233a;${me?'background:rgba(217,184,119,.09);':''}"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><b>${medal}</b> <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${playerColor(x.pl.id)};vertical-align:middle;"></span> ${x.pl.name}${me?' <span style="color:#efd8a3;font-weight:700;">(ты)</span>':''}</span><span style="font-family:ui-monospace,monospace;font-weight:800;color:#efd8a3;white-space:nowrap;">${fmtN(x.val)} $</span></div>`;
+            }).join('');
+            return `<div style="margin-bottom:10px;border:1px solid #23324a;border-radius:10px;overflow:hidden;">
+                <div style="background:#0e1b2e;padding:7px 10px;font-size:12px;font-weight:800;color:#7dd3fc;">🏆 Крупнейшие инвесторы <span style="color:#6b7280;font-weight:400;">· по вложениям в рынок</span></div>
+                ${rows}
+            </div>`;
+        }
         function renderMarketPanel(p){
             const m=state.market;
             if(!m||!m.assets) return '<div class="card"><div class="block-title">📈 Биржа</div><div style="color:#9ca3af;font-size:13px;">рынок загружается…</div></div>';
@@ -10904,7 +10920,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const ownIds=Object.keys(p.holdings);
             let holdHtml = ownIds.length ? ownIds.map(id=>{
                 const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, plPct=h.avg?((pr/h.avg-1)*100):0, plAbs=Math.round((pr-h.avg)*h.qty), c=plPct>=0?'#10b981':'#f43f5e';
-                return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${h.avg.toFixed(2)}$</b> · сейчас ${pr.toFixed(pr<1?4:2)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellWhole('${id}')" class="btn btn-orange" style="margin-top:4px;">Продать</button></div></div>`;
+                return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellWhole('${id}')" class="btn btn-orange" style="margin-top:4px;">Продать</button></div></div>`;
             }).join('') : '<div style="color:#9ca3af;font-size:13px;">пока нет активов — открой биржу ниже и купи</div>';
             const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
             const alertHtml = ev.length ? ev.map(e=>`<div style="background:${e.kind==='КРАХ'?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${e.kind==='КРАХ'?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`).join('') : '';
@@ -10912,11 +10928,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(state.showMarket){
                 const tab=state.marketTab||'crypto';
                 const tabBar=`<div style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0 6px;">${MARKET_TABS.map(([k,lbl])=>`<button onclick="setMarketTab('${k}')" class="btn" style="padding:4px 10px;font-size:12px;background:${tab===k?'#2563eb':'#1f2937'};color:#fff;font-weight:${tab===k?'800':'400'};">${lbl}</button>`).join('')}</div>`;
-                // В категории — сортировка как на биржах: растущие СВЕРХУ, пробитое дно В НИЗУ. Игроки ищут сами.
-                const sorted=m.assets.filter(a=>assetCat(a)===tab).map(a=>{ const base=a.price0||a.price; return {a, chg: base?((a.price/base-1)*100):0}; }).sort((x,y)=>y.chg-x.chg);
-                const rows=sorted.length?sorted.map(({a,chg})=>{
+                // СОРТИРОВКА (Ринат): где больше всего капитала вложено — та акция/крипта СВЕРХУ. По убыванию.
+                // Капитал = сумма по всем игрокам (кол-во × текущая цена). Ничего не вложено → по цене (крупные выше).
+                const sorted=m.assets.filter(a=>assetCat(a)===tab).map(a=>{
+                    const base=a.price0||a.price, chg=base?((a.price/base-1)*100):0;
+                    let heldQty=0; for(const pl of (state.players||[])){ const h=pl.holdings&&pl.holdings[a.id]; if(h) heldQty+=(Number(h.qty)||0); }
+                    return {a, chg, invested: heldQty*a.price};
+                }).sort((x,y)=> (y.invested - x.invested) || (y.a.price - x.a.price));
+                const rows=sorted.length?sorted.map(({a,chg,invested})=>{
                     const c=chg>=0?'#10b981':'#f43f5e', arrow=chg>=0?'▲':'▼';
-                    return `<div class="row-item"><div style="flex:1;"><b>${a.name}</b><div style="font-size:12px;color:${c};font-weight:700;">${a.price.toFixed(a.price<1?4:2)}$ · ${arrow} ${fmtPct(chg)}</div></div><button onclick="openBuyModal('${a.id}')" class="btn" style="background:#10b981;color:#fff;">Купить</button></div>`;
+                    const cap=invested>0?` <span style="color:#efd8a3;font-size:11px;font-weight:700;">💰 ${fmtN(invested)}$</span>`:'';
+                    return `<div class="row-item"><div style="flex:1;"><b>${a.name}</b>${cap}<div style="font-size:12px;color:${c};font-weight:700;">${fmtPrice(a.price)}$ · ${arrow} ${fmtPct(chg)}</div></div><button onclick="openBuyModal('${a.id}')" class="btn" style="background:#10b981;color:#fff;">Купить</button></div>`;
                 }).join(''):'<div style="color:#9ca3af;font-size:13px;padding:10px;text-align:center;">В этой категории пока нет активов.</div>';
                 listHtml=tabBar+rows;
             }
@@ -10951,7 +10973,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <span style="font-size:10px;color:#6b7280;white-space:nowrap;">${tm}</span>
                     </div>
                     <div style="font-size:12px;color:#cbd5e1;margin-top:4px;line-height:1.7;">
-                        ${fmtN(t.qty)} шт · ${buy?'цена покупки':'цена продажи'} <b>${t.price}$</b><br>
+                        ${fmtN(t.qty)} шт · ${buy?'цена покупки':'цена продажи'} <b>${fmtPrice(t.price)}$</b><br>
                         ${buy?'вложил':'получил'}: <b style="color:${buy?'#fca5a5':'#34d399'};">${fmtN(buy?t.gross:got)}$</b> &nbsp;·&nbsp; комиссия брокера: <b style="color:#fbbf24;">${fmtN(t.fee)}$</b>${buy?` <span style="color:#6b7280;">(всего списано ${fmtN(got)}$)</span>`:''}
                     </div>
                 </div>`;
