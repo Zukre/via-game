@@ -240,6 +240,24 @@ if via_market and DATA.get('market') and DATA['market'].get('assets'):
             _liq_changed = True
     if _liq_changed:
         save_data(DATA)
+# НОВЫЕ активы из CSV, которых нет в сохранённом рынке (напр. добавленные мем-токены) — ДОМЕРЖИМ,
+# не трогая цены уже живущих активов. Так на деплое появятся ASS/TASAK и др. без сброса игры.
+# Плюс обновляем ЛИКВИДНОСТЬ существующих под новую логику стаканов (крупные — глубокие, мемы — тонкие).
+if via_market and DATA.get('market') and DATA['market'].get('assets'):
+    _fresh = via_market.load_assets()
+    _by_id = {str(a.get('id')): a for a in _fresh}
+    _have = {str(a.get('id')) for a in DATA['market']['assets']}
+    _changed = False
+    for _a in DATA['market']['assets']:                     # пересчёт стаканов существующих
+        _src = _by_id.get(str(_a.get('id')))
+        _newliq = via_market.asset_liq(_a.get('type'), _a.get('vol'))
+        if _a.get('liq') != _newliq:
+            _a['liq'] = _newliq; _changed = True
+    for _fa in _fresh:                                      # домерж новых активов
+        if str(_fa.get('id')) not in _have:
+            DATA['market']['assets'].append(_fa); _changed = True
+    if _changed:
+        save_data(DATA)
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):

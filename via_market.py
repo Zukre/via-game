@@ -49,6 +49,7 @@ TYPE_GROWTH = {"stock": 0.03, "crypto": 0.00, "metal": 0.02, "commodity": 0.00}
 # Сдвиг цены при сделке = (объём$ / liq) × IMPACT_MULT.
 TYPE_LIQ = {"stock": 6_000_000, "metal": 8_000_000, "commodity": 2_000_000, "crypto": 4_000_000}
 MEME_VOL = 40   # порог мемкоина: vol>=40 → тонкий стакан. Так выделяются Zen(65)/APXM(70)/Metaflare(40).
+MOON_MEMES = {"ASS": 240000, "TASAK": 15000}   # показуха: стартовый % (уже улетели вверх — ты опоздал)
 
 def asset_liq(typ, vol):
     liq = TYPE_LIQ.get(typ, 1_000_000)
@@ -99,9 +100,12 @@ def load_assets(path=CSV_PATH):
         if typ == "crypto": pmin = min(pmin, round(cur * 0.03, 6))   # скам может провалиться глубоко (rug) и залипнуть
         if pmax <= cur: pmax = cur * 5
         if not (pmin < pavg < pmax): pavg = cur
+        # ПОКАЗУХА (Ринат): мем-токены, которые «уже улетели вверх» — стартовый % огромный (ты опоздал).
+        # Занижаем price0 → клиент показывает +15 000% / +240 000%. На сам рынок не влияет (тик по anchor).
+        p0 = round(cur / (1 + MOON_MEMES[name] / 100.0), 8) if name in MOON_MEMES else round(cur, 2)
         assets.append({
             "id": (r.get("AssetID") or name).strip(), "name": name, "type": typ,
-            "price": round(cur, 2), "price0": round(cur, 2), "min": pmin,
+            "price": round(cur, 2), "price0": p0, "min": pmin,
             "avg0": pavg, "avg": round(cur, 2), "anchor": round(cur, 2), "cool": 0, "max": pmax,
             "vol": vol, "liq": asset_liq(typ, vol), "history": [round(cur, 2)],
         })
@@ -160,8 +164,8 @@ def tick_market(market):
 
         # 3) события крипты — только ВНЕ мёртвой зоны; частота/сила растут с volatility
         if typ == "crypto" and a["vol"] >= 8 and cool <= 0:
-            crash_p = 0.004 + a["vol"] / 4000.0     # vol70 -> ~2.2%/тик
-            boom_p = 0.006 + a["vol"] / 3000.0
+            crash_p = 0.004 + a["vol"] / 4000.0     # vol70 -> ~2.2%/тик (мемы умирают)
+            boom_p = 0.002 + a["vol"] / 8000.0      # мемы РЕДКО пампят (как тысячи мёртвых монет на Solane); редкий памп = икс
             r = random.random()
             if r < crash_p:
                 # RUG: цена И ЯКОРЬ рушатся навсегда (−80..−95%) — скам может умереть, откупить дно = поймать нож

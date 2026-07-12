@@ -10700,6 +10700,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function buyWindowOpen(){ const b=state.board; return !!(b && b.buyWindowEndsAt && b.buyWindowEndsAt*1000 > Date.now()); }
         // Разделение разрядов (1 000 000) — числа легче читать. Только для ПОКАЗА, не для арифметики.
         function fmtN(n){ return (Math.round(Number(n)||0)).toLocaleString('ru-RU'); }
+        // Проценты: большие (мемы +240 000%) с разрядами, мелкие с десятой.
+        function fmtPct(chg){ const s=chg>=0?'+':''; return Math.abs(chg)>=1000 ? s+fmtN(Math.round(chg))+'%' : s+chg.toFixed(1)+'%'; }
         // 🔒 АНТИ-ОБМАН: карта конкретного объекта (asset_/big_) закрепляется за купившим.
         // Владелец пишется в p.ownedCards (синхрится через broadcast игроков) → другой её отсканить не может.
         function cardOwner(token){ for(const pl of (state.players||[])){ if((pl.ownedCards||[]).includes(token)) return pl; } return null; }
@@ -10710,20 +10712,79 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const FEE_CAP  = 0.06;    // потолок 6%
         function tradeFeePct(p){ const s=p.stats||{}; const n=(Number(s.buys)||0)+(Number(s.sells)||0); return Math.min(FEE_CAP, FEE_BASE + n*FEE_STEP); }
         function logTrade(p,side,name,qty,price,gross,fee){ p.trades=p.trades||[]; p.trades.push({t:Date.now(),side,name,qty,price:Math.round(price*100)/100,gross:Math.round(gross),fee:Math.round(fee)}); if(p.trades.length>120) p.trades=p.trades.slice(-120); }
-        async function buyAsset(id){
+        // Открыть красивое окно покупки (в стиле игры) для актива id.
+        function openBuyModal(id){
+            const a=assetById(id); if(!a) return;
+            const p=state.players.find(x=>x.id==state.currentPlayerId);
+            if(p && (Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
+            state.buyModal={assetId:String(id), qty:0}; render();
+        }
+        function closeBuyModal(){ state.buyModal=null; render(); }
+        function setBuyByFrac(frac){
+            const bm=state.buyModal; if(!bm) return;
+            const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(bm.assetId); if(!p||!a) return;
+            const budget = (frac>=1 ? 0.98 : frac) * (Number(p.savings)||0);   // 100%/МАКС с запасом 2% под проскальзывание
+            bm.qty = Math.max(0, Math.floor(budget/(a.price*(1+tradeFeePct(p)))));
+            render();
+        }
+        function setBuyMin(){ const bm=state.buyModal; if(bm){ bm.qty=1; render(); } }
+        function onBuyManual(v){   // ручной ввод: обновляем оценку и кнопку БЕЗ полного render (не терять фокус)
+            const bm=state.buyModal; if(!bm) return;
+            bm.qty=Math.max(0,Math.floor(Number(v)||0));
+            const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(bm.assetId); if(!p||!a) return;
+            const q=bm.qty, price=a.price, cost=q*price, fee=q*price*tradeFeePct(p), total=cost+fee, enough=total<=p.savings;
+            const est=document.getElementById('buyEst'); if(est) est.innerHTML=buyEstHtml(q,price,cost,fee,total,p.savings);
+            const btn=document.getElementById('buyConfirmBtn');
+            if(btn){ btn.disabled=(q<1); btn.style.background=(enough&&q>0)?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'; btn.style.color=(enough&&q>0)?'#20180a':'#9ca3af'; btn.textContent=q>0?(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`):'Выбери количество'; }
+        }
+        async function confirmBuy(){
+            const bm=state.buyModal; if(!bm) return;
+            const id=bm.assetId, q=Math.floor(Number(bm.qty)||0);
+            if(!q||q<1){ alert('Выбери количество — кнопкой % / Мин / Макс или впиши вручную.'); return; }
+            state.buyModal=null;
+            await buyAssetQty(id, q);
+        }
+        function buyEstHtml(q,price,cost,fee,total,cash){
+            if(!q||q<1) return '<span style="color:#6b7280;">Выбери количество кнопкой или впиши вручную.</span>';
+            return `Количество: <b>${fmtN(q)} шт</b> × ${price.toFixed(price<1?4:2)}$<br>Стоимость: <b>${fmtN(Math.round(cost))}$</b> + комиссия брокера <b style="color:#fbbf24;">${fmtN(Math.round(fee))}$</b><br>Итого списание: <b style="color:${total<=cash?'#34d399':'#f87171'};">${fmtN(Math.round(total))}$</b>`;
+        }
+        function renderBuyModal(){
+            const bm=state.buyModal; if(!bm) return '';
+            const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(bm.assetId);
+            if(!p||!a) return '';
+            const q=Math.floor(Number(bm.qty)||0), price=a.price;
+            const cost=q*price, fee=q*price*tradeFeePct(p), total=cost+fee, enough=total<=p.savings;
+            const base=a.price0||price, chg=base?((price/base-1)*100):0;
+            const pctBtn=(lbl,frac,bg)=>`<button onclick="setBuyByFrac(${frac})" class="btn" style="flex:1;min-width:52px;padding:8px 4px;font-size:13px;background:${bg||'#241a0c'};color:#efd8a3;border:1px solid #b98a3e;font-weight:700;">${lbl}</button>`;
+            return `<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;" onclick="if(event.target===this){closeBuyModal();}">
+                <div style="width:400px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 32px -8px #d9b877;">
+                    <div style="height:4px;background:linear-gradient(90deg,transparent,#efd8a3,transparent);"></div>
+                    <div style="padding:20px;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                            <div><div style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Покупка на бирже</div>
+                            <div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#f3efe6;line-height:1.1;">${a.name}</div>
+                            <div style="font-size:12px;color:${chg>=0?'#10b981':'#f43f5e'};font-weight:700;margin-top:2px;">${price.toFixed(price<1?4:2)}$ · ${chg>=0?'▲':'▼'} ${fmtPct(chg)}</div></div>
+                            <button onclick="closeBuyModal()" class="btn btn-gray" style="flex:0 0 auto;">✕</button>
+                        </div>
+                        <div style="font-size:12px;color:#9c988e;margin:14px 0 8px;">💰 Касса: <b style="color:var(--lx-gold-br);">${fmtN(p.savings)} $</b> &nbsp;·&nbsp; комиссия брокера ${(tradeFeePct(p)*100).toFixed(1)}%</div>
+                        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">
+                            <button onclick="setBuyMin()" class="btn" style="flex:1;min-width:48px;padding:8px 4px;font-size:13px;background:#1f2937;color:#fff;font-weight:700;">Мин</button>
+                            ${pctBtn('10%',0.10)}${pctBtn('25%',0.25)}${pctBtn('50%',0.50)}${pctBtn('100%',1)}
+                            <button onclick="setBuyByFrac(1)" class="btn" style="flex:1;min-width:58px;padding:8px 4px;font-size:13px;background:#166534;color:#fff;font-weight:800;border:1px solid #22c55e;">МАКС 💰</button>
+                        </div>
+                        <input id="buyManualQty" type="number" min="1" value="${q||''}" placeholder="или впиши количество вручную" oninput="onBuyManual(this.value)" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;margin-bottom:10px;">
+                        <div id="buyEst" style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.8;margin-bottom:12px;">${buyEstHtml(q,price,cost,fee,total,p.savings)}</div>
+                        <button id="buyConfirmBtn" onclick="confirmBuy()" ${q<1?'disabled':''} class="btn" style="width:100%;background:${enough&&q>0?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'};color:${enough&&q>0?'#20180a':'#9ca3af'};font-weight:800;font-size:15px;padding:13px;">${q>0?(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`):'Выбери количество'}</button>
+                    </div>
+                </div>
+            </div>`;
+        }
+        // Ядро покупки: q штук актива id (вызывается из окна покупки).
+        async function buyAssetQty(id, q){
             const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(id);
             if(!p||!a) return;
-            if((Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только лудка (казино).'); return; }
-            // Биржа открыта ВСЕГДА (Ринат 10июл): окно-ограничитель убрано — покупай в любой момент.
-            let q;
-            const _pre=state.qtyPreset;
-            if(_pre==='max'){                                                  // МАКС: машина сама считает, сколько влезет на всю кассу (+комиссия)
-                q=Math.floor((0.98*(Number(p.savings)||0))/(a.price*(1+tradeFeePct(p))));
-                if(!q||q<1){ alert('Не хватает даже на 1 шт «'+a.name+'» по '+a.price+'$ (+комиссия). Касса '+fmtN(p.savings)+'$.'); return; }
-            }
-            else if(_pre==='min'){ q=1; }                                      // МИН: одна штука
-            else if(typeof _pre==='number' && _pre>0){ q=_pre; }               // быстрый пресет 50/100/500/1000
-            else { q=parseInt((prompt('Сколько штук «'+a.name+'» купить? Цена сейчас '+a.price+'$')||'0'),10); }
+            if((Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
+            q=Math.floor(Number(q)||0);
             if(!q||q<1) return;
             const p0=a.price;                       // витрина ДО сделки
             let fill=p0;                            // цена исполнения (со стаканом)
@@ -10731,6 +10792,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // мгновенный отказ БЕЗ обращения к бирже. Рынок НЕ двигается от одного ввода суммы.
             if(q*p0 > p.savings){ alert('Не хватает кассы: '+fmtN(q)+' шт × '+p0+'$ = '+fmtN(Math.round(q*p0))+'$, а у тебя '+fmtN(p.savings)+'$. Рынок не тронут — уменьши количество.'); return; }
             lastSaveT=Date.now();                   // защита от гонки: пока идёт сделка, push не подменяет state.players
+            const origQ=q;
             if(SERVER_MODE){
                 // 1) КОТИРОВКА (dry-run): узнаём цену исполнения со стаканом, НЕ двигая рынок для всех
                 try{
@@ -10738,9 +10800,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         body:JSON.stringify({assetId:id,side:'buy',qty:q,commit:false})});
                     const jq=await rq.json(); if(jq&&jq.avgFill) fill=jq.avgFill;
                 }catch(e){ console.warn('quote:',e); }
-                // 2) проверяем деньги ПО КОТИРОВКЕ — рынок ещё не двинут, отказ ничего не ломает
-                if(q*fill > p.savings){ alert('При таком объёме стакан поднимет цену до ~'+fill+'$/шт — нужно '+fmtN(Math.round(q*fill))+'$, есть '+fmtN(p.savings)+'$. Рынок не тронут.'); return; }
-                // 3) КОММИТ: денег хватает → теперь реально двигаем цену для всех и берём по факту
+                // 2) АВТО-ПОДГОН: если по котировке (стакан + комиссия) не влезает — уменьшаем кол-во до того,
+                //    что реально по карману. У мемов тонкий стакан → МАКС «уезжает», это и чиним.
+                const feePct0=tradeFeePct(p);
+                const maxAff=Math.floor((Number(p.savings)||0)/(fill*(1+feePct0)));
+                if(maxAff<1){ alert('Не хватает даже на 1 шт «'+a.name+'» — при этом объёме стакан поднимает цену до ~'+fill+'$. Касса '+fmtN(p.savings)+'$.'); return; }
+                if(q>maxAff){ q=maxAff; }   // подогнали под кассу (рынок ещё не тронут — котировка)
+                // 3) КОММИТ: теперь реально двигаем цену для всех и берём по факту (объём меньше → слиппедж меньше)
                 try{
                     const rc=await fetch('/market/impact',{method:'POST',headers:{'Content-Type':'application/json'},
                         body:JSON.stringify({assetId:id,side:'buy',qty:q,commit:true})});
@@ -10759,7 +10825,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             h.avg=(h.avg*h.qty + fill*q)/(h.qty+q); h.qty+=q; h.name=a.name;
             p.holdings[id]=h; logTrade(p,'BUY',a.name,q,fill,cost,fee); save(); render();
             const moved = Math.abs(fill-p0)>0.0001 ? ('\n📈 Твой объём двинул рынок: витрина была '+p0+'$, ты взял по ~'+fill+'$/шт.') : '';
-            alert('✅ Куплено '+q+' «'+a.name+'» по ~'+fill+'$ · комиссия биржи '+fmtN(fee)+'$ ('+(feePct*100).toFixed(1)+'%) · всего −'+fmtN(totalCost)+'$'+moved);
+            const trimmed = q<origQ ? ('\n✂️ Подогнал под кассу: взял '+fmtN(q)+' вместо '+fmtN(origQ)+' шт (у мемов стакан дорогой).') : '';
+            alert('✅ Куплено '+fmtN(q)+' «'+a.name+'» по ~'+fill+'$ · комиссия биржи '+fmtN(fee)+'$ ('+(feePct*100).toFixed(1)+'%) · всего −'+fmtN(totalCost)+'$'+trimmed+moved);
         }
         // Ядро продажи: q штук актива id → импакт + комиссия + запись в историю. Возвращает итог (или null).
         async function sellHolding(p,id,q){
@@ -10797,6 +10864,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Твой объём просадил рынок: витрина была '+r.p0+'$, выход по ~'+r.fill+'$/шт.') : '';
                 alert('✅ Продано '+r.qty+' «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ ('+(r.feePct*100).toFixed(1)+'%) → +'+fmtN(r.net)+'$ в кассу'+moved); }
         }
+        // Продать ВСЮ позицию по одному активу (кнопка «Продать» у актива).
+        async function sellWhole(id){
+            const p=state.players.find(x=>x.id==state.currentPlayerId);
+            if(!p||!p.holdings||!p.holdings[id]) return;
+            const have=p.holdings[id].qty;
+            lastSaveT=Date.now();
+            const r=await sellHolding(p,id,have); save(); render();
+            if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Объём просадил рынок: витрина '+r.p0+'$, выход по ~'+r.fill+'$.') : '';
+                alert('✅ Продано всё «'+r.name+'» ('+fmtN(r.qty)+' шт) по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу'+moved); }
+        }
         async function sellAllAssets(){
             const pid=state.currentPlayerId;
             let p=state.players.find(x=>x.id==pid); if(!p) return;
@@ -10825,10 +10902,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!m||!m.assets) return '<div class="card"><div class="block-title">📈 Биржа</div><div style="color:#9ca3af;font-size:13px;">рынок загружается…</div></div>';
             p.holdings=p.holdings||{};
             const ownIds=Object.keys(p.holdings);
-            const selLbl=(have)=>{ const q=state.qtyPreset; if(q==='max') return ' Всё'; if(q==='min') return ' 1'; if(typeof q==='number') return ' '+Math.min(q,have); return ''; };
             let holdHtml = ownIds.length ? ownIds.map(id=>{
                 const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, plPct=h.avg?((pr/h.avg-1)*100):0, plAbs=Math.round((pr-h.avg)*h.qty), c=plPct>=0?'#10b981':'#f43f5e';
-                return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${h.avg.toFixed(2)}$</b> · сейчас ${pr.toFixed(pr<1?4:2)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellAsset('${id}')" class="btn btn-orange" style="margin-top:4px;">Продать${selLbl(h.qty)}</button></div></div>`;
+                return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${h.avg.toFixed(2)}$</b> · сейчас ${pr.toFixed(pr<1?4:2)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellWhole('${id}')" class="btn btn-orange" style="margin-top:4px;">Продать</button></div></div>`;
             }).join('') : '<div style="color:#9ca3af;font-size:13px;">пока нет активов — открой биржу ниже и купи</div>';
             const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
             const alertHtml = ev.length ? ev.map(e=>`<div style="background:${e.kind==='КРАХ'?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${e.kind==='КРАХ'?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`).join('') : '';
@@ -10840,24 +10916,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const sorted=m.assets.filter(a=>assetCat(a)===tab).map(a=>{ const base=a.price0||a.price; return {a, chg: base?((a.price/base-1)*100):0}; }).sort((x,y)=>y.chg-x.chg);
                 const rows=sorted.length?sorted.map(({a,chg})=>{
                     const c=chg>=0?'#10b981':'#f43f5e', arrow=chg>=0?'▲':'▼';
-                    return `<div class="row-item"><div style="flex:1;"><b>${a.name}</b><div style="font-size:12px;color:${c};font-weight:700;">${a.price.toFixed(a.price<1?4:2)}$ · ${arrow} ${chg>=0?'+':''}${chg.toFixed(1)}%</div></div><button onclick="buyAsset('${a.id}')" class="btn" style="background:#10b981;color:#fff;">Купить${qtyLabel()}</button></div>`;
+                    return `<div class="row-item"><div style="flex:1;"><b>${a.name}</b><div style="font-size:12px;color:${c};font-weight:700;">${a.price.toFixed(a.price<1?4:2)}$ · ${arrow} ${fmtPct(chg)}</div></div><button onclick="openBuyModal('${a.id}')" class="btn" style="background:#10b981;color:#fff;">Купить</button></div>`;
                 }).join(''):'<div style="color:#9ca3af;font-size:13px;padding:10px;text-align:center;">В этой категории пока нет активов.</div>';
                 listHtml=tabBar+rows;
             }
-            const qbtn=(v,label,extra)=>`<button onclick="setQty(${typeof v==='string'?`'${v}'`:v})" class="btn" style="padding:3px 11px;font-size:12px;background:${state.qtyPreset===v?'#2563eb':(extra||'#374151')};color:#fff;font-weight:${(v==='max'||v==='min')?'700':'400'};">${label}</button>`;
             return `<div class="card">
                 <div class="block-title">📈 Биржа · Год ${m.game_year||1}</div>
                 <div id="mktTick" style="text-align:center;font-size:12px;font-weight:800;color:#7dd3fc;margin-bottom:6px;">⏳ …</div>
                 <div id="buyTimer" style="display:none;text-align:center;background:#064e3b;color:#d1fae5;padding:6px 10px;border-radius:8px;font-weight:800;margin-bottom:8px;"></div>
                 ${alertHtml}
                 <div style="font-size:13px;color:#a7f3d0;margin-bottom:6px;">💼 Портфель: <b>${fmtN(portfolioValue(p))} $</b> &nbsp;·&nbsp; 💰 Касса: <b>${fmtN(p.savings)} $</b></div>
-                <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">💸 Комиссия биржи сейчас: <b style="color:#fbbf24;">${(tradeFeePct(p)*100).toFixed(1)}%</b> на сделку <span style="color:#6b7280;">(спред ${(FEE_BASE*100).toFixed(1)}% + надбавка за частоту — чем больше торгуешь, тем выше, до ${(FEE_CAP*100).toFixed(0)}%)</span></div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
-                    <span style="font-size:12px;color:#9ca3af;font-weight:700;">Кол-во за клик:</span>
-                    ${qbtn('min','Мин')}
-                    ${[50,100,500,1000].map(n=>qbtn(n,String(n))).join('')}
-                    ${qbtn('max','Макс 💰','#166534')}
-                </div>
+                <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">💸 Комиссия биржи сейчас: <b style="color:#fbbf24;">${(tradeFeePct(p)*100).toFixed(1)}%</b> на сделку <span style="color:#6b7280;">(спред ${(FEE_BASE*100).toFixed(1)}% + надбавка за частоту, до ${(FEE_CAP*100).toFixed(0)}%)</span></div>
                 <button onclick="state.showMarket=!state.showMarket;render();" class="btn" style="width:100%;margin:2px 0 8px;background:${state.showMarket?'#374151':'#2563eb'};color:#fff;">${state.showMarket?'Скрыть биржу ▲':'📈 Открыть биржу (купить активы) ▼'}</button>
                 ${listHtml}
                 <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin:10px 0 4px;border-top:1px solid #1f2937;padding-top:10px;">💼 Мои активы (куплено)</div>
@@ -11096,6 +11165,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${/* Мировое событие УБРАНО у игроков (Ринат): открывает ведущий, в дальнейшем — автоматически. Игроки только ВИДЯТ результат (renderWorldShow). */''}
                 ${renderWorldShow()}
                 ${renderHistoryModal()}
+                ${renderBuyModal()}
                 ${renderWorkPanel(p)}
                 ${renderWorkModal()}
                 ${renderExpensePanel(p)}

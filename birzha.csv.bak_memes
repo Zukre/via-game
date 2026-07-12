@@ -57,9 +57,3 @@ AssetID,Название,Тип Актива,Минимальная цена ,Т
 ,,,,,,,,,,,Flat,Range
 ,,,,,,,,,,,Flat,Range
 ,,,,,,,,,,,Flat,Range
-55,ASS,Crypto,1,2400,2400,9000,70,,2400,2400,Flat,Range
-56,TASAK,Crypto,5,1500,1500,6000,60,,1500,1500,Flat,Range
-57,SHOSHKA,Crypto,0.001,0.05,0.05,5,55,,0,0,Flat,Range
-58,BALA,Crypto,0.001,0.02,0.02,3,50,,0,0,Flat,Range
-59,PONK,Crypto,0.0005,0.008,0.008,2,65,,0,0,Flat,Range
-60,DOGEZ,Crypto,0.01,0.3,0.3,40,48,,0,0,Flat,Range
