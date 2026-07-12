@@ -10943,7 +10943,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 listHtml=tabBar+rows;
             }
             return `<div class="card">
-                <div class="block-title">📈 Биржа · Год ${m.game_year||1}</div>
+                <div class="block-title" style="display:flex;justify-content:space-between;align-items:center;">
+                    <span>📈 Биржа · Год ${m.game_year||1}</span>
+                    <button onclick="state.showHistory=true;render();" title="История сделок" style="background:#0e2a3a;border:1px solid #23324a;border-radius:9px;color:#7dd3fc;font-size:15px;padding:4px 10px;cursor:pointer;font-weight:700;">🧾${(p.trades&&p.trades.length)?` ${p.trades.length}`:''}</button>
+                </div>
                 <div id="mktTick" style="text-align:center;font-size:12px;font-weight:800;color:#7dd3fc;margin-bottom:6px;">⏳ …</div>
                 <div id="buyTimer" style="display:none;text-align:center;background:#064e3b;color:#d1fae5;padding:6px 10px;border-radius:8px;font-weight:800;margin-bottom:8px;"></div>
                 ${alertHtml}
@@ -10954,15 +10957,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin:10px 0 4px;border-top:1px solid #1f2937;padding-top:10px;">💼 Мои активы (куплено)</div>
                 ${holdHtml}
                 ${ownIds.length?`<button onclick="sellAllAssets()" class="btn" style="width:100%;background:#b91c1c;color:#fff;font-weight:700;margin:6px 0 4px;">💸 Продать ВСЁ (${ownIds.length} поз.)</button>`:''}
-                ${(p.trades&&p.trades.length)?`<button onclick="state.showHistory=true;render();" class="btn" style="width:100%;margin-top:10px;background:#0e2a3a;color:#7dd3fc;font-weight:700;">🧾 История сделок (${p.trades.length}) — открыть окно</button>`:''}
             </div>`;
         }
 
         // 🧾 ОКНО истории сделок: что, сколько, по чём, когда (открывается кнопкой).
+        function setHistoryTab(t){ state.historyTab=t; render(); }
         function renderHistoryModal(){
             if(!state.showHistory) return '';
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return '';
-            const tr=(p.trades||[]);
+            const all=(p.trades||[]);
+            const tab = state.historyTab==='SELL' ? 'SELL' : 'BUY';       // 2 вкладки: покупки / продажи
+            const nBuy=all.filter(t=>t.side==='BUY').length, nSell=all.filter(t=>t.side==='SELL').length;
+            const tr=all.filter(t=>t.side===tab);
             const rows = tr.length ? [...tr].reverse().map(t=>{
                 let tm=''; try{ tm=new Date(t.t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){}
                 const buy=t.side==='BUY';
@@ -10977,13 +10983,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         ${buy?'вложил':'получил'}: <b style="color:${buy?'#fca5a5':'#34d399'};">${fmtN(buy?t.gross:got)}$</b> &nbsp;·&nbsp; комиссия брокера: <b style="color:#fbbf24;">${fmtN(t.fee)}$</b>${buy?` <span style="color:#6b7280;">(всего списано ${fmtN(got)}$)</span>`:''}
                     </div>
                 </div>`;
-            }).join('') : '<p style="color:#9ca3af;font-size:13px;text-align:center;padding:24px;">Сделок пока нет.</p>';
+            }).join('') : `<p style="color:#9ca3af;font-size:13px;text-align:center;padding:24px;">${tab==='BUY'?'Покупок пока нет.':'Продаж пока нет.'}</p>`;
+            const tbtn=(key,label,n)=>`<button onclick="setHistoryTab('${key}')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:800;cursor:pointer;border:none;border-bottom:2px solid ${tab===key?(key==='BUY'?'#93c5fd':'#fca5a5'):'transparent'};background:${tab===key?'#0d1016':'#0a0d12'};color:${tab===key?(key==='BUY'?'#93c5fd':'#fca5a5'):'#6b7280'};">${label} (${n})</button>`;
             return `<div style="position:fixed;inset:0;z-index:4000;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;" onclick="if(event.target===this){state.showHistory=false;render();}">
                 <div style="width:540px;max-width:100%;max-height:86vh;display:flex;flex-direction:column;background:#0d1016;border:1px solid var(--lx-gold-ln);border-radius:16px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #1f2937;">
-                        <div><div style="font-family:Georgia,serif;font-size:19px;font-weight:700;color:#efd8a3;">🧾 История сделок</div><div style="font-size:11px;color:#9ca3af;">${tr.length} сделок · что · сколько · по чём · когда</div></div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;">
+                        <div style="font-family:Georgia,serif;font-size:19px;font-weight:700;color:#efd8a3;">🧾 История сделок</div>
                         <button onclick="state.showHistory=false;render();" class="btn btn-gray" style="flex:0 0 auto;">✕ Закрыть</button>
                     </div>
+                    <div style="display:flex;border-bottom:1px solid #1f2937;">${tbtn('BUY','🛒 Покупки',nBuy)}${tbtn('SELL','📤 Продажи',nSell)}</div>
                     <div style="overflow-y:auto;padding:4px 14px 16px;">${rows}</div>
                 </div>
             </div>`;
