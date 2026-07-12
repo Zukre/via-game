@@ -556,20 +556,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                 break
                     if b['order']:
                         b['turnIdx'] = (b['turnIdx'] + 1) % len(b['order'])
-                        # МИРОВОЕ СОБЫТИЕ раз в круг: когда ход вернулся к «якорю» после полного круга.
-                        # Якорь сдвигается на следующего игрока → событие «путешествует» по столу.
+                        # МИРОВОЕ СОБЫТИЕ строго РАЗ В КРУГ: считаем ходы, каждые n (число игроков) — событие.
+                        # (Раньше «путешествующий якорь» давал сбой n+1 → события реже круга. Теперь ровно раз в круг.)
                         n = len(b['order'])
-                        anchor = b.get('anchorIdx', 0) % n
                         tsa = int(b.get('turnsSinceAnchor', 0)) + 1
-                        b['turnsSinceAnchor'] = tsa
-                        if b['turnIdx'] == anchor and tsa >= n:
+                        if tsa >= n:
                             we = pick_world_event()
                             DATA['world'] = we
                             _fx = we.get('fx') or {}
                             apply_market_shock(_fx)                    # событие двигает биржу у всех
                             apply_business_shock(_fx.get('biz', 0))    # и денежный поток бизнесов игроков
-                            b['anchorIdx'] = (anchor + 1) % n
                             b['turnsSinceAnchor'] = 0
+                        else:
+                            b['turnsSinceAnchor'] = tsa
                     b['lastRoll'] = None
                     b['turnEndsAt'] = time.time() + TURN_SECONDS   # 2 минуты новому ходящему
                     save_data(DATA)
