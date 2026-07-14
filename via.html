@@ -10542,7 +10542,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             // recent && lastSavedId==null (полная запись ведущего) — держим локальное 2.2с, не трогаем
             maybeShowWorld();
+            updateTurnPlate();   // ход обновляем ВСЕГДА: даже если фокус в поле и safeRerender молчит
             safeRerender();
+            // окно сделки перерисовалось (тик рынка/чужой ход) → блок проскальзывания сбросился,
+            // считаем заново, иначе человек смотрит на «впиши количество» с уже введённым числом
+            if(state.buyModal && state.buyModal.qty > 0) slipSoon('buy');
+            else if(state.sellModal && state.sellModal.qty > 0) slipSoon('sell');
         }
         // ГЛАВНЫЙ канал: SSE — сервер сам мгновенно толкает изменения (реальное время).
         let _es = null;
@@ -10749,7 +10754,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const a=assetById(id); if(!a) return;
             const p=state.players.find(x=>x.id==state.currentPlayerId);
             if(p && (Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
-            state.buyModal={assetId:String(id), qty:0}; render();
+            state.buyModal={assetId:String(id), qty:0}; render(); slipSoon('buy');
         }
         function closeBuyModal(){ state.buyModal=null; render(); }
         function setBuyByFrac(frac){
@@ -10757,9 +10762,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(bm.assetId); if(!p||!a) return;
             const budget = (frac>=1 ? 0.98 : frac) * (Number(p.savings)||0);   // 100%/МАКС с запасом 2% под проскальзывание
             bm.qty = Math.max(0, Math.floor(budget/(a.price*(1+tradeFeePct(p)))));
-            render();
+            render(); slipSoon('buy');
         }
-        function setBuyMin(){ const bm=state.buyModal; if(bm){ bm.qty=1; render(); } }
+        function setBuyMin(){ const bm=state.buyModal; if(bm){ bm.qty=1; render(); slipSoon('buy'); } }
         function onBuyManual(v){   // ручной ввод: обновляем оценку и кнопку БЕЗ полного render (не терять фокус)
             const bm=state.buyModal; if(!bm) return;
             bm.qty=Math.max(0,Math.floor(Number(v)||0));
@@ -10768,6 +10773,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const est=document.getElementById('buyEst'); if(est) est.innerHTML=buyEstHtml(q,price,cost,fee,total,p.savings);
             const btn=document.getElementById('buyConfirmBtn');
             if(btn){ btn.disabled=(q<1); btn.style.background=(enough&&q>0)?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'; btn.style.color=(enough&&q>0)?'#20180a':'#9ca3af'; btn.textContent=q>0?(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`):'Выбери количество'; }
+            slipSoon('buy');   // ручной ввод — тоже пересчитываем стакан
         }
         async function confirmBuy(){
             const bm=state.buyModal; if(!bm) return;
@@ -10805,7 +10811,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                             <button onclick="setBuyByFrac(1)" class="btn" style="flex:1;min-width:58px;padding:8px 4px;font-size:13px;background:#166534;color:#fff;font-weight:800;border:1px solid #22c55e;">МАКС 💰</button>
                         </div>
                         <input id="buyManualQty" type="number" min="1" value="${q||''}" placeholder="или впиши количество вручную" oninput="onBuyManual(this.value)" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;margin-bottom:10px;">
-                        <div id="buyEst" style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.8;margin-bottom:12px;">${buyEstHtml(q,price,cost,fee,total,p.savings)}</div>
+                        <div id="buyEst" style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.8;margin-bottom:8px;">${buyEstHtml(q,price,cost,fee,total,p.savings)}</div>
+                        <div id="slipBox" style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.7;margin-bottom:12px;">Впиши количество — покажу, по какой цене сделка пройдёт на самом деле.</div>
                         <button id="buyConfirmBtn" onclick="confirmBuy()" ${q<1?'disabled':''} class="btn" style="width:100%;background:${enough&&q>0?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'};color:${enough&&q>0?'#20180a':'#9ca3af'};font-weight:800;font-size:15px;padding:13px;">${q>0?(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`):'Выбери количество'}</button>
                     </div>
                 </div>
@@ -10888,7 +10895,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(_pre==='max'){ q=have; }                                        // МАКС: продать всю позицию
             else if(_pre==='min'){ q=1; }                                      // МИН: одну штуку
             else if(typeof _pre==='number' && _pre>0){ q=Math.min(_pre, have); }// быстрый пресет, но не больше чем есть
-            else { q=parseInt((prompt('Сколько штук «'+a.name+'» продать? Есть '+have+', цена '+a.price+'$')||'0'),10); }
+            else { openSellModal(id); return; }   // 🆕 окно с живым проскальзыванием вместо системного prompt
             if(!q||q<1) return;
             if(q>have){ alert('У тебя только '+have+' шт.'); return; }
             lastSaveT=Date.now();                   // защита от гонки: пока идёт сделка, push не подменяет state.players
@@ -11239,9 +11246,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             // 3) бездействие — приходит ЗА НИЧЕГО: ноль покупок и ноль сделок за 3 года.
             //    Начал шевелиться — карта больше не придёт.
+            //    ВАЖНО: считаем годы ОТ ВХОДА игрока, а не абсолютный год партии — иначе тот,
+            //    кто сел на 20-м году, мгновенно получал упрёк за чужое время.
             const acts = (Number(st.buys)||0) + (Number(st.sells)||0);
             const gy = Math.max(1, Number(state.market && state.market.game_year) || 1);
-            if(acts === 0 && give('idle', SOUL_IDLE_STEP, gy)){ done(); return; }   // яда не даёт
+            if(p.joinYear == null){ p.joinYear = gy; dirty = true; }
+            const idleYears = Math.max(0, gy - Number(p.joinYear));
+            if(acts === 0 && give('idle', SOUL_IDLE_STEP, idleYears)){ done(); return; }   // яда не даёт
             if(give('lie', SOUL_SHADOW_STEP, Number(p.shadow)||0)){ poison(); done(); return; }
             if(give('casino', SOUL_CASINO_STEP, Number(st.casinoPlays)||0)){ p.soulCard='greed_casino'; poison(); done(); return; }
             if(give('trade', SOUL_TRADE_STEP, (Number(st.buys)||0)+(Number(st.sells)||0))){ p.soulCard='greed_trade'; poison(); done(); return; }
@@ -11271,6 +11282,129 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     color:${t.txt};margin-bottom:${long?'14px':'20px'};">${lines}</div>
                 <button onclick="soulCardClose(${p.id})" class="btn" style="background:${t.bbg};
                     color:${t.bfg};font-weight:800;padding:12px 32px;font-size:15px;">${t.btn}</button>
+            </div>`;
+        }
+        // ── ПЛАШКА ХОДА: кто ходит сейчас и кто следующий ──
+        // Обновляется ОТДЕЛЬНО от остального экрана (updateTurnPlate), потому что safeRerender()
+        // молчит, когда игрок стоит в поле ввода — из-за этого плашка застывала и врала.
+        function turnPlateHtml(p){
+            const b=state.board; if(!b||!b.order||!b.order.length||!p) return '';
+            const nm=id=>(state.players.find(x=>x.id==id)||{}).name||'игрок';
+            const tp=b.order[b.turnIdx];
+            const nextPid=b.order[(b.turnIdx+1)%b.order.length];
+            const nextTxt = b.order.length>1
+                ? `<div style="font-size:11.5px;font-weight:700;opacity:.9;margin-top:4px;">⏭️ Следующий — <b>${nextPid==p.id?'ТЫ':nm(nextPid)}</b></div>`
+                : '';
+            if(tp==p.id) return `<div style="background:linear-gradient(90deg,#1d4ed8,#2563eb);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:800;text-align:center;">🎯 ТВОЙ ХОД! Действуй.${nextTxt}</div>`;
+            return `<div style="background:#3f1d1d;color:#fecaca;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">⏳ Сейчас ходит <b>${nm(tp)}</b> — жди свой ход. Твои действия отключены (только казино и общее окно покупки).${nextTxt}</div>`;
+        }
+        function updateTurnPlate(){
+            const el=document.getElementById('turnPlate'); if(!el) return;
+            const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            const html=turnPlateHtml(p);
+            if(el.innerHTML!==html) el.innerHTML=html;   // не трогаем DOM зря
+        }
+        // ═══ ПРОСКАЛЬЗЫВАНИЕ: показываем ДО сделки, а не после ═══
+        // Котировка идёт с commit:false — узнаём цену исполнения по стакану, НЕ двигая рынок для всех.
+        let _slipSeq = 0, _slipTimer = null;
+        async function quoteFill(id, side, qty){
+            const a = assetById(id); if(!a) return null;
+            if(!SERVER_MODE) return {fill:a.price, move:0, offline:true};
+            try{
+                const r = await fetch('/market/impact',{method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({assetId:id, side:side, qty:qty, commit:false})});
+                const j = await r.json();
+                if(j && j.avgFill) return {fill:j.avgFill, move:Number(j.move)||0};
+            }catch(e){ console.warn('quote:', e); }
+            return {fill:a.price, move:0};
+        }
+        function slipSoon(side){ clearTimeout(_slipTimer); _slipTimer = setTimeout(()=>slipRefresh(side), 300); }
+        async function slipRefresh(side){
+            const box = document.getElementById('slipBox'); if(!box) return;
+            const m = (side==='buy') ? state.buyModal : state.sellModal; if(!m) return;
+            const p = state.players.find(x=>x.id==state.currentPlayerId); const a = assetById(m.assetId);
+            if(!p || !a) return;
+            const q = Math.floor(Number(m.qty)||0);
+            if(q < 1){ box.innerHTML = '<span style="color:#6b7280;">Впиши количество — покажу, по какой цене сделка пройдёт на самом деле.</span>'; return; }
+            box.innerHTML = '<span style="color:#7dd3fc;">⏳ Спрашиваю стакан…</span>';
+            const seq = ++_slipSeq;
+            const r = await quoteFill(m.assetId, side, q);
+            if(seq !== _slipSeq) return;                    // пока считали, человек поменял число — ответ устарел
+            const box2 = document.getElementById('slipBox'); if(!box2 || !r) return;
+            const shelf = a.price, fill = r.fill;
+            const slipPct = shelf ? ((fill/shelf - 1) * 100) : 0;
+            const feePct = tradeFeePct(p);
+            const gross = q * fill, fee = gross * feePct;
+            const bad = Math.abs(slipPct) >= 3;
+            const col = Math.abs(slipPct) < 0.5 ? '#34d399' : (bad ? '#f87171' : '#fbbf24');
+            const arrow = slipPct >= 0 ? '▲' : '▼';
+            let head;
+            if(Math.abs(slipPct) < 0.05) head = `📊 Стакан держит: пройдёт по витрине <b>${fmtPrice(shelf)}$</b>/шт — проскальзывания нет.`;
+            else if(side==='buy') head = `📊 Витрина <b>${fmtPrice(shelf)}$</b> → твоя цена <b style="color:${col};">~${fmtPrice(fill)}$</b>/шт <b style="color:${col};">${arrow} ${Math.abs(slipPct).toFixed(1)}%</b><br><span style="font-size:11.5px;color:#9c988e;">Твой объём сам двигает цену вверх — чем больше берёшь, тем дороже.</span>`;
+            else head = `📊 Витрина <b>${fmtPrice(shelf)}$</b> → выход по <b style="color:${col};">~${fmtPrice(fill)}$</b>/шт <b style="color:${col};">${arrow} ${Math.abs(slipPct).toFixed(1)}%</b><br><span style="font-size:11.5px;color:#9c988e;">Твой объём продавливает цену вниз — чем больше сливаешь, тем дешевле.</span>`;
+            const tail = (side==='buy')
+                ? `<div style="margin-top:7px;padding-top:7px;border-top:1px solid #242833;">Спишется: <b style="color:${(gross+fee)<=p.savings?'#34d399':'#f87171'};">${fmtN(Math.round(gross+fee))}$</b> <span style="color:#9c988e;">(в т.ч. комиссия ${fmtN(Math.round(fee))}$)</span></div>`
+                : `<div style="margin-top:7px;padding-top:7px;border-top:1px solid #242833;">На руки: <b style="color:#34d399;">${fmtN(Math.round(gross-fee))}$</b> <span style="color:#9c988e;">(после комиссии ${fmtN(Math.round(fee))}$)</span></div>`;
+            box2.innerHTML = head + tail;
+        }
+        // ── ОКНО ПРОДАЖИ (вместо системного prompt, где ничего не показать) ──
+        function openSellModal(id){
+            const a = assetById(id); if(!a) return;
+            const p = state.players.find(x=>x.id==state.currentPlayerId);
+            if(!p || !p.holdings || !p.holdings[id]) return;
+            state.sellModal = {assetId:String(id), qty:0}; render(); slipSoon('sell');
+        }
+        function closeSellModal(){ state.sellModal = null; render(); }
+        function sellHave(){ const m=state.sellModal; const p=state.players.find(x=>x.id==state.currentPlayerId);
+            return (m && p && p.holdings && p.holdings[m.assetId]) ? Number(p.holdings[m.assetId].qty)||0 : 0; }
+        function setSellByFrac(frac){ const m=state.sellModal; if(!m) return;
+            m.qty = Math.max(1, Math.floor(sellHave() * frac)); render(); slipSoon('sell'); }
+        function onSellManual(v){
+            const m = state.sellModal; if(!m) return;
+            m.qty = Math.max(0, Math.min(sellHave(), Math.floor(Number(v)||0)));
+            const btn = document.getElementById('sellConfirmBtn');
+            if(btn){ const q=m.qty; btn.disabled=(q<1);
+                btn.textContent = q>0 ? `✅ Продать ${fmtN(q)} шт` : 'Выбери количество'; }
+            slipSoon('sell');
+        }
+        async function confirmSell(){
+            const m = state.sellModal; if(!m) return;
+            const id = m.assetId, q = Math.floor(Number(m.qty)||0);
+            if(!q || q<1){ alert('Выбери количество — кнопкой или впиши вручную.'); return; }
+            state.sellModal = null;
+            const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            lastSaveT = Date.now();
+            const r = await sellHolding(p, id, q); save(); render();
+            if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Твой объём просадил рынок: витрина была '+r.p0+'$, выход по ~'+r.fill+'$/шт.') : '';
+                alert('✅ Продано '+fmtN(r.qty)+' «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу'+moved); }
+        }
+        function renderSellModal(){
+            const m = state.sellModal; if(!m) return '';
+            const p = state.players.find(x=>x.id==state.currentPlayerId); const a = assetById(m.assetId);
+            if(!p || !a || !p.holdings || !p.holdings[m.assetId]) return '';
+            const have = sellHave(), q = Math.floor(Number(m.qty)||0);
+            const h = p.holdings[m.assetId], avg = Number(h.avg)||0;
+            const pnl = avg ? ((a.price/avg - 1) * 100) : 0;
+            const fbtn = (lbl, frac) => `<button onclick="setSellByFrac(${frac})" class="btn" style="flex:1;min-width:52px;padding:8px 4px;font-size:13px;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;font-weight:700;">${lbl}</button>`;
+            return `<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;" onclick="if(event.target===this){closeSellModal();}">
+                <div style="width:400px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 32px -8px #d9b877;">
+                    <div style="height:4px;background:linear-gradient(90deg,transparent,#f87171,transparent);"></div>
+                    <div style="padding:20px;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                            <div><div style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Продажа на бирже</div>
+                            <div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#f3efe6;line-height:1.1;">${a.name}</div>
+                            <div style="font-size:12px;color:#9c988e;margin-top:2px;">Витрина <b style="color:#e9eefb;">${fmtPrice(a.price)}$</b> · у тебя <b style="color:#efd8a3;">${fmtN(have)} шт</b>${avg?` · твоя средняя ${fmtPrice(avg)}$ <b style="color:${pnl>=0?'#34d399':'#f87171'};">${pnl>=0?'+':''}${pnl.toFixed(1)}%</b>`:''}</div></div>
+                            <button onclick="closeSellModal()" class="btn btn-gray" style="flex:0 0 auto;">✕</button>
+                        </div>
+                        <div style="display:flex;gap:5px;flex-wrap:wrap;margin:14px 0 8px;">
+                            ${fbtn('25%',0.25)}${fbtn('50%',0.50)}${fbtn('75%',0.75)}
+                            <button onclick="setSellByFrac(1)" class="btn" style="flex:1;min-width:58px;padding:8px 4px;font-size:13px;background:#7f1d1d;color:#fff;font-weight:800;border:1px solid #f87171;">ВСЁ 📉</button>
+                        </div>
+                        <input id="sellManualQty" type="number" min="1" max="${have}" value="${q||''}" placeholder="или впиши количество вручную" oninput="onSellManual(this.value)" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#120a0a;margin-bottom:10px;">
+                        <div id="slipBox" style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.7;margin-bottom:12px;">Впиши количество — покажу, по какой цене сделка пройдёт на самом деле.</div>
+                        <button id="sellConfirmBtn" onclick="confirmSell()" ${q<1?'disabled':''} class="btn" style="width:100%;background:${q>0?'linear-gradient(180deg,#f87171,#b91c1c)':'#374151'};color:${q>0?'#fff':'#9ca3af'};font-weight:800;font-size:15px;padding:13px;">${q>0?`✅ Продать ${fmtN(q)} шт`:'Выбери количество'}</button>
+                    </div>
+                </div>
             </div>`;
         }
         function renderPlayer(app) {
@@ -11303,12 +11437,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${(()=>{ const up=(Number(p.otherExpPct)||0)+(Number(p.jailPress)||0), dn=Number(p.taxDiscPct)||0; if(!up&&!dn) return ''; const parts=[]; if(up) parts.push(`+${up}% к прочим расходам`); if(dn) parts.push(`−${dn}% к налогам`); return `<div style="font-size:11px;margin-bottom:10px;color:#fecaca;background:rgba(0,0,0,.22);border-radius:8px;padding:6px 8px;">🩸 Следы тюрьмы (навсегда): ${parts.join(' · ')}${(Number(p.jailPress)||0)?` <span style="color:#fca5a5;">· давление сидки +${Number(p.jailPress)||0}%</span>`:''}</div>`; })()}
                     <button onclick="jailBuyout(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;">💸 Откупиться (−${jailBuyoutPct(p)}%)</button>
                 </div>` : ''}
-                ${(()=>{ const b=state.board; if(!b||!b.order||!b.order.length) return '';
-                    const tp=b.order[b.turnIdx];
-                    if(tp==p.id) return `<div style="background:linear-gradient(90deg,#1d4ed8,#2563eb);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:800;text-align:center;">🎯 ТВОЙ ХОД! Действуй.</div>`;
-                    const tn=(state.players.find(x=>x.id==tp)||{}).name||'игрок';
-                    return `<div style="background:#3f1d1d;color:#fecaca;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">⏳ Сейчас ходит <b>${tn}</b> — жди свой ход. Твои действия отключены (только казино и общее окно покупки).</div>`;
-                })()}
+                <div id="turnPlate">${turnPlateHtml(p)}</div>
                 ${p.allow ? `<div style="background:linear-gradient(90deg,#065f46,#047857);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">✅ Ведущий ОТКРЫЛ клетку: ${ALLOW_LABEL[p.allow]||p.allow}. Жми её кнопку и тяни карту.</div>` : `<div style="background:#1f2937;color:#9ca3af;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-size:12px;text-align:center;">🔒 Клетки закрыты. Попал на клетку → жди, пока ведущий откроет её тебе.</div>`}
                 <button onclick="startScan()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;font-size:15px;padding:14px;margin-bottom:12px;box-shadow:0 10px 26px rgba(217,184,119,.22);">📷 Сканировать карту</button>
                 <div class="card flex-between">
@@ -11381,6 +11510,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderWorldShow()}
                 ${renderHistoryModal()}
                 ${renderBuyModal()}
+                ${renderSellModal()}
                 ${renderWorkPanel(p)}
                 ${renderWorkModal()}
                 ${renderExpensePanel(p)}
@@ -12988,7 +13118,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ccLeft: pr.initCC, rLeft: pr.initRetail,
                 assets: [], skills: [], lifeSkills: {}, taxMod: 0, jail: 0, jailCount: 0, allow: null,
                 otherExpPct: 0, taxDiscPct: 0, jailPress: 0, jailPending: null, ownedCards: [], skillTries: 0,
-                trades: [], soulCard: null, soulSeen: {}, soulPoison: 0, shadow: 0, lastCell: 0,
+                trades: [], soulCard: null, soulSeen: {}, soulPoison: 0, shadow: 0, lastCell: 0, joinYear: null,
                 stats: { casinoPlays:0, casinoWins:0, casinoLosses:0, casinoWon:0, casinoLost:0, buys:0, buyAmt:0, sells:0, sellAmt:0, salaryCount:0, salaryTotal:0, feePaid:0 }
             });
             state.chosenProf = null; state.nameDraft = ''; save(newId); render();
@@ -13578,8 +13708,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             // ЧЁРНЫЙ РЫНОК: скан → предпросмотр карты → применить
             if(String(type).startsWith('black_')){ showCardPreview(pid,type); return; }
-            // ПАССИВЫ: скан → предпросмотр карты → применить
-            if(String(type).startsWith('passive_')){ showCardPreview(pid,type); return; }
+            // ПАССИВЫ: скан → СРАЗУ применяем (Ринат 14июл). Пассив — это то, что уже произошло:
+            // расход/обязательство не одобряют, его показывают по факту. Выбор остаётся только
+            // у Рынка и Сделок (там «купить / отказаться»).
+            if(String(type).startsWith('passive_')){
+                const pv = PASSIVE_CARDS.find(x=>x.id===parseInt(String(type).slice(8),10));
+                if(!pv){ alert('Нет карты: '+type); return; }
+                resolvePassiveCard(pid, pv);   // спишет и покажет карточку с результатом
+                return;
+            }
             // РЫНОК: скан market_<id> → предложение продать объект по рыночной цене
             if(String(type).startsWith('market_')){
                 const mid = parseInt(String(type).slice(7),10);
