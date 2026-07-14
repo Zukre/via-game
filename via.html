@@ -10761,7 +10761,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const bm=state.buyModal; if(!bm) return;
             const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(bm.assetId); if(!p||!a) return;
             const budget = (frac>=1 ? 0.98 : frac) * (Number(p.savings)||0);   // 100%/МАКС с запасом 2% под проскальзывание
-            bm.qty = Math.max(0, Math.floor(budget/(a.price*(1+tradeFeePct(p)))));
+            const unit = a.price*(1+tradeFeePct(p));                            // цена одной штуки с комиссией
+            let q = Math.floor(budget/unit);
+            // 🐞 ФИКС (Ринат 14июл): на дорогом активе процент от кассы < цены 1 шт → floor давал 0,
+            // и кнопка немо просила «впиши количество». Теперь: хватает на одну — берём одну,
+            // не хватает и на одну — говорим об этом честно, а не молчим.
+            if(q < 1){
+                if((Number(p.savings)||0) >= unit){ q = 1; }
+                else { alert('Не хватает даже на 1 шт «'+a.name+'»: цена '+fmtPrice(a.price)+'$ + комиссия брокера, а в кассе '+fmtN(p.savings)+'$.'); return; }
+            }
+            bm.qty = q;
             render(); slipSoon('buy');
         }
         function setBuyMin(){ const bm=state.buyModal; if(bm){ bm.qty=1; render(); slipSoon('buy'); } }
@@ -10794,7 +10803,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const cost=q*price, fee=q*price*tradeFeePct(p), total=cost+fee, enough=total<=p.savings;
             const base=a.price0||price, chg=base?((price/base-1)*100):0;
             const pctBtn=(lbl,frac,bg)=>`<button onclick="setBuyByFrac(${frac})" class="btn" style="flex:1;min-width:52px;padding:8px 4px;font-size:13px;background:${bg||'#241a0c'};color:#efd8a3;border:1px solid #b98a3e;font-weight:700;">${lbl}</button>`;
-            return `<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;" onclick="if(event.target===this){closeBuyModal();}">
+            return `<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;">
                 <div style="width:400px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 32px -8px #d9b877;">
                     <div style="height:4px;background:linear-gradient(90deg,transparent,#efd8a3,transparent);"></div>
                     <div style="padding:20px;">
@@ -11214,6 +11223,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // иначе первый же SSE-пуш сотрёт карту с экрана и счётчики обнулятся.
         function soulCheck(p){
             if(!p || p.soulCard) return;                 // одна карта за раз, очередь не копим
+            if(state.buyModal || state.sellModal) return;   // идёт сделка — не лезем поверх окна (Ринат: «окно закрылось само»)
             const seen = p.soulSeen = p.soulSeen || {};
             const st = pstat(p);
             let dirty = false;
@@ -11386,7 +11396,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const h = p.holdings[m.assetId], avg = Number(h.avg)||0;
             const pnl = avg ? ((a.price/avg - 1) * 100) : 0;
             const fbtn = (lbl, frac) => `<button onclick="setSellByFrac(${frac})" class="btn" style="flex:1;min-width:52px;padding:8px 4px;font-size:13px;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;font-weight:700;">${lbl}</button>`;
-            return `<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;" onclick="if(event.target===this){closeSellModal();}">
+            return `<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;">
                 <div style="width:400px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 32px -8px #d9b877;">
                     <div style="height:4px;background:linear-gradient(90deg,transparent,#f87171,transparent);"></div>
                     <div style="padding:20px;">
