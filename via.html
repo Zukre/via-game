@@ -11312,13 +11312,29 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
         // ── ДВЕРИ ────────────────────────────────────────────
         // Открывается, когда капитал взял порог. Одна дверь за раз, каждая один раз.
+        // МЕСТНЫЙ ЗАМОК: живёт на устройстве игрока и переживает любой чужой пуш.
+        // Ведущий шлёт игроков целиком и может затереть doorsDone своей устаревшей
+        // копией — тогда дверь открылась бы второй раз. Этот замок не даст.
+        const _doorLock = {};
+        function doorLocked(pid, did){ return !!_doorLock[pid + ':' + did]; }
+        function doorLock(pid, did){ _doorLock[pid + ':' + did] = 1; }
+
         function doorCheck(p){
             if(!p || p.doorOpen || p.soulNew || p.soulBurn || p.soulCard) return;
             if(state.buyModal || state.sellModal) return;
             const d = p.doorsDone = p.doorsDone || {};
             const cap = pnetWorth(p);
             for(const D of DOORS){
-                if(!d[D.id] && cap >= D.at){ p.doorOpen = D.id; save(p.id); return; }
+                if(d[D.id] || doorLocked(p.id, D.id)) continue;   // пройдена — и точка
+                if(cap >= D.at){
+                    // Замок и отметку ставим СРАЗУ, до показа. Если игрока затрут
+                    // прямо сейчас — дверь всё равно уже пройдена, второй раз не придёт.
+                    doorLock(p.id, D.id);
+                    d[D.id] = 'open';
+                    p.doorOpen = D.id;
+                    save(p.id);
+                    return;
+                }
             }
         }
         // Благотворительность списывает САМА. Чаще берёт больше: 10% в 80% случаев, 5% в 20%.
@@ -11327,6 +11343,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function doorPick(pid, choice){
             const p = state.players.find(x => x.id == pid); if(!p || !p.doorOpen) return;
             const id = p.doorOpen;
+            doorLock(p.id, id);
             p.doorsDone = p.doorsDone || {}; p.doorsDone[id] = choice;
             p.doorOpen = null;
 
