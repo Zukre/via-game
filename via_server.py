@@ -578,6 +578,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return
+        if self.path == '/world/draw':
+            # Ведущий ВРУЧНУЮ тянет мировое событие с пульта («Событие круга»).
+            # Раньше это делал клиент и двигал только p.assets — реальная биржа не двигалась
+            # и эффект не записывался. Теперь событие тянет и применяет СЕРВЕР (авторитетно):
+            # apply_market_shock двигает живые цены биржи, apply_business_shock — cf бизнесов всех,
+            # затем broadcast рассылает карту на все экраны (оверлей у игроков через SSE).
+            try:
+                with LOCK:
+                    we = pick_world_event()
+                    DATA['world'] = we
+                    _fx = we.get('fx') or {}
+                    apply_market_shock(_fx)                    # событие двигает биржу у всех
+                    apply_business_shock(_fx.get('biz', 0))    # и денежный поток бизнесов игроков
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True, 'world': we})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
         if self.path == '/turn/timer':
             # ведущий управляет таймером хода: secs>0 = запустить/перезапустить, secs<=0 = СТОП (убрать таймер)
             n = int(self.headers.get('Content-Length', 0) or 0)

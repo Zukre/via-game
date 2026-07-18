@@ -11372,6 +11372,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Адский чит: выбрал живого → его следующая сделка твоя. И душа сгорела.
         function cheatPick(pid, victimId){
             const p = state.players.find(x => x.id == pid); if(!p) return;
+            // Себя обокрасть нельзя — жертвой может быть только другой живой человек.
+            // (нашли боты: иначе игрок сжигал колоду, «обокрав» сам себя)
+            if(Number(victimId) === Number(pid)) return;
+            if(!(state.players||[]).some(x => x.id === Number(victimId))) return;
             p.cheatPick = false;
             p.cheatOn = Number(victimId);
             s5burn(p, 'cheat');
@@ -12503,7 +12507,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                         </div>
                                         <div>
                                             💰 Касса:
-                                            <input type="number" value="${p.savings}" onchange="chSavings(${p.id},this.value)" style="width:90px; background:#111827; color:#fbbf24; border:1px solid #374151; padding:3px; border-radius:4px; text-align:right; font-weight:bold;">
+                                            <input type="number" value="${Math.round((Number(p.savings)||0)*100)/100}" onchange="chSavings(${p.id},this.value)" style="width:90px; background:#111827; color:#fbbf24; border:1px solid #374151; padding:3px; border-radius:4px; text-align:right; font-weight:bold;">
                                         </div>
                                     </div>
 
@@ -12925,6 +12929,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         // ВЕДУЩИЙ: раз в круг тянет мировое событие — применяется ко ВСЕМ и транслируется на все экраны.
         function hostDrawWorld(){
+            // Server-mode: событие тянет и применяет СЕРВЕР (авторитетно) — двигает реальную
+            // биржу (apply_market_shock) и бизнесы всех (apply_business_shock), затем broadcast'ит
+            // карту на все экраны. Клиент увидит оверлей через SSE. Раньше клиент трогал только
+            // p.assets, и market-эффект не записывался (событие было чисто косметическим).
+            if (SERVER_MODE) {
+                fetch('/world/draw',{method:'POST',headers:{'Content-Type':'application/json'}}).catch(e=>console.warn('world:',e));
+                return;
+            }
             const total = WORLD_EVENTS.reduce((s,e)=>s+e.w,0);
             let rr = Math.random()*total, ev = WORLD_EVENTS[0];
             for (const e of WORLD_EVENTS) { if ((rr -= e.w) < 0) { ev = e; break; } }
@@ -14388,7 +14400,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     p.notify = '🎉 ПОЗДРАВЛЯЕМ! Ведущий подтвердил твой выигрыш +' + d.details.payout + '$! 👑 Касса пополнена.';
                 }
                 else if (d.type === 'PAY_BANK') { const owe=Number(p.bankLoan)||0; p.savings=Math.round(((p.savings||0)-owe)*100)/100; p.bankLoan = 0; p.notify='🏦 Кредит банка закрыт: −'+fmtN(owe)+'$ с кассы.'; }
-                else if (d.type === 'TAKE_LOAN') { p.bankLoan += d.details.amount; p.savings += d.details.amount; }
+                else if (d.type === 'TAKE_LOAN') { p.bankLoan += d.details.amount; p.savings = Math.round(((Number(p.savings)||0) + d.details.amount) * 100) / 100; }
                 return p;
             });
             state.deals = state.deals.filter(dl => dl.id != dId);
