@@ -11033,7 +11033,34 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Вкладки биржи (Ринат): разбить по категориям, не всё подряд.
         const MARKET_TABS = [['stock','📈 Акции'],['crypto','🪙 Крипта'],['meme','🚀 МЕМ'],['metal','🥇 Металлы'],['comm','🌾 Сырьё']];
         function assetCat(a){ const t=a.type; if(t==='metal')return'metal'; if(t==='commodity')return'comm'; if(t==='crypto')return (Number(a.vol)||0)>=40?'meme':'crypto'; return 'stock'; }
-        function setMarketTab(t){ state.marketTab=t; render(); }
+        // 🖼️ ОКНА АКТИВОВ (Ринат 19июл): при ПЕРВОМ заходе в категорию — всплывает окно с картинкой и текстом.
+        const CAT_POPUP={
+            stock:{img:'cat_imgs/0.webp', t:'📈 Акции', c:'#5cb08b', txt:'Доли компаний. Растут ~5–10% в год, стабильно. Большие деньги, тихо. Выигрывает терпеливый, кто держит и не дёргается.'},
+            crypto:{img:'cat_imgs/3.webp', t:'⚡ Крипта', c:'#fbbf24', txt:'Опасно! Скачки ±50–60% за день — можно всё потерять. Но за 10–20 лет сильно выросла. Может взлететь — а может и нет.'},
+            meme:{img:'cat_imgs/1.webp', t:'☠️ Мемкоин', c:'#f87171', txt:'Риск потери 80–99%. Почти всегда обнуляются. На свой страх и риск — брокер не несёт ответственности. Один из сотни срывает куш.'},
+            metal:{img:'cat_imgs/2.webp', t:'🥇 Металлы · Золото', c:'#efd8a3', txt:'Тихая гавань. ~2–3% в год, медленно, но почти не падает. Сейф для больших денег.'},
+            comm:{img:'cat_imgs/4.webp', t:'🌾 Сырьё · Нефть', c:'#efd8a3', txt:'Стабильно, глубокий рынок — как золото. Большие объёмы поглощает спокойно.'}
+        };
+        function setMarketTab(t){
+            state.marketTab=t;
+            const p=state.players.find(x=>x.id==state.currentPlayerId);
+            if(p && CAT_POPUP[t]){ p.catSeen=p.catSeen||{}; if(!p.catSeen[t]){ p.catSeen[t]=true; state.catPopup=t; } }
+            render();
+        }
+        function closeCatPopup(){ state.catPopup=null; render(); }
+        function renderCatPopup(){
+            const c=state.catPopup && CAT_POPUP[state.catPopup]; if(!c) return '';
+            return `<div onclick="if(event.target===this)closeCatPopup()" style="position:fixed;inset:0;z-index:5000;background:rgba(4,6,9,.9);display:flex;align-items:center;justify-content:center;padding:16px;">
+                <div style="width:420px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.7);">
+                    <img src="${c.img}" style="width:100%;display:block;" alt="">
+                    <div style="padding:16px 18px 18px;">
+                        <div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:${c.c};">${c.t}</div>
+                        <p style="font-size:13px;color:#cdc8bd;line-height:1.6;margin:8px 0 16px;">${c.txt}</p>
+                        <button onclick="closeCatPopup()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понятно</button>
+                    </div>
+                </div>
+            </div>`;
+        }
         // 🏆 Лидерборд биржи: игроки по убыванию суммы, вложенной в рынок (портфель по текущим ценам).
         function renderInvestorBoard(){
             const ranked=(state.players||[]).map(pl=>({pl, val:Math.round(portfolioValue(pl))})).filter(x=>x.val>0).sort((a,b)=>b.val-a.val);
@@ -12053,9 +12080,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="height:8px;border-radius:99px;background:#0a0c10;border:1px solid #23272f;overflow:hidden;"><div style="height:100%;width:${pct}%;border-radius:99px;background:linear-gradient(90deg,#b48f4e,#d9b877 60%,#efd8a3);box-shadow:0 0 12px rgba(217,184,119,.4);"></div></div>
                     ${free?`<div style="font-size:11px;color:#5cb08b;margin-top:7px;font-weight:700;">Пассив в ${WIN_MULT}× перекрыл расходы — ты СВОБОДЕН! 🎉</div>`:`<div style="font-size:11px;color:#9c988e;margin-top:7px;">До свободы ещё <b style="color:#efd8a3;">${fmtN(need)}$/мес</b> пассива.</div>`}
                   </div>
+                  <div style="margin-top:13px;padding-top:13px;border-top:1px solid var(--lx-line);">
+                    <div style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:var(--lx-gold-br);margin-bottom:9px;">🎴 Карты души — дверь на 2-й круг</div>
+                    ${renderS5Slots(p)}
+                  </div>
                 </div>`; })()}
-
-                <div class="soul-strip"><div class="ss-h">🎴 Карты души — дверь на 2-й круг</div>${renderS5Slots(p)}</div>
 
                 <details class="sec" open><summary>📈 Биржа <span class="sec-hint">— торгуй в любой момент</span></summary><div class="sec-in">${renderMarketPanel(p)}</div></details>
 
@@ -12074,15 +12103,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div></details>
 
                 <details class="sec"><summary>🎴 Клетки и действия <span class="sec-hint">— на что попал</span></summary><div class="sec-in">
-                ${renderCareerPanel(p)}
-                ${renderSkillPanel(p)}
-                ${renderGovPanel(p)}
-                ${renderWorkPanel(p)}
-                ${renderExpensePanel(p)}
-                ${renderTaxPanel(p)}
-                ${renderSvyazPanel(p)}
-                ${renderSdelkaPanel(p)}
-                ${renderMedPanel(p)}
+                ${renderCellChips(p)}
                 </div></details>
 
                 <details class="sec"><summary>💼 Доход и расходы <span class="sec-hint">— зарплата, налоги, платежи</span></summary><div class="sec-in">
@@ -12200,18 +12221,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div></details>
 
                 <details class="sec"><summary>🏆 Путь к победе</summary><div class="sec-in">
-                <div class="card win-box ${f.win ? 'win-active' : ''}">
-                    <div style="font-size:12px; color:#9ca3af; font-weight:700; text-transform:uppercase; margin-bottom:5px;">🏆 Условие победы</div>
-                    <p style="font-size:13px; color:#cbd5e1; margin-bottom:10px;">Пассивный доход ≥ Расходы × ${WIN_MULT}</p>
-                    <div style="font-size:20px; font-weight:800; font-family:monospace;">
-                        <span style="color:#3b82f6;">${f.passive} $</span>
-                        <span style="color:#6b7280;"> ${f.win?'≥':'<'} </span>
-                        <span style="color:#ef4444;">${f.target} $</span>
+                ${(()=>{
+                  const dt=(Number(p.mLeft)||0)+(Number(p.eLeft)||0)+(Number(p.aLeft)||0)+(Number(p.ccLeft)||0)+(Number(p.rLeft)||0)+(Number(p.bankLoan)||0);
+                  const soulN=(p.soul5||[]).length;
+                  const c1=dt===0, c2=f.passive>=f.target, c3=soulN>=5, ready=c1&&c2&&c3;
+                  const cond=(ok,txt,val)=>`<div style="display:flex;align-items:center;gap:9px;padding:10px 0;border-top:1px solid var(--lx-line);"><span style="width:20px;font-size:15px;color:${ok?'#5cb08b':'#6d6a62'};">${ok?'✓':'○'}</span><span style="flex:1;font-size:13px;color:${ok?'#f3efe6':'#9c988e'};">${txt}</span><span style="font-family:ui-monospace,monospace;font-size:12px;color:${ok?'#5cb08b':'#cf9a9a'};">${val}</span></div>`;
+                  return `<div class="card" style="border-color:${ready?'#10b981':'var(--lx-gold-ln)'};text-align:center;">
+                    <div style="font-family:Georgia,serif;font-size:19px;font-weight:700;color:${ready?'#6ee7b7':'#efd8a3'};">🚪 Дверь на 2-й круг</div>
+                    <div style="font-size:11.5px;color:#9c988e;margin:5px 0 6px;">Три условия, чтобы шагнуть выше денег:</div>
+                    <div style="text-align:left;">
+                      ${cond(c1,'Закрой все долги',dt===0?'готово':fmtN(dt)+'$ осталось')}
+                      ${cond(c2,'Пассив ≥ расходы ×'+WIN_MULT,fmtN(f.passive)+' / '+fmtN(f.target))}
+                      ${cond(c3,'Собери 5 карт души (см. вверху)',soulN+' / 5')}
                     </div>
-                    <p style="margin-top:10px; font-weight:bold; font-size:13px; color:${f.win?'#10b981':'#f59e0b'};">
-                        ${f.win ? '🎉 ПОБЕДА В VIA! 🎉' : `Осталось добрать пассива: ${f.target - f.passive} $`}
-                    </p>
-                </div>
+                    ${ready?`<div style="margin-top:12px;padding:11px;border-radius:10px;background:rgba(6,78,59,.22);border:1px solid #10b981;color:#6ee7b7;font-weight:800;font-size:13px;">🎉 ДВЕРЬ ОТКРЫТА — ты прошёл 1-й круг! Дальше твой выбор.</div>`:`<div style="margin-top:12px;font-size:11px;color:#9c988e;">Собери все три — и дверь наверх откроется.</div>`}
+                  </div>`; })()}
                 </div></details>
 
                 ${/* МОДАЛКИ вынесены в конец, вне сворачиваемых секций, чтобы всплывали поверх (внутри закрытого details они были бы скрыты) */''}
@@ -12225,6 +12249,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderSdelkaModal()}
                 ${renderMarketModal()}
                 ${renderMedModal()}
+                ${renderCatPopup()}
             `;
         }
 
@@ -12831,6 +12856,28 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(); render();
         }
 
+        // 🎴 КЛЕТКИ как компактные цветные плашки (Ринат 19июл — как в макете), вместо развёрнутых панелей.
+        // Каждая зовёт своё действие (гейтится через allow — если ведущий не открыл, будет подсказка).
+        // Открытая ведущим клетка (p.allow) подсвечивается золотом.
+        function renderCellChips(p){
+            const chips=[
+                ['🎯','Карьера','career','careerRoll('+p.id+')','var(--c-career)'],
+                ['🃏','Навык','skill','openSkillModal('+p.id+')','var(--c-skill)'],
+                ['🏛️','Государство','gov','openGovModal('+p.id+')','var(--c-gov)'],
+                ['💼','Работа','work','openWorkModal('+p.id+')','var(--c-work)'],
+                ['💸','Расход','expense','openExpenseModal('+p.id+')','var(--c-tax)'],
+                ['🏦','Налог','tax','openTaxModal('+p.id+')','var(--c-tax)'],
+                ['🌐','Связи','svyaz','openSvyazModal('+p.id+')','var(--c-stock)'],
+                ['🤝','Мелкая сделка','sdelka','openSdelkaSmall('+p.id+')','#ec4899'],
+                ['🏢','Крупная сделка','sdelka','openSdelkaBig('+p.id+')','#ec4899'],
+                ['⚕️','Медицина','med','openMedModal('+p.id+')','var(--c-jail)']
+            ];
+            return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+chips.map(function(ch){
+                var ic=ch[0],nm=ch[1],typ=ch[2],fn=ch[3],col=ch[4];
+                var on=(p.allow===typ);
+                return '<button onclick="'+fn+'" style="display:flex;align-items:center;gap:8px;border-radius:12px;padding:12px 11px;cursor:pointer;text-align:left;font-weight:700;font-size:13px;background:'+(on?'rgba(217,184,119,.10)':'var(--lx-ink)')+';border:1px solid '+(on?'var(--lx-gold-ln)':'var(--lx-line)')+';color:var(--lx-text);'+(on?'box-shadow:0 0 16px -6px var(--lx-gold);':'')+'"><span style="width:9px;height:9px;border-radius:50%;background:'+col+';box-shadow:0 0 8px '+col+';flex:0 0 auto;"></span><span style="font-size:17px;">'+ic+'</span><span>'+nm+'</span>'+(on?'<span style="margin-left:auto;font-size:9.5px;color:var(--lx-gold-br);">▶</span>':'')+'</button>';
+            }).join('')+'</div>';
+        }
         function renderCareerPanel(p) {
             const f = calc(p);
             const bonusPct = Math.round((f.skillBonus||0)*100);
