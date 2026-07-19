@@ -248,15 +248,15 @@
         .casino-spin:hover{filter:brightness(1.08)}
         .suit-r{color:#d98a8a} .suit-b{color:#cdc8bd}
         /* ─── НОВЫЙ БЛАНК (19июл): эмблема + сворачивающиеся разделы, чтоб не «простыня» ─── */
-        .blank-crest{display:flex; justify-content:center; margin:2px 0 12px;}
+        .blank-crest{display:flex; justify-content:center; margin:2px 0 0;}
         .blank-crest .bc{width:60px; height:60px; border-radius:50%;
             background:radial-gradient(60% 60% at 38% 32%, #fff6dd, transparent 60%),
               conic-gradient(from 210deg, #b98a3e, #efd8a3 25%, #d9b877 50%, #a9741f 72%, #efd8a3 100%);
             border:2px solid #f6e6b8; display:flex; align-items:center; justify-content:center; flex-direction:column; position:relative;
             box-shadow:0 8px 26px rgba(0,0,0,.6), 0 0 30px -4px rgba(217,184,119,.75), inset 0 2px 6px rgba(255,255,255,.35);}
         .blank-crest .bc::after{content:""; position:absolute; inset:5px; border-radius:50%; border:1px solid rgba(60,40,10,.35);}
-        .blank-crest .bc b{font-family:Georgia,serif; font-size:20px; color:#3a2a08; letter-spacing:1px; line-height:1; text-shadow:0 1px 0 rgba(255,255,255,.4);}
-        .blank-crest .bc i{font-style:normal; font-size:6px; letter-spacing:.3em; color:#5a4413; font-weight:800; margin-top:2px;}
+        .blank-crest .bc b{font-family:Georgia,serif; font-size:22px; color:#3a2a08; letter-spacing:1.5px; line-height:1; text-shadow:0 1px 0 rgba(255,255,255,.4);}
+        .blank-tag{text-align:center; font-size:9px; letter-spacing:.34em; text-transform:uppercase; color:var(--lx-gold); font-weight:800; margin:7px 0 14px;}
         details.sec{background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel)); border:1px solid var(--lx-line);
             border-radius:15px; margin-bottom:10px; overflow:hidden;}
         details.sec[open]{border-color:var(--lx-gold-ln); box-shadow:0 0 22px -14px var(--lx-gold);}
@@ -11952,7 +11952,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             `;
 
             app.innerHTML = `
-                <div class="blank-crest"><div class="bc"><b>VIA</b><i>ИГРА ЖИЗНИ</i></div></div>
+                <div class="blank-crest"><div class="bc"><b>VIA</b></div></div>
+                <div class="blank-tag">Игра жизни</div>
                 ${p.notify ? `<div style="background:linear-gradient(90deg,#10b981,#059669);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>${p.notify}</span><button onclick="clearNotify()" class="btn" style="background:#fff;color:#059669;flex:0 0 auto;">ОК</button></div>` : ''}
                 ${(Number(p.jail)||0)>0 ? `<div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fff;padding:16px 14px;border-radius:12px;margin-bottom:10px;text-align:center;border:2px solid #fca5a5;box-shadow:0 0 22px rgba(239,68,68,.45);">
                     <div style="font-size:22px;font-weight:900;letter-spacing:1px;">🔒 ТЫ В ТЮРЬМЕ</div>
@@ -11977,39 +11978,27 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
                 ${(()=>{ const pct=f.target>0?Math.min(100,Math.round(f.passive/f.target*100)):0;
                   const free=f.passive>=f.target; const need=Math.max(0,f.target-f.passive);
-                  const nAssets=(p.assets||[]).filter(a=>Number(a.cf||0)>0).length;
-                  const lvl=playerLevel(f);
+                  const debtTotal=(Number(p.mLeft)||0)+(Number(p.eLeft)||0)+(Number(p.aLeft)||0)+(Number(p.ccLeft)||0)+(Number(p.rLeft)||0)+(Number(p.bankLoan)||0);
+                  const box=(k,v,c)=>`<div style="background:#0d1016;border:1px solid #242833;border-radius:11px;padding:9px 10px;"><div style="font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:#6d6a62;font-weight:700;">${k}</div><div style="font-family:ui-monospace,monospace;font-size:15px;font-weight:700;margin-top:3px;color:${c};">${v}</div></div>`;
                   return `
-                <!-- ЛЮКС-ГЕРОЙ БЛАНКА (RINATVERSE Private) -->
-                <div style="background:linear-gradient(180deg,#171b23,#14171e);border:1px solid #242833;border-radius:16px;padding:16px 18px;margin-bottom:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);">
-                  <div style="display:flex;align-items:flex-end;justify-content:space-between;">
+                <!-- ШАПКА БЛАНКА (по макету): касса + 3 квадратика + полоса победы -->
+                <div style="background:linear-gradient(180deg,#171b23,#14171e);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:16px 18px;margin-bottom:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);">
+                  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;">
                     <div>
-                      <div style="font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#9c988e;font-weight:700;">Касса</div>
-                      <div style="font-family:Georgia,'Times New Roman',serif;font-size:34px;font-weight:600;line-height:1;margin-top:6px;">${fmtN(p.savings)} <span style="color:#d9b877;font-size:20px;font-family:system-ui;">$</span></div>
+                      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9c988e;font-weight:700;">💰 Касса</div>
+                      <div style="font-family:ui-monospace,monospace;font-size:34px;font-weight:700;line-height:1;margin-top:5px;color:#efd8a3;">${fmtN(p.savings)}<span style="color:#d9b877;font-size:19px;margin-left:2px;">$</span></div>
                     </div>
-                    <div style="text-align:right;">
-                      <span style="font-family:ui-monospace,monospace;font-weight:700;font-size:13px;color:${f.flow>=0?'#5cb08b':'#cf9a9a'};background:${f.flow>=0?'rgba(92,176,139,.12)':'rgba(207,154,154,.12)'};padding:5px 10px;border-radius:999px;white-space:nowrap;">${f.flow>=0?'▲ +':'▼ '}${fmtN(f.flow)} / мес</span>
-                      <div style="font-size:10px;color:#9c988e;margin-top:4px;">чистый поток</div>
-                    </div>
+                    <span style="font-family:ui-monospace,monospace;font-weight:700;font-size:13px;color:${f.flow>=0?'#5cb08b':'#cf9a9a'};background:${f.flow>=0?'rgba(92,176,139,.12)':'rgba(207,154,154,.12)'};padding:5px 10px;border-radius:999px;white-space:nowrap;">${f.flow>=0?'▲ +':'▼ '}${fmtN(f.flow)}/мес</span>
                   </div>
-                  <div style="margin-top:14px;padding:13px 14px;border-radius:12px;background:#0d1016;border:1px solid #242833;">
-                    <div style="display:flex;align-items:baseline;justify-content:space-between;">
-                      <span style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9c988e;font-weight:700;">${free?'🏆 Финансовая свобода':'Путь к свободе'}</span>
-                      <span style="font-family:Georgia,serif;font-size:20px;color:#efd8a3;font-weight:600;">${pct}%</span>
-                    </div>
-                    <div style="font-size:11px;color:var(--lx-gold);font-weight:700;margin-top:6px;">Уровень ${lvl.n} · ${lvl.name} <span style="color:#6d6a62;font-weight:400;">— ${lvl.d}</span></div>
-                    <div style="height:7px;border-radius:5px;background:#0a0c10;border:1px solid #23272f;margin:10px 0 8px;overflow:hidden;">
-                      <div style="height:100%;width:${pct}%;border-radius:5px;background:linear-gradient(90deg,#b48f4e,#d9b877 60%,#efd8a3);box-shadow:0 0 12px rgba(217,184,119,.4);"></div>
-                    </div>
-                    <div style="font-size:11.5px;color:#9c988e;">${free?`Пассив в ${WIN_MULT}× перекрыл расходы — ты СВОБОДЕН! 🎉`:`Пассив <b style="color:#efd8a3;">${fmtN(f.passive)}$/мес</b>. Цель свободы — пассив <b style="color:#efd8a3;">${fmtN(f.target)}$/мес</b> (расходы ${fmtN(f.totalExp)}$ × ${WIN_MULT}). До свободы ещё <b style="color:#efd8a3;">${fmtN(need)}$/мес</b> пассива.`}</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:14px 0 12px;">
+                    ${box('Поток/мес', (f.flow>=0?'+':'')+fmtN(f.flow)+'$', f.flow>=0?'#5cb08b':'#cf9a9a')}
+                    ${box('Пассив/мес', fmtN(f.passive)+'$', '#efd8a3')}
+                    ${box('Долги', fmtN(debtTotal)+'$', debtTotal>0?'#cf9a9a':'#5cb08b')}
                   </div>
-                  <div style="margin-top:12px;">
-                    <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;"><span style="color:#cdc8bd;">💼 Зарплата</span><span style="font-family:ui-monospace,monospace;font-weight:700;color:#5cb08b;">+${fmtN(f.salary)}</span></div>
-                    <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;border-top:1px solid #242833;"><span style="color:#cdc8bd;">🏠 Пассивный доход <span style="color:#6d6a62;font-size:11px;">· ${nAssets} актив(ов)</span></span><span style="font-family:ui-monospace,monospace;font-weight:700;color:#5cb08b;">+${fmtN(f.passive)}</span></div>
-                    ${renderS5Slots(p)}
-                    <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;border-top:1px solid #242833;"><span style="color:#cdc8bd;">💸 Расходы <span style="color:#6d6a62;font-size:11px;">· налоги, кредит, жизнь</span></span><span style="font-family:ui-monospace,monospace;font-weight:700;color:#cf9a9a;">−${fmtN(f.totalExp)}</span></div>
-                    <div style="display:flex;justify-content:space-between;padding:11px 0 2px;font-size:14px;border-top:1px solid rgba(217,184,119,.18);"><span style="color:#f3efe6;font-weight:600;">Денежный поток / мес</span><span style="font-family:ui-monospace,monospace;font-weight:700;color:#efd8a3;font-size:15px;">${f.flow>=0?'+':''}${fmtN(f.flow)}</span></div>
-                    ${p.bankLoan>0?`<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:12px;color:#9c988e;"><span>🏦 Кредит банка</span><span style="font-family:ui-monospace,monospace;">${fmtN(p.bankLoan)}$ · платёж ${fmtN(f.bankPay)}$/мес</span></div>`:''}
+                  <div style="background:#0d1016;border:1px solid #242833;border-radius:11px;padding:10px 12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#9c988e;margin-bottom:7px;"><span>🏆 ${free?'Свобода достигнута!':'До победы: пассив ≥ расходы ×'+WIN_MULT}</span><span style="font-family:ui-monospace,monospace;color:#efd8a3;font-weight:700;">${fmtN(f.passive)} / ${fmtN(f.target)}</span></div>
+                    <div style="height:8px;border-radius:99px;background:#0a0c10;border:1px solid #23272f;overflow:hidden;"><div style="height:100%;width:${pct}%;border-radius:99px;background:linear-gradient(90deg,#b48f4e,#d9b877 60%,#efd8a3);box-shadow:0 0 12px rgba(217,184,119,.4);"></div></div>
+                    ${free?`<div style="font-size:11px;color:#5cb08b;margin-top:7px;font-weight:700;">Пассив в ${WIN_MULT}× перекрыл расходы — ты СВОБОДЕН! 🎉</div>`:`<div style="font-size:11px;color:#9c988e;margin-top:7px;">До свободы ещё <b style="color:#efd8a3;">${fmtN(need)}$/мес</b> пассива.</div>`}
                   </div>
                 </div>`; })()}
 
