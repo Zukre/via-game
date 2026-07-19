@@ -10807,6 +10807,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const a=assetById(id); if(!a) return;
             const p=state.players.find(x=>x.id==state.currentPlayerId);
             if(p && (Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
+            // ⚠️ МЕМ-ГЕЙТ (Ринат 19июл): при заходе в мем — окно риска с подтверждением. Без «понимаю» не пускаем.
+            if(p && assetCat(a)==='meme' && !p.memeOk){
+                if(!confirm('☠️ МЕМКОИН «'+a.name+'» — ЭКСТРЕМАЛЬНЫЙ РИСК.\n\nРиск потери 80–99%. Мемы почти всегда обнуляются. Торгуешь на СВОЙ страх и риск — брокер НЕ несёт ответственности за твою торговлю.\n\nПодтверждаешь, что заходишь на свой риск?')) return;
+                p.memeOk=true;   // подтвердил — эту партию больше не спрашиваем
+            }
             state.buyModal={assetId:String(id), qty:0}; paintOverlays(); slipSoon('buy');
         }
         function closeBuyModal(){ state.buyModal=null; paintOverlays(); }
@@ -11070,7 +11075,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     const cap=invested>0?` <span style="color:#efd8a3;font-size:11px;font-weight:700;">💰 ${fmtN(invested)}$</span>`:'';
                     return `<div class="row-item"><div style="flex:1;"><b>${a.name}</b>${cap}<div style="font-size:12px;color:${c};font-weight:700;">${fmtPrice(a.price)}$ · ${arrow} ${fmtPct(chg)}</div></div><button onclick="openBuyModal('${a.id}')" class="btn" style="background:#10b981;color:#fff;">Купить</button></div>`;
                 }).join(''):'<div style="color:#9ca3af;font-size:13px;padding:10px;text-align:center;">В этой категории пока нет активов.</div>';
-                listHtml=tabBar+rows;
+                // ℹ️ Прогноз доходности по вкладке (Ринат 19июл): «сколько даёт в год как в жизни»
+                const CAT_INFO={stock:['#5cb08b','📈 Акции — доли компаний. ~5–10%/год, стабильно. Большие деньги, тихо. Выигрывает терпеливый, кто держит и не дёргается.'],crypto:['#fbbf24','⚡ Крипта — ОПАСНО. Скачки ±50–60% за день, можно всё потерять. Но за 10–20 лет сильно выросла. Может взлететь — а может и нет.'],meme:['#f87171','☠️ Мем — риск потери 80–99%. Почти всегда обнуляются. На свой страх и риск — брокер не отвечает. Один из сотни срывает куш.'],metal:['#efd8a3','🥇 Металлы — тихая гавань. ~2–3%/год, медленно, но почти не падает. Сейф для больших денег.'],comm:['#efd8a3','🌾 Сырьё/нефть — стабильно, глубокий рынок, как золото.']};
+                const ci=CAT_INFO[tab]; const catInfoHtml=ci?`<div style="background:#0d1016;border:1px solid #242833;border-radius:9px;padding:8px 10px;font-size:11px;color:${ci[0]};line-height:1.5;margin-bottom:8px;">${ci[1]}</div>`:'';
+                listHtml=tabBar+catInfoHtml+rows;
             }
             return `<div class="card">
                 <div class="block-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -11166,6 +11174,49 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 alert('🎲 Выпало '+roll+'... '+near[Math.floor(Math.random()*near.length)]+'\n−'+bet+'$. Казино не спешит отдавать. Рискни ещё разок!');
             }
         }
+        // ─── 🎰 СЛОТ-АВТОМАТ (Ринат 19июл): 3 одинаковых фрукта = выигрыш, у каждого свой множитель.
+        // Выигрыш по ШАНСУ (таблица Рината): край дома высокий (RTP ~18%), джекпот 7️⃣ редкий (1:10000).
+        const SLOT_TIERS=[{s:'7️⃣',m:100,p:1/10000},{s:'💎',m:9,p:1/1000},{s:'🔔',m:7,p:1/500},{s:'🍇',m:5,p:1/200},{s:'🍊',m:3,p:1/90},{s:'🍋',m:2,p:1/50},{s:'🍒',m:1,p:1/20}];
+        const SLOT_ALL=['🍒','🍋','🍊','🍇','🔔','💎','7️⃣'];
+        let _slotSpinning=false;
+        function slotRnd(){ return SLOT_ALL[Math.floor(Math.random()*SLOT_ALL.length)]; }
+        function spinSlot(){
+            const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            if(_slotSpinning) return;
+            const el=document.getElementById('betAmt');
+            const bet=Math.floor(Number(el?el.value:0));
+            if(!bet||bet<1){ alert('Введи ставку (число больше 0).'); return; }
+            if(bet>p.savings){ alert('Не хватает кассы. У тебя '+Math.round(p.savings)+'$.'); return; }
+            // исход по шансу
+            let out=null, r=Math.random(), cum=0;
+            for(const t of SLOT_TIERS){ cum+=t.p; if(r<cum){ out=t; break; } }
+            let finals;
+            if(out){ finals=[out.s,out.s,out.s]; }
+            else { let a,b,c; do{a=slotRnd();b=slotRnd();c=slotRnd();}while(a===b&&b===c); finals=[a,b,c]; }
+            // ставка списывается СРАЗУ
+            p.savings=Math.round((p.savings-bet)*100)/100;
+            const st=pstat(p); st.casinoPlays++;
+            const reels=[document.getElementById('reel0'),document.getElementById('reel1'),document.getElementById('reel2')];
+            if(!reels[0]){ finishSlot(p,st,out,bet,finals); return; }   // барабанов нет в DOM — решаем сразу
+            _slotSpinning=true;
+            const timers=reels.map(rl=>setInterval(()=>{ rl.textContent=slotRnd(); },70));
+            [600,900,1200].forEach((ms,i)=>setTimeout(()=>{ clearInterval(timers[i]); reels[i].textContent=finals[i];
+                if(i===2){ setTimeout(()=>{ _slotSpinning=false; finishSlot(p,st,out,bet,finals); }, 500); } }, ms));
+        }
+        function finishSlot(p,st,out,bet,finals){
+            if(out){
+                const payout=Math.round(bet*out.m*100)/100;
+                p.savings=Math.round((p.savings+payout)*100)/100;
+                st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(payout-bet))*100)/100;
+                p.notify='🎰🎉 '+finals.join(' ')+' ×'+out.m+'! +'+Math.round(payout-bet)+'$ чистыми.';
+                save(); render();
+                alert((out.m>=100?'🎰👑 ДЖЕКПОТ 7️⃣7️⃣7️⃣ ×100 → +':'🎰🎉 Три '+out.s+' ×'+out.m+' → +')+payout+'$ сразу в кассу!');
+            } else {
+                st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
+                save(); render();
+                alert('🎰 '+finals.join(' ')+' — не сошлось. −'+bet+'$. Казино не спешит отдавать. Рискни ещё разок!');
+            }
+        }
         function clearNotify(){ const p=state.players.find(x=>x.id==state.currentPlayerId); if(p){ p.notify=null; save(); render(); } }
         function giveSalary(id){
             const p=state.players.find(x=>x.id==id); if(!p) return;
@@ -11206,15 +11257,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     </div>
                     <div style="font-size:19px;letter-spacing:2px;white-space:nowrap;"><span class="suit-r">♥</span><span class="suit-b">♠</span><span class="suit-r">♦</span><span class="suit-b">♣</span></div>
                 </div>
-                <div class="reels"><div class="reel">🍒</div><div class="reel">💎</div><div class="reel">🎰</div></div>
-                <p style="font-size:12.5px;color:#d8e6dd;text-align:center;margin-bottom:12px;line-height:1.5;">
-                    🎯 <b style="color:var(--lx-gold-br);">6</b> → ДЖЕКПОТ <b style="color:#efd8a3;">×${CASINO_PAYOUT[6]}</b> &nbsp;·&nbsp; <b style="color:var(--lx-gold-br);">5</b> → <b style="color:#efd8a3;">×${CASINO_PAYOUT[5]}</b> &nbsp;·&nbsp; иначе ставка сгорает 🔥</p>
+                <div class="reels"><div class="reel" id="reel0">🍒</div><div class="reel" id="reel1">🍋</div><div class="reel" id="reel2">🍊</div></div>
+                <div style="font-size:11px;color:#d8e6dd;text-align:center;margin-bottom:10px;line-height:1.7;">
+                    <b style="color:#efd8a3;">3 одинаковых фрукта = выигрыш.</b><br>
+                    <span style="font-family:ui-monospace,monospace;color:#cdc8bd;">7️⃣×100 · 💎×9 · 🔔×7 · 🍇×5 · 🍊×3 · 🍋×2 · 🍒×1</span><br>
+                    <span style="color:#9c988e;font-size:10px;">Джекпот 7️⃣ редкий (1 из 10 000). Не сошлось — ставка сгорает 🔥</span></div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:8px;">
                     ${[['10%',0.10],['25%',0.25],['50%',0.50],['80%',0.80],['МАКС 💰',1]].map(([lbl,fr])=>`<button onclick="setBet(${fr})" class="btn" style="padding:4px 12px;font-size:12px;background:#3a2a12;color:#efd8a3;border:1px solid #b98a3e;font-weight:700;">${lbl}</button>`).join('')}
                 </div>
                 <div style="display:flex;gap:8px;">
                     <input id="betAmt" type="number" min="1" placeholder="ставка, $ (или выбери % сверху)" class="inp" style="flex:1;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;">
-                    <button onclick="gambleRoll()" class="btn casino-spin" style="flex:0 0 auto;font-size:15px;padding:12px 22px;">🎲 КРУТИТЬ</button>
+                    <button onclick="spinSlot()" class="btn casino-spin" style="flex:0 0 auto;font-size:15px;padding:12px 22px;">🎲 КРУТИТЬ</button>
                 </div>
                 <p style="font-size:11px;color:#a9b8ae;margin-top:11px;text-align:center;">Сам решаешь, сколько рискнуть 🍾 · твоя касса: <b style="color:var(--lx-gold-br);">${fmtN(p.savings)} $</b></p>
             </div>`;
@@ -12006,7 +12059,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
                 <details class="sec" open><summary>📈 Биржа <span class="sec-hint">— торгуй в любой момент</span></summary><div class="sec-in">${renderMarketPanel(p)}</div></details>
 
-                <details class="sec"><summary>🎰 Казино</summary><div class="sec-in">${renderLuckPanel(p)}</div></details>
+                ${p.casinoOff ? '' : `<details class="sec"><summary>🎰 Казино</summary><div class="sec-in">${renderLuckPanel(p)}</div></details>`}
 
                 <details class="sec"><summary>🛒 Мои активы <span class="sec-hint">— бизнес, недвижимость</span></summary><div class="sec-in">
                 <div class="card">
@@ -12634,6 +12687,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                             <button onclick="setJail(${p.id},1)" class="btn btn-gray" style="padding:5px 10px; font-size:11px;">1 ход</button>
                                             <button onclick="jailFree(${p.id})" class="btn" style="background:rgba(92,176,139,.16); color:#7fd3ad; border:1px solid #234436; padding:5px 12px; font-size:11px;">Освободить</button>
                                         </div>
+                                    </div>
+
+                                    <!-- КАЗИНО вкл/выкл для игрока (Ринат 19июл: убрать казино кому не надо) -->
+                                    <div style="background:var(--lx-ink); border:1px solid var(--lx-line); border-radius:9px; padding:9px 10px; margin-bottom:7px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                                        <span style="font-size:11px; color:var(--lx-muted); font-weight:700; text-transform:uppercase; letter-spacing:.1em;">🎰 Казино — ${p.casinoOff?'<span style="color:#e0a3a3;">выключено</span>':'<span style="color:#7fd3ad;">включено</span>'}</span>
+                                        <button onclick="toggleCasino(${p.id})" class="btn btn-gray" style="padding:5px 12px; font-size:11px;">${p.casinoOff?'Включить':'Выключить'}</button>
                                     </div>
 
                                     <!-- РАЗРЕШЕНИЕ КЛЕТОК (ведущий открывает игроку одну клетку на раз) -->
@@ -14735,6 +14794,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function jailDec(id) { state.players = state.players.map(p => p.id==id ? {...p, jail: Math.max(0, (Number(p.jail)||0)-1)} : p); save(); render(); }
         function jailFree(id) { state.players = state.players.map(p => p.id==id ? {...p, jail: 0} : p); save(); render(); }
+        function toggleCasino(id) { state.players = state.players.map(p => p.id==id ? {...p, casinoOff: !p.casinoOff} : p); save(); render(); }
         // Откуп «дать на лапу» (Ринат 19июл): 10% от СУММЫ КАСС ВСЕХ игроков за столом (общий котёл), фикс, не растёт.
         // (Наказание за повторные посадки со временем → карцер, отдельная фича.)
         function tableCashSum(){ return (state.players||[]).reduce((s,x)=>s+(Number(x.savings)||0),0); }
