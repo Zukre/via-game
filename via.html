@@ -247,6 +247,30 @@
             text-shadow:0 1px 2px rgba(0,0,0,.4); letter-spacing:.04em;}
         .casino-spin:hover{filter:brightness(1.08)}
         .suit-r{color:#d98a8a} .suit-b{color:#cdc8bd}
+        /* ─── НОВЫЙ БЛАНК (19июл): эмблема + сворачивающиеся разделы, чтоб не «простыня» ─── */
+        .blank-crest{display:flex; justify-content:center; margin:2px 0 12px;}
+        .blank-crest .bc{width:60px; height:60px; border-radius:50%;
+            background:radial-gradient(60% 60% at 38% 32%, #fff6dd, transparent 60%),
+              conic-gradient(from 210deg, #b98a3e, #efd8a3 25%, #d9b877 50%, #a9741f 72%, #efd8a3 100%);
+            border:2px solid #f6e6b8; display:flex; align-items:center; justify-content:center; flex-direction:column; position:relative;
+            box-shadow:0 8px 26px rgba(0,0,0,.6), 0 0 30px -4px rgba(217,184,119,.75), inset 0 2px 6px rgba(255,255,255,.35);}
+        .blank-crest .bc::after{content:""; position:absolute; inset:5px; border-radius:50%; border:1px solid rgba(60,40,10,.35);}
+        .blank-crest .bc b{font-family:Georgia,serif; font-size:20px; color:#3a2a08; letter-spacing:1px; line-height:1; text-shadow:0 1px 0 rgba(255,255,255,.4);}
+        .blank-crest .bc i{font-style:normal; font-size:6px; letter-spacing:.3em; color:#5a4413; font-weight:800; margin-top:2px;}
+        details.sec{background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel)); border:1px solid var(--lx-line);
+            border-radius:15px; margin-bottom:10px; overflow:hidden;}
+        details.sec[open]{border-color:var(--lx-gold-ln); box-shadow:0 0 22px -14px var(--lx-gold);}
+        details.sec>summary{list-style:none; cursor:pointer; padding:15px; display:flex; align-items:center; gap:10px;
+            font-family:Georgia,serif; font-size:16px; font-weight:700; color:var(--lx-text); user-select:none;}
+        details.sec>summary::-webkit-details-marker{display:none;}
+        details.sec>summary::after{content:"▸"; margin-left:auto; color:var(--lx-gold); font-size:14px; transition:transform .2s ease;}
+        details.sec[open]>summary::after{transform:rotate(90deg);}
+        details.sec>summary .sec-hint{font-family:system-ui; font-size:11px; font-weight:400; color:var(--lx-muted);}
+        .sec-in{padding:0 13px 14px;}
+        .sec-in>.card{margin-bottom:10px;} .sec-in>.card:last-child{margin-bottom:0;}
+        .soul-strip{background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel)); border:1px solid var(--lx-line);
+            border-radius:15px; padding:12px 14px; margin-bottom:11px;}
+        .soul-strip .ss-h{font-family:Georgia,serif; font-size:14px; font-weight:700; color:var(--lx-gold-br); margin-bottom:9px;}
     </style>
 </head>
 <body>
@@ -10361,6 +10385,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     </div>
 
     <div id="app" class="container"></div>
+    <!-- Отдельный слой всплывающих окон: покупка/история/карта/событие рисуются ЗДЕСЬ, а не внутри #app.
+         Открытие окна обновляет только этот слой — экран за окном не пересобирается (не мигает/не дёргается). -->
+    <div id="overlay"></div>
 
     <script>
         // ─── ПРОФЕССИИ для VIA ───
@@ -10387,8 +10414,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
               initMortgage: 40000, initEdu: 0, initAuto: 45000, initCC: 20000, initRetail: 30000 },
 
             { id: 6, name: 'Стартапер 🚀', salary: 8000, taxes: 1600,
-              mortgagePay: 1200, eduPay: 0, autoPay: 600, ccPay: 500, retailPay: 400, otherExp: 3300, childCost: 180, savings: 2500,
-              initMortgage: 25000, initEdu: 0, initAuto: 0, initCC: 15000, initRetail: 12000 },
+              mortgagePay: 1200, eduPay: 0, autoPay: 0, ccPay: 500, retailPay: 400, otherExp: 3900, childCost: 180, savings: 2500,
+              initMortgage: 25000, initEdu: 0, initAuto: 0, initCC: 15000, initRetail: 12000 },   // Ринат 19июл: машины нет → autoPay 600→0, 600 перенесён в otherExp (поток тот же, математика ровная)
 
             { id: 7, name: 'Топ-Менеджер 🏢', salary: 13000, taxes: 2600,
               mortgagePay: 2400, eduPay: 0, autoPay: 950, ccPay: 800, retailPay: 500, otherExp: 4000, childCost: 250, savings: 6000,
@@ -10476,15 +10503,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function dataHash() {
             return (localStorage.getItem('v0_players')||'') + '|' + (localStorage.getItem('v0_deals')||'');
         }
+        // АНТИ-ПРЫЖОК: не рвём ввод (фокус в поле), запоминаем прокрутку, рендерим синхронно, возвращаем.
+        // Синхронный рендер+scrollTo браузер отрисовывает одним кадром — прыжка/рывка нет. Коалесценцию
+        // с задержкой убрали: она отделяла мгновенную перерисовку действия от серверной → двойной кадр.
+        // Мигание на тике рынка гасится отдельно — в applyServerData (перерисовка только если менялся не рынок).
         function safeRerender() {
             const a = document.activeElement;
-            if (!a || (a.tagName !== 'INPUT' && a.tagName !== 'TEXTAREA' && a.tagName !== 'SELECT')) {
-                // АНТИ-ПРЫЖОК: запоминаем прокрутку, рендерим, возвращаем на место.
-                // Без этого каждое обновление с сервера (чужой ход/тик рынка) кидало экран наверх.
-                const sx = window.scrollX, sy = window.scrollY;
-                render();
-                window.scrollTo(sx, sy);
-            }
+            if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) return;
+            const sx = window.scrollX, sy = window.scrollY;
+            render();
+            window.scrollTo(sx, sy);
         }
 
         function save(meId) {
@@ -10514,6 +10542,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         let lastServerData = '';
         let lastSaveT = 0;   // время последней локальной записи (антизатирание своих же ходов)
         let lastSavedId = null;   // чей бланк защищён от затирания на 2.2с (null = полная запись ведущего)
+        let _lastNonMarket = '';   // слепок всего КРОМЕ цен рынка — чтобы тик рынка не мигал бланком ведущего
+        let _ackedDeals = new Set();   // id заявок, которые сервер УЖЕ показывал — если потом исчезли, значит ведущий их закрыл (не воскрешать)
         function applyServerData(txt) {
             if (!txt || txt === lastServerData) return;
             let j; try { j = JSON.parse(txt); } catch(e) { return; }
@@ -10523,6 +10553,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             state.board = j.board || null;           // поле (движок хода) — всегда свежее
             const sp = j.players || [];
             const sd = j.deals || [];
+            sd.forEach(d => { if (d && d.id != null) _ackedDeals.add(d.id); });   // сервер показал заявку → запомнили
             const recent = (Date.now() - lastSaveT <= 2200);
             if (!recent) {
                 // окно защиты прошло — берём всё с сервера как есть
@@ -10536,14 +10567,23 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 let merged = sp.map(x => (mine && x.id == lastSavedId) ? mine : x);
                 if (mine && !merged.some(p => p.id == lastSavedId)) merged.push(mine);  // новичок ещё не на сервере
                 state.players = merged;
-                // заявки: серверные + свои локальные, которых сервер ещё не видел
-                const localOnly = (state.deals || []).filter(d => !sd.some(x => x.id == d.id));
+                // заявки: серверные + ТОЛЬКО свои совсем новые, которых сервер ЕЩЁ НЕ ВИДЕЛ.
+                // 🩹 Ринат 18июл «постоянно запрос на кредит»: раньше сюда попадали и заявки, которые
+                // ведущий УЖЕ закрыл (они исчезли с сервера) — игрок их воскрешал и слал назад по кругу.
+                // Теперь воскрешаем только те, что сервер НИ РАЗУ не подтверждал (_ackedDeals).
+                const localOnly = (state.deals || []).filter(d => !sd.some(x => x.id == d.id) && !_ackedDeals.has(d.id));
                 state.deals = sd.concat(localOnly);
             }
             // recent && lastSavedId==null (полная запись ведущего) — держим локальное 2.2с, не трогаем
             maybeShowWorld();
-            updateTurnPlate();   // ход обновляем ВСЕГДА: даже если фокус в поле и safeRerender молчит
-            safeRerender();
+            updateTurnPlate();   // ход/таймеры обновляем ВСЕГДА — точечно (textContent), без перерисовки всего
+            // 🩹 АНТИ-МИГАНИЕ (Ринат 18июл): рынок тикает каждые 30с и раньше на каждый тик целиком
+            // перерисовывал экран (вспышка бланка). Бланк ведущего / аналитика / лобби живые цены НЕ
+            // показывают → если с сервера пришёл ТОЛЬКО тик рынка (игроки/заявки/событие/поле не
+            // менялись), полную перерисовку пропускаем. В player-виде рынок виден — там рендерим как раньше.
+            const _nonMarket = JSON.stringify([j.players||[], j.deals||[], j.world||null, j.board||null]);
+            if (state.view === 'player' || _nonMarket !== _lastNonMarket) safeRerender();
+            _lastNonMarket = _nonMarket;
             // окно сделки перерисовалось (тик рынка/чужой ход) → блок проскальзывания сбросился,
             // считаем заново, иначе человек смотрит на «впиши количество» с уже введённым числом
             if(state.buyModal && state.buyModal.qty > 0) slipSoon('buy');
@@ -10644,7 +10684,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             app.setAttribute('data-view', state.view);
             if (_sameView) window.scrollTo(0, _sy);   // та же страница — держим позицию, не прыгаем
             updateDebugBar();
+            paintOverlays();   // всплывающие окна рисуем в отдельный слой — их появление не пересобирает #app
         }
+        // Слой всплывающих окон (покупка/история/карта/событие). Рисуется отдельно от #app, поэтому
+        // открытие/закрытие окна не перестраивает весь экран → нет мигания и рывка за окном.
+        function renderOverlays(){
+            if (state.view !== 'player') return '';
+            const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return '';
+            return renderWorldShow() + renderHistoryModal() + renderBuyModal() + renderCardPreview();
+        }
+        function paintOverlays(){ const ov=document.getElementById('overlay'); if(ov) ov.innerHTML = renderOverlays(); }
 
         function renderLobby(app) {
             app.innerHTML = `
@@ -10745,19 +10794,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function cardOwner(token){ for(const pl of (state.players||[])){ if((pl.ownedCards||[]).includes(token)) return pl; } return null; }
         // ── КОМИССИЯ БИРЖИ: спред + надбавка за ЧАСТОТУ спекуляций (часто торгуешь → выше комиссия) ──
         // Часто спекулирует — биржа/брокер забирает больше. Комиссия = сток денег из экономики (анти-скальп).
-        const FEE_BASE = 0.008;   // базовый спред 0.8% на каждую сделку
-        const FEE_STEP = 0.002;   // +0.2% за каждую совершённую сделку в игре (растёт у скальперов)
-        const FEE_CAP  = 0.06;    // потолок 6%
+        // Спред снижен (Ринат 19июл «спреды очень большие» + хочет БОЛЬШЕ торговли): было 0.8%→6%, стало 0.5%→3%.
+        const FEE_BASE = 0.005;   // базовый спред 0.5% на каждую сделку
+        const FEE_STEP = 0.001;   // +0.1% за каждую совершённую сделку в игре (мягкий анти-скальп)
+        const FEE_CAP  = 0.03;    // потолок 3% (было 6%)
         function tradeFeePct(p){ const s=p.stats||{}; const n=(Number(s.buys)||0)+(Number(s.sells)||0); return Math.min(FEE_CAP, FEE_BASE + n*FEE_STEP); }
-        function logTrade(p,side,name,qty,price,gross,fee){ p.trades=p.trades||[]; p.trades.push({t:Date.now(),side,name,qty,price:Math.round((Number(price)||0)*1e6)/1e6,gross:Math.round(gross),fee:Math.round(fee)}); if(p.trades.length>120) p.trades=p.trades.slice(-120); }
+        // Каждая сделка получает РАСТУЩИЙ номер `no` (Ринат 19июл: «счётчик застыл на 120, не понять какая сделка прошла»).
+        // Номер не сбрасывается, даже когда список подрезается. Храним последние 250 записей (было 120).
+        function logTrade(p,side,name,qty,price,gross,fee){ p.trades=p.trades||[]; p.tradeSeq=(Number(p.tradeSeq)||0)+1; p.trades.push({no:p.tradeSeq,t:Date.now(),side,name,qty,price:Math.round((Number(price)||0)*1e6)/1e6,gross:Math.round(gross),fee:Math.round(fee)}); if(p.trades.length>250) p.trades=p.trades.slice(-250); }
         // Открыть красивое окно покупки (в стиле игры) для актива id.
         function openBuyModal(id){
             const a=assetById(id); if(!a) return;
             const p=state.players.find(x=>x.id==state.currentPlayerId);
             if(p && (Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
-            state.buyModal={assetId:String(id), qty:0}; render(); slipSoon('buy');
+            state.buyModal={assetId:String(id), qty:0}; paintOverlays(); slipSoon('buy');
         }
-        function closeBuyModal(){ state.buyModal=null; render(); }
+        function closeBuyModal(){ state.buyModal=null; paintOverlays(); }
         function setBuyByFrac(frac){
             const bm=state.buyModal; if(!bm) return;
             const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(bm.assetId); if(!p||!a) return;
@@ -10772,9 +10824,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 else { alert('Не хватает даже на 1 шт «'+a.name+'»: цена '+fmtPrice(a.price)+'$ + комиссия брокера, а в кассе '+fmtN(p.savings)+'$.'); return; }
             }
             bm.qty = q;
-            render(); slipSoon('buy');
+            paintOverlays(); slipSoon('buy');
         }
-        function setBuyMin(){ const bm=state.buyModal; if(bm){ bm.qty=1; render(); slipSoon('buy'); } }
+        function setBuyMin(){ const bm=state.buyModal; if(bm){ bm.qty=1; paintOverlays(); slipSoon('buy'); } }
         function onBuyManual(v){   // ручной ввод: обновляем оценку и кнопку БЕЗ полного render (не терять фокус)
             const bm=state.buyModal; if(!bm) return;
             bm.qty=Math.max(0,Math.floor(Number(v)||0));
@@ -10794,7 +10846,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function buyEstHtml(q,price,cost,fee,total,cash){
             if(!q||q<1) return '<span style="color:#6b7280;">Выбери количество кнопкой или впиши вручную.</span>';
-            return `Количество: <b>${fmtN(q)} шт</b> × ${fmtPrice(price)}$<br>Стоимость: <b>${fmtN(Math.round(cost))}$</b> + комиссия брокера <b style="color:#fbbf24;">${fmtN(Math.round(fee))}$</b><br>Итого списание: <b style="color:${total<=cash?'#34d399':'#f87171'};">${fmtN(Math.round(total))}$</b>`;
+            return `Количество: <b>${fmtN(q)} шт</b> × витрина ${fmtPrice(price)}$<br>Ориентир по витрине: <b>${fmtN(Math.round(cost))}$</b> + брокер <b style="color:#fbbf24;">${fmtN(Math.round(fee))}$</b><br><span style="color:#9c988e;font-size:12px;">⬇ Точная сумма со стаканом — ниже, её и спишем.</span>`;
         }
         function renderBuyModal(){
             const bm=state.buyModal; if(!bm) return '';
@@ -10815,6 +10867,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                             <button onclick="closeBuyModal()" class="btn btn-gray" style="flex:0 0 auto;">✕</button>
                         </div>
                         <div style="font-size:12px;color:#9c988e;margin:14px 0 8px;">💰 Касса: <b style="color:var(--lx-gold-br);">${fmtN(p.savings)} $</b> &nbsp;·&nbsp; комиссия брокера ${(tradeFeePct(p)*100).toFixed(1)}%</div>
+                        ${(function(){ const cat=assetCat(a);
+                            if(cat==='meme') return '<div style="background:rgba(120,20,20,.28);border:1px solid #b91c1c;border-radius:10px;padding:9px 11px;font-size:12px;color:#fca5a5;line-height:1.55;margin-bottom:8px;">⚠️ <b>МЕМКОИН</b> — крошечный объём, дикий риск. В жизни мемы почти всегда в минус. Заходишь на свой страх и риск — можешь потерять <b>ВСЁ</b>. Один из сотни срывает куш.</div>';
+                            if(cat==='crypto') return '<div style="background:rgba(80,60,10,.22);border:1px solid #a16207;border-radius:10px;padding:9px 11px;font-size:12px;color:#fcd34d;line-height:1.55;margin-bottom:8px;">⚡ <b>Крипта</b> — высокая волатильность. Может резко взлететь и так же рухнуть. На свой страх и риск.</div>';
+                            return '<div style="background:rgba(16,60,40,.18);border:1px solid #14532d;border-radius:10px;padding:8px 11px;font-size:12px;color:#86efac;line-height:1.5;margin-bottom:8px;">🛟 Тихая гавань — растёт мало, но стабильно. Большие деньги стоят спокойно.</div>';
+                        })()}
                         <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">
                             <button onclick="setBuyMin()" class="btn" style="flex:1;min-width:48px;padding:8px 4px;font-size:13px;background:#1f2937;color:#fff;font-weight:700;">Мин</button>
                             ${pctBtn('10%',0.10)}${pctBtn('25%',0.25)}${pctBtn('50%',0.50)}${pctBtn('100%',1)}
@@ -10823,16 +10880,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <input id="buyManualQty" type="number" min="1" value="${q||''}" placeholder="или впиши количество вручную" oninput="onBuyManual(this.value)" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;margin-bottom:10px;">
                         <div id="buyEst" style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.8;margin-bottom:8px;">${buyEstHtml(q,price,cost,fee,total,p.savings)}</div>
                         <div id="slipBox" style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.7;margin-bottom:12px;">Впиши количество — покажу, по какой цене сделка пройдёт на самом деле.</div>
-                        <button id="buyConfirmBtn" onclick="confirmBuy()" ${q<1?'disabled':''} class="btn" style="width:100%;background:${enough&&q>0?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'};color:${enough&&q>0?'#20180a':'#9ca3af'};font-weight:800;font-size:15px;padding:13px;">${q>0?(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`):'Выбери количество'}</button>
+                        <button id="buyConfirmBtn" onclick="confirmBuy()" ${q<1?'disabled':''} class="btn" style="width:100%;background:${q>0?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'};color:${q>0?'#20180a':'#9ca3af'};font-weight:800;font-size:15px;padding:13px;">${q<1?'Выбери количество':(SERVER_MODE?'⏳ Считаю точную цену со стаканом…':(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`))}</button>
                     </div>
                 </div>
             </div>`;
         }
         // Ядро покупки: q штук актива id (вызывается из окна покупки).
         async function buyAssetQty(id, q){
-            const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(id);
+            let p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(id);
             if(!p||!a) return;
             if((Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
+            // 🔒 БИРЖА ЗАКРЫТА (Ринат 18июл): окно покупки жёсткое — покупать можно ТОЛЬКО когда ведущий
+            // открыл окно (кнопка ▶ на пульте). Раньше проверку делали только боты, люди покупали всегда.
+            // Гейтим лишь во время активной партии (движок хода идёт), чтобы не ломать лобби/фри-плей.
+            if(!buyWindowOpen()){ const bb=state.board; if(bb && Array.isArray(bb.order) && bb.order.length){ alert('🔒 Биржа закрыта. Покупка доступна, только когда ведущий откроет окно покупки (кнопка ▶ на пульте).'); return; } }
             q=Math.floor(Number(q)||0);
             if(!q||q<1) return;
             const p0=a.price;                       // витрина ДО сделки
@@ -10862,6 +10923,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     const jc=await rc.json(); if(jc&&jc.avgFill) fill=jc.avgFill;   // сервер двинул цену для всех
                 }catch(e){ console.warn('impact:',e); }
             }
+            // 🩹 АНТИ-ПОТЕРЯ ПОКУПКИ (Ринат 18июл «покупают через раз / средняя не учитывается»):
+            // за время await'ов (котировка+коммит) мог прийти broadcast и ПЕРЕСОБРАТЬ state.players
+            // (свой же коммит двигает цену + чужие покупки + тик рынка). Старый `p` тогда «осиротел» —
+            // запись holdings/savings ушла бы в никуда, покупка терялась. Перечитываем живой объект и
+            // освежаем окно защиты, чтобы следующий broadcast не затёр наш бланк 2.2с.
+            const pNow=state.players.find(x=>x.id==state.currentPlayerId); if(pNow) p=pNow;
+            lastSaveT=Date.now();
             const cost=Math.round(q*fill*100)/100;
             const feePct=tradeFeePct(p);
             const fee=Math.round(cost*feePct*100)/100;
@@ -10887,6 +10955,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     body:JSON.stringify({assetId:id,side:'sell',qty:q,commit:true})});
                     const j=await r.json(); if(j&&j.avgFill) fill=j.avgFill; }catch(e){ console.warn('impact:',e); }
             }
+            // тот же анти-осиротение, что в покупке: за await мог прийти broadcast и пересобрать state.players
+            const pNow=state.players.find(x=>x.id==p.id); if(pNow&&pNow.holdings&&pNow.holdings[id]) p=pNow;
+            lastSaveT=Date.now();
             const proceeds=Math.round(q*fill*100)/100;
             const feePct=tradeFeePct(p); const fee=Math.round(proceeds*feePct*100)/100; const net=Math.round((proceeds-fee)*100)/100;
             const st=pstat(p); st.sells++; st.sellAmt=Math.round((st.sellAmt+proceeds)*100)/100; st.feePaid=Math.round(((st.feePaid||0)+fee)*100)/100;
@@ -10922,6 +10993,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const r=await sellHolding(p,id,have); save(); render();
             if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Объём просадил рынок: витрина '+r.p0+'$, выход по ~'+r.fill+'$.') : '';
                 alert('✅ Продано всё «'+r.name+'» ('+fmtN(r.qty)+' шт) по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу'+moved); }
+        }
+        // Продать ДОЛЮ позиции (Ринат 18июл: кнопка 50%). frac=0.5 → половина (округляем вниз, минимум 1 шт).
+        async function sellFrac(id, frac){
+            const p=state.players.find(x=>x.id==state.currentPlayerId);
+            if(!p||!p.holdings||!p.holdings[id]) return;
+            const have=Number(p.holdings[id].qty)||0;
+            let q=Math.floor(have*frac); if(q<1) q=1; if(q>have) q=have;
+            lastSaveT=Date.now();
+            const r=await sellHolding(p,id,q); save(); render();
+            if(r){ const left = (p.holdings&&p.holdings[id]) ? (Number(p.holdings[id].qty)||0) : 0;
+                const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Объём просадил рынок: витрина '+r.p0+'$, выход по ~'+r.fill+'$.') : '';
+                alert('✅ Продано '+fmtN(r.qty)+' шт «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу. Осталось '+fmtN(left)+' шт.'+moved); }
         }
         async function sellAllAssets(){
             const pid=state.currentPlayerId;
@@ -10967,7 +11050,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const ownIds=Object.keys(p.holdings);
             let holdHtml = ownIds.length ? ownIds.map(id=>{
                 const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, plPct=h.avg?((pr/h.avg-1)*100):0, plAbs=Math.round((pr-h.avg)*h.qty), c=plPct>=0?'#10b981':'#f43f5e';
-                return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellWhole('${id}')" class="btn btn-orange" style="margin-top:4px;">Продать</button></div></div>`;
+                return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellFrac('${id}',0.5)" class="btn" style="margin-top:4px;background:#c2792b;color:#fff;font-weight:700;" title="Продать половину позиции">½&nbsp;50%</button> <button onclick="sellWhole('${id}')" class="btn btn-orange" style="margin-top:4px;">Продать</button></div></div>`;
             }).join('') : '<div style="color:#9ca3af;font-size:13px;">пока нет активов — открой биржу ниже и купи</div>';
             const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
             const alertHtml = ev.length ? ev.map(e=>`<div style="background:${e.kind==='КРАХ'?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${e.kind==='КРАХ'?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`).join('') : '';
@@ -10992,7 +11075,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `<div class="card">
                 <div class="block-title" style="display:flex;justify-content:space-between;align-items:center;">
                     <span>📈 Биржа · Год ${m.game_year||1}</span>
-                    <button onclick="state.showHistory=true;render();" title="История сделок" style="background:#0e2a3a;border:1px solid #23324a;border-radius:9px;color:#7dd3fc;font-size:15px;padding:4px 10px;cursor:pointer;font-weight:700;">🧾${(p.trades&&p.trades.length)?` ${p.trades.length}`:''}</button>
+                    <button onclick="state.showHistory=true;paintOverlays();" title="История сделок (всего за игру)" style="background:#0e2a3a;border:1px solid #23324a;border-radius:9px;color:#7dd3fc;font-size:15px;padding:4px 10px;cursor:pointer;font-weight:700;">🧾${(()=>{const n=Number(p.tradeSeq)||((p.trades&&p.trades.length)||0);return n?` ${n}`:'';})()}</button>
                 </div>
                 <div id="mktTick" style="text-align:center;font-size:12px;font-weight:800;color:#7dd3fc;margin-bottom:6px;">⏳ …</div>
                 <div id="buyTimer" style="display:none;text-align:center;background:#064e3b;color:#d1fae5;padding:6px 10px;border-radius:8px;font-weight:800;margin-bottom:8px;"></div>
@@ -11022,7 +11105,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const got = buy ? (t.gross+t.fee) : (t.gross - t.fee);   // покупка: всего списано; продажа: получил на руки
                 return `<div style="padding:10px 8px;border-top:1px solid #1f2937;">
                     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
-                        <span style="font-weight:800;color:${buy?'#93c5fd':'#fca5a5'};">${buy?'🛒 ПОКУПКА':'📤 ПРОДАЖА'} · <span style="color:#f3efe6;">${t.name}</span></span>
+                        <span style="font-weight:800;color:${buy?'#93c5fd':'#fca5a5'};">${t.no?`<span style="color:#6b7280;">#${t.no}</span> `:''}${buy?'🛒 ПОКУПКА':'📤 ПРОДАЖА'} · <span style="color:#f3efe6;">${t.name}</span></span>
                         <span style="font-size:10px;color:#6b7280;white-space:nowrap;">${tm}</span>
                     </div>
                     <div style="font-size:12px;color:#cbd5e1;margin-top:4px;line-height:1.7;">
@@ -11032,11 +11115,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>`;
             }).join('') : `<p style="color:#9ca3af;font-size:13px;text-align:center;padding:24px;">${tab==='BUY'?'Покупок пока нет.':'Продаж пока нет.'}</p>`;
             const tbtn=(key,label,n)=>`<button onclick="setHistoryTab('${key}')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:800;cursor:pointer;border:none;border-bottom:2px solid ${tab===key?(key==='BUY'?'#93c5fd':'#fca5a5'):'transparent'};background:${tab===key?'#0d1016':'#0a0d12'};color:${tab===key?(key==='BUY'?'#93c5fd':'#fca5a5'):'#6b7280'};">${label} (${n})</button>`;
-            return `<div style="position:fixed;inset:0;z-index:4000;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;" onclick="if(event.target===this){state.showHistory=false;render();}">
+            return `<div style="position:fixed;inset:0;z-index:4000;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;" onclick="if(event.target===this){state.showHistory=false;paintOverlays();}">
                 <div style="width:540px;max-width:100%;max-height:86vh;display:flex;flex-direction:column;background:#0d1016;border:1px solid var(--lx-gold-ln);border-radius:16px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6);">
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;">
                         <div style="font-family:Georgia,serif;font-size:19px;font-weight:700;color:#efd8a3;">🧾 История сделок</div>
-                        <button onclick="state.showHistory=false;render();" class="btn btn-gray" style="flex:0 0 auto;">✕ Закрыть</button>
+                        <button onclick="state.showHistory=false;paintOverlays();" class="btn btn-gray" style="flex:0 0 auto;">✕ Закрыть</button>
                     </div>
                     <div style="display:flex;border-bottom:1px solid #1f2937;">${tbtn('BUY','🛒 Покупки',nBuy)}${tbtn('SELL','📤 Продажи',nSell)}</div>
                     <div style="overflow-y:auto;padding:4px 14px 16px;">${rows}</div>
@@ -11771,6 +11854,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ? `<div style="margin-top:7px;padding-top:7px;border-top:1px solid #242833;">Спишется: <b style="color:${(gross+fee)<=p.savings?'#34d399':'#f87171'};">${fmtN(Math.round(gross+fee))}$</b> <span style="color:#9c988e;">(в т.ч. комиссия ${fmtN(Math.round(fee))}$)</span></div>`
                 : `<div style="margin-top:7px;padding-top:7px;border-top:1px solid #242833;">На руки: <b style="color:#34d399;">${fmtN(Math.round(gross-fee))}$</b> <span style="color:#9c988e;">(после комиссии ${fmtN(Math.round(fee))}$)</span></div>`;
             box2.innerHTML = head + tail;
+            // 🔧 ЧЕСТНАЯ КНОПКА (Ринат 19июл): кнопка покупки берёт РЕАЛЬНУЮ цифру со стаканом (ту же, что спишется),
+            // а не наивную «qty×витрина». Раньше кнопка показывала 305к, а списывалось 610к — сюрприз.
+            if(side==='buy'){ const btn=document.getElementById('buyConfirmBtn');
+                if(btn){ const total=Math.round(gross+fee), ok=total<=p.savings;
+                    btn.disabled=false;
+                    btn.textContent = ok ? `✅ Купить ${fmtN(q)} шт за ${fmtN(total)}$` : `Не хватает — нужно ${fmtN(total)}$`;
+                    btn.style.background = ok ? 'linear-gradient(180deg,#efd8a3,#d9b877)' : '#374151';
+                    btn.style.color = ok ? '#20180a' : '#9ca3af'; } }
         }
         // ── ОКНО ПРОДАЖИ (вместо системного prompt, где ничего не показать) ──
         function openSellModal(id){
@@ -11861,13 +11952,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             `;
 
             app.innerHTML = `
+                <div class="blank-crest"><div class="bc"><b>VIA</b><i>ИГРА ЖИЗНИ</i></div></div>
                 ${p.notify ? `<div style="background:linear-gradient(90deg,#10b981,#059669);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>${p.notify}</span><button onclick="clearNotify()" class="btn" style="background:#fff;color:#059669;flex:0 0 auto;">ОК</button></div>` : ''}
                 ${(Number(p.jail)||0)>0 ? `<div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fff;padding:16px 14px;border-radius:12px;margin-bottom:10px;text-align:center;border:2px solid #fca5a5;box-shadow:0 0 22px rgba(239,68,68,.45);">
                     <div style="font-size:22px;font-weight:900;letter-spacing:1px;">🔒 ТЫ В ТЮРЬМЕ</div>
                     <div style="font-size:13px;margin:6px 0 6px;">Сидишь ещё <b>${p.jail}</b> ход(ов). Работают только <b style="color:#c4b5fd;">🎰 КАЗИНО</b> и <b style="color:#6ee7b7;">📈 ПРОДАЖА АКЦИЙ</b>. Остальное закрыто — жди, пока ходы дойдут до тебя.</div>
                     <div style="font-size:12px;margin-bottom:8px;color:#fecaca;">🔢 За игру ты сидел <b>${Number(p.jailCount)||1}</b> раз(а). Срок уходит сам, когда ходы доходят до тебя — ничего нажимать не надо. Хочешь выйти сразу — откупись.</div>
                     ${(()=>{ const up=(Number(p.otherExpPct)||0)+(Number(p.jailPress)||0), dn=Number(p.taxDiscPct)||0; if(!up&&!dn) return ''; const parts=[]; if(up) parts.push(`+${up}% к прочим расходам`); if(dn) parts.push(`−${dn}% к налогам`); return `<div style="font-size:11px;margin-bottom:10px;color:#fecaca;background:rgba(0,0,0,.22);border-radius:8px;padding:6px 8px;">🩸 Следы тюрьмы (навсегда): ${parts.join(' · ')}${(Number(p.jailPress)||0)?` <span style="color:#fca5a5;">· давление сидки +${Number(p.jailPress)||0}%</span>`:''}</div>`; })()}
-                    <button onclick="jailBuyout(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;">💸 Откупиться (−${jailBuyoutPct(p)}%)</button>
+                    <button onclick="jailBuyout(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;">💸 Дать на лапу (10% котла −${fmtN(Math.round(tableCashSum()*0.10))}$)</button>
                 </div>` : ''}
                 <div id="turnPlate">${turnPlateHtml(p)}</div>
                 ${p.allow ? `<div style="background:linear-gradient(90deg,#065f46,#047857);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">✅ Ведущий ОТКРЫЛ клетку: ${ALLOW_LABEL[p.allow]||p.allow}. Жми её кнопку и тяни карту.</div>` : `<div style="background:#1f2937;color:#9ca3af;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-size:12px;text-align:center;">🔒 Клетки закрыты. Попал на клетку → жди, пока ведущий откроет её тебе.</div>`}
@@ -11921,8 +12013,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                   </div>
                 </div>`; })()}
 
-                ${renderMarketPanel(p)}
+                <div class="soul-strip"><div class="ss-h">🎴 Карты души — дверь на 2-й круг</div>${renderS5Slots(p)}</div>
 
+                <details class="sec" open><summary>📈 Биржа <span class="sec-hint">— торгуй в любой момент</span></summary><div class="sec-in">${renderMarketPanel(p)}</div></details>
+
+                <details class="sec"><summary>🎰 Казино</summary><div class="sec-in">${renderLuckPanel(p)}</div></details>
+
+                <details class="sec"><summary>🛒 Мои активы <span class="sec-hint">— бизнес, недвижимость</span></summary><div class="sec-in">
                 <div class="card">
                     <div class="block-title">🛒 Мои активы (бизнес · недвижимость · прочее)</div>
                     ${(p.assets&&p.assets.length) ? p.assets.map(a=>{
@@ -11932,33 +12029,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         return `<div class="row-item"><div style="flex:1;"><b>${a.title||a.name||'Актив'}</b> <span style="font-size:10px;color:#9ca3af;">${tl}${a.qty?` · ${a.qty} шт`:''}</span>${cf>0?`<div style="font-size:12px;color:#10b981;font-weight:700;">+${fmtN(cf)}$/мес пассив</div>`:''}${(Number(a.liab)||0)>0?`<div style="font-size:11px;color:#f87171;">обязательства ${fmtN(a.liab)}$ (спишутся при продаже)</div>`:''}</div><div style="text-align:right;"><b>${fmtN(val)} $</b>${a.down?`<br><span style="font-size:10px;color:#6b7280;">взнос ${fmtN(a.down)}$</span>`:''}</div></div>`;
                     }).join('') : '<p style="font-size:12px;color:#9ca3af;">Пока нет бизнеса/недвижимости. Отсканируй QR карты сделок кнопкой «📷 Сканировать карту» — купленное появится здесь <b style="color:#22d3ee;">автоматически</b>.</p>'}
                 </div>
+                </div></details>
 
-                ${renderLuckPanel(p)}
+                <details class="sec"><summary>🎴 Клетки и действия <span class="sec-hint">— на что попал</span></summary><div class="sec-in">
                 ${renderCareerPanel(p)}
                 ${renderSkillPanel(p)}
-                ${renderSkillModal()}
                 ${renderGovPanel(p)}
-                ${renderGovModal()}
-                ${/* Мировое событие УБРАНО у игроков (Ринат): открывает ведущий, в дальнейшем — автоматически. Игроки только ВИДЯТ результат (renderWorldShow). */''}
-                ${renderWorldShow()}
-                ${renderHistoryModal()}
-                ${renderBuyModal()}
-                ${renderSellModal()}
                 ${renderWorkPanel(p)}
-                ${renderWorkModal()}
                 ${renderExpensePanel(p)}
-                ${renderExpenseModal()}
                 ${renderTaxPanel(p)}
-                ${renderTaxModal()}
                 ${renderSvyazPanel(p)}
-                ${renderSvyazModal()}
                 ${renderSdelkaPanel(p)}
-                ${renderSdelkaModal()}
-                ${renderMarketModal()}
-                ${renderCardPreview()}
                 ${renderMedPanel(p)}
-                ${renderMedModal()}
+                </div></details>
 
+                <details class="sec"><summary>💼 Доход и расходы <span class="sec-hint">— зарплата, налоги, платежи</span></summary><div class="sec-in">
                 <div class="grid-2">
                     <div class="card">
                         <div class="block-title">📈 Доходы</div>
@@ -12039,7 +12124,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         </div>
                     </div>
                 </div>
+                </div></details>
 
+                <details class="sec"><summary>🏦 Долги и кредит <span class="sec-hint">— погашение, банк</span></summary><div class="sec-in">
                 <div class="card">
                     <div class="block-title">📋 Пассивы (долги на погашение)</div>
                     <div class="grid-2" style="margin:0; gap:10px;">
@@ -12068,7 +12155,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <button onclick="reqLoan()" ${hasP?'disabled':''} class="btn btn-amber">Запросить кредит</button>
                     </div>
                 </div>
+                </div></details>
 
+                <details class="sec"><summary>🏆 Путь к победе</summary><div class="sec-in">
                 <div class="card win-box ${f.win ? 'win-active' : ''}">
                     <div style="font-size:12px; color:#9ca3af; font-weight:700; text-transform:uppercase; margin-bottom:5px;">🏆 Условие победы</div>
                     <p style="font-size:13px; color:#cbd5e1; margin-bottom:10px;">Пассивный доход ≥ Расходы × ${WIN_MULT}</p>
@@ -12081,6 +12170,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         ${f.win ? '🎉 ПОБЕДА В VIA! 🎉' : `Осталось добрать пассива: ${f.target - f.passive} $`}
                     </p>
                 </div>
+                </div></details>
+
+                ${/* МОДАЛКИ вынесены в конец, вне сворачиваемых секций, чтобы всплывали поверх (внутри закрытого details они были бы скрыты) */''}
+                ${renderSkillModal()}
+                ${renderGovModal()}
+                ${renderSellModal()}
+                ${renderWorkModal()}
+                ${renderExpenseModal()}
+                ${renderTaxModal()}
+                ${renderSvyazModal()}
+                ${renderSdelkaModal()}
+                ${renderMarketModal()}
+                ${renderMedModal()}
             `;
         }
 
@@ -12953,7 +13055,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 state.worldShow = state.world;            // оверлей событием — у ВСЕХ
             }
         }
-        function dismissWorldShow(){ state.worldShow = null; render(); }
+        function dismissWorldShow(){ state.worldShow = null; paintOverlays(); }
         function renderWorldModal(){
             const m = state.worldDraw; if (!m) return '';
             if (!m.done) {
@@ -13171,7 +13273,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function drawTaxCard(){
             const m = state.taxModal; if (!m || m.drawn) return;
             const p = state.players.find(x => x.id === m.pId); if (!p) return;
-            const c = TAX_CARDS[Math.floor(Math.random()*TAX_CARDS.length)];
+            // 🚗 У безлошадных (профессия без авто: autoPay=0 и initAuto=0, напр. Стартапер) НЕ выпадают авто-налоги
+            // (Ринат 19июл: «убери налог на машину если нету»). Тянем из отфильтрованной колоды.
+            const hasCar = (Number(p.prof && p.prof.autoPay)||0) > 0 || (Number(p.prof && p.prof.initAuto)||0) > 0;
+            const CAR_TAXES = ['Транспортный налог','Акциз','Дорожный сбор'];
+            const pool = hasCar ? TAX_CARDS : TAX_CARDS.filter(x => !CAR_TAXES.includes(x.t));
+            const c = pool[Math.floor(Math.random()*pool.length)];
             const cost = Math.max(20, Math.round(p.prof.salary * c.m));
             const fc = Math.min(cost, Math.max(0, Number(p.savings)||0));
             p.savings = (Number(p.savings)||0) - fc;
@@ -14073,7 +14180,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(); render();
         }
         // ── ПРЕДПРОСМОТР КАРТЫ при скане: карточка со всеми данными → «Применить» ──
-        function closeCardPreview(){ state.cardPreview=null; render(); }
+        function closeCardPreview(){ state.cardPreview=null; paintOverlays(); }
         function applyCardPreview(){ const cp=state.cardPreview; state.cardPreview=null; if(cp&&cp.apply) cp.apply(); }
         function showCardPreview(pid, type){
             var cp=null;
@@ -14325,6 +14432,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
         function send(type, details={}) {
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            // 🩹 ДЕДУП (Ринат 19июл «несколько запросов на закрытие кредитов»): не плодим одинаковые
+            // заявки одного типа от одного игрока — одна уже висит и ждёт ведущего. Раньше при
+            // воскрешении долга игрок жал «Погасить» повторно → ведущему летели дубли.
+            if (state.deals.some(d => d.pId == p.id && d.type === type && d.status === 'PENDING')) {
+                alert('⏳ Такая заявка уже отправлена и ждёт ведущего. Не дублируй — он вот-вот одобрит.'); return;
+            }
             // Погашение долга стоит денег — сразу проверяем кассу, не гоняя заявку к ведущему впустую.
             if (DEBT_FIELD[type]) {
                 const owe = Number(p[DEBT_FIELD[type]]) || 0;
@@ -14633,14 +14746,26 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function jailDec(id) { state.players = state.players.map(p => p.id==id ? {...p, jail: Math.max(0, (Number(p.jail)||0)-1)} : p); save(); render(); }
         function jailFree(id) { state.players = state.players.map(p => p.id==id ? {...p, jail: 0} : p); save(); render(); }
-        // Откуп РАСТЁТ: 1-й раз 30%, 2-й 40%, 3-й 50%… +10% за каждое попадание (до 90%). Ведущий тоже может «Освободить».
-        function jailBuyoutPct(p){ const times = Math.max(1, Number(p.jailCount)||1); return Math.min(90, 30 + (times-1)*10); }
-        function jailBuyout(id) {
+        // Откуп «дать на лапу» (Ринат 19июл): 10% от СУММЫ КАСС ВСЕХ игроков за столом (общий котёл), фикс, не растёт.
+        // (Наказание за повторные посадки со временем → карцер, отдельная фича.)
+        function tableCashSum(){ return (state.players||[]).reduce((s,x)=>s+(Number(x.savings)||0),0); }
+        function jailBuyoutPct(p){ return 10; }   // 10% — но от КОТЛА стола, не от своей кассы (см. jailBuyout)
+        async function jailBuyout(id) {
             const p = state.players.find(x => x.id == id); if (!p) return;
-            const times = Math.max(1, Number(p.jailCount)||1);
-            const pct = jailBuyoutPct(p);
-            const cost = Math.round((Number(p.savings)||0) * pct / 100);
-            if (!confirm(`Откупиться из тюрьмы за ${pct}% кассы (−${cost}$)? Это ${times}-й раз в тюрьме — чем чаще сидишь, тем дороже. Выйдешь сразу.`)) return;
+            const pot = tableCashSum();
+            const cost = Math.round(pot * 0.10);
+            if(cost > (Number(p.savings)||0)){ alert('Дать на лапу стоит 10% от общего котла стола = '+fmtN(cost)+'$, а в кассе у тебя только '+fmtN(p.savings)+'$. Не хватает — отбывай ходы (тюрьма 2 хода).'); return; }
+            if (!confirm(`Дать на лапу и выйти сразу за 10% от общего котла стола (−${fmtN(cost)}$)? Котёл = сумма касс всех игроков (${fmtN(pot)}$).`)) return;
+            if(SERVER_MODE){
+                lastSaveT=Date.now();
+                try{
+                    const r=await fetch('/jail/buyout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:id})});
+                    const j=await r.json();
+                    if(j && j.ok===false && j.reason==='not_enough'){ alert('Не хватает: откуп '+fmtN(Math.round(j.cost))+'$ (10% котла).'); return; }
+                }catch(e){ console.warn('jail/buyout:',e); alert('Сеть подвела — попробуй ещё раз.'); return; }
+                return;   // сервер сам списал/освободил и разослал broadcast → ждём applyServerData
+            }
+            // офлайн: считаем и списываем локально
             state.players = state.players.map(x => x.id==id
                 ? {...x, savings: Math.round(((Number(x.savings)||0) - cost)*100)/100, jail: 0,
                     shadow:(Number(x.shadow)||0)+1} : x);   // 🕯️ откупился = сделка с собой (копится на «Ложь»)

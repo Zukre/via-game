@@ -139,7 +139,7 @@ CELL_ALLOW = [
     None, 'sdelka', '__BUY__', 'skill', 'svyaz', 'expense', None, '__BUY__', 'sdelka', None,
     'sdelka', 'gov', 'med'
 ]
-TURN_SECONDS = 120    # ход длится 2 минуты (мягкий таймер: предупреждает, ведущий передаёт сам)
+TURN_SECONDS = 60     # ход длится 1 минуту (мягкий таймер: предупреждает, ведущий передаёт сам)
 BUY_SECONDS = 60      # окно покупки акций — 1 минута для всех (жёсткое авто-закрытие)
 JAIL_TURNS = 3        # клетка Тюрьма сажает на 3 хода (ведущий может поправить в пульте)
 IMPACT_MULT = 2.0     # жёсткость ликвидности: (объём$/liq)×MULT = сдвиг цены ($5k в $10k liq → +100%)
@@ -390,7 +390,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         incoming = {p['id']: p for p in new.get('players', []) if 'id' in p}
                         cur = {p['id']: p for p in DATA['players'] if 'id' in p}
                         if me in incoming:
-                            cur[me] = incoming[me]          # апсерт только своего бланка
+                            srv_prev = cur.get(me)
+                            rec = incoming[me]
+                            if srv_prev is not None:
+                                # 🔒 СЕРВЕР-АВТОРИТЕТ по тюрьме (Ринат 19июл «тюрьма сама не уходит»):
+                                # jail/jailPress меняет ТОЛЬКО сервер (посадка на __JAIL__, декремент в /turn/next,
+                                # откуп через /jail/buyout). Клиентский save НЕ должен воскрешать старый срок —
+                                # раньше `cur[me]=incoming[me]` затирал серверный декремент старым снимком.
+                                rec['jail'] = srv_prev.get('jail', rec.get('jail'))
+                                rec['jailPress'] = srv_prev.get('jailPress', rec.get('jailPress'))
+                                # 🔒 СЕРВЕР-АВТОРИТЕТ по стартовым ДОЛГАМ (Ринат 19июл «долг воскресает, гасил 4 раза;
+                                # закладная не списывается»). Погашение ставит ведущий (одобрение заявки, авторитетная
+                                # запись). Игрок сам эти поля НЕ меняет — но его старый бланк затирал «оплачено» назад.
+                                # Держим серверные значения флагов и остатков. (Банковский кредит bankLoan НЕ трогаем —
+                                # его игрок берёт сам на клиенте.)
+                                for _fp in ('isM','isE','isA','isCC','isR'):
+                                    if _fp in srv_prev: rec[_fp] = srv_prev[_fp]
+                                for _fl in ('mLeft','eLeft','aLeft','ccLeft','rLeft'):
+                                    if _fl in srv_prev: rec[_fl] = srv_prev[_fl]
+                            cur[me] = rec                   # апсерт только своего бланка
                         DATA['players'] = list(cur.values())
                         # заявки — аддитивно по id (добавить новые / обновить свои), не удаляем
                         dcur = {d['id']: d for d in DATA['deals'] if 'id' in d}
@@ -517,7 +535,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                 if int(pl.get('jail') or 0) == 0:           # был на свободе → считаем посадку
                                     pl['jailCount'] = int(pl.get('jailCount') or 0) + 1
                                     pl['jailPending'] = True               # запуск выбора под давлением (2 окна) у игрока
-                                pl['jail'] = random.randint(1, 3)          # клетка Тюрьма — сажаем на 1-3 хода (по-разному)
+                                pl['jail'] = 2                             # клетка Тюрьма — ровно 2 хода (Ринат 19июл), гарантированное освобождение через /turn/next
                                 pl['allow'] = None
                                 break
                     elif key == '__CHILD__':
@@ -533,7 +551,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             if pl.get('id') == pid:
                                 pl['allow'] = key                          # авто-открыть карточку ходящему
                                 break
-                    b['turnEndsAt'] = time.time() + TURN_SECONDS            # 2 минуты на ход
+                    b['turnEndsAt'] = time.time() + TURN_SECONDS            # 1 минута на ход
                     save_data(DATA)
                     broadcast()
                 self._send_json({'ok': True, 'pid': pid, 'value': value, 'pos': newpos, 'salaryDue': salary_due})
@@ -570,7 +588,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         else:
                             b['turnsSinceAnchor'] = tsa
                     b['lastRoll'] = None
-                    b['turnEndsAt'] = time.time() + TURN_SECONDS   # 2 минуты новому ходящему
+                    b['turnEndsAt'] = time.time() + TURN_SECONDS   # 1 минута новому ходящему
                     save_data(DATA)
                     broadcast()
                     idx = b['turnIdx']
@@ -594,6 +612,34 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     save_data(DATA)
                     broadcast()
                 self._send_json({'ok': True, 'world': we})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path == '/jail/buyout':
+            # ОТКУП «дать на лапу» (Ринат 19июл): выйти из тюрьмы сразу за 10% от СУММЫ КАСС ВСЕХ игроков
+            # (общий котёл). Серверно-авторитетно (не клиентом) — иначе гонка воскрешала бы срок.
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw)
+                pid = req.get('pid')
+                with LOCK:
+                    pl = next((p for p in DATA['players'] if p.get('id') == pid), None)
+                    if pl is None:
+                        raise ValueError('player not found')
+                    if int(pl.get('jail') or 0) <= 0:
+                        raise ValueError('not in jail')
+                    pot = round(sum(float(p.get('savings') or 0) for p in DATA['players']), 2)
+                    cost = round(pot * 0.10, 2)
+                    if float(pl.get('savings') or 0) < cost:
+                        self._send_json({'ok': False, 'reason': 'not_enough', 'cost': cost, 'pot': pot}, 200)
+                        return
+                    pl['savings'] = round(float(pl.get('savings') or 0) - cost, 2)
+                    pl['jail'] = 0
+                    pl['shadow'] = int(pl.get('shadow') or 0) + 1   # сделка с собой → копится на «Ложь»
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True, 'cost': cost, 'pot': pot})
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return

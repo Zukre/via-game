@@ -63,3 +63,5 @@ AssetID,Название,Тип Актива,Минимальная цена ,Т
 58,BALA,Crypto,0.001,0.02,0.02,3,50,,0,0,Flat,Range
 59,PONK,Crypto,0.0005,0.008,0.008,2,65,,0,0,Flat,Range
 60,DOGEZ,Crypto,0.01,0.3,0.3,40,48,,0,0,Flat,Range
+61,Нефть Brent (Oil),Commodities,20,70,90,150,4,,70,70,Flat,Range
+62,Природный газ (Gas),Commodities,1,3,5,15,5,,3,3,Flat,Range
