@@ -12017,7 +12017,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
      в секунду. На каждой перерисовке она исчезала — содержимое прыгало вверх, через миг
      таймер возвращал её — прыгало вниз. И только при открытом окне покупки, как он и заметил.
      Теперь рождается сразу в нужном виде: пересборка её не гасит, прыгать нечему. */''}
-                <div id="buyTimer" style="display:${buyWindowOpen()?'block':'none'};text-align:center;background:#064e3b;color:#d1fae5;padding:6px 10px;border-radius:8px;font-weight:800;margin-bottom:8px;">${buyWindowOpen()&&state.board?'🟢 Покупка открыта ВСЕМ: '+fmtLeft(state.board.buyWindowEndsAt):''}</div>
+                <div id="buyTimer" style="position:fixed;right:18px;top:330px;z-index:900;width:152px;visibility:${buyWindowOpen()?'visible':'hidden'};text-align:center;background:#064e3b;color:#d1fae5;padding:9px 13px;border-radius:10px;font-weight:800;font-size:13px;border:1px solid #10b981;box-shadow:0 8px 26px -10px rgba(16,185,129,.75);">${buyWindowOpen()&&state.board?'🟢 Покупка открыта ВСЕМ: '+fmtLeft(state.board.buyWindowEndsAt):''}</div>
                 ${alertHtml}
                 <div style="font-size:13px;color:#a7f3d0;margin-bottom:6px;">💼 Портфель: <b>${fmtN(portfolioValue(p))} $</b> &nbsp;·&nbsp; 💰 Касса: <b>${fmtN(p.savings)} $</b></div>
                 <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">💸 Комиссия биржи сейчас: <b style="color:#fbbf24;">${(tradeFeePct(p)*100).toFixed(1)}%</b> на сделку <span style="color:#6b7280;">(спред ${(FEE_BASE*100).toFixed(1)}% + надбавка за частоту, до ${(FEE_CAP*100).toFixed(0)}%)</span></div>
@@ -13480,7 +13480,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
      в секунду. На каждой перерисовке она исчезала — содержимое прыгало вверх, через миг
      таймер возвращал её — прыгало вниз. И только при открытом окне покупки, как он и заметил.
      Теперь рождается сразу в нужном виде: пересборка её не гасит, прыгать нечему. */''}
-                <div id="buyTimer" style="display:${buyWindowOpen()?'block':'none'};text-align:center;background:#064e3b;color:#d1fae5;padding:6px 10px;border-radius:8px;font-weight:800;margin-bottom:8px;">${buyWindowOpen()&&state.board?'🟢 Покупка открыта ВСЕМ: '+fmtLeft(state.board.buyWindowEndsAt):''}</div>
+                <div id="buyTimer" style="position:fixed;right:18px;top:330px;z-index:900;width:152px;visibility:${buyWindowOpen()?'visible':'hidden'};text-align:center;background:#064e3b;color:#d1fae5;padding:9px 13px;border-radius:10px;font-weight:800;font-size:13px;border:1px solid #10b981;box-shadow:0 8px 26px -10px rgba(16,185,129,.75);">${buyWindowOpen()&&state.board?'🟢 Покупка открыта ВСЕМ: '+fmtLeft(state.board.buyWindowEndsAt):''}</div>
                 <div style="text-align:center;margin-bottom:8px;color:#e9eefb;font-weight:800;">
                     🎲 Ходит: <span style="color:${tcol}">${nameOf(turnPid)}</span> · клетка <b>${cellName}</b>${roll}
                     &nbsp; <span id="turnTimer" style="color:#93c5fd;"></span>
@@ -13492,7 +13492,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                             <div style="font-size:10px;color:var(--lx-muted);font-weight:800;letter-spacing:.14em;text-transform:uppercase;">⏱ Ход · 2 мин</div>
                             <div id="turnTimerBig" style="font-size:34px;font-weight:900;color:var(--lx-gold-br);line-height:1.1;font-family:Georgia,serif;">—</div>
                         </div>
-                        <div id="buyTimerBox" style="background:var(--lx-ink);border:1px solid #234436;border-radius:12px;padding:14px 12px;text-align:center;display:${buyWindowOpen()?'block':'none'};">
+                        <div id="buyTimerBox" style="background:var(--lx-ink);border:1px solid #234436;border-radius:12px;padding:14px 12px;text-align:center;display:block;visibility:${buyWindowOpen()?'visible':'hidden'};">
                             <div style="font-size:10px;color:#7fd3ad;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">🛒 Покупка · 1 мин</div>
                             <div id="buyTimerBig" style="font-size:34px;font-weight:900;color:#5cb08b;line-height:1.1;font-family:Georgia,serif;">—</div>
                             <div style="font-size:10px;color:#7fd3ad;">акции / сделки — всем</div>
@@ -13568,11 +13568,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             const open=buyWindowOpen();
             const bt=document.getElementById('buyTimer');
-            if(bt){ bt.textContent = open ? ('🟢 Покупка открыта ВСЕМ: '+fmtLeft(b.buyWindowEndsAt)) : ''; bt.style.display = open?'block':'none'; }
+            if(bt){ bt.textContent = open ? ('🟢 Покупка открыта ВСЕМ: '+fmtLeft(b.buyWindowEndsAt)) : '';
+                    // 🩹 НЕ трогаем display: место под плашку зарезервировано всегда.
+                    // Раньше таймер её схлопывал, и страница прыгала вверх-вниз каждую секунду.
+                    bt.style.visibility = open?'visible':'hidden'; }
             // большие боковые таймеры у поля
             const ttb=document.getElementById('turnTimerBig');
             if(ttb){ if(b.turnEndsAt){ const left=b.turnEndsAt-Date.now()/1000; ttb.textContent = left>0?fmtLeft(b.turnEndsAt):'ВРЕМЯ!'; ttb.style.color = left>0?(left<20?'#f59e0b':'#93c5fd'):'#ef4444'; } else ttb.textContent='—'; }
-            const btbox=document.getElementById('buyTimerBox'); if(btbox) btbox.style.display = open?'block':'none';
+            const btbox=document.getElementById('buyTimerBox'); if(btbox) btbox.style.visibility = open?'visible':'hidden';
             const btb=document.getElementById('buyTimerBig'); if(btb && open) btb.textContent = fmtLeft(b.buyWindowEndsAt);
             if(_buyWasOpen && !open){ _buyWasOpen=false; safeRerender(); }   // окно закрылось → перерисовать, запереть покупку
             if(open) _buyWasOpen=true;
