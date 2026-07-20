@@ -10578,6 +10578,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 // а именно они меняются на каждую покупку и заказывали пересборку зря.
                 // Смотрим только на то, что на этом экране реально нарисовано.
                 if (state.view === 'analytics') return base + '|' + JSON.stringify(state.players || []);
+                // 🩹 ЭКРАН ПОЛЯ (скрин Рината 21 июл: поле поймано в момент пересборки — клетки
+                // съехали, картинки схлопнулись). На поле видно ТОЛЬКО имена, фишки и таймеры.
+                // Кассы там нет — а именно она менялась на каждую покупку бота и заказывала
+                // пересборку, из-за которой браузер заново раскладывал все картинки клеток.
+                // Смотрим строго на видимое → во время торгов поле не пересобирается вообще.
+                if (state.view === 'admin') {
+                    return base + '|' + JSON.stringify((state.players || []).map(p => ({
+                        i: p.id, n: p.name, j: p.jail, a: p.allow, c: p.soulCard || null
+                    })));
+                }
                 return base + '|' + JSON.stringify((state.players || []).map(p => _sigProj(p)));
             } catch (e) { return String(Math.random()); }   // не смогли — рисуем, не рискуем
         }
