@@ -85,6 +85,29 @@
         .btn-buy:hover { background: rgba(217,184,119,.18); border-color: var(--lx-gold); color:#f6e6b8; filter:none; }
         .btn-sell { background: rgba(207,154,154,.08); color: var(--lx-rose); border:1px solid rgba(207,154,154,.32); font-weight:800; }
         .btn-sell:hover { background: rgba(207,154,154,.16); border-color: var(--lx-rose); filter:none; }
+        .btn-debt { background: rgba(207,154,154,.07); color: var(--lx-rose); border:1px solid rgba(207,154,154,.28);
+                    font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:.09em; padding:7px 14px; }
+        .btn-debt:hover { background: rgba(207,154,154,.15); border-color: var(--lx-rose); filter:none; }
+        /* Золотой близнец .btn-debt — для кредита банка: карточка золотая, кнопка была зелёной
+           из старого набора и выпадала из языка игры (Ринат 20июл). */
+        .btn-debt-gold { background: rgba(217,184,119,.08); color: var(--lx-gold-br);
+            border:1px solid rgba(217,184,119,.32); font-weight:700; letter-spacing:.04em;
+            padding:9px 16px; border-radius:9px; flex:0 0 auto; }
+        .btn-debt-gold:hover { background: rgba(217,184,119,.18); border-color: var(--lx-gold);
+            box-shadow:0 0 16px -6px var(--lx-gold); filter:none; }
+        .btn-debt-gold:disabled { opacity:.35; box-shadow:none; }
+        /* Карточка долга: этикетка сверху, вес долга снизу */
+        .debt-card { background: var(--lx-ink); border:1px solid var(--lx-line); border-radius:12px; padding:12px 14px;
+                     display:flex; align-items:center; gap:12px; transition:border-color .18s; }
+        .debt-card:hover { border-color: rgba(207,154,154,.3); }
+        .debt-card.strike { opacity:.4; }
+        .debt-name { font-size:10px; letter-spacing:.15em; text-transform:uppercase; color:var(--lx-faint); font-weight:700; }
+        .debt-sum  { font-family:Georgia,serif; font-size:20px; font-weight:700; color:var(--lx-rose); margin:3px 0 1px;
+                     font-variant-numeric:tabular-nums; }
+        .debt-meta { font-size:11px; color:var(--lx-muted); }
+        /* Шкала веса: какую долю от всех долгов занимает этот */
+        .debt-bar  { height:2px; background:rgba(207,154,154,.12); border-radius:2px; margin-top:8px; overflow:hidden; }
+        .debt-bar>i{ display:block; height:100%; background:linear-gradient(90deg,rgba(207,154,154,.45),var(--lx-rose)); }
         .btn:hover { filter: brightness(1.08); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -262,6 +285,10 @@
         .blank-crest .bc::after{content:""; position:absolute; inset:5px; border-radius:50%; border:1px solid rgba(60,40,10,.35);}
         .blank-crest .bc b{font-family:Georgia,serif; font-size:22px; color:#3a2a08; letter-spacing:1.5px; line-height:1; text-shadow:0 1px 0 rgba(255,255,255,.4);}
         .blank-tag{text-align:center; font-size:9px; letter-spacing:.34em; text-transform:uppercase; color:var(--lx-gold); font-weight:800; margin:7px 0 14px;}
+        /* 🌍 строка эпохи: тихая, без рамок — фон, а не объявление */
+        .era-line{text-align:center; font-size:10px; letter-spacing:.22em; text-transform:uppercase;
+            color:var(--lx-faint); font-weight:700; margin:-8px 0 14px;}
+        .era-line b{color:var(--lx-gold); font-weight:800;}
         details.sec{background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel)); border:1px solid var(--lx-line);
             border-radius:15px; margin-bottom:10px; overflow:hidden;}
         details.sec[open]{border-color:var(--lx-gold-ln); box-shadow:0 0 22px -14px var(--lx-gold);}
@@ -10558,6 +10585,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // рынок и мировые события — всегда актуальные
             if (j.market) state.market = j.market;   // живые цены рынка
             state.world = j.world || null;           // мировое событие (broadcast)
+            state.rumor = j.rumor || null;           // 🗞️ слух о следующем звене цепочки мира
             state.board = j.board || null;           // поле (движок хода) — всегда свежее
             state.p2p = j.p2p || [];                 // сделки игрок↔игрок (#23/#24) — реестр целиком серверный
             const sp = j.players || [];
@@ -10627,10 +10655,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const WIN_MULT = 20;
         function calc(p) {
             if (!p) return {};
+            // 🛡️ Броня: игрок без профессии (битая запись, недозаполненный бланк, мусор с сервера)
+            // раньше ронял calc → падал ВЕСЬ экран, включая чужие бланки. Один плохой объект
+            // не должен гасить игру — особенно под прогоном ботов.
+            if (!p.prof || typeof p.prof !== 'object') {
+                return { salary:0, baseSalary:0, skillBonus:0, passive:0, income:0, taxes:0,
+                         mortgagePay:0, eduPay:0, autoPay:0, ccPay:0, retailPay:0, otherExp:0,
+                         childExp:0, bankPay:0, totalExp:0, flow:0, target:0, win:false, broken:true };
+            }
             const skillBonus = Math.min(0.20, (p.skills || []).reduce((s, sk) => s + (Number(sk.pct) || 0), 0));
             const baseSalary = p.prof.salary;
             const salary = Math.round(baseSalary * (1 + skillBonus));
-            const passive = p.assets.reduce((s, a) => s + Number(a.cf || 0), 0);
+            // 🕯️ ДНО (закон души 2.0): бизнесы перестают кормить — поток ×0.7. Нигде не объявлено,
+            // человек просто видит, что дела пошли хуже. Выход — сменить поведение (soulYearTick).
+            const passive = Math.round(p.assets.reduce((s, a) => s + Number(a.cf || 0), 0) * (p.bottom ? 0.7 : 1));
             const income = salary + passive;
 
             const taxDisc = Math.min(90, Math.max(0, Number(p.taxDiscPct) || 0));   // 🔒 тюрьма: «продавил силой» → скидка к налогам
@@ -10678,6 +10716,26 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             bar.innerHTML = `${mode}: <b style="color:#3b82f6;">${pCount}</b> игроков · <b style="color:#ef4444;">${dCount}</b> заявок`;
         }
 
+        // ═══ РАСКРЫТЫЕ РАЗДЕЛЫ ДЕРЖАТСЯ ОТКРЫТЫМИ (Ринат 20июл) ═══
+        // Любое действие перерисовывает #app целиком, и <details> схлопывались сами.
+        // Теперь помним, что человек открыл, и возвращаем после каждой перерисовки.
+        // Закрыть раздел может только он сам — нажав на стрелку.
+        const _openSecs = new Set();
+        function secKey(d){ const s = d.querySelector('summary'); return s ? s.textContent.trim().slice(0, 60) : ''; }
+        // toggle не всплывает, поэтому слушаем на перехвате
+        document.addEventListener('toggle', e => {
+            const d = e.target;
+            if(!(d instanceof HTMLDetailsElement) || !d.classList.contains('sec')) return;
+            const k = secKey(d); if(!k) return;
+            if(d.open) _openSecs.add(k); else _openSecs.delete(k);
+        }, true);
+        function restoreSecs(root){
+            (root || document).querySelectorAll('details.sec').forEach(d => {
+                const k = secKey(d);
+                if(k && _openSecs.has(k) && !d.open) d.open = true;
+            });
+        }
+
         function render() {
             // ВСЕГДА перечитываем перед рендером — гарантирует свежесть данных
             reloadFromStorage();
@@ -10696,6 +10754,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else if (state.view === 'analytics') renderAnalytics(app);
             else if (state.view === 'serve') app.innerHTML = renderServe();   // 🕯️ ведущий выдаёт Служение
             app.setAttribute('data-view', state.view);
+            restoreSecs(app);                         // раскрытое человеком остаётся раскрытым
             if (_sameView) window.scrollTo(0, _sy);   // та же страница — держим позицию, не прыгаем
             updateDebugBar();
             paintOverlays();   // всплывающие окна рисуем в отдельный слой — их появление не пересобирает #app
@@ -10735,7 +10794,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <p class="block-title" style="border:none; margin:0; padding:0; margin-bottom:10px;">Бланки за столом (${state.players.length})</p>
                         ${state.players.length === 0
                             ? '<p style="color:#6b7280; font-size:13px;">Бланков пока нет — зарегистрируй первого.</p>'
-                            : state.players.map(p => {
+                            : state.players.filter(p => p && p.prof).map(p => {
+                                // 🛡️ битые записи пропускаем: один плохой игрок не гасит лобби целиком
                                 const f = calc(p);
                                 const pendCount = state.deals.filter(d => d.pId == p.id && d.status === 'PENDING').length;
                                 return `
@@ -11064,7 +11124,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function closeCatPopup(){ state.catPopup=null; render(); }
         function renderCatPopup(){
             const c=state.catPopup && CAT_POPUP[state.catPopup]; if(!c) return '';
-            return `<div onclick="if(event.target===this)closeCatPopup()" style="position:fixed;inset:0;z-index:5000;background:rgba(4,6,9,.9);display:flex;align-items:center;justify-content:center;padding:16px;">
+            return `<div style="position:fixed;inset:0;z-index:5000;background:rgba(4,6,9,.9);display:flex;align-items:center;justify-content:center;padding:16px;">
                 <div style="width:420px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.7);">
                     <img src="${c.img}" style="width:100%;display:block;" alt="">
                     <div style="padding:16px 18px 18px;">
@@ -11125,6 +11185,30 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.deposits=p.deposits.filter(x=>x.id!==id);
             save(); render();
         }
+        // Сколько человек заработает, если положит сумму на этот срок.
+        // Проценты простые — ровно как считает depAccrued, чтобы обещание совпало с выплатой.
+        // Плавающий срока не имеет, поэтому показываем его доход за 1 год.
+        function depYears(t){ return t.lock > 0 ? t.lock : 1; }
+        function depGain(amt, t){ return Math.round(amt * t.rate / 100 * depYears(t)); }
+        // Пересчёт на лету: трогаем только подписи, весь бланк не перерисовываем (иначе моргает ввод)
+        function depPreview(){
+            const el = document.getElementById('depAmt');
+            const amt = Math.max(0, Math.floor(Number(el ? el.value : 0)) || 0);
+            DEPOSIT_TIERS.forEach(t => {
+                const box = document.getElementById('depGain_' + t.k);
+                if(!box) return;
+                box.innerHTML = amt > 0
+                    ? '+' + fmtN(depGain(amt, t)) + '$ за ' + depYears(t) + (depYears(t) === 1 ? ' год' : ' лет')
+                    : t.rate + '%/год';
+            });
+            const tot = document.getElementById('depTotal');
+            if(tot){
+                tot.innerHTML = amt > 0
+                    ? 'Положишь <b style="color:#efd8a3;">' + fmtN(amt) + '$</b> на 10 лет — заберёшь <b style="color:#5cb08b;">'
+                      + fmtN(amt + depGain(amt, DEPOSIT_TIERS[DEPOSIT_TIERS.length - 1])) + '$</b>'
+                    : '';
+            }
+        }
         function renderDepositPanel(p){
             const cy=curYear();
             const list=(p.deposits&&p.deposits.length)?p.deposits.map(d=>{
@@ -11133,13 +11217,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const locked=(d.lock>0 && yrs<d.lock); const left=Math.max(0,d.lock-yrs);
                 return `<div class="row-item"><div style="flex:1;"><b>${fmtN(d.amount)}$</b> <span style="font-size:11px;color:#9c988e;">· ${t.n} · ${d.rate}%/год</span><div style="font-size:11.5px;color:#5cb08b;">+${fmtN(accrued)}$ процентов · ${locked?`<span style="color:#e0a3a3;">🔒 ещё ${left} лет (досрочно −40%)</span>`:'✅ можно снять полностью'}</div></div><button onclick="withdrawDeposit('${d.id}')" class="btn ${locked?'btn-gray':'btn-orange'}">Снять</button></div>`;
             }).join(''):'<div style="color:#9ca3af;font-size:13px;padding:6px 0;">Вкладов нет. Положи свободные деньги — пусть тихо растут без риска.</div>';
-            const tierBtns=DEPOSIT_TIERS.map(t=>`<button onclick="placeDeposit('${t.k}')" class="btn" style="flex:1;min-width:66px;padding:8px 4px;font-size:11px;line-height:1.35;background:#0d1016;color:#efd8a3;border:1px solid var(--lx-gold-ln);font-weight:700;">${t.n}<br><span style="color:#5cb08b;">${t.rate}%/год</span></button>`).join('');
+            const tierBtns=DEPOSIT_TIERS.map(t=>`<button onclick="placeDeposit('${t.k}')" class="btn" style="flex:1;min-width:66px;padding:8px 4px;font-size:11px;line-height:1.35;background:#0d1016;color:#efd8a3;border:1px solid var(--lx-gold-ln);font-weight:700;">${t.n}<br><span id="depGain_${t.k}" style="color:#5cb08b;">${t.rate}%/год</span></button>`).join('');
             return `<div class="sec-in">
                 <p style="font-size:12px;color:#9c988e;margin:2px 0 10px;line-height:1.5;">Положи деньги в банк — тихо растут без риска. Чем дольше не трогаешь, тем выше процент. Плавающий снимешь когда угодно; срочный снимешь раньше срока — потеряешь 40%.</p>
                 ${list}
                 <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--lx-line);">
-                    <input id="depAmt" type="number" min="1" placeholder="Сумма вклада, $" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:15px;margin-bottom:8px;">
+                    <input id="depAmt" type="number" min="1" oninput="depPreview()" placeholder="Сумма вклада, $" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:15px;margin-bottom:8px;">
                     <div style="display:flex;gap:6px;flex-wrap:wrap;">${tierBtns}</div>
+                    <div id="depTotal" style="font-size:12px;color:#9c988e;margin-top:8px;text-align:center;line-height:1.5;"></div>
                     <div style="font-size:10.5px;color:#6d6a62;margin-top:7px;text-align:center;">Касса: <b style="color:#efd8a3;">${fmtN(p.savings)}$</b> · сейчас Год ${cy}</div>
                 </div>
             </div>`;
@@ -11163,6 +11248,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function openLoanModal(pid){ state.loanModal={pId:pid}; render(); }
         function closeLoanModal(){ state.loanModal=null; render(); }
         function openPartnerModal(pid){ state.partnerModal={pId:pid, picked:[]}; render(); }
+        // Партнёрство открывается ТОЛЬКО из окна отсканированной сделки — карта уже в руках.
+        function openPartnerFromDeal(){
+            const m=state.sdelkaModal; if(!m || !m.drawn || m.drawn.kind!=='business') return;
+            const c=m.drawn.card; if(!c || !((Number(c.cf)||0)>0)) return;
+            const p=state.players.find(x=>x.id==m.pId); if(!p) return;
+            if(!p2pOthers(p).length){ alert('Пока не с кем скидываться — за столом ты один.'); return; }
+            state.partnerModal={pId:m.pId, picked:[], card:c, token:m.token||null};
+            render();
+        }
         function closePartnerModal(){ state.partnerModal=null; render(); }
         function partnerToggle(id){
             const m=state.partnerModal; if(!m) return;
@@ -11184,19 +11278,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(r&&r.ok){ state.loanModal=null; await pollServer(true); alert('📨 Запрос отправлен '+who+'. Деньги уйдут, когда он примет.'); render(); }
             else if(r&&r.reason==='not_enough') alert('Не хватает кассы на такой заём.');
         }
+        // Ничего не спрашиваем руками: название, цена, поток и обязательства берутся из карты,
+        // которую человек уже отсканировал. Владельцем станет он — партнёры получат только поток.
         async function sendPartner(pid){
-            const m=state.partnerModal; if(!m) return;
-            const title=String((document.getElementById('parTitle')||{}).value||'').trim()||'Общее дело';
-            const amount=Math.floor(Number((document.getElementById('parAmt')||{}).value)||0);
-            const cf=Math.floor(Number((document.getElementById('parCf')||{}).value)||0);
-            if(!m.picked.length){ alert('Выбери, с кем скидываешься.'); return; }
-            if(amount<1){ alert('Впиши полную цену дела.'); return; }
-            const n=m.picked.length+1, share=Math.round(amount/n);
+            const m=state.partnerModal; if(!m || !m.card) return;
+            const c=m.card;
+            if(!m.picked.length){ alert('Выбери, кого зовёшь в долю.'); return; }
+            const n=m.picked.length+1, share=Math.round(c.price/n), cfShare=Math.round((Number(c.cf)||0)/n);
             const p=state.players.find(x=>x.id==pid);
             if(share>(Number(p.savings)||0)){ alert('Твоя доля '+fmtN(share)+'$, а в кассе '+fmtN(Math.round(p.savings))+'$.'); return; }
-            if(!confirm('Общее дело «'+title+'» за '+fmtN(amount)+'$.\n\nПартнёров с тобой: '+n+'. Доля каждого '+fmtN(share)+'$, поток делится поровну (по '+fmtN(Math.round(cf/n))+'$/мес).\n\nДеньги спишутся у всех, только когда СОГЛАСЯТСЯ ВСЕ.')) return;
-            const r=await p2pCall('create',{kind:'partner',from:pid,to:m.picked,amount:amount,cf:cf,title:title});
-            if(r&&r.ok){ state.partnerModal=null; await pollServer(true); alert('📨 Запросы отправлены. Дело откроется, когда согласятся все.'); render(); }
+            if(!confirm('Партнёрство: «'+c.t+'» за '+fmtN(c.price)+'$.\n\nСкидываются '+n+' — по '+fmtN(share)+'$ с каждого, поток по '+fmtN(cfShare)+'$/мес.\n\nДело записывается на ТЕБЯ: ты владелец, развивать можешь только ты. Партнёры получают долю потока — разовьёшь дело, вырастет и у них.\n\nДеньги спишутся у всех, только когда согласятся все.')) return;
+            const r=await p2pCall('create',{kind:'partner',from:pid,to:m.picked,amount:c.price,cf:Number(c.cf)||0,
+                                            price:Number(c.val||c.price)||0,liab:Number(c.liab)||0,title:c.t});
+            if(r&&r.ok){
+                state.partnerModal=null;
+                if(m.token){ const pp=state.players.find(x=>x.id==pid); if(pp){ pp.ownedCards=pp.ownedCards||[]; if(!pp.ownedCards.includes(m.token)) pp.ownedCards.push(m.token); } }
+                state.sdelkaModal=null;                       // карта отыграна — окно сделки закрываем
+                await pollServer(true);
+                alert('📨 Позвал в долю. Дело откроется, когда согласятся все.'); render();
+            }
         }
         async function p2pRespond(id, pid, accept){
             const r=await p2pCall('respond',{id:id,pid:pid,accept:accept});
@@ -11239,17 +11339,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `${inboxHtml}
                 <div style="display:flex;gap:7px;margin-bottom:${(debts.length||loans.length)?'10px':'0'};">
                     <button onclick="openLoanModal(${p.id})" class="btn" style="flex:1;padding:10px;font-weight:700;font-size:12.5px;background:var(--lx-ink);border:1px solid var(--lx-line);color:var(--lx-text);">💰 Дать в долг</button>
-                    <button onclick="openPartnerModal(${p.id})" class="btn" style="flex:1;padding:10px;font-weight:700;font-size:12.5px;background:var(--lx-ink);border:1px solid var(--lx-line);color:var(--lx-text);">🤝 Скинуться на дело</button>
                 </div>
                 ${debtHtml}${loanHtml}
-                ${(!inbox.length&&!debts.length&&!loans.length)?'<p style="font-size:11.5px;color:#6d6a62;line-height:1.5;margin:0;">Дорогое дело в одиночку не потянуть — сложитесь. А свободные деньги можно дать другому игроку под процент: он растёт, ты зарабатываешь.</p>':''}`;
+                ${(!inbox.length&&!debts.length&&!loans.length)?'<p style="font-size:11.5px;color:#6d6a62;line-height:1.5;margin:0;">Свободные деньги можно дать другому игроку под процент: он растёт, ты зарабатываешь. А в долю зовут прямо из карты сделки — кнопка «Партнёрство» появляется, когда ты отсканировал бизнес.</p>':''}`;
         }
         function renderLoanModal(){
             if(!state.loanModal) return '';
             const p=state.players.find(x=>x.id==state.loanModal.pId); if(!p) return '';
             const others=p2pOthers(p);
             if(!others.length) return '';
-            return `<div onclick="if(event.target===this)closeLoanModal()" style="position:fixed;inset:0;z-index:5260;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+            return `<div style="position:fixed;inset:0;z-index:5260;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
                 <div style="width:390px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;">
                     <div style="text-align:center;font-size:36px;line-height:1;">💰</div>
                     <div style="text-align:center;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#efd8a3;margin:4px 0 3px;">Дать в долг</div>
@@ -11262,23 +11361,109 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <button onclick="closeLoanModal()" class="btn btn-gray" style="width:100%;margin-top:7px;padding:10px;">Отмена</button>
                 </div></div>`;
         }
+        // ═══ 🤝 ПАРТНЁРСТВО (правило Рината, 20 июл) ═══
+        // Было неправильно: «Общее дело» просило вписать РУКАМИ название, цену и поток — человек
+        // сам придумывал себе бизнес. Теперь партнёрство живёт только внутри окна ОТСКАНИРОВАННОЙ
+        // сделки: карта уже известна, вписывать нечего. Зовётся одним словом — «Партнёрство».
+        //
+        // Правило владения: дело остаётся у того, кто вытащил карту и попросил помощи.
+        // Партнёр НЕ владеет — получает только долю пассива. Развивать может лишь владелец,
+        // и выросший поток идёт партнёрам тоже (пересчёт в syncMates).
+        // ═══════ 🗞️ СЛУХИ (спека VIA_WORLD_RUMORS_SPEC_2026_07_20.md) ═══════
+        // Карта приходит ВСЕМ разом, раньше, чем звено цепочки наступит. Текст одинаковый и мутный.
+        // Каждый выбирает ТИХО, не видя чужого выбора. Через ход-два звено наступает по-настоящему —
+        // и выборы считаются на сервере (resolve_rumor). Правильного ответа нет ни одного:
+        // осторожный проверяет, смелый верит, хитрый разгоняет, мудрый иногда просто ждёт.
+        const RUMOR_CHOICES = [
+            { k:'believe', img:'cat_imgs/rumor_believe.webp', t:'Поверить',  col:'#e0b16a',
+              d:'Действуешь сразу, по старой цене. Верный слух — ты один из единиц. Пустой — вышел зря.' },
+            { k:'check',   img:'cat_imgs/rumor_check.webp',   t:'Проверить', col:'#8fb3e0',
+              d:'Платишь 5% кассы и узнаёшь правду. Но заходишь позже — и берёшь вдвое меньше.' },
+            { k:'wait',    img:'cat_imgs/rumor_wait.webp',    t:'Переждать', col:'#9c988e',
+              d:'Ничего не делаешь. Не теряешь и не получаешь. Это нормальный взрослый выбор.' },
+            { k:'spread',  img:'cat_imgs/rumor_spread.webp',  t:'Разогнать', col:'#cf9a9a',
+              d:'Рассказываешь всем. Удар станет сильнее для всех, а ты уже встал. Соврал — ответишь.' },
+        ];
+        async function rumorChoose(pid, choice){
+            const r = state.rumor; if(!r || r.resolved) return;
+            const c = RUMOR_CHOICES.find(x=>x.k===choice); if(!c) return;
+            if(!confirm('Слух: «'+r.text+'»\n\nТвоё решение — «'+c.t+'».\n'+c.d+'\n\nПереиграть будет нельзя.')) return;
+            let j=null;
+            try{
+                const res = await fetch('/world/rumor',{method:'POST',headers:{'Content-Type':'application/json'},
+                                                       body:JSON.stringify({pid:pid, choice:choice})});
+                j = await res.json();
+            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
+            if(!j || j.ok===false){
+                alert(j && j.reason==='already' ? 'Ты уже решил по этому слуху.'
+                    : j && j.reason==='closed'  ? 'Поздно — всё уже случилось.'
+                    : 'Не получилось, попробуй ещё раз.');
+                return;
+            }
+            if(choice==='check'){
+                alert('🔎 Проверка обошлась в '+fmtN(Math.round(j.fee||0))+'$.\n\n'
+                      + (j.truth ? 'Слух ПОДТВЕРДИЛСЯ. Так и будет.'
+                                 : 'Слух ПУСТОЙ. Ничего этого не случится.'));
+            }
+            await pollServer(true); render();
+        }
+        // Сервер положил игроку итог по слуху (resolve_rumor) — показываем ОДИН раз и стираем.
+        function rumorResultCheck(p){
+            const rr = p && p.rumorResult; if(!rr) return;
+            const c = RUMOR_CHOICES.find(x=>x.k===rr.choice);
+            const d = Number(rr.delta)||0;
+            p.rumorResult = null;
+            if(rr.choice==='wait'){ p.notify='🗞️ Ты переждал. Слух оказался '+(rr.true?'верным':'пустым')+'. Ты ничего не потерял.'; }
+            else p.notify = '🗞️ Слух оказался '+(rr.true?'ВЕРНЫМ':'ПУСТЫМ')+'. Твоё решение — «'+(c?c.t:rr.choice)+'»: '
+                          + (d>0?'+'+fmtN(Math.round(d))+'$':(d<0?fmtN(Math.round(d))+'$':'без движения'))
+                          + (rr.choice==='spread'&&!rr.true?' Люди поверили тебе и потеряли деньги.':'');
+            save(p.id);
+        }
+        function renderRumorModal(p){
+            const r = state.rumor;
+            if(!r || r.resolved || !p) return '';
+            if((r.choices||{})[String(p.id)]) return '';     // уже решил — окно не держим
+            return `<div style="position:fixed;inset:0;z-index:5290;background:rgba(3,5,8,.95);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;">
+                <div style="width:430px;max-width:100%;max-height:94vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:18px 16px;">
+                    <div style="border-radius:13px;overflow:hidden;margin-bottom:11px;position:relative;height:120px;">
+                        <img src="cat_imgs/rumor_card.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'">
+                        <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,.15),rgba(11,14,20,.9));"></div>
+                        <div style="position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Слухи</div>
+                    </div>
+                    <div style="text-align:center;font-family:Georgia,serif;font-style:italic;font-size:15px;line-height:1.55;color:#f3efe6;margin-bottom:4px;">«${r.text}»</div>
+                    <div style="text-align:center;font-size:11px;color:#6d6a62;margin-bottom:13px;">Слышали все. Правда это или пустое — никто не знает.</div>
+                    ${RUMOR_CHOICES.map(c=>`
+                        <button onclick="rumorChoose(${p.id},'${c.k}')" class="btn" style="width:100%;margin-bottom:8px;padding:0;overflow:hidden;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:12px;display:flex;align-items:stretch;text-align:left;gap:0;">
+                            <img src="${c.img}" alt="" style="width:74px;height:74px;object-fit:cover;flex:0 0 auto;display:block;" onerror="this.style.display='none'">
+                            <span style="flex:1;min-width:0;padding:9px 11px;">
+                                <b style="display:block;font-size:13.5px;color:${c.col};margin-bottom:2px;">${c.t}</b>
+                                <span style="display:block;font-size:11px;color:#9c988e;line-height:1.42;white-space:normal;">${c.d}</span>
+                            </span>
+                        </button>`).join('')}
+                    <div style="font-size:10.5px;color:#6d6a62;text-align:center;line-height:1.45;margin-top:3px;">Решение тихое — остальные не видят, что ты выбрал.</div>
+                </div></div>`;
+        }
         function renderPartnerModal(){
-            const m=state.partnerModal; if(!m) return '';
+            const m=state.partnerModal; if(!m || !m.card) return '';
             const p=state.players.find(x=>x.id==m.pId); if(!p) return '';
             const others=p2pOthers(p); if(!others.length) return '';
-            const n=m.picked.length+1;
-            return `<div onclick="if(event.target===this)closePartnerModal()" style="position:fixed;inset:0;z-index:5260;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+            const c=m.card, n=m.picked.length+1;
+            const share=Math.round(c.price/n), cfShare=Math.round((Number(c.cf)||0)/n);
+            const canPay=(Number(p.savings)||0)>=share;
+            return `<div style="position:fixed;inset:0;z-index:5260;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
                 <div style="width:400px;max-width:100%;max-height:90vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;">
                     <div style="text-align:center;font-size:36px;line-height:1;">🤝</div>
-                    <div style="text-align:center;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#efd8a3;margin:4px 0 3px;">Общее дело</div>
-                    <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:14px;">Дорогое в одиночку — по силам вместе. Цена и поток делятся поровну.</div>
-                    <input id="parTitle" placeholder="Что за дело (например, Кофейня)" class="inp" style="width:100%;margin-bottom:8px;">
-                    <input id="parAmt" type="number" min="1" placeholder="Полная цена дела, $" class="inp" style="width:100%;margin-bottom:8px;font-family:ui-monospace,monospace;font-weight:700;">
-                    <input id="parCf" type="number" min="0" placeholder="Поток дела, $/мес" class="inp" style="width:100%;margin-bottom:12px;font-family:ui-monospace,monospace;font-weight:700;">
-                    <div style="font-size:11px;color:#6d6a62;text-transform:uppercase;letter-spacing:.1em;font-weight:800;margin-bottom:6px;">С кем скидываешься</div>
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#efd8a3;margin:4px 0 3px;">Партнёрство</div>
+                    <div style="text-align:center;font-size:13px;color:#f3efe6;font-weight:700;margin-bottom:2px;">${c.e||''} ${c.t}</div>
+                    <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:14px;">Цена <b style="color:#efd8a3;">${fmtN(c.price)}$</b> · поток <b style="color:#5cb08b;">+${fmtN(c.cf)}$/мес</b>${(c.liab||0)>0?` · обязательства <b style="color:#cf9a9a;">${fmtN(c.liab)}$</b>`:''}</div>
+                    <div style="font-size:11px;color:#6d6a62;text-transform:uppercase;letter-spacing:.1em;font-weight:800;margin-bottom:6px;">Кого зовёшь в долю</div>
                     ${others.map(o=>{const on=m.picked.indexOf(o.id)>=0;return `<button onclick="partnerToggle(${o.id})" class="btn" style="width:100%;margin-bottom:6px;padding:9px;text-align:left;font-weight:700;background:${on?'rgba(217,184,119,.12)':'var(--lx-ink)'};border:1px solid ${on?'var(--lx-gold-ln)':'var(--lx-line)'};color:var(--lx-text);">${on?'✓':'○'} ${o.name} <span style="color:#6d6a62;font-size:11px;">· касса ${fmtN(Math.round(o.savings||0))}$</span></button>`;}).join('')}
-                    <div style="font-size:12px;color:#cdc8bd;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:10px;padding:10px 12px;margin:8px 0 12px;line-height:1.5;">Участников будет <b style="color:#efd8a3;">${n}</b> (вместе с тобой). Деньги спишутся у всех разом — и только если <b>согласятся все</b>.</div>
-                    <button onclick="sendPartner(${p.id})" class="btn" style="width:100%;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">Позвать в дело</button>
+                    <div style="font-size:12px;color:#cdc8bd;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:10px;padding:10px 12px;margin:8px 0 12px;line-height:1.55;">
+                        Скидываются <b style="color:#efd8a3;">${n}</b> — по <b style="color:#efd8a3;">${fmtN(share)}$</b> с каждого, поток по <b style="color:#5cb08b;">+${fmtN(cfShare)}$/мес</b>.<br>
+                        <span style="color:#9c988e;">Дело записывается на <b style="color:#f3efe6;">тебя</b> — ты владелец, только ты можешь его развивать. Партнёры получают долю потока: разовьёшь дело — вырастет и у них.</span>
+                        ${canPay?'':'<br><b style="color:#cf9a9a;">В твоей кассе не хватает на свою долю.</b>'}
+                    </div>
+                    <button onclick="sendPartner(${p.id})" ${canPay?'':'disabled'} class="btn" style="width:100%;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;${canPay?'':'opacity:.45;'}">Позвать в долю</button>
                     <button onclick="closePartnerModal()" class="btn btn-gray" style="width:100%;margin-top:7px;padding:10px;">Отмена</button>
                 </div></div>`;
         }
@@ -11354,18 +11539,62 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
         };
         // Сколько даёт карта в долларах на этой ступени
-        function bizAdd(key, out){
+        // Ринат 20июл: «на рекламе за 10к человек ГАРАНТ получает мощную рекламу — тупо же».
+        // Было: вложил вдесятеро → 75% шанс лучшей карты, то есть деньги покупали удачу.
+        // Стало: деньги двигают РАЗМЕР исхода, а не гарантию. Крупный вклад бьёт сильнее —
+        // и в плюс, и в минус (вложил больше — и провал дороже). Ровно как в жизни.
+        // Рост подкоренной и с потолком ×3: удвоил вклад — эффект не удваивается.
+        // Потолок ×1.5 (Ринат 20июл: «можно сделать строже»). Крупный вклад бьёт сильнее, но
+        // полторы «лучшей карты» — это край. Числа Рината: реклама +1000, люди +2000, сеть +5000,
+        // франшиза +10000. Смысл: платить много можно, но выгоднее заходить по минимуму.
+        function bizSize(mult){ return Math.min(1.5, Math.sqrt(Math.max(1, Number(mult)||1))); }
+        // ─── СКОЛЬКО СТОИТ ДЕЛО (Ринат 20июл: «откуда цена? вложил 10к — продать за 5к?»)
+        // Раньше: бизнес с карты заводился с price 0, а развитие добавляло к цене половину вклада —
+        // отсюда и абсурд. Теперь дело стоит СТОЛЬКО, СКОЛЬКО ПРИНОСИТ: 20 месячных потоков.
+        // Двадцать — не с потолка: вся игра меряет свободу как «пассив × 20» (WIN_MULT).
+        // Развил дело → вырос поток → выросла цена. Ничего вписывать руками не надо.
+        function bizValue(a){
+            if(!a) return 0;
+            const price=Number(a.price)||0, cf=Number(a.cf)||0;
+            return (a.type==='BUSINESS' && cf>0) ? Math.max(price, Math.round(cf*WIN_MULT)) : price;
+        }
+        function assetSale(a){ return Math.max(0, bizValue(a) - (Number(a.liab)||0)); }
+        // ─── ПАРТНЁРЫ: владелец развил дело → поток вырос У ВСЕХ (правило Рината, 20 июл).
+        // Партнёр не платит за развитие и не решает — но его доля растёт вместе с делом.
+        // a.cfTotal — полный поток дела, a.cf — доля владельца. Скидывались поровну, значит
+        // и делим поровну: n = партнёры + владелец.
+        function syncMates(a){
+            const mates=(a && a.mates)||[]; if(!mates.length) return;
+            const n=mates.length+1;
+            const total=Math.round(Number(a.cfTotal)||((Number(a.cf)||0)*n));
+            const share=Math.round(total/n);
+            a.cfTotal=total; a.cf=share;
+            mates.forEach(mt=>{
+                mt.cf=share;
+                const pl=(state.players||[]).find(x=>x.id==mt.id); if(!pl) return;
+                const mir=(pl.assets||[]).find(z=>z.srcAsset==a.id);
+                if(mir && mir.cf!==share){
+                    mir.cf=share;
+                    pl.notify='📈 «'+(a.title||'дело')+'»: партнёр развил дело — твоя доля теперь +'+fmtN(share)+'$/мес.';
+                    save(pl.id);
+                }
+            });
+        }
+        function bizAdd(key, out, mult){
             const u=BIZ_UPGRADES.find(x=>x.k===key); if(!u) return 0;
-            return Math.round((Number(u.best)||0) * (Number(BIZ_STORY[key][out][2])||0));
+            return Math.round((Number(u.best)||0) * (Number(BIZ_STORY[key][out][2])||0) * bizSize(mult));
         }
         // ШАНСЫ. Базово (минимальный вход): провал 25%, слабо 30%, средне 30%, лучшая 15%.
         // Ринат: «чем больше вкладываешь, тем вероятность лучшей карты выше». Вложил вдвое сверх
         // минимума — шанс лучшей растёт, провала падает. Но провал возможен ВСЕГДА (кап 50/10).
         function bizOdds(mult){          // mult = во сколько раз вложено больше минимума
             const k = Math.max(1, Number(mult)||1);
-            // вход по минимуму → 15% на лучшую; вдесятеро больше → 75%. Провал не исчезает никогда.
-            const boom = Math.min(75, 15 + 7*(k-1));
-            const bad  = Math.max(5,  25 - 3*(k-1));
+            // Ринат: «три промаха — один раз забирает мощную карту». Потолок лучшей карты — 25%,
+            // то есть примерно один заход из четырёх, СКОЛЬКО БЫ ты ни заплатил. Гарантии нет
+            // никогда. Провал тоже не исчезает (пол 12%). Крупный вклад окупается размером
+            // выигрыша (bizSize), а не вероятностью — иначе деньги покупали бы удачу.
+            const boom = Math.round(Math.min(25, 15 + 1.2*(k-1)));
+            const bad  = Math.round(Math.max(12, 25 - 1.3*(k-1)));
             const rest = 100 - boom - bad;
             return { bad:bad, weak:Math.round(rest*0.5), mid:rest-Math.round(rest*0.5), boom:boom };
         }
@@ -11416,10 +11645,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const u=BIZ_UPGRADES.find(x=>x.k===m.key); if(!u) return;
             const key=m.cards[i]; const out=BIZ_DECK.find(d=>d.k===key); if(!out) return;
             m.picked=i;
-            const story=BIZ_STORY[m.key][key], add=bizAdd(m.key, key);
+            const story=BIZ_STORY[m.key][key], add=bizAdd(m.key, key, m.mult);   // размер зависит от вклада
             const oldCf=Number(a.cf)||0;
-            const newCf=Math.max(0, oldCf+add);
-            a.cf=newCf;
+            // Дело с партнёрами: карта двигает ПОЛНЫЙ поток, а он потом делится на всех.
+            if((a.mates||[]).length){
+                const n=a.mates.length+1;
+                a.cfTotal=Math.max(0,(Number(a.cfTotal)||oldCf*n)+add);
+                syncMates(a);
+            } else {
+                a.cf=Math.max(0, oldCf+add);
+            }
+            const newCf=Number(a.cf)||0;
             if(key!=='bad'){
                 // ступень пройдена — идём дальше по лестнице
                 a.bizLvl=bizLevel(a)+1;
@@ -11448,9 +11684,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <span style="font-size:17px;">${d.ic}</span>
                 <div style="flex:1;"><div style="font-weight:700;font-size:12.5px;color:${d.col};">${st[d.k][0]}
                     <span id="odds_${d.k}" style="color:#6d6a62;font-weight:800;"> · ${o0[d.k]}%</span>
-                    <span style="float:right;font-family:ui-monospace,monospace;color:${bizAdd(m.key,d.k)>0?'#34d399':(bizAdd(m.key,d.k)<0?'#fca5a5':'#6d6a62')};">${bizAdd(m.key,d.k)>0?'+':''}${fmtN(bizAdd(m.key,d.k))}$</span></div>
+                    <span id="pay_${d.k}" style="float:right;font-family:ui-monospace,monospace;color:${bizAdd(m.key,d.k,cur/u.min)>0?'#34d399':(bizAdd(m.key,d.k,cur/u.min)<0?'#fca5a5':'#6d6a62')};">${bizAdd(m.key,d.k,cur/u.min)>0?'+':''}${fmtN(bizAdd(m.key,d.k,cur/u.min))}$</span></div>
                 <div style="font-size:11.5px;color:#9c988e;line-height:1.45;">${st[d.k][1]}</div></div></div>`).join('');
-            return `<div onclick="if(event.target===this)closeBizBudget()" style="position:fixed;inset:0;z-index:5270;background:rgba(4,5,8,.93);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;">
+            return `<div style="position:fixed;inset:0;z-index:5270;background:rgba(4,5,8,.93);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;">
                 <div style="width:420px;max-width:100%;max-height:92vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;">
                     <div style="text-align:center;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#b98a3e;font-weight:800;">${u.ic} ${u.t}</div>
                     <div style="text-align:center;font-family:Georgia,serif;font-size:19px;font-weight:700;color:#f3efe6;margin:4px 0 3px;">Сколько вложишь?</div>
@@ -11483,6 +11719,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const k=amt/u.min, o=bizOdds(k);
             ['bad','weak','mid','boom'].forEach(x=>{
                 const n=document.getElementById('odds_'+x); if(n) n.textContent=' · '+o[x]+'%';
+                // деньги двигают РАЗМЕР исхода — цифры должны шевелиться прямо под пальцем
+                const s=document.getElementById('pay_'+x);
+                if(s){ const v=bizAdd(m.key,x,k);
+                       s.textContent=(v>0?'+':'')+fmtN(v)+'$';
+                       s.style.color = v>0?'#34d399':(v<0?'#fca5a5':'#6d6a62'); }
             });
             const mm=document.getElementById('oddsMult');
             if(mm) mm.textContent='вложение ×'+(Math.round(k*10)/10);
@@ -11550,7 +11791,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${foot}
                 </div>`;
             }).join('');
-            return `<div onclick="if(event.target===this)closeBizModal()" style="position:fixed;inset:0;z-index:5250;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;">
+            return `<div style="position:fixed;inset:0;z-index:5250;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;">
                 <div style="width:430px;max-width:100%;max-height:90vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;box-shadow:0 30px 70px rgba(0,0,0,.7);">
                     <div style="margin:-20px -18px 14px;height:118px;overflow:hidden;position:relative;border-radius:18px 18px 0 0;"><img src="cat_imgs/hero_ladder.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'"><div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,.15),rgba(11,14,20,.92));"></div></div>
                     <div style="text-align:center;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#b98a3e;font-weight:800;">🏗️ Развитие дела</div>
@@ -11586,7 +11827,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!state.cellLocked) return '';
             const h=CELL_HELP[state.cellLocked]; if(!h) return '';
             const [ic,nm,tx]=h;
-            return `<div onclick="if(event.target===this)closeCellLocked()" style="position:fixed;inset:0;z-index:5300;background:rgba(4,5,8,.9);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+            return `<div style="position:fixed;inset:0;z-index:5300;background:rgba(4,5,8,.9);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
                 <div style="width:390px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-line);border-radius:18px;padding:22px 20px;box-shadow:0 30px 70px rgba(0,0,0,.7);">
                     <div style="text-align:center;font-size:40px;line-height:1;">${ic}</div>
                     <div style="text-align:center;font-family:Georgia,serif;font-size:21px;font-weight:700;color:#f3efe6;margin:5px 0 3px;">${nm}</div>
@@ -11611,7 +11852,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function closeSoulsInfo(){ state.soulsInfo=false; render(); }
         function renderSoulsInfo(){
             if(!state.soulsInfo) return '';
-            return `<div onclick="if(event.target===this)closeSoulsInfo()" style="position:fixed;inset:0;z-index:5100;background:rgba(4,6,9,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+            return `<div style="position:fixed;inset:0;z-index:5100;background:rgba(4,6,9,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
                 <div style="width:440px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:22px 20px;box-shadow:0 30px 70px rgba(0,0,0,.7);">
                     <div style="text-align:center;font-family:Georgia,serif;font-size:22px;font-weight:700;color:#efd8a3;">🕯️ Карты Души</div>
                     <p style="text-align:center;font-size:12.5px;color:#9c988e;line-height:1.55;margin:8px 0 16px;">Души не купить. Каждая даётся за то, <b style="color:#cdc8bd;">какой ты</b> — за твои действия и характер в игре. Собери <b style="color:#efd8a3;">все 5</b>.</p>
@@ -11650,7 +11891,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return '';
             const big=Number(p.bigDonations)||0, need=CHARITY_AUCTION_NEED, aucOpen=big>=need, total=Number(p.donatedTotal)||0;
             const quick=[1000,5000,10000].map(v=>`<button onclick="document.getElementById('charAmt').value=${v}" class="btn" style="flex:1;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;padding:8px 4px;font-size:12px;font-weight:700;">${fmtN(v)}</button>`).join('');
-            return `<div onclick="if(event.target===this)closeCharity()" style="position:fixed;inset:0;z-index:5200;background:rgba(4,5,8,.9);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+            return `<div style="position:fixed;inset:0;z-index:5200;background:rgba(4,5,8,.9);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
                 <div style="width:400px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.7),0 0 40px -12px var(--lx-gold);">
                     <div style="height:3px;background:linear-gradient(90deg,transparent,#efd8a3,transparent);"></div>
                     <div style="padding:20px;">
@@ -11786,7 +12027,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>`;
             }).join('') : `<p style="color:#9ca3af;font-size:13px;text-align:center;padding:24px;">${tab==='BUY'?'Покупок пока нет.':'Продаж пока нет.'}</p>`;
             const tbtn=(key,label,n)=>`<button onclick="setHistoryTab('${key}')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:800;cursor:pointer;border:none;border-bottom:2px solid ${tab===key?(key==='BUY'?'#93c5fd':'#fca5a5'):'transparent'};background:${tab===key?'#0d1016':'#0a0d12'};color:${tab===key?(key==='BUY'?'#93c5fd':'#fca5a5'):'#6b7280'};">${label} (${n})</button>`;
-            return `<div style="position:fixed;inset:0;z-index:4000;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;" onclick="if(event.target===this){state.showHistory=false;paintOverlays();}">
+            return `<div style="position:fixed;inset:0;z-index:4000;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;">
                 <div style="width:540px;max-width:100%;max-height:86vh;display:flex;flex-direction:column;background:#0d1016;border:1px solid var(--lx-gold-ln);border-radius:16px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6);">
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;">
                         <div style="font-family:Georgia,serif;font-size:19px;font-weight:700;color:#efd8a3;">🧾 История сделок</div>
@@ -11816,11 +12057,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const bet=Math.floor(Number(el? el.value : 0));
             if(!bet||bet<1){ alert('Введи ставку (число больше 0).'); return; }
             if(bet>p.savings){ alert('Не хватает кассы. У тебя '+Math.round(p.savings)+'$.'); return; }
-            const roll=1+Math.floor(Math.random()*6);
+            let roll=1+Math.floor(Math.random()*6);
             // ставка списывается СРАЗУ (committed). Проигрыш мгновенный.
             p.savings=Math.round((p.savings-bet)*100)/100;
             const st=pstat(p); st.casinoPlays++;
-            const mult = CASINO_PAYOUT[roll] || 0;
+            const mult = casinoAdjust(p, CASINO_PAYOUT[roll] || 0);   // 🕯️ затухание: казино мертвеет
+            // если выигрыш сгорел — и кубик показывает проигрышную грань: иначе на экране
+            // была бы шестёрка вместе с минусом, и закон объявил бы себя вслух.
+            if(mult <= 0 && (CASINO_PAYOUT[roll]||0) > 0) roll = 1+Math.floor(Math.random()*4);
             if(mult > 0){
                 const payout=Math.round(bet*mult*100)/100;   // возврат (включает ставку)
                 p.savings=Math.round((p.savings+payout)*100)/100;   // МГНОВЕННО: если выиграл — выиграл (без одобрения)
@@ -11851,15 +12095,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const bet=Math.floor(Number(el?el.value:0));
             if(!bet||bet<1){ alert('Введи ставку (число больше 0).'); return; }
             if(bet>p.savings){ alert('Не хватает кассы. У тебя '+Math.round(p.savings)+'$.'); return; }
-            // исход по шансу
-            let out=null, r=Math.random(), cum=0;
-            for(const t of SLOT_TIERS){ cum+=t.p; if(r<cum){ out=t; break; } }
-            let finals;
-            if(out){ finals=[out.s,out.s,out.s]; }
-            else { let a,b,c; do{a=slotRnd();b=slotRnd();c=slotRnd();}while(a===b&&b===c); finals=[a,b,c]; }
             // ставка списывается СРАЗУ
             p.savings=Math.round((p.savings-bet)*100)/100;
             const st=pstat(p); st.casinoPlays++;
+            // исход по шансу
+            let out=null, r=Math.random(), cum=0;
+            for(const t of SLOT_TIERS){ cum+=t.p; if(r<cum){ out=t; break; } }
+            // 🕯️ затухание решаем ДО барабанов: если выигрыш сгорел — фрукты честно не сойдутся,
+            // человек видит обычную неудачу, а не «три вишни и минус». Закон молчит.
+            if(out){ const m=casinoAdjust(p,out.m); out = m>0 ? {s:out.s, m:m} : null; }
+            let finals;
+            if(out){ finals=[out.s,out.s,out.s]; }
+            else { let a,b,c; do{a=slotRnd();b=slotRnd();c=slotRnd();}while(a===b&&b===c); finals=[a,b,c]; }
             const reels=[document.getElementById('reel0'),document.getElementById('reel1'),document.getElementById('reel2')];
             if(!reels[0]){ finishSlot(p,st,out,bet,finals); return; }   // барабанов нет в DOM — решаем сразу
             _slotSpinning=true;
@@ -11868,16 +12115,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 if(i===2){ setTimeout(()=>{ _slotSpinning=false; finishSlot(p,st,out,bet,finals); }, 500); } }, ms));
         }
         function finishSlot(p,st,out,bet,finals){
-            if(out){
-                const payout=Math.round(bet*out.m*100)/100;
+            const _m = out ? out.m : 0;   // 🕯️ затухание уже применено в spinSlot (до барабанов)
+            if(_m > 0){
+                const payout=Math.round(bet*_m*100)/100;
                 p.savings=Math.round((p.savings+payout)*100)/100;
                 st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(payout-bet))*100)/100;
-                p.notify='🎰🎉 '+finals.join(' ')+' ×'+out.m+'! +'+Math.round(payout-bet)+'$ чистыми.';
+                p.notify='🎰🎉 '+finals.join(' ')+' ×'+_m+'! +'+Math.round(payout-bet)+'$ чистыми.';
                 save(); render();
-                alert((out.m>=100?'🎰👑 ДЖЕКПОТ 7️⃣7️⃣7️⃣ ×100 → +':'🎰🎉 Три '+out.s+' ×'+out.m+' → +')+payout+'$ сразу в кассу!');
+                alert((_m>=100?'🎰👑 ДЖЕКПОТ 7️⃣7️⃣7️⃣ ×'+_m+' → +':'🎰🎉 Три '+out.s+' ×'+_m+' → +')+payout+'$ сразу в кассу!');
             } else {
                 st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
                 save(); render();
+                // выигрыш мог сгореть в затухании — человек видит обычный проигрыш, закон молчит
                 alert('🎰 '+finals.join(' ')+' — не сошлось. −'+bet+'$. Казино не спешит отдавать. Рискни ещё разок!');
             }
         }
@@ -11886,6 +12135,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p=state.players.find(x=>x.id==id); if(!p) return;
             const f=calc(p);
             const _st=pstat(p); _st.salaryCount++; _st.salaryTotal=Math.round((_st.salaryTotal+f.flow)*100)/100;   // копилка
+            soulYearTick(p);   // 🕯️ прожитый год: чистые годы, висящий долг, отпускает ли дно
             if (SERVER_MODE) {
                 // Сервер-авторитет: начисление применяет сервер (атомарно под LOCK) и рассылает всем.
                 // ОПТИМИСТИЧНО обновляем и локальный экран той же суммой — иначе экран ведущего остаётся
@@ -12460,6 +12710,85 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const SOUL_POISON_STEP = 3;    // карт пороков = яда в душе
         const SOUL_EGO_MULT    = 2;    // во сколько раз оторвался от второго
         const SOUL_IDLE_STEP   = 3;    // лет без единой покупки/сделки (1 год = 10 мин)
+
+        // ══════════ ЗАКОН ДУШИ 2.0 ══════════ (спека: Desktop\VIA_SOUL_LAW_SPEC_2026_07_20.md)
+        // Нина: игра объявляет правило заранее — это клетка, человек учится слушаться автора.
+        // Решение Рината: закон остаётся, но замолкает. Одна ошибка не карается — карается
+        // устойчивый ПАТТЕРН. Три ступени: шёпот (скрытый вес) → голос (Лудоман) → дно.
+        const SOUL_DECAY_FROM  = 20;   // с какого кручения казино начинает мертветь
+        const SOUL_BOTTOM_AT   = 25;   // кручений до дна (15 Лудоман + 10 на подумать)
+        const SOUL_FORGIVE_AT  = 40;   // свет, при котором снимается cursed
+        const SOUL_CLEAN_OUT   = 3;    // чистых лет, чтобы дно отпустило
+
+        // Скрытый вес: свет минус тьма. Нигде не показывается, ни в одном тексте не звучит.
+        // Человек за одну партию почти ничего не заметит. За три-четыре — заметит сам.
+        function soulWeight(p){
+            if(!p) return {light:0, dark:0, bias:0};
+            const st = pstat(p);
+            const nw = Math.max(1, pnetWorth(p));
+            const light = Math.min(60,
+                  Math.min(40, (Number(p.donatedTotal)||0) / nw * 100)   // доля отданного
+                + Math.min(20, (Number(p.helpedBack)||0) * 5)            // займы, которые вернули
+                + Math.min(20, (Number(p.cleanYears)||0) * 2));          // годы без казино и тени
+            const dark = Math.min(100,
+                  Math.min(30, (Number(st.casinoPlays)||0) * 1.5)
+                + Math.min(20, (Number(p.shadow)||0) * 5)                // чёрный рынок, откуп
+                + Math.min(20, (Number(p.soulPoison)||0) * 4)
+                + Math.min(20, (Number(p.debtYears)||0) * 3)             // висящий долг
+                + (Number(p.betrayals)||0) * 40);                        // кидок живого человека
+            const bias = p.bottom ? -0.10
+                       : 0.10 * (light / 60) - 0.10 * (Math.min(dark,100) / 100);
+            return {light, dark, bias};
+        }
+        // Затухание казино: чем больше крутишь, тем меньше отдаёт. Пол — четверть.
+        // Тот, кто зашёл дважды из любопытства, не увидит ничего: до 20-го кручения decay = 1.
+        function casinoDecay(p){
+            const plays = Number(pstat(p).casinoPlays)||0;
+            if(plays < SOUL_DECAY_FROM) return 1;
+            return Math.max(0.25, Math.min(1, 1 - 0.06 * (plays - (SOUL_DECAY_FROM - 1))));
+        }
+        // Правит уже выпавший выигрыш: сгорает в проигрыш с шансом (1-decay), сумма мельчает.
+        // Возвращает новый множитель (0 = выигрыш сгорел).
+        function casinoAdjust(p, mult){
+            if(!(mult > 0)) return 0;
+            const d = casinoDecay(p);
+            const bias = soulWeight(p).bias;                     // щедрость казино слышит вес
+            if(Math.random() > d + bias) return 0;               // сгорел
+            return Math.round(mult * Math.max(0.5, d) * 100) / 100;
+        }
+        // Дно: после Лудомана человек не услышал и докрутил до 25-го.
+        function soulBottomCheck(p){
+            if(!p || p.bottom) return false;
+            const plays = Number(pstat(p).casinoPlays)||0;
+            if(plays < SOUL_BOTTOM_AT) return false;
+            p.bottom = true;
+            p.bottomDonated = Number(p.donatedTotal)||0;         // отсчёт «любого пожертвования»
+            p.cleanYears = 0;
+            return true;
+        }
+        // Год прожит (считаем по зарплате — это и есть месяц/год стола).
+        function soulYearTick(p){
+            if(!p) return;
+            const st = pstat(p);
+            const casino = Number(st.casinoPlays)||0, shadow = Number(p.shadow)||0;
+            const debt = (Number(p.mLeft)||0)+(Number(p.eLeft)||0)+(Number(p.aLeft)||0)
+                       + (Number(p.ccLeft)||0)+(Number(p.rLeft)||0)+(Number(p.bankLoan)||0);
+            const prev = p.soulMark;
+            if(prev){
+                const clean = (casino === prev.casino) && (shadow === prev.shadow);
+                p.cleanYears = clean ? (Number(p.cleanYears)||0) + 1 : 0;
+                // висящий долг: больше 30% капитала и за год не сократился
+                if(debt > Math.max(1, pnetWorth(p)) * 0.30 && debt >= prev.debt)
+                    p.debtYears = (Number(p.debtYears)||0) + 1;
+                // дно отпускает: три чистых года + любое пожертвование. Не «покайся», а дела.
+                if(p.bottom && (Number(p.cleanYears)||0) >= SOUL_CLEAN_OUT
+                   && (Number(p.donatedTotal)||0) > (Number(p.bottomDonated)||0)){
+                    p.bottom = false; p.bottomDonated = null;
+                    p.notify = '🌅 Что-то отпустило. Дела снова слушаются.';
+                }
+            }
+            p.soulMark = {casino, shadow, debt};
+        }
         // ВАЖНО: applyServerData заменяет state.players целиком, поэтому всё, что здесь
         // намутировали (карта, пороги, яд, теневые ходы), надо СРАЗУ слить на сервер —
         // иначе первый же SSE-пуш сотрёт карту с экрана и счётчики обнулятся.
@@ -12469,6 +12798,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const seen = p.soulSeen = p.soulSeen || {};
             const st = pstat(p);
             let dirty = false;
+            // ПРОЩЕНИЕ: cursed больше не приговор до конца партии. Свет дорос до 40 — колода
+            // снова начинает собираться с нуля. Кидок отмаливается дольше соблазна (в тьме +40).
+            if(p.cursed && soulWeight(p).light >= SOUL_FORGIVE_AT){
+                p.cursed = false; p.soulBurn = null; p.soul5 = [];
+                p.notify = '🕊️ Колода снова открыта. Собирай заново.';
+                dirty = true;
+            }
+            if(soulBottomCheck(p)) dirty = true;
             // теневые ходы: откуп из тюрьмы (см. jailBuyout) + визит на «Чёрный рынок» (клетка 15)
             const b = state.board;
             if(b && b.positions){
@@ -12682,19 +13019,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (p.soulNew)   { app.innerHTML = renderS5New(p);    return; }      // 🕯️ «Поздравляю, ты получил карту души»
             if (p.cheatPick) { app.innerHTML = renderCheatPick(p);return; }      // 😈 выбор жертвы
             if (p.doorOpen)  { app.innerHTML = renderDoorModal(p);return; }      // 🚪 карты выбора
+            rumorResultCheck(p);                                                 // 🗞️ слух сбылся или нет — сказать один раз
             soulCheck(p);                                                        // 🕯️ карта духа приходит сама
             if (p.soulCard) { app.innerHTML = renderSoulModal(p); return; }      // 🕯️ весь экран: голос внутри
             const f = calc(p);
             const hasP = hasPendingFor(p.id);
 
+            // Общий вес долгов — чтобы каждая карточка показала свою долю в этой петле
+            const debtTotal = Math.max(1, (Number(p.mLeft)||0) + (Number(p.eLeft)||0) + (Number(p.aLeft)||0)
+                                        + (Number(p.ccLeft)||0) + (Number(p.rLeft)||0));
             const debtRow = (paid, name, debt, monthly, type) => `
-                <div class="row-item ${paid ? 'strike' : ''}">
-                    <div style="flex:1;">
-                        <span style="font-size:11px; color:#9ca3af;">${name} · ежемес. ${monthly}$</span>
-                        <div style="font-size:15px; font-weight:bold;">Долг: ${debt} $</div>
+                <div class="debt-card ${paid ? 'strike' : ''}">
+                    <div style="flex:1;min-width:0;">
+                        <div class="debt-name">${name}</div>
+                        <div class="debt-sum">${fmtN(debt)} $</div>
+                        <div class="debt-meta">${monthly}$ в месяц${monthly > 0 && debt > 0 ? ` · тянуть ещё ${Math.ceil(debt / monthly)} мес.` : ''}</div>
+                        ${debt > 0 ? `<div class="debt-bar"><i style="width:${Math.round(debt / debtTotal * 100)}%"></i></div>` : ''}
                     </div>
                     ${!paid && debt > 0
-                        ? `<button onclick="send('${type}')" ${hasP?'disabled':''} class="btn btn-orange">Погасить</button>`
+                        ? `<button onclick="send('${type}')" ${hasP?'disabled':''} class="btn btn-debt">Погасить</button>`
                         : paid ? '<b style="color:#10b981; font-size:12px;">Выплачено</b>' : '<b style="color:#6b7280; font-size:12px;">Нет</b>'}
                 </div>
             `;
@@ -12702,6 +13045,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             app.innerHTML = `
                 <div class="blank-crest"><div class="bc"><b>VIA</b></div></div>
                 <div class="blank-tag">Игра жизни</div>
+                ${/* 🌍 ЭПОХА. Одно слово, без объяснений — человек сам свяжет, что в перегрев все в
+                      плюсе, а потом почему-то нет. Множителей эпохи он не видит никогда. */''}
+                ${(state.world && state.world.eraName) ? `<div class="era-line">Эпоха: <b>${state.world.eraName}</b></div>` : ''}
                 ${p.notify ? `<div style="background:linear-gradient(90deg,#10b981,#059669);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>${p.notify}</span><button onclick="clearNotify()" class="btn" style="background:#fff;color:#059669;flex:0 0 auto;">ОК</button></div>` : ''}
                 ${(Number(p.jail)||0)>0 ? `<div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fff;padding:16px 14px;border-radius:12px;margin-bottom:10px;text-align:center;border:2px solid #fca5a5;box-shadow:0 0 22px rgba(239,68,68,.45);">
                     <div style="font-size:22px;font-weight:900;letter-spacing:1px;">🔒 ТЫ В ТЮРЬМЕ</div>
@@ -12818,7 +13164,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                         `;
                                     }
                                     const _price = Number(a.price||0), _liab = Number(a.liab||0), _cf = Number(a.cf||0);
-                                    const _sale = Math.max(0, _price - _liab);
+                                    const _sale = assetSale(a);   // дело стоит 20 своих потоков
                                     const _typeLbl = a.type==='ESTATE'?'Недвижимость':a.type==='BUSINESS'?'Бизнес':'Актив';
                                     return `
                                         <div class="row-item" style="display:block; padding:12px;">
@@ -12836,8 +13182,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                             ${a.note?`<div style="font-size:11px; color:#fbbf24; margin-bottom:8px;">⚡ ${a.note}</div>`:''}
                                             ${bizLevel(a)?`<div style="font-size:11px;color:#efd8a3;margin-bottom:8px;">🏗️ Развит до ступени ${bizLevel(a)}/4${bizResist(a)?` · устойчивость ${bizResist(a)}%`:''}</div>`:''}
                                             <div style="display:flex;gap:7px;">
-                                            ${_cf>0?`<button onclick="openBizModal(${p.id},${p.assets.indexOf(a)})" class="btn" style="flex:1;padding:4px 12px;font-size:11px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">🏗️ Развить дело</button>`:''}
-                                            <button onclick="send('SELL_ASSET', {aId:${a.id}, title:'${a.title.replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-sell" style="flex:0 0 auto;padding:4px 12px; font-size:11px;">📤 Продать (${_sale}$)</button>
+                                            ${/* 🤝 доля в чужом деле: партнёр не владеет — не развивает и не продаёт */''}
+                                            ${a.partnerOf
+                                              ? `<div style="flex:1;font-size:11px;color:#9c988e;line-height:1.4;padding:3px 0;">🤝 Твоя доля в чужом деле. Развивает владелец — поток растёт и тебе.</div>`
+                                              : `${_cf>0?`<button onclick="openBizModal(${p.id},${p.assets.indexOf(a)})" class="btn" style="flex:1;padding:4px 12px;font-size:11px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">🏗️ Развить дело</button>`:''}
+                                            <button onclick="send('SELL_ASSET', {aId:${a.id}, sale:${_sale}, title:'${a.title.replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-sell" style="flex:0 0 auto;padding:4px 12px; font-size:11px;">📤 Продать (${_sale}$)</button>`}
                                             </div>
                                         </div>
                                     `;
@@ -12882,23 +13231,24 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         ${debtRow(p.isCC, 'Долг по кредитным карточкам', p.ccLeft, p.prof.ccPay, 'PAY_CC')}
                         ${debtRow(p.isR, 'Розничный долг', p.rLeft, p.prof.retailPay, 'PAY_RETAIL')}
                         ${p.bankLoan > 0 ? `
-                            <div class="row-item" style="border-color:#6366f1;">
-                                <div style="flex:1;">
-                                    <span style="font-size:11px; color:#a5b4fc;">Кредит банка · 10%/мес</span>
-                                    <div style="font-size:15px; font-weight:bold;">Долг: ${p.bankLoan} $</div>
+                            <div class="debt-card" style="border-color:rgba(217,184,119,.28);">
+                                <div style="flex:1;min-width:0;">
+                                    <div class="debt-name" style="color:var(--lx-gold);">Кредит банка · 10% в месяц</div>
+                                    <div class="debt-sum" style="color:var(--lx-gold-br);">${fmtN(p.bankLoan)} $</div>
+                                    <div class="debt-meta">Самый дорогой долг в игре — гасится целиком</div>
                                 </div>
-                                <button onclick="payBank()" ${hasP?'disabled':''} class="btn btn-orange">Погасить полностью</button>
+                                <button onclick="payBank()" ${hasP?'disabled':''} class="btn btn-debt-gold">Погасить</button>
                             </div>
                         ` : ''}
                     </div>
                 </div>
 
-                <div class="card" style="border-color:#6366f1; background:rgba(67,56,202,0.05);">
-                    <div class="block-title" style="color:#a5b4fc;">🏦 Взять кредит банка</div>
-                    <p style="font-size:12px; color:#9ca3af; margin-bottom:12px;">Доступно кратно $1000. Платёж = 10% от суммы (например, $5000 → $500/мес). После одобрения деньги поступят в кассу.</p>
+                <div class="card" style="border-color:var(--lx-gold-ln); background:linear-gradient(180deg,rgba(217,184,119,.05),transparent);">
+                    <div class="block-title" style="color:var(--lx-gold-br);">🏦 Взять кредит банка</div>
+                    <p style="font-size:12px; color:var(--lx-muted); margin-bottom:12px; line-height:1.55;">Занимать кратно 1000$. Каждый занятый доллар просит 10 центов в месяц — 5000$ превращаются в 500$ платежа. Деньги придут в кассу после одобрения ведущим.</p>
                     <div style="display:grid; grid-template-columns:1fr auto; gap:10px;">
                         <input type="number" id="loanAmount" placeholder="Сколько занять? ($1000, $2000, $5000...)" class="inp" step="1000" min="1000">
-                        <button onclick="reqLoan()" ${hasP?'disabled':''} class="btn btn-amber">Запросить кредит</button>
+                        <button onclick="reqLoan()" ${hasP?'disabled':''} class="btn btn-debt-gold" style="padding:10px 18px;">Запросить</button>
                     </div>
                 </div>
                 </div></details>
@@ -12908,7 +13258,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${(()=>{
                   const dt=(Number(p.mLeft)||0)+(Number(p.eLeft)||0)+(Number(p.aLeft)||0)+(Number(p.ccLeft)||0)+(Number(p.rLeft)||0)+(Number(p.bankLoan)||0);
                   const soulN=(p.soul5||[]).length;
-                  const c1=dt===0, c2=f.passive>=f.target, c3=soulN>=5, ready=c1&&c2&&c3;
+                  // 🕯️ Было «собери 5 карт души» — но карты приходят в основном ЗА ГРЕХИ (казино,
+                  // сделки, тень, эго). Выходило, что для двери надо нагрешить. Стало: свет
+                  // перевешивает тьму. Карты остаются зеркалом, но коллекционировать грехи невыгодно.
+                  const _w=soulWeight(p);
+                  const c1=dt===0, c2=f.passive>=f.target, c3=_w.light>_w.dark, ready=c1&&c2&&c3;
                   const cond=(ok,txt,val)=>`<div style="display:flex;align-items:center;gap:9px;padding:10px 0;border-top:1px solid var(--lx-line);"><span style="width:20px;font-size:15px;color:${ok?'#5cb08b':'#6d6a62'};">${ok?'✓':'○'}</span><span style="flex:1;font-size:13px;color:${ok?'#f3efe6':'#9c988e'};">${txt}</span><span style="font-family:ui-monospace,monospace;font-size:12px;color:${ok?'#5cb08b':'#cf9a9a'};">${val}</span></div>`;
                   return `<div class="card" style="border-color:${ready?'#10b981':'var(--lx-gold-ln)'};text-align:center;">
                     <div style="font-family:Georgia,serif;font-size:19px;font-weight:700;color:${ready?'#6ee7b7':'#efd8a3'};">🚪 Дверь на 2-й круг</div>
@@ -12916,7 +13270,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="text-align:left;">
                       ${cond(c1,'Закрой все долги',dt===0?'готово':fmtN(dt)+'$ осталось')}
                       ${cond(c2,'Пассив ≥ расходы ×'+WIN_MULT,fmtN(f.passive)+' / '+fmtN(f.target))}
-                      ${cond(c3,'Собери 5 карт души (см. вверху)',soulN+' / 5')}
+                      ${cond(c3,'Добра в тебе больше, чем тьмы',c3?'да':'пока нет')}
                     </div>
                     ${ready?`<div style="margin-top:12px;padding:11px;border-radius:10px;background:rgba(6,78,59,.22);border:1px solid #10b981;color:#6ee7b7;font-weight:800;font-size:13px;">🎉 ДВЕРЬ ОТКРЫТА — ты прошёл 1-й круг! Дальше твой выбор.</div>`:`<div style="margin-top:12px;font-size:11px;color:#9c988e;">Собери все три — и дверь наверх откроется.</div>`}
                   </div>`; })()}
@@ -12933,6 +13287,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderSdelkaModal()}
                 ${renderMarketModal()}
                 ${renderMedModal()}
+                ${renderRumorModal(p)}
                 ${renderCatPopup()}
                 ${renderSoulsInfo()}
                 ${renderCellLocked()}
@@ -13186,7 +13541,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const bet=Math.max(50,Math.round((Number(p.savings)||0)*0.1)); if(bet>p.savings) return;
             p.savings=Math.round((p.savings-bet)*100)/100;
             const st=pstat(p); st.casinoPlays++;
-            const roll=1+Math.floor(Math.random()*6); const mult=CASINO_PAYOUT[roll]||0;
+            let roll=1+Math.floor(Math.random()*6); const mult=casinoAdjust(p, CASINO_PAYOUT[roll]||0);
+            if(mult<=0 && (CASINO_PAYOUT[roll]||0)>0) roll=1+Math.floor(Math.random()*4);
             if(mult>0){ const win=Math.round(bet*mult*100)/100; p.savings=Math.round((p.savings+win)*100)/100;
                 st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(win-bet))*100)/100;
                 autoToast('🎰 '+p.name+' лудит: '+roll+' → +'+win+'$', '#a855f7'); }
@@ -14382,6 +14738,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                             <button onclick="buyDeal()" class="btn" style="background:#059669;color:#fff;font-weight:800;padding:8px 20px;">${btn}</button>
                             <button onclick="closeSdelkaModal()" class="btn btn-gray" style="padding:8px 20px;">Пропустить</button>
                         </div>
+                        ${/* 🤝 Партнёрство — только у настоящего бизнеса с потоком (не перепродажа, не ставка).
+                              Дело запишется на того, кто вытащил карту; партнёры дают деньги за долю потока. */''}
+                        ${(!isFlip && !isRisk && (Number(c.cf)||0)>0)?`<button onclick="openPartnerFromDeal()" class="btn" style="width:100%;margin-top:9px;padding:9px;font-weight:800;font-size:12.5px;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;">🤝 Партнёрство — позвать в долю (не тянешь один)</button>
+                        <div style="font-size:11px;color:#6d6a62;margin-top:6px;line-height:1.45;">Дело останется твоим, развивать сможешь только ты. Партнёры получат долю потока.</div>`:''}
                     </div>
                 </div>`;
             }
@@ -15329,7 +15689,30 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             state.players = state.players.map(p => {
                 if (p.id != d.pId) return p;
                 if (d.type === 'BUY_ASSET') p.assets.push({ ...d.details, id: Date.now() });
-                else if (d.type === 'SELL_ASSET') p.assets = p.assets.filter(a => a.id != d.details.aId);
+                else if (d.type === 'SELL_ASSET') {
+                    // 🐞 БАГ (Ринат 20июл): актив исчезал, а деньги за него НЕ приходили —
+                    // кнопка обещала «Продать (5000$)» и молча забирала дело даром.
+                    // Считаем сумму заново на месте одобрения (заявка могла ждать, поток вырасти).
+                    const _a = (p.assets||[]).find(a => a.id == d.details.aId);
+                    let _got = _a ? assetSale(_a) : (Number(d.details.sale)||0);
+                    // 🤝 продаётся дело с партнёрами: они скидывались — им и доля от продажи.
+                    // Их зеркала гаснут: потока больше нет, дела больше нет.
+                    const _mates = (_a && _a.mates) || [];
+                    if(_mates.length){
+                        const n=_mates.length+1, part=Math.round(_got/n);
+                        _mates.forEach(mt=>{
+                            const pl=(state.players||[]).find(x=>x.id==mt.id); if(!pl) return;
+                            pl.assets=(pl.assets||[]).filter(z=>z.srcAsset!=_a.id);
+                            pl.savings=Math.round(((Number(pl.savings)||0)+part)*100)/100;
+                            pl.notify='🤝 «'+(_a.title||'дело')+'» продано. Твоя доля от продажи: +'+fmtN(part)+'$.';
+                            save(pl.id);
+                        });
+                        _got = _got - part*_mates.length;
+                    }
+                    p.assets = p.assets.filter(a => a.id != d.details.aId);
+                    p.savings = Math.round(((Number(p.savings)||0) + _got) * 100) / 100;
+                    p.notify = '📤 Дело продано: +' + fmtN(_got) + '$ в кассу.';
+                }
                 else if (d.type === 'SELL_MARKET') {
                     const dd = d.details;
                     if (p.holdings && p.holdings[dd.assetId]) {
@@ -15725,7 +16108,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Чистый капитал = касса + портфель (акции) + активы (бизнес/недвижка − обязательства) − кредит.
         function pnetWorth(p){
             let v = (Number(p.savings)||0) + portfolioValue(p);
-            (p.assets||[]).forEach(a=>{ v += (Number(a.price)||0) - (Number(a.liab)||0); });
+            (p.assets||[]).forEach(a=>{ v += bizValue(a) - (Number(a.liab)||0); });   // дело = 20 потоков
             v -= (Number(p.bankLoan)||0);
             return Math.round(v);
         }

@@ -115,6 +115,234 @@ def pick_world_event():
     return {'id': int(time.time() * 1000), 'emoji': e[0], 'title': e[1], 'text': e[2],
             'fx': fx, 'fxtext': _fx_text(fx)}
 
+
+# ═══════════ 🌍 ЖИВОЙ МИР: ЭПОХИ И ЦЕПОЧКИ ═══════════
+# Спека: Desktop\VIA_WORLD_RUMORS_SPEC_2026_07_20.md
+# Ринат: «в мире же постоянно что-то происходит, а у нас мир вроде идёт — и ничего не происходит».
+# Было: плоский список, раз в круг берётся СЛУЧАЙНОЕ. Событие мигнуло и исчезло, из него ничего
+# не выросло. Стало: события идут ЦЕПОЧКАМИ (война → нефть → инфляция → ставка), а над ними стоит
+# ЭПОХА, которая решает, какие цепочки возможны и насколько сильно они бьют.
+# Механику доставки (apply_market_shock / apply_business_shock / broadcast) не трогаем.
+
+# Эпоха: (имя для экрана, множитель хороших новостей, множитель плохих).
+# В перегрев хорошее бьёт сильнее, а плохое приглушено — потому и кажется, что риска нет.
+ERAS = {
+    'growth':   ('Рост',             1.0, 1.0),
+    'overheat': ('Перегрев',         1.3, 0.7),
+    'crisis':   ('Кризис',           0.7, 1.4),
+    'recovery': ('Восстановление',   1.1, 0.9),
+}
+# Куда эпоха переходит дальше. Повторы в списке = вес, чтобы не выучили наизусть.
+ERA_NEXT = {
+    'growth':   ['overheat', 'overheat', 'crisis'],
+    'overheat': ['crisis', 'crisis', 'growth'],
+    'crisis':   ['recovery', 'recovery', 'crisis'],
+    'recovery': ['growth', 'growth', 'overheat'],
+}
+ERA_LEN = (3, 5)   # сколько кругов живёт эпоха
+
+# Цепочки. rumor — чем шепчут о СЛЕДУЮЩЕМ звене (карта «Слухи», см. спеку).
+CHAINS = [
+    {'k': 'rate', 'eras': ['overheat', 'crisis'],
+     'rumor': 'Поговаривают, ставку могут поднять — деньги подорожают.',
+     'links': [
+         ('🔔', 'ЦБ поднял ставку', 'Деньги дорогие — рисковые активы просели.',
+          {'stock': -0.05, 'crypto': -0.07, 'biz': -0.05}),
+         ('🏢', 'Компании режут расходы', 'Сокращения пошли по рынку.',
+          {'stock': -0.04, 'biz': -0.07}),
+         ('🏚️', 'Долги дорожают', 'Кто сидел в кредитах — тому тяжелее всех.',
+          {'biz': -0.04, 'stock': -0.02, 'metal': 0.03}),
+     ]},
+    {'k': 'oil', 'eras': ['growth', 'overheat', 'crisis', 'recovery'],
+     'rumor': 'На Ближнем Востоке неспокойно — топливо может рвануть.',
+     'links': [
+         ('🛢️', 'Скачок цен на нефть', 'Топливо дорожает — сырьё вверх, бизнес под давлением.',
+          {'commodity': 0.14, 'stock': -0.04, 'biz': -0.04}),
+         ('⚡', 'Энергия дорожает следом', 'Счета выросли у всех, кто что-то производит.',
+          {'commodity': 0.08, 'stock': -0.03, 'biz': -0.06}),
+         ('🌾', 'Продукты подорожали', 'Расходы выросли у всех — цепочка дошла до полки.',
+          {'commodity': 0.05, 'biz': -0.03}),
+     ]},
+    {'k': 'tech', 'eras': ['growth', 'overheat'],
+     'rumor': 'Ходят разговоры про новую технологию — деньги побегут туда.',
+     'links': [
+         ('💻', 'Технопрорыв', 'Крипта, IT и бизнесы на подъёме.',
+          {'crypto': 0.14, 'stock': 0.06, 'biz': 0.06}),
+         ('🪙', 'Крипто-лихорадка', 'Все скупают монеты — цена оторвалась от земли.',
+          {'crypto': 0.22, 'stock': 0.02, 'biz': 0.02}),
+         ('💥', 'Пузырь лопнул', 'Кто зашёл последним — тот и заплатил за всех.',
+          {'crypto': -0.25, 'stock': -0.05, 'biz': -0.02}),
+     ]},
+    {'k': 'crash', 'eras': ['crisis'],
+     'rumor': 'Говорят, у крупного банка дыра в балансе.',
+     'links': [
+         ('🌍', 'Мировой кризис', 'Экономика замедлилась — рынки и бизнесы падают у всех.',
+          {'stock': -0.10, 'crypto': -0.12, 'metal': 0.04, 'commodity': -0.05, 'biz': -0.08}),
+         ('🦠', 'Паника на рынках', 'Продают всё подряд, не разбирая.',
+          {'stock': -0.07, 'crypto': -0.09, 'metal': 0.06, 'biz': -0.05}),
+         ('🏦', 'Банки снизили ставки', 'Дешёвые деньги — экономику спасают.',
+          {'stock': 0.06, 'crypto': 0.05, 'biz': 0.05}),
+         ('📈', 'Восстановление пошло', 'Худшее позади — рынки поднимают голову.',
+          {'stock': 0.09, 'crypto': 0.08, 'biz': 0.09}),
+     ]},
+    {'k': 'build', 'eras': ['recovery', 'growth'],
+     'rumor': 'Слышно, государство заходит большими стройками.',
+     'links': [
+         ('🏗️', 'Строительный бум', 'Стройка тянет металлы, сырьё и бизнесы вверх.',
+          {'metal': 0.10, 'commodity': 0.08, 'stock': 0.03, 'biz': 0.06}),
+         ('🛒', 'Потребительский бум', 'Люди тратят — бизнесы в жирном плюсе.',
+          {'stock': 0.07, 'commodity': 0.03, 'biz': 0.10}),
+     ]},
+]
+
+
+# Чем шепчут ПЕРЕД следующим звеном. WHISPERS[k][i] — слух о звене номер (i+2).
+# Первое звено цепочки приходит БЕЗ предупреждения: первый удар всегда неожиданный.
+# А вот дальше люди уже начинают гадать, что будет — и вот тут появляется слух.
+WHISPERS = {
+    'rate':  ['Слышно, крупные компании готовят сокращения.',
+              'Говорят, обслуживать долги стало нечем — посыплются те, кто сидит в кредитах.'],
+    'oil':   ['Поговаривают, следом полетят счета за энергию.',
+              'Говорят, дорогая логистика вот-вот дойдёт до полки — продукты подорожают.'],
+    'tech':  ['Ходят разговоры, что в монеты заходят очень большие деньги.',
+              'Шепчут, что это пузырь и он вот-вот лопнет.'],
+    'crash': ['Говорят, начинается паника — скоро будут продавать всё подряд.',
+              'Слышно, банки готовят дешёвые деньги, чтобы спасти экономику.',
+              'Поговаривают, дно пройдено и рынки поднимут голову.'],
+    'build': ['Слышно, у людей появились деньги и они начали тратить.'],
+}
+RUMOR_TRUE_P   = 0.67   # примерно каждый третий слух пустой — иначе это не слух, а расписание
+RUMOR_CHECK_FEE = 0.05  # доля кассы за проверку («аналитика», свой человек)
+RUMOR_SPREAD_AMP = 1.25 # насколько сильнее бьёт событие, если слух разогнали
+
+
+def _portfolio_value(p):
+    """Сколько у игрока стоит портфель на бирже — от него считается сила решения по слуху."""
+    mkt = DATA.get('market') or {}
+    prices = {a.get('id'): float(a.get('price') or 0) for a in mkt.get('assets', [])}
+    total = 0.0
+    for aid, h in (p.get('holdings') or {}).items():
+        try:
+            total += float(h.get('qty') or 0) * prices.get(aid, 0)
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
+def publish_rumor(cdef, next_link):
+    """Слух о звене next_link (нумерация с 1). Треть слухов — пустые: текст берём у ЧУЖОЙ
+    цепочки, так что поверивший действует по неверной картине."""
+    idx = next_link - 2
+    whispers = WHISPERS.get(cdef['k']) or []
+    if idx < 0 or idx >= len(whispers):
+        DATA['rumor'] = None
+        return
+    is_true = random.random() < RUMOR_TRUE_P
+    if is_true:
+        text = whispers[idx]
+    else:
+        others = [w for k, ws in WHISPERS.items() if k != cdef['k'] for w in ws]
+        text = random.choice(others) if others else whispers[idx]
+    DATA['rumor'] = {'id': int(time.time() * 1000), 'text': text, 'true': is_true,
+                     'chain': cdef['k'], 'link': next_link, 'choices': {}, 'resolved': False}
+
+
+def resolve_rumor(r, fx):
+    """Звено наступило — разбираем, кто что выбрал. Вызывать ВНУТРИ LOCK, ДО применения шока."""
+    mag = max([abs(float(v)) for k, v in (fx or {}).items() if k != 'biz'] or [0.05])
+    is_true = bool(r.get('true'))
+    for p in DATA.get('players', []):
+        ch = (r.get('choices') or {}).get(str(p.get('id')))
+        if not ch or ch == 'wait':
+            continue                      # переждал — ничего не теряет и не получает
+        port = _portfolio_value(p)
+        if port <= 0:
+            port = max(0.0, float(p.get('savings') or 0)) * 0.5   # без портфеля — по кассе, мягче
+        delta = 0.0
+        if ch == 'believe':
+            delta = port * mag if is_true else -port * mag * 0.5
+        elif ch == 'check':
+            delta = port * mag * 0.5 if is_true else 0.0          # знал, что пусто — не полез
+        elif ch == 'spread':
+            delta = port * mag * RUMOR_SPREAD_AMP if is_true else -port * mag * 0.5
+            if not is_true:
+                # разогнал пустой слух, люди потеряли деньги, поверив тебе → в тьму (закон души)
+                p['betrayals'] = int(p.get('betrayals') or 0) + 1
+        delta = round(delta, 2)
+        if delta:
+            p['savings'] = round(float(p.get('savings') or 0) + delta, 2)
+        p['rumorResult'] = {'choice': ch, 'true': is_true, 'delta': delta}
+    r['resolved'] = True
+
+
+def era_now():
+    e = DATA.get('era')
+    if not isinstance(e, dict) or e.get('k') not in ERAS:
+        e = DATA['era'] = {'k': 'growth', 'left': random.randint(*ERA_LEN)}
+    e['name'] = ERAS[e['k']][0]
+    return e
+
+
+def era_tick():
+    """Эпоха прожила круг. Кончилась — переходим к следующей."""
+    e = era_now()
+    e['left'] = int(e.get('left') or 0) - 1
+    if e['left'] <= 0:
+        e['k'] = random.choice(ERA_NEXT.get(e['k'], ['growth']))
+        e['left'] = random.randint(*ERA_LEN)
+        e['name'] = ERAS[e['k']][0]
+
+
+def scale_fx(fx):
+    """Эпоха множит силу удара. Игрок этих множителей не видит никогда."""
+    _, pos, neg = ERAS.get(era_now()['k'], ERAS['growth'])
+    return {k: round(float(v) * (pos if float(v) > 0 else neg), 4) for k, v in (fx or {}).items()}
+
+
+def _chain_by_k(k):
+    for c in CHAINS:
+        if c['k'] == k:
+            return c
+    return None
+
+
+def next_world_event():
+    """Следующее ЗВЕНО цепочки вместо случайного события.
+    Цепочка кончилась (или её нет) — эпоха проживает круг и начинается новая цепочка,
+    разрешённая нынешней эпохой."""
+    ch = DATA.get('chain') if isinstance(DATA.get('chain'), dict) else None
+    cdef = _chain_by_k(ch['k']) if ch else None
+    if not cdef or int(ch.get('idx') or 0) >= len(cdef['links']):
+        era_tick()
+        k = era_now()['k']
+        pool = [c for c in CHAINS if k in c['eras']] or CHAINS
+        cdef = random.choice(pool)
+        ch = DATA['chain'] = {'k': cdef['k'], 'idx': 0}
+    i = int(ch.get('idx') or 0)
+    link = cdef['links'][i]
+    ch['idx'] = i + 1
+    fx = scale_fx(link[3] if len(link) > 3 else {})
+
+    # ─── СЛУХ ───
+    # 1) Был ли слух ПРО ЭТО звено — разбираем выборы (до применения шока).
+    r = DATA.get('rumor')
+    if (isinstance(r, dict) and not r.get('resolved')
+            and r.get('chain') == cdef['k'] and int(r.get('link') or 0) == i + 1):
+        if any(c == 'spread' for c in (r.get('choices') or {}).values()):
+            fx = {k: round(v * RUMOR_SPREAD_AMP, 4) for k, v in fx.items()}   # толпа усилила удар
+        resolve_rumor(r, fx)
+    # 2) Рождается слух о СЛЕДУЮЩЕМ звене. Кончилась цепочка — шептать больше не о чем.
+    if i + 1 < len(cdef['links']):
+        publish_rumor(cdef, i + 2)
+    else:
+        DATA['rumor'] = None
+
+    e = era_now()
+    return {'id': int(time.time() * 1000), 'emoji': link[0], 'title': link[1], 'text': link[2],
+            'fx': fx, 'fxtext': _fx_text(fx),
+            'era': e['k'], 'eraName': e['name'],
+            'chain': cdef['k'], 'link': i + 1, 'links': len(cdef['links'])}
+
 # 2026-05-31: PORT from env so it runs on any free cloud host (Render/Railway/etc.).
 # Locally still defaults to 8080. Cloud hosts inject $PORT.
 PORT = int(os.environ.get("PORT", 8080))
@@ -593,7 +821,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         n = len(b['order'])
                         tsa = int(b.get('turnsSinceAnchor', 0)) + 1
                         if tsa >= n:
-                            we = pick_world_event()
+                            we = next_world_event()
                             DATA['world'] = we
                             _fx = we.get('fx') or {}
                             apply_market_shock(_fx)                    # событие двигает биржу у всех
@@ -610,6 +838,40 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return
+        if self.path == '/world/rumor':
+            # Игрок выбрал, что делать со слухом: believe | check | wait | spread.
+            # Выбор ТИХИЙ — чужие решения не видны до наступления звена.
+            # «Проверить» стоит денег и СРАЗУ возвращает правду только этому игроку.
+            try:
+                req = json.loads(self.rfile.read(int(self.headers.get('Content-Length') or 0)) or b'{}')
+                pid = str(req.get('pid') or '')
+                choice = str(req.get('choice') or '')
+                if choice not in ('believe', 'check', 'wait', 'spread'):
+                    raise ValueError('неизвестный выбор')
+                with LOCK:
+                    r = DATA.get('rumor')
+                    if not isinstance(r, dict) or r.get('resolved'):
+                        self._send_json({'ok': False, 'reason': 'closed'}, 200)
+                        return
+                    if pid in (r.get('choices') or {}):
+                        self._send_json({'ok': False, 'reason': 'already'}, 200)
+                        return
+                    p = next((x for x in DATA.get('players', []) if str(x.get('id')) == pid), None)
+                    if p is None:
+                        self._send_json({'ok': False, 'reason': 'no_player'}, 200)
+                        return
+                    fee = 0
+                    if choice == 'check':
+                        fee = round(max(0.0, float(p.get('savings') or 0)) * RUMOR_CHECK_FEE, 2)
+                        p['savings'] = round(float(p.get('savings') or 0) - fee, 2)
+                    r.setdefault('choices', {})[pid] = choice
+                    save_data(DATA); broadcast()
+                # правду отдаём ТОЛЬКО тому, кто заплатил за проверку
+                self._send_json({'ok': True, 'fee': fee,
+                                 'truth': bool(r.get('true')) if choice == 'check' else None})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
         if self.path == '/world/draw':
             # Ведущий ВРУЧНУЮ тянет мировое событие с пульта («Событие круга»).
             # Раньше это делал клиент и двигал только p.assets — реальная биржа не двигалась
@@ -618,7 +880,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             # затем broadcast рассылает карту на все экраны (оверлей у игроков через SSE).
             try:
                 with LOCK:
-                    we = pick_world_event()
+                    we = next_world_event()
                     DATA['world'] = we
                     _fx = we.get('fx') or {}
                     apply_market_shock(_fx)                    # событие двигает биржу у всех
@@ -703,6 +965,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             deal = {'id': int(time.time() * 1000) % 10 ** 12, 'kind': 'partner', 'from': frm['id'],
                                     'fromName': frm.get('name', ''), 'to': targets, 'accepted': [],
                                     'amount': amount, 'cf': round(float(req.get('cf') or 0), 2),
+                                    'price': round(float(req.get('price') or amount), 2),
+                                    'liab': round(float(req.get('liab') or 0), 2),
                                     'title': str(req.get('title') or 'Общее дело')[:60],
                                     'status': 'pending', 'ts': time.time()}
                         else:
@@ -825,15 +1089,36 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             save_data(DATA); broadcast()
                             self._send_json({'ok': False, 'reason': 'partner_broke', 'who': broke}, 200)
                             return
-                        cf_share = round(float(d.get('cf') or 0) / len(crowd), 2)
+                        # ═══ ПАРТНЁРСТВО (правило Рината, 20 июл) ═══
+                        # Бизнес ОСТАЁТСЯ У ТОГО, КТО ОТСКАНИРОВАЛ карту и попросил помощи.
+                        # Партнёр НЕ владеет делом — он получает ТОЛЬКО долю пассива.
+                        # Развивать дело может лишь владелец; выросший поток идёт и партнёрам.
+                        cf_total = round(float(d.get('cf') or 0), 2)
+                        cf_share = round(cf_total / len(crowd), 2)
+                        owner = crowd[0]                      # инициатор = тот, кто тянул карту
+                        aid = int(time.time() * 1000) % 10 ** 12
+                        mates = [{'id': c['id'], 'name': c.get('name', ''), 'cf': cf_share}
+                                 for c in crowd[1:]]
                         for c in crowd:
                             c['savings'] = round(float(c.get('savings') or 0) - share, 2)
+                        # владельцу — само дело: полная цена, обязательства, право развивать.
+                        # Его пассив = только его доля; чужие доли висят в 'mates'.
+                        owner.setdefault('assets', []).append(
+                            {'id': aid, 'type': 'BUSINESS', 'title': d['title'],
+                             'cf': cf_share, 'cfTotal': cf_total, 'paid': share,
+                             'price': round(float(d.get('price') or d['amount']), 2),
+                             'liab': round(float(d.get('liab') or 0), 2), 'mates': mates})
+                        owner['notify'] = '🤝 «%s» — дело ТВОЁ. Вложил %s$, партнёров %d. Твой поток +%s$/мес, развивать можешь только ты.' % (
+                            d['title'], int(share), len(mates), int(cf_share))
+                        # партнёрам — зеркало: только поток, ни цены, ни права развивать
+                        for c in crowd[1:]:
                             c.setdefault('assets', []).append(
                                 {'id': int(time.time() * 1000) % 10 ** 12 + len(c.get('assets', [])),
-                                 'type': 'BUSINESS', 'title': '🤝 ' + d['title'], 'cf': cf_share,
-                                 'price': round(share, 2), 'liab': 0, 'partners': len(crowd)})
-                            c['notify'] = '🤝 Общее дело «%s»: вложил %s$, доля потока +%s$/мес. Партнёров: %d.' % (
-                                d['title'], int(share), int(cf_share), len(crowd))
+                                 'type': 'BUSINESS', 'title': '🤝 доля: ' + d['title'], 'cf': cf_share,
+                                 'price': 0, 'liab': 0, 'paid': share,
+                                 'partnerOf': owner['id'], 'srcAsset': aid, 'noDev': True})
+                            c['notify'] = '🤝 Ты в доле «%s»: вложил %s$, получаешь +%s$/мес. Дело у %s — развивает он, поток растёт и тебе.' % (
+                                d['title'], int(share), int(cf_share), owner.get('name', ''))
                         bump(*crowd)
                         d['status'] = 'done'
                         save_data(DATA); broadcast()
