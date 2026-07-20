@@ -10539,12 +10539,52 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Синхронный рендер+scrollTo браузер отрисовывает одним кадром — прыжка/рывка нет. Коалесценцию
         // с задержкой убрали: она отделяла мгновенную перерисовку действия от серверной → двойной кадр.
         // Мигание на тике рынка гасится отдельно — в applyServerData (перерисовка только если менялся не рынок).
+        // 🩹 ДЁРГАНЬЕ ЭКРАНА (Ринат, живой прогон 21 июл: «бланк дёргается то вверх, то вниз,
+        // когда они хором покупают»). Верно и сравнение с биржей: Бинанс не пересобирает страницу,
+        // он меняет только изменившиеся цифры. Мы же на КАЖДУЮ серверную рассылку сносили весь
+        // бланк и строили заново — на кадр высота схлопывалась, браузер подтягивал прокрутку к
+        // новому краю, код возвращал её назад. Отсюда рывок. Боты торгуют часто → трясло постоянно,
+        // причём даже когда в самом бланке ничего не менялось (тикали чужие цены).
+        //
+        // Два слоя лечения:
+        //  1) СЛЕПОК: если то, что видно на этом экране, не изменилось — DOM не трогаем ВООБЩЕ.
+        //     Тогда страница физически не может дёрнуться. Это и есть принцип биржи.
+        //  2) СКЛЕЙКА: не чаще одной перерисовки в RERENDER_MIN_MS — частые пуши сливаются в одну.
+        // Плюс прокрутку возвращаем ещё и следующим кадром: картинки встают на место ПОСЛЕ
+        // восстановления и иначе снова сдвигают страницу.
+        const RERENDER_MIN_MS = 500;
+        let _rrTimer = null, _rrLast = 0, _rrSig = '';
+        function viewSignature() {
+            try {
+                const b = state.board || {};
+                const base = state.view + '|' + b.turnIdx + '|' + (b.lastRoll||'') + '|' + buyWindowOpen()
+                           + '|' + ((state.world||{}).id||'') + '|' + ((state.rumor||{}).id||'')
+                           + '|' + (state.deals||[]).length + '|' + (state.p2p||[]).length;
+                if (state.view === 'player') {
+                    const me = (state.players||[]).find(x => x.id == state.currentPlayerId);
+                    return base + '|' + JSON.stringify(me || null) + '|' + JSON.stringify(b.positions||{});
+                }
+                return base + '|' + JSON.stringify(state.players || []);
+            } catch (e) { return String(Math.random()); }   // не смогли — рисуем, не рискуем
+        }
         function safeRerender() {
             const a = document.activeElement;
             if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) return;
+            const sig = viewSignature();
+            if (sig === _rrSig) { paintOverlays(); return; }   // видимое не изменилось — DOM не трогаем
+            const gap = Date.now() - _rrLast;
+            if (gap >= RERENDER_MIN_MS) { _rrLast = Date.now(); _rrNow(sig); return; }
+            if (_rrTimer) return;                              // перерисовка уже в очереди — не плодим
+            _rrTimer = setTimeout(() => {
+                _rrTimer = null; _rrLast = Date.now(); _rrNow(viewSignature());
+            }, RERENDER_MIN_MS - gap);
+        }
+        function _rrNow(sig) {
+            _rrSig = sig || viewSignature();
             const sx = window.scrollX, sy = window.scrollY;
             render();
             window.scrollTo(sx, sy);
+            requestAnimationFrame(() => window.scrollTo(sx, sy));
         }
 
         function save(meId) {
@@ -10755,7 +10795,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else if (state.view === 'serve') app.innerHTML = renderServe();   // 🕯️ ведущий выдаёт Служение
             app.setAttribute('data-view', state.view);
             restoreSecs(app);                         // раскрытое человеком остаётся раскрытым
-            if (_sameView) window.scrollTo(0, _sy);   // та же страница — держим позицию, не прыгаем
+            if (_sameView) {                          // та же страница — держим позицию, не прыгаем
+                window.scrollTo(0, _sy);
+                // и ещё раз следующим кадром: картинки/шрифты встают ПОСЛЕ и снова сдвигают страницу
+                requestAnimationFrame(() => { if (window.scrollY !== _sy) window.scrollTo(0, _sy); });
+            }
             updateDebugBar();
             paintOverlays();   // всплывающие окна рисуем в отдельный слой — их появление не пересобирает #app
         }
@@ -13600,6 +13644,23 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             await _asPlayer(p, ()=>{ doCharity(amt); });
             autoToast('🕯️ '+p.name+' отдал '+fmtN(amt)+'$ на благотворительность', '#efd8a3');
         }
+        // 🏢 покупка дела — настоящий buyDeal из карты крупных сделок.
+        // Без этого боты копили миллионы с нулём активов, и развитие/продажа/партнёрство
+        // работали вхолостую (поймано живым прогоном 21 июл: у всех 8 игроков активов 0).
+        async function autoBuyDeal(p){
+            if((p.assets||[]).length >= 4) return;                  // не превращаем бота в коллекционера
+            const deck=(typeof SDELKI_BIG!=='undefined'&&SDELKI_BIG.length)
+                       ? SDELKI_BIG.filter(x=>x.k==='business'&&(Number(x.cf)||0)>0) : [];
+            if(!deck.length) return;
+            const c=_rnd(deck);
+            if((Number(p.savings)||0) < Number(c.price)) return;
+            await _asPlayer(p, ()=>{
+                state.sdelkaModal={pId:p.id, drawn:{kind:'business', card:c}};
+                buyDeal();
+                state.sdelkaModal=null;
+            });
+            autoToast('🏢 '+p.name+' купил «'+c.t+'» за '+fmtN(c.price)+'$', '#5cb08b');
+        }
         // 🏗️ развитие дела — весь настоящий путь: ступень → бюджет → четыре карты → тянем одну
         async function autoDevelopBiz(p){
             const idx=(p.assets||[]).findIndex(a=>a && !a.partnerOf && (Number(a.cf)||0)>0);
@@ -13688,9 +13749,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         // Что бот делает помимо клетки. Веса подобраны так, чтобы за прогон было потрогано ВСЁ.
         const AUTO_ACTS=[
-            [autoRumor,       28], [autoDevelopBiz, 16], [autoCharity,   10],
-            [autoLoan,        10], [autoInbox,      16], [autoPartner,    8],
-            [autoSlot,         8], [autoSellAsset,   4], [autoBuyClosed,  6],
+            [autoRumor,       26], [autoBuyDeal,    20], [autoDevelopBiz, 16],
+            [autoInbox,       14], [autoCharity,     8], [autoLoan,        8],
+            [autoPartner,      8], [autoSlot,        6], [autoSellAsset,   4],
+            [autoBuyClosed,    5],
         ];
         async function autoAction(p){
             const tot=AUTO_ACTS.reduce((s,x)=>s+x[1],0);
