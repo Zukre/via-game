@@ -13565,6 +13565,138 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(buyWindowOpen()){ await autoBuyStock(pp); return; }
             if(pp.allow){ autoResolveCard(pp, pp.allow); return; }
         }
+        // ═══════════ 🤖 БОТЫ, УМЕЮЩИЕ ВСЁ ═══════════
+        // Задача Рината: «механика должна работать как сердце, без сбоев и пробоев — пусть боты
+        // тестируют ВСЁ, что есть в игре». Раньше боты умели кубик + акции + казино ≈ четверть игры,
+        // и прогон врал, что всё чисто.
+        //
+        // ГЛАВНЫЙ ПРИНЦИП: бот ходит по НАСТОЯЩИМ функциям игры (doCharity, chooseBizBudget,
+        // pickBizCard, sendPartner, rumorChoose…), а не по упрощённым копиям. Иначе мы тестируем
+        // не игру, а свои дубликаты. Ради этого на время прогона глушим confirm/alert — иначе
+        // каждый шаг замирал бы на модальном окне браузера.
+        let _autoDlg=null;
+        function autoDialogsOff(){
+            if(_autoDlg) return;
+            _autoDlg={c:window.confirm, a:window.alert};
+            window.confirm=()=>true;                                  // бот всегда соглашается
+            window.alert=(m)=>autoToast('💬 '+String(m).split('\n')[0].slice(0,90), '#64748b');
+        }
+        function autoDialogsOn(){
+            if(!_autoDlg) return;
+            window.confirm=_autoDlg.c; window.alert=_autoDlg.a; _autoDlg=null;
+        }
+        const _rnd=(a)=>a[Math.floor(Math.random()*a.length)];
+        // Бот «садится за свой бланк»: половина функций игры работает от currentPlayerId.
+        async function _asPlayer(p, fn){
+            const keep=state.currentPlayerId;
+            state.currentPlayerId=p.id;
+            try{ await fn(); }catch(e){ autoToast('⚠️ '+p.name+': '+e.message, '#ef4444'); console.warn('bot',p.name,e); }
+            state.currentPlayerId=keep;
+        }
+        // 🕯️ благотворительность — настоящий doCharity
+        async function autoCharity(p){
+            const amt=Math.max(100, Math.round((Number(p.savings)||0)*0.05));
+            if(amt>(Number(p.savings)||0)) return;
+            await _asPlayer(p, ()=>{ doCharity(amt); });
+            autoToast('🕯️ '+p.name+' отдал '+fmtN(amt)+'$ на благотворительность', '#efd8a3');
+        }
+        // 🏗️ развитие дела — весь настоящий путь: ступень → бюджет → четыре карты → тянем одну
+        async function autoDevelopBiz(p){
+            const idx=(p.assets||[]).findIndex(a=>a && !a.partnerOf && (Number(a.cf)||0)>0);
+            if(idx<0) return;
+            const a=p.assets[idx];
+            const u=BIZ_UPGRADES.find(x=>x.lvl===bizLevel(a)); if(!u) return;
+            if((Number(p.savings)||0) < u.min) return;
+            const amt=Math.min(Math.floor(Number(p.savings)||0), u.min*_rnd([1,1,2,5,10]));
+            await _asPlayer(p, async ()=>{
+                doBizUpgrade(p.id, idx, u.k); render();
+                setBizAmt(amt); chooseBizBudget(); render();
+                await sleep(250);
+                if(state.bizDraw){ pickBizCard(Math.floor(Math.random()*4)); render(); await sleep(250); closeBizDraw(); }
+            });
+            autoToast('🏗️ '+p.name+' вложил '+fmtN(amt)+'$ в «'+u.t+'»', '#efd8a3');
+        }
+        // 🤝 партнёрство — из окна отсканированной сделки, как у живого игрока
+        async function autoPartner(p){
+            const others=p2pOthers(p); if(!others.length) return;
+            // берём НАСТОЯЩУЮ карту из колоды крупных сделок — ту же, что вытянул бы живой игрок
+            const deck=(typeof SDELKI_BIG!=='undefined'&&SDELKI_BIG.length)
+                       ? SDELKI_BIG.filter(x=>x.k==='business'&&(Number(x.cf)||0)>0) : [];
+            const c=deck.length?_rnd(deck):{e:'🍔',t:'Сеть кафе',price:5500,cf:700,liab:2800,val:5500};
+            if(!((Number(c.cf)||0)>0)) return;
+            const n=2, share=Math.round(c.price/n);
+            if(share>(Number(p.savings)||0)) return;
+            await _asPlayer(p, async ()=>{
+                state.sdelkaModal={pId:p.id, drawn:{kind:'business', card:c}};
+                openPartnerFromDeal();
+                if(state.partnerModal){ state.partnerModal.picked=[_rnd(others).id]; await sendPartner(p.id); }
+                state.sdelkaModal=null; state.partnerModal=null;
+            });
+            autoToast('🤝 '+p.name+' зовёт в долю «'+c.t+'»', '#b98a3e');
+        }
+        // 💰 заём игрок↔игрок + встречное согласие: проверяем обе стороны денежного моста
+        async function autoLoan(p){
+            const others=p2pOthers(p).filter(x=>(Number(x.savings)||0)>0); if(!others.length) return;
+            const to=_rnd(others), amt=Math.max(200, Math.round((Number(p.savings)||0)*0.1));
+            if(amt>(Number(p.savings)||0)) return;
+            const r=await p2pCall('create',{kind:'loan',from:p.id,to:[to.id],amount:amt,pct:10});
+            if(r&&r.ok){ autoToast('💰 '+p.name+' даёт в долг '+fmtN(amt)+'$ → '+to.name, '#5cb08b'); }
+        }
+        // отвечаем на входящие предложения — иначе p2p копится и ничего не проверяет
+        async function autoInbox(p){
+            const inb=p2pInbox(p); if(!inb.length) return;
+            const d=inb[0];
+            await p2pRespond(d.id, p.id, Math.random()<0.75);          // чаще соглашаемся
+            autoToast('📨 '+p.name+' ответил на предложение', '#8fb3e0');
+        }
+        // 📤 продажа дела — заявка ведущему (проверяем очередь и зачисление денег)
+        async function autoSellAsset(p){
+            const a=(p.assets||[]).find(x=>x && !x.partnerOf); if(!a) return;
+            await _asPlayer(p, ()=>{ send('SELL_ASSET',{aId:a.id, sale:assetSale(a), title:String(a.title||'Дело')}); });
+            autoToast('📤 '+p.name+' продаёт «'+(a.title||'дело')+'»', '#cf9a9a');
+        }
+        // 🗞️ решение по слуху — настоящий rumorChoose
+        async function autoRumor(p){
+            const r=state.rumor; if(!r || r.resolved) return;
+            if((r.choices||{})[String(p.id)]) return;
+            const ch=_rnd(['believe','believe','check','wait','spread']);
+            await rumorChoose(p.id, ch);
+            autoToast('🗞️ '+p.name+' по слуху: '+ch, '#8fb3e0');
+        }
+        // 🎰 слот — тот же расчёт, что у живого (включая затухание казино)
+        function autoSlot(p){
+            const bet=Math.max(50, Math.round((Number(p.savings)||0)*0.05));
+            if(bet>(Number(p.savings)||0)) return;
+            p.savings=Math.round((p.savings-bet)*100)/100;
+            const st=pstat(p); st.casinoPlays++;
+            let out=null, r=Math.random(), cum=0;
+            for(const t of SLOT_TIERS){ cum+=t.p; if(r<cum){ out=t; break; } }
+            if(out){ const m=casinoAdjust(p,out.m); out = m>0?{s:out.s,m:m}:null; }
+            if(out){ const pay=Math.round(bet*out.m*100)/100;
+                p.savings=Math.round((p.savings+pay)*100)/100;
+                st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(pay-bet))*100)/100;
+                autoToast('🎰 '+p.name+' слот: '+out.s+' ×'+out.m+' → +'+fmtN(pay)+'$', '#a855f7'); }
+            else { st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
+                autoToast('🎰 '+p.name+' слот: мимо → −'+fmtN(bet)+'$', '#ef4444'); }
+            save(p.id);
+        }
+        // 🛒 намеренная попытка купить при ЗАКРЫТОЙ бирже — проверяем, что блок держит
+        async function autoBuyClosed(p){
+            if(buyWindowOpen()) return;
+            await autoBuyStock(p);                                     // должно молча не пройти
+            autoToast('🔒 '+p.name+' ткнулся в закрытую биржу', '#6b7280');
+        }
+        // Что бот делает помимо клетки. Веса подобраны так, чтобы за прогон было потрогано ВСЁ.
+        const AUTO_ACTS=[
+            [autoRumor,       28], [autoDevelopBiz, 16], [autoCharity,   10],
+            [autoLoan,        10], [autoInbox,      16], [autoPartner,    8],
+            [autoSlot,         8], [autoSellAsset,   4], [autoBuyClosed,  6],
+        ];
+        async function autoAction(p){
+            const tot=AUTO_ACTS.reduce((s,x)=>s+x[1],0);
+            let r=Math.random()*tot;
+            for(const [fn,w] of AUTO_ACTS){ if((r-=w)<0){ await fn(p); return; } }
+        }
         let _autoTimer=null;
         async function autoStep(){
             if(!state.autoPlay || !state.autoPlay.on) return;
@@ -13577,7 +13709,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     else {
                         const val=1+Math.floor(Math.random()*6);
                         try{ await fetch('/turn/roll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid,value:val})}); }catch(e){}
-                        await sleep(speed*0.6); await autoResolveCell(pid); await sleep(speed*0.4); boardNext();
+                        await sleep(speed*0.5); await autoResolveCell(pid);
+                        await sleep(speed*0.3); await autoAction(p);    // 🤖 бот пользуется всей игрой
+                        await sleep(speed*0.2); boardNext();
                     }
                 } else { boardNext(); }
             }
@@ -13586,8 +13720,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function toggleAutoPlay(){
             state.autoPlay=state.autoPlay||{on:false,speed:2500};
             state.autoPlay.on=!state.autoPlay.on; render();
-            if(state.autoPlay.on){ autoToast('🤖 Автопрогон ботов запущен', '#3b82f6'); autoStep(); }
-            else { autoToast('⏸ Автопрогон остановлен', '#6b7280'); if(_autoTimer) clearTimeout(_autoTimer); }
+            if(state.autoPlay.on){ autoDialogsOff(); autoToast('🤖 Автопрогон ботов запущен — трогают ВСЮ игру', '#3b82f6'); autoStep(); }
+            else { autoDialogsOn(); autoToast('⏸ Автопрогон остановлен', '#6b7280'); if(_autoTimer) clearTimeout(_autoTimer); }
         }
         function setAutoSpeed(ms){ state.autoPlay=state.autoPlay||{on:false,speed:2500}; state.autoPlay.speed=Number(ms)||2500; render(); }
 
