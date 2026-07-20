@@ -10787,14 +10787,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const _openSecs = new Set();
         function secKey(d){ const s = d.querySelector('summary'); return s ? s.textContent.trim().slice(0, 60) : ''; }
         // toggle не всплывает, поэтому слушаем на перехвате
+        // 🩹 (Ринат 21 июл: «открываю окно посмотреть — оно само закрывается»). Раньше помнили
+        // ТОЛЬКО разделы с меткой .sec — а на пульте ведущего окна без неё, и каждая перерисовка
+        // их складывала. Теперь помним ЛЮБОЕ раскрытое окно: закрывается только рукой человека.
         document.addEventListener('toggle', e => {
             const d = e.target;
-            if(!(d instanceof HTMLDetailsElement) || !d.classList.contains('sec')) return;
+            if(!(d instanceof HTMLDetailsElement)) return;
             const k = secKey(d); if(!k) return;
             if(d.open) _openSecs.add(k); else _openSecs.delete(k);
         }, true);
         function restoreSecs(root){
-            (root || document).querySelectorAll('details.sec').forEach(d => {
+            (root || document).querySelectorAll('details').forEach(d => {
                 const k = secKey(d);
                 if(k && _openSecs.has(k) && !d.open) d.open = true;
             });
@@ -11693,8 +11696,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p=state.players.find(x=>x.id==m.pId); if(!p) return;
             const a=(p.assets||[])[m.idx]; if(!a) return;
             const u=BIZ_UPGRADES.find(x=>x.k===m.key); if(!u) return;
+            // 🐞 (живой прогон 21 июл: развитие бизнеса — НОЛЬ за всю партию, хотя дела есть у всех).
+            // Сумма читалась ТОЛЬКО из поля ввода, а поле существует лишь когда открыт экран игрока.
+            // Боты ходят с пульта ведущего — окна нет, поле не найдено, сумма 0, ступень не проходит,
+            // и всё молча заканчивалось ничем. Живого это тоже касалось бы при фоновой перерисовке.
+            // Берём сумму из состояния (её ставит setBizAmt), поле ввода — только если оно есть.
             const el=document.getElementById('bizAmt');
-            const amt=Math.floor(Number(el&&el.value)||0);
+            const amt=Math.floor(Number((el && el.value) || m.amt || 0));
             if(amt < u.min){ alert('Минимальный вход в «'+u.t+'» — '+fmtN(u.min)+'$.'); return; }
             if((Number(p.savings)||0) < amt){ alert('Не хватает кассы: у тебя '+fmtN(Math.round(Number(p.savings)||0))+'$.'); return; }
             // деньги уходят СРАЗУ — как в жизни: заплатил, а результат ещё неизвестен
