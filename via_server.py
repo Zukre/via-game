@@ -408,6 +408,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                     if _fp in srv_prev: rec[_fp] = srv_prev[_fp]
                                 for _fl in ('mLeft','eLeft','aLeft','ccLeft','rLeft'):
                                     if _fl in srv_prev: rec[_fl] = srv_prev[_fl]
+                                # 🔒 СЕРВЕР-АВТОРИТЕТ по сделкам игрок↔игрок (#23/#24). Реестр займов игрок
+                                # никогда не правит сам — он меняется только эндпоинтами /p2p/*.
+                                rec['p2pDebts'] = srv_prev.get('p2pDebts', rec.get('p2pDebts') or [])
+                                rec['p2pLoans'] = srv_prev.get('p2pLoans', rec.get('p2pLoans') or [])
+                                # ⚠️ ГОНКА КАССЫ: перевод денег между игроками происходит на сервере, а бланк
+                                # получателя мог сняться ДО перевода — его save затёр бы пришедшие деньги.
+                                # p2pSeq растёт при каждом движении денег по p2p; снимок со старым seq
+                                # признаём устаревшим и кассу берём серверную.
+                                _srv_seq = int(srv_prev.get('p2pSeq') or 0)
+                                if int(rec.get('p2pSeq') or 0) < _srv_seq:
+                                    rec['savings'] = srv_prev.get('savings', rec.get('savings'))
+                                    rec['assets'] = srv_prev.get('assets', rec.get('assets'))
+                                rec['p2pSeq'] = _srv_seq
                             cur[me] = rec                   # апсерт только своего бланка
                         DATA['players'] = list(cur.values())
                         # заявки — аддитивно по id (добавить новые / обновить свои), не удаляем
@@ -425,6 +438,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             'market': DATA.get('market'),   # рынок не трогаем при апдейте бланков
                             'world': new.get('world', DATA.get('world')),  # мировое событие — broadcast всем
                             'board': DATA.get('board'),     # ⚠️ СОХРАНЯЕМ поле! иначе sync создаст пустое и все шашки прыгнут на старт
+                            'p2p': DATA.get('p2p', []),     # ⚠️ и реестр сделок игрок↔игрок — иначе запись ведущего сносит все займы
                         }
                     sync_board_roster()   # держим поле в согласии с ростером игроков
                     save_data(DATA)
@@ -640,6 +654,193 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     save_data(DATA)
                     broadcast()
                 self._send_json({'ok': True, 'cost': cost, 'pot': pot})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path.startswith('/p2p/'):
+            # ═══ ИГРОК ↔ ИГРОК (Ринат 19июл, задачи #23/#24): займы под % и партнёрство «скинуться на бизнес».
+            # ВСЯ логика денег — здесь, на сервере, под LOCK. Клиент только рисует и шлёт намерение:
+            # иначе две касс[ы] правятся на двух телефонах одновременно и деньги множатся из воздуха
+            # (ровно этот класс багов чинили 18 июл сервер-авторитетом по кредитам/долгам).
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw)
+                action = self.path[5:]
+                with LOCK:
+                    deals = DATA.setdefault('p2p', [])
+                    players = DATA['players']
+                    def find(pid):
+                        return next((p for p in players if p.get('id') == pid), None)
+                    def bump(*ps):
+                        """Пометить, что касса игрока изменена сервером — устаревший снимок бланка её не затрёт."""
+                        for _p in ps:
+                            if _p is not None:
+                                _p['p2pSeq'] = int(_p.get('p2pSeq') or 0) + 1
+
+                    if action == 'create':
+                        kind = req.get('kind')            # 'loan' | 'partner'
+                        frm = find(req.get('from'))
+                        if frm is None:
+                            raise ValueError('автор не найден')
+                        amount = round(float(req.get('amount') or 0), 2)
+                        if amount <= 0:
+                            raise ValueError('сумма должна быть больше нуля')
+                        targets = [t for t in (req.get('to') or []) if find(t) is not None]
+                        if not targets:
+                            raise ValueError('не выбран ни один игрок')
+                        if kind == 'loan':
+                            # Заём: деньги даёт АВТОР. Проверяем его кассу уже сейчас, чтобы не обещать пустое.
+                            pct = max(0, min(20, int(req.get('pct') or 0)))
+                            if float(frm.get('savings') or 0) < amount:
+                                self._send_json({'ok': False, 'reason': 'not_enough'}, 200)
+                                return
+                            deal = {'id': int(time.time() * 1000) % 10 ** 12, 'kind': 'loan', 'from': frm['id'],
+                                    'fromName': frm.get('name', ''), 'to': targets[:1], 'accepted': [],
+                                    'amount': amount, 'pct': pct, 'status': 'pending', 'ts': time.time()}
+                        elif kind == 'partner':
+                            # Партнёрство: складываемся на дело. amount = ПОЛНАЯ цена, доля = поровну на всех.
+                            deal = {'id': int(time.time() * 1000) % 10 ** 12, 'kind': 'partner', 'from': frm['id'],
+                                    'fromName': frm.get('name', ''), 'to': targets, 'accepted': [],
+                                    'amount': amount, 'cf': round(float(req.get('cf') or 0), 2),
+                                    'title': str(req.get('title') or 'Общее дело')[:60],
+                                    'status': 'pending', 'ts': time.time()}
+                        else:
+                            raise ValueError('неизвестный тип сделки')
+                        deals.append(deal)
+                        # держим список коротким — старьё игре не нужно
+                        if len(deals) > 60:
+                            del deals[:len(deals) - 60]
+                        save_data(DATA); broadcast()
+                        self._send_json({'ok': True, 'id': deal['id']})
+                        return
+
+                    if action == 'repay':
+                        # ВОЗВРАТ ЗАЙМА (частичный или полный). Считает сервер — по своему реестру,
+                        # чтобы должник не мог «погасить» долг правкой своего бланка.
+                        borrower = find(req.get('pid'))
+                        if borrower is None:
+                            raise ValueError('игрок не найден')
+                        debt = next((x for x in borrower.get('p2pDebts', []) if x.get('id') == req.get('id')), None)
+                        if debt is None:
+                            raise ValueError('такого долга нет')
+                        lender = find(debt['toId'])
+                        if lender is None:
+                            raise ValueError('кредитор вышел из игры')
+                        left = round(float(debt.get('due') or 0), 2)
+                        pay = round(float(req.get('amount') or left), 2)
+                        pay = max(0.0, min(pay, left))
+                        if pay <= 0:
+                            raise ValueError('нечего возвращать')
+                        if float(borrower.get('savings') or 0) < pay:
+                            self._send_json({'ok': False, 'reason': 'not_enough', 'left': left}, 200)
+                            return
+                        borrower['savings'] = round(float(borrower.get('savings') or 0) - pay, 2)
+                        lender['savings'] = round(float(lender.get('savings') or 0) + pay, 2)
+                        left = round(left - pay, 2)
+                        debt['due'] = left
+                        loan = next((x for x in lender.get('p2pLoans', []) if x.get('id') == req.get('id')), None)
+                        if loan is not None:
+                            loan['due'] = left
+                        if left <= 0.01:
+                            borrower['p2pDebts'] = [x for x in borrower.get('p2pDebts', []) if x.get('id') != req.get('id')]
+                            lender['p2pLoans'] = [x for x in lender.get('p2pLoans', []) if x.get('id') != req.get('id')]
+                            borrower['notify'] = '✅ Долг перед %s закрыт полностью.' % lender.get('name', '')
+                            lender['notify'] = '✅ %s вернул долг полностью: +%s$.' % (borrower.get('name', ''), int(pay))
+                        else:
+                            borrower['notify'] = '💸 Вернул %s$ игроку %s. Осталось: %s$.' % (int(pay), lender.get('name', ''), int(left))
+                            lender['notify'] = '💰 %s вернул %s$. Осталось за ним: %s$.' % (borrower.get('name', ''), int(pay), int(left))
+                        bump(lender, borrower)
+                        save_data(DATA); broadcast()
+                        self._send_json({'ok': True, 'left': left})
+                        return
+
+                    d = next((x for x in deals if x.get('id') == req.get('id')), None)
+                    if d is None:
+                        raise ValueError('сделка не найдена')
+
+                    if action == 'cancel':
+                        if d.get('status') == 'pending':
+                            d['status'] = 'cancelled'
+                            save_data(DATA); broadcast()
+                        self._send_json({'ok': True})
+                        return
+
+                    if action == 'respond':
+                        pid = req.get('pid')
+                        if d.get('status') != 'pending':
+                            self._send_json({'ok': False, 'reason': 'closed'}, 200)
+                            return
+                        if pid not in d.get('to', []):
+                            raise ValueError('эта сделка не тебе')
+                        if not req.get('accept'):
+                            d['status'] = 'declined'
+                            save_data(DATA); broadcast()
+                            self._send_json({'ok': True, 'declined': True})
+                            return
+
+                        lender = find(d['from'])
+                        if lender is None:
+                            raise ValueError('автор сделки вышел из игры')
+
+                        if d['kind'] == 'loan':
+                            borrower = find(pid)
+                            amount, pct = d['amount'], d['pct']
+                            if float(lender.get('savings') or 0) < amount:
+                                d['status'] = 'failed'
+                                save_data(DATA); broadcast()
+                                self._send_json({'ok': False, 'reason': 'lender_broke'}, 200)
+                                return
+                            lender['savings'] = round(float(lender.get('savings') or 0) - amount, 2)
+                            borrower['savings'] = round(float(borrower.get('savings') or 0) + amount, 2)
+                            due = round(amount * (1 + pct / 100.0), 2)
+                            borrower.setdefault('p2pDebts', []).append(
+                                {'id': d['id'], 'toId': lender['id'], 'toName': lender.get('name', ''),
+                                 'amount': amount, 'pct': pct, 'due': due})
+                            lender.setdefault('p2pLoans', []).append(
+                                {'id': d['id'], 'fromId': borrower['id'], 'fromName': borrower.get('name', ''),
+                                 'amount': amount, 'pct': pct, 'due': due})
+                            d['status'] = 'done'; d['accepted'] = [pid]
+                            bump(lender, borrower)
+                            borrower['notify'] = '🤝 %s дал тебе в долг %s$ под %d%%. Вернуть: %s$.' % (
+                                lender.get('name', ''), int(amount), pct, int(due))
+                            lender['notify'] = '🤝 %s взял твой заём %s$ под %d%%.' % (borrower.get('name', ''), int(amount), pct)
+                            save_data(DATA); broadcast()
+                            self._send_json({'ok': True})
+                            return
+
+                        # ПАРТНЁРСТВО: копим согласия. Как только согласились все — списываем доли и заводим общее дело.
+                        if pid not in d['accepted']:
+                            d['accepted'].append(pid)
+                        if len(d['accepted']) < len(d['to']):
+                            save_data(DATA); broadcast()
+                            self._send_json({'ok': True, 'waiting': len(d['to']) - len(d['accepted'])})
+                            return
+                        crowd = [lender] + [find(x) for x in d['accepted']]
+                        crowd = [c for c in crowd if c is not None]
+                        share = round(d['amount'] / len(crowd), 2)
+                        broke = [c.get('name', '') for c in crowd if float(c.get('savings') or 0) < share]
+                        if broke:
+                            d['status'] = 'failed'
+                            save_data(DATA); broadcast()
+                            self._send_json({'ok': False, 'reason': 'partner_broke', 'who': broke}, 200)
+                            return
+                        cf_share = round(float(d.get('cf') or 0) / len(crowd), 2)
+                        for c in crowd:
+                            c['savings'] = round(float(c.get('savings') or 0) - share, 2)
+                            c.setdefault('assets', []).append(
+                                {'id': int(time.time() * 1000) % 10 ** 12 + len(c.get('assets', [])),
+                                 'type': 'BUSINESS', 'title': '🤝 ' + d['title'], 'cf': cf_share,
+                                 'price': round(share, 2), 'liab': 0, 'partners': len(crowd)})
+                            c['notify'] = '🤝 Общее дело «%s»: вложил %s$, доля потока +%s$/мес. Партнёров: %d.' % (
+                                d['title'], int(share), int(cf_share), len(crowd))
+                        bump(*crowd)
+                        d['status'] = 'done'
+                        save_data(DATA); broadcast()
+                        self._send_json({'ok': True, 'share': share, 'partners': len(crowd)})
+                        return
+
+                    raise ValueError('неизвестное действие')
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return

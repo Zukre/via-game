@@ -80,6 +80,11 @@
         .btn-orange { background: #ea580c; color: white; font-size: 11px; text-transform: uppercase; padding: 6px 12px; }
         .btn-gray { background: var(--lx-panel); color: var(--lx-text); border:1px solid var(--lx-line); }
         .btn-gray:hover { border-color: var(--lx-gold-ln); color: var(--lx-gold-br); filter:none; }
+        /* Люкс-кнопки покупки/продажи (Ринат 19июл: старые зелёные/оранжевые стрёмные) */
+        .btn-buy { background: rgba(217,184,119,.09); color: var(--lx-gold-br); border:1px solid var(--lx-gold-ln); font-weight:800; }
+        .btn-buy:hover { background: rgba(217,184,119,.18); border-color: var(--lx-gold); color:#f6e6b8; filter:none; }
+        .btn-sell { background: rgba(207,154,154,.08); color: var(--lx-rose); border:1px solid rgba(207,154,154,.32); font-weight:800; }
+        .btn-sell:hover { background: rgba(207,154,154,.16); border-color: var(--lx-rose); filter:none; }
         .btn:hover { filter: brightness(1.08); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -10544,17 +10549,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         let lastSavedId = null;   // чей бланк защищён от затирания на 2.2с (null = полная запись ведущего)
         let _lastNonMarket = '';   // слепок всего КРОМЕ цен рынка — чтобы тик рынка не мигал бланком ведущего
         let _ackedDeals = new Set();   // id заявок, которые сервер УЖЕ показывал — если потом исчезли, значит ведущий их закрыл (не воскрешать)
-        function applyServerData(txt) {
-            if (!txt || txt === lastServerData) return;
+        // force=true — ЖЁСТКО принять серверную картину, минуя 2.2-секундную защиту своей записи.
+        // Нужен после сделок игрок↔игрок: деньги двигал сервер, и защита «своего бланка» иначе
+        // держит на экране устаревшую кассу (проверено: заём уходил у одного и не приходил другому).
+        function applyServerData(txt, force) {
+            if (!txt || (!force && txt === lastServerData)) return;
             let j; try { j = JSON.parse(txt); } catch(e) { return; }
             // рынок и мировые события — всегда актуальные
             if (j.market) state.market = j.market;   // живые цены рынка
             state.world = j.world || null;           // мировое событие (broadcast)
             state.board = j.board || null;           // поле (движок хода) — всегда свежее
+            state.p2p = j.p2p || [];                 // сделки игрок↔игрок (#23/#24) — реестр целиком серверный
             const sp = j.players || [];
             const sd = j.deals || [];
             sd.forEach(d => { if (d && d.id != null) _ackedDeals.add(d.id); });   // сервер показал заявку → запомнили
-            const recent = (Date.now() - lastSaveT <= 2200);
+            const recent = !force && (Date.now() - lastSaveT <= 2200);
             if (!recent) {
                 // окно защиты прошло — берём всё с сервера как есть
                 lastServerData = txt;
@@ -10581,8 +10590,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // перерисовывал экран (вспышка бланка). Бланк ведущего / аналитика / лобби живые цены НЕ
             // показывают → если с сервера пришёл ТОЛЬКО тик рынка (игроки/заявки/событие/поле не
             // менялись), полную перерисовку пропускаем. В player-виде рынок виден — там рендерим как раньше.
-            const _nonMarket = JSON.stringify([j.players||[], j.deals||[], j.world||null, j.board||null]);
-            if (state.view === 'player' || _nonMarket !== _lastNonMarket) safeRerender();
+            const _nonMarket = JSON.stringify([j.players||[], j.deals||[], j.world||null, j.board||null, j.p2p||[]]);
+            const _nmChanged = (_nonMarket !== _lastNonMarket);
+            // 🛡️ (Ринат 19июл: «тик цен обновляет страницу, окна сбиваются») — НЕ дёргаем полную
+            // перерисовку от тика рынка, когда открыто окно или крутится слот: картинка бы моргала,
+            // барабаны слота сбивались, прокрутка прыгала. Живые цены догонят при закрытии окна / действии.
+            const _winOpen = !!(state.catPopup||state.soulsInfo||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.partnerModal||state.charityModal||state.buyModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.showHistory||state.doorOpen||state.soulCard);
+            if (!_slotSpinning && (_nmChanged || (state.view === 'player' && !_winOpen))) safeRerender();
             _lastNonMarket = _nonMarket;
             // окно сделки перерисовалось (тик рынка/чужой ход) → блок проскальзывания сбросился,
             // считаем заново, иначе человек смотрит на «впиши количество» с уже введённым числом
@@ -10600,11 +10614,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             } catch(e) {}
         }
         // Страховка: опрос /data (реже, чем раньше — основную работу делает push)
-        async function pollServer() {
+        async function pollServer(force) {
             try {
                 const r = await fetch('/data', {cache: 'no-store'});
                 if (!r.ok) return;
-                applyServerData(await r.text());
+                applyServerData(await r.text(), force);
             } catch(e) {}
         }
 
@@ -11075,6 +11089,593 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${rows}
             </div>`;
         }
+        // ─── 🏦 ДЕПОЗИТЫ (Ринат 19июл): путь «хранителя» — тихий рост без риска, чем дольше держишь тем выше %.
+        // Плавающий 1%/год (снять когда угодно), 1год 2%, 5лет 3%, 10лет 5%. Досрочно со срочного — минус 40%.
+        const DEPOSIT_TIERS=[
+            {k:'float',n:'Плавающий',rate:1,lock:0},
+            {k:'y1',n:'1 год',rate:2,lock:1},
+            {k:'y5',n:'5 лет',rate:3,lock:5},
+            {k:'y10',n:'10 лет',rate:5,lock:10}
+        ];
+        function curYear(){ return (state.market && state.market.game_year) || 1; }
+        function depAccrued(d){ const yrs=Math.max(0,curYear()-(d.placedY||1)); return Math.round((Number(d.amount)||0)*(Number(d.rate)||0)/100*yrs); }
+        function placeDeposit(tier){
+            const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            const t=DEPOSIT_TIERS.find(x=>x.k===tier); if(!t) return;
+            const el=document.getElementById('depAmt'); const amt=Math.floor(Number(el?el.value:0));
+            if(!amt||amt<1){ alert('Впиши сумму вклада (число больше 0).'); return; }
+            if(amt>p.savings){ alert('Не хватает кассы. У тебя '+fmtN(p.savings)+'$.'); return; }
+            if(t.lock>0 && !confirm('Положить '+fmtN(amt)+'$ на «'+t.n+'» под '+t.rate+'%/год?\n\n⚠️ Снимешь раньше '+t.lock+' лет — потеряешь 40% и проценты сгорят.')) return;
+            p.savings=Math.round((p.savings-amt)*100)/100;
+            p.deposits=p.deposits||[];
+            p.deposits.push({id:uid(), amount:amt, tier:t.k, rate:t.rate, lock:t.lock, placedY:curYear()});
+            save(); render();
+        }
+        function withdrawDeposit(id){
+            const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p||!p.deposits) return;
+            const d=p.deposits.find(x=>x.id===id); if(!d) return;
+            const yrs=Math.max(0,curYear()-(d.placedY||1)); const accrued=depAccrued(d);
+            const early=(d.lock>0 && yrs<d.lock); let payout;
+            if(early){ payout=Math.round((Number(d.amount)||0)*0.60);
+                if(!confirm('Снять досрочно? Держал '+yrs+' из '+d.lock+' лет.\nШтраф −40%: вернётся '+fmtN(payout)+'$ (проценты сгорят).')) return;
+            } else { payout=(Number(d.amount)||0)+accrued;
+                if(!confirm('Снять вклад? Вернётся '+fmtN(payout)+'$ (вложил '+fmtN(d.amount)+' + проценты '+fmtN(accrued)+').')) return;
+            }
+            p.savings=Math.round((p.savings+payout)*100)/100;
+            p.deposits=p.deposits.filter(x=>x.id!==id);
+            save(); render();
+        }
+        function renderDepositPanel(p){
+            const cy=curYear();
+            const list=(p.deposits&&p.deposits.length)?p.deposits.map(d=>{
+                const t=DEPOSIT_TIERS.find(x=>x.k===d.tier)||{n:d.tier};
+                const yrs=Math.max(0,cy-(d.placedY||1)); const accrued=depAccrued(d);
+                const locked=(d.lock>0 && yrs<d.lock); const left=Math.max(0,d.lock-yrs);
+                return `<div class="row-item"><div style="flex:1;"><b>${fmtN(d.amount)}$</b> <span style="font-size:11px;color:#9c988e;">· ${t.n} · ${d.rate}%/год</span><div style="font-size:11.5px;color:#5cb08b;">+${fmtN(accrued)}$ процентов · ${locked?`<span style="color:#e0a3a3;">🔒 ещё ${left} лет (досрочно −40%)</span>`:'✅ можно снять полностью'}</div></div><button onclick="withdrawDeposit('${d.id}')" class="btn ${locked?'btn-gray':'btn-orange'}">Снять</button></div>`;
+            }).join(''):'<div style="color:#9ca3af;font-size:13px;padding:6px 0;">Вкладов нет. Положи свободные деньги — пусть тихо растут без риска.</div>';
+            const tierBtns=DEPOSIT_TIERS.map(t=>`<button onclick="placeDeposit('${t.k}')" class="btn" style="flex:1;min-width:66px;padding:8px 4px;font-size:11px;line-height:1.35;background:#0d1016;color:#efd8a3;border:1px solid var(--lx-gold-ln);font-weight:700;">${t.n}<br><span style="color:#5cb08b;">${t.rate}%/год</span></button>`).join('');
+            return `<div class="sec-in">
+                <p style="font-size:12px;color:#9c988e;margin:2px 0 10px;line-height:1.5;">Положи деньги в банк — тихо растут без риска. Чем дольше не трогаешь, тем выше процент. Плавающий снимешь когда угодно; срочный снимешь раньше срока — потеряешь 40%.</p>
+                ${list}
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--lx-line);">
+                    <input id="depAmt" type="number" min="1" placeholder="Сумма вклада, $" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:15px;margin-bottom:8px;">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">${tierBtns}</div>
+                    <div style="font-size:10.5px;color:#6d6a62;margin-top:7px;text-align:center;">Касса: <b style="color:#efd8a3;">${fmtN(p.savings)}$</b> · сейчас Год ${cy}</div>
+                </div>
+            </div>`;
+        }
+        // ═══════ 🤝 ДРУГ НА ДРУГЕ: ЗАЙМЫ И ПАРТНЁРСТВА (#23/#24, Ринат 19июл) ═══════
+        // Деньги между игроками двигает ТОЛЬКО сервер (/p2p/*) — клиент рисует и шлёт намерение.
+        // Иначе две кассы правятся на двух телефонах разом и деньги родятся из воздуха.
+        async function p2pCall(action, body){
+            try{
+                const r = await fetch('/p2p/'+action, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+                const j = await r.json().catch(()=>({}));
+                if(j && j.error){ alert('Не вышло: '+j.error); return null; }
+                return j;
+            }catch(e){ alert('Нет связи с сервером — сделка не прошла.'); return null; }
+        }
+        function p2pOthers(p){ return (state.players||[]).filter(x=>x.id!==p.id); }
+        // Входящие: сделки, где я в списке «кому» и ещё не ответил.
+        function p2pInbox(p){
+            return (state.p2p||[]).filter(d=>d.status==='pending' && (d.to||[]).indexOf(p.id)>=0 && (d.accepted||[]).indexOf(p.id)<0);
+        }
+        function openLoanModal(pid){ state.loanModal={pId:pid}; render(); }
+        function closeLoanModal(){ state.loanModal=null; render(); }
+        function openPartnerModal(pid){ state.partnerModal={pId:pid, picked:[]}; render(); }
+        function closePartnerModal(){ state.partnerModal=null; render(); }
+        function partnerToggle(id){
+            const m=state.partnerModal; if(!m) return;
+            const i=m.picked.indexOf(id); if(i<0) m.picked.push(id); else m.picked.splice(i,1);
+            render();
+        }
+        async function sendLoan(pid){
+            const to=parseInt((document.getElementById('loanTo')||{}).value,10);
+            const amount=Math.floor(Number((document.getElementById('loanAmt')||{}).value)||0);
+            const pct=Math.max(0,Math.min(20,Math.floor(Number((document.getElementById('loanPct')||{}).value)||0)));
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            if(!to){ alert('Выбери, кому даёшь в долг.'); return; }
+            if(amount<1){ alert('Впиши сумму займа.'); return; }
+            if(amount>(Number(p.savings)||0)){ alert('В кассе только '+fmtN(Math.round(p.savings))+'$.'); return; }
+            const who=(state.players.find(x=>x.id==to)||{}).name||'игрок';
+            const due=Math.round(amount*(1+pct/100));
+            if(!confirm('Дать '+who+' в долг '+fmtN(amount)+'$ под '+pct+'%?\n\nОн вернёт '+fmtN(due)+'$. Деньги уйдут из кассы, только если он СОГЛАСИТСЯ.')) return;
+            const r=await p2pCall('create',{kind:'loan',from:pid,to:[to],amount:amount,pct:pct});
+            if(r&&r.ok){ state.loanModal=null; await pollServer(true); alert('📨 Запрос отправлен '+who+'. Деньги уйдут, когда он примет.'); render(); }
+            else if(r&&r.reason==='not_enough') alert('Не хватает кассы на такой заём.');
+        }
+        async function sendPartner(pid){
+            const m=state.partnerModal; if(!m) return;
+            const title=String((document.getElementById('parTitle')||{}).value||'').trim()||'Общее дело';
+            const amount=Math.floor(Number((document.getElementById('parAmt')||{}).value)||0);
+            const cf=Math.floor(Number((document.getElementById('parCf')||{}).value)||0);
+            if(!m.picked.length){ alert('Выбери, с кем скидываешься.'); return; }
+            if(amount<1){ alert('Впиши полную цену дела.'); return; }
+            const n=m.picked.length+1, share=Math.round(amount/n);
+            const p=state.players.find(x=>x.id==pid);
+            if(share>(Number(p.savings)||0)){ alert('Твоя доля '+fmtN(share)+'$, а в кассе '+fmtN(Math.round(p.savings))+'$.'); return; }
+            if(!confirm('Общее дело «'+title+'» за '+fmtN(amount)+'$.\n\nПартнёров с тобой: '+n+'. Доля каждого '+fmtN(share)+'$, поток делится поровну (по '+fmtN(Math.round(cf/n))+'$/мес).\n\nДеньги спишутся у всех, только когда СОГЛАСЯТСЯ ВСЕ.')) return;
+            const r=await p2pCall('create',{kind:'partner',from:pid,to:m.picked,amount:amount,cf:cf,title:title});
+            if(r&&r.ok){ state.partnerModal=null; await pollServer(true); alert('📨 Запросы отправлены. Дело откроется, когда согласятся все.'); render(); }
+        }
+        async function p2pRespond(id, pid, accept){
+            const r=await p2pCall('respond',{id:id,pid:pid,accept:accept});
+            if(r&&r.ok===false){
+                if(r.reason==='lender_broke') alert('У того, кто предлагал заём, уже не хватает денег — сделка отменена.');
+                else if(r.reason==='partner_broke') alert('Не у всех хватило денег на долю ('+(r.who||[]).join(', ')+') — дело не открылось, деньги не списаны.');
+                else if(r.reason==='closed') alert('Эта сделка уже закрыта.');
+            } else if(r&&r.waiting){ alert('✅ Ты согласился. Ждём ещё '+r.waiting+' партнёр(ов).'); }
+            await pollServer(true); render();
+        }
+        async function p2pRepay(id, pid, left){
+            const v=prompt('Сколько вернуть? Остаток долга '+fmtN(left)+'$:', String(Math.round(left)));
+            if(v===null) return;
+            const amt=Math.floor(Number(String(v).replace(/[^0-9]/g,''))||0);
+            if(amt<1) return;
+            const r=await p2pCall('repay',{id:id,pid:pid,amount:amt});
+            if(r&&r.ok===false&&r.reason==='not_enough') alert('Не хватает кассы на такой платёж.');
+            await pollServer(true); render();
+        }
+        // ── Раздел бланка: входящие запросы + мои долги/займы + кнопки действий ──
+        function renderP2P(p){
+            const inbox=p2pInbox(p);
+            const debts=(p.p2pDebts||[]), loans=(p.p2pLoans||[]);
+            const inboxHtml=inbox.map(d=>{
+                const n=(d.to||[]).length+1, share=Math.round((d.amount||0)/n);
+                const body = d.kind==='loan'
+                    ? `<b style="color:#efd8a3;">${d.fromName||'Игрок'}</b> предлагает тебе в долг <b style="color:#34d399;">${fmtN(d.amount)}$</b> под <b>${d.pct}%</b>.<br><span style="color:#9c988e;">Вернуть придётся ${fmtN(Math.round(d.amount*(1+d.pct/100)))}$.</span>`
+                    : `<b style="color:#efd8a3;">${d.fromName||'Игрок'}</b> зовёт в общее дело <b>«${d.title||''}»</b> за ${fmtN(d.amount)}$.<br><span style="color:#9c988e;">Твоя доля ${fmtN(share)}$ · поток тебе +${fmtN(Math.round((d.cf||0)/n))}$/мес. Спишется, когда согласятся все.</span>`;
+                return `<div style="background:radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.09),transparent 70%),var(--lx-ink);border:1px solid var(--lx-gold-ln);border-radius:12px;padding:11px 13px;margin-bottom:8px;">
+                    <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#b98a3e;font-weight:800;margin-bottom:5px;">${d.kind==='loan'?'💰 предложение займа':'🤝 приглашение в дело'}</div>
+                    <div style="font-size:12.5px;color:#cdc8bd;line-height:1.55;">${body}</div>
+                    <div style="display:flex;gap:7px;margin-top:9px;">
+                        <button onclick="p2pRespond(${d.id},${p.id},true)" class="btn" style="flex:1;padding:8px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">Согласиться</button>
+                        <button onclick="p2pRespond(${d.id},${p.id},false)" class="btn btn-gray" style="flex:0 0 auto;padding:8px 13px;">Отказать</button>
+                    </div>
+                </div>`;
+            }).join('');
+            const debtHtml=debts.map(d=>`<div class="row-item"><div style="flex:1;"><b>Должен ${d.toName||''}</b><div style="font-size:11px;color:#9c988e;">взял ${fmtN(d.amount)}$ под ${d.pct}%</div></div><div style="text-align:right;"><b style="color:#fca5a5;">${fmtN(d.due)}$</b><br><button onclick="p2pRepay(${d.id},${p.id},${d.due})" class="btn" style="margin-top:4px;padding:3px 10px;font-size:11px;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;">Вернуть</button></div></div>`).join('');
+            const loanHtml=loans.map(d=>`<div class="row-item"><div style="flex:1;"><b>${d.fromName||''} должен тебе</b><div style="font-size:11px;color:#9c988e;">дал ${fmtN(d.amount)}$ под ${d.pct}%</div></div><b style="color:#34d399;">${fmtN(d.due)}$</b></div>`).join('');
+            return `${inboxHtml}
+                <div style="display:flex;gap:7px;margin-bottom:${(debts.length||loans.length)?'10px':'0'};">
+                    <button onclick="openLoanModal(${p.id})" class="btn" style="flex:1;padding:10px;font-weight:700;font-size:12.5px;background:var(--lx-ink);border:1px solid var(--lx-line);color:var(--lx-text);">💰 Дать в долг</button>
+                    <button onclick="openPartnerModal(${p.id})" class="btn" style="flex:1;padding:10px;font-weight:700;font-size:12.5px;background:var(--lx-ink);border:1px solid var(--lx-line);color:var(--lx-text);">🤝 Скинуться на дело</button>
+                </div>
+                ${debtHtml}${loanHtml}
+                ${(!inbox.length&&!debts.length&&!loans.length)?'<p style="font-size:11.5px;color:#6d6a62;line-height:1.5;margin:0;">Дорогое дело в одиночку не потянуть — сложитесь. А свободные деньги можно дать другому игроку под процент: он растёт, ты зарабатываешь.</p>':''}`;
+        }
+        function renderLoanModal(){
+            if(!state.loanModal) return '';
+            const p=state.players.find(x=>x.id==state.loanModal.pId); if(!p) return '';
+            const others=p2pOthers(p);
+            if(!others.length) return '';
+            return `<div onclick="if(event.target===this)closeLoanModal()" style="position:fixed;inset:0;z-index:5260;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:390px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;">
+                    <div style="text-align:center;font-size:36px;line-height:1;">💰</div>
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#efd8a3;margin:4px 0 3px;">Дать в долг</div>
+                    <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:14px;">Свободные деньги могут работать. В кассе <b style="color:#f3efe6;">${fmtN(Math.round(p.savings))}$</b>.</div>
+                    <select id="loanTo" class="inp" style="width:100%;margin-bottom:8px;"><option value="">Кому дать?</option>${others.map(o=>`<option value="${o.id}">${o.name}</option>`).join('')}</select>
+                    <input id="loanAmt" type="number" min="1" placeholder="Сумма займа, $" class="inp" style="width:100%;margin-bottom:8px;font-family:ui-monospace,monospace;font-weight:700;">
+                    <input id="loanPct" type="number" min="0" max="20" value="10" placeholder="Процент (0–20)" class="inp" style="width:100%;margin-bottom:12px;font-family:ui-monospace,monospace;font-weight:700;">
+                    <div style="font-size:11.5px;color:#9c988e;line-height:1.5;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:10px;padding:9px 11px;margin-bottom:13px;">Деньги уйдут из кассы только после его согласия. Возврат — его решение и его совесть: игра долги за него не отдаёт.</div>
+                    <button onclick="sendLoan(${p.id})" class="btn" style="width:100%;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">Отправить предложение</button>
+                    <button onclick="closeLoanModal()" class="btn btn-gray" style="width:100%;margin-top:7px;padding:10px;">Отмена</button>
+                </div></div>`;
+        }
+        function renderPartnerModal(){
+            const m=state.partnerModal; if(!m) return '';
+            const p=state.players.find(x=>x.id==m.pId); if(!p) return '';
+            const others=p2pOthers(p); if(!others.length) return '';
+            const n=m.picked.length+1;
+            return `<div onclick="if(event.target===this)closePartnerModal()" style="position:fixed;inset:0;z-index:5260;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:400px;max-width:100%;max-height:90vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;">
+                    <div style="text-align:center;font-size:36px;line-height:1;">🤝</div>
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#efd8a3;margin:4px 0 3px;">Общее дело</div>
+                    <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:14px;">Дорогое в одиночку — по силам вместе. Цена и поток делятся поровну.</div>
+                    <input id="parTitle" placeholder="Что за дело (например, Кофейня)" class="inp" style="width:100%;margin-bottom:8px;">
+                    <input id="parAmt" type="number" min="1" placeholder="Полная цена дела, $" class="inp" style="width:100%;margin-bottom:8px;font-family:ui-monospace,monospace;font-weight:700;">
+                    <input id="parCf" type="number" min="0" placeholder="Поток дела, $/мес" class="inp" style="width:100%;margin-bottom:12px;font-family:ui-monospace,monospace;font-weight:700;">
+                    <div style="font-size:11px;color:#6d6a62;text-transform:uppercase;letter-spacing:.1em;font-weight:800;margin-bottom:6px;">С кем скидываешься</div>
+                    ${others.map(o=>{const on=m.picked.indexOf(o.id)>=0;return `<button onclick="partnerToggle(${o.id})" class="btn" style="width:100%;margin-bottom:6px;padding:9px;text-align:left;font-weight:700;background:${on?'rgba(217,184,119,.12)':'var(--lx-ink)'};border:1px solid ${on?'var(--lx-gold-ln)':'var(--lx-line)'};color:var(--lx-text);">${on?'✓':'○'} ${o.name} <span style="color:#6d6a62;font-size:11px;">· касса ${fmtN(Math.round(o.savings||0))}$</span></button>`;}).join('')}
+                    <div style="font-size:12px;color:#cdc8bd;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:10px;padding:10px 12px;margin:8px 0 12px;line-height:1.5;">Участников будет <b style="color:#efd8a3;">${n}</b> (вместе с тобой). Деньги спишутся у всех разом — и только если <b>согласятся все</b>.</div>
+                    <button onclick="sendPartner(${p.id})" class="btn" style="width:100%;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">Позвать в дело</button>
+                    <button onclick="closePartnerModal()" class="btn btn-gray" style="width:100%;margin-top:7px;padding:10px;">Отмена</button>
+                </div></div>`;
+        }
+
+        // ═══════ 🏗️ СТРОИТЕЛЬ: РАЗВИТИЕ БИЗНЕСА (Ринат 19июл, концепция утверждена) ═══════
+        // Купил бизнес → развиваешь его РЕШЕНИЯМИ, не кубиком. Никакого скрытого казино:
+        // заплатил — эффект наступил гарантированно. Думать надо не «повезёт ли», а «когда и во что».
+        // Цена каждой ступени = множитель × ТЕКУЩИЙ поток, поэтому чем позже вкладываешься, тем дороже
+        // (ранний вклад дешевле, но забирает кассу, когда она нужна на сделки — вот и весь выбор).
+        // Ступени идут лестницей: сначала реклама, потом люди, потом сеть, потом франшиза.
+        // ⚠️ ЦЕНЫ (mult × поток) — РИНАТУ НА РЕШЕНИЕ. Он называл 10/20/50/120, но по математике это
+        // окупаемость 33–60 кругов, а обычная карта-актив окупается за ~8 (1200$ → 150$/мес) — то есть
+        // развивать дело было бы ВСЕГДА хуже, чем купить новое, и кнопкой никто не пользовался бы.
+        // Поставил 2/4/10/25: с учётом карт-исходов (25% провал) реальная окупаемость ~15 кругов.
+        // Если захочешь строже — просто верни mult обратно, вся экономика считается отсюда.
+        // ЦЕНЫ И ВЫПЛАТЫ — цифры Рината (20июл). min = минимальный вход, best = что даёт ЛУЧШАЯ карта
+        // (фиксированный пассив в $/мес, а не процент от потока). Чем больше вложил сверх минимума —
+        // тем выше шанс вытянуть лучшую карту (но провал возможен всегда).
+        const BIZ_UPGRADES = [
+            { k:'ads',   img:'cat_imgs/biz_ads.webp',ic:'📣', t:'Реклама',    min:500,    best:1000,  lvl:0, res:0,
+              d:'Тебя узнают. Самый дешёвый первый шаг — но реклама редко идёт как надо.',
+              e:'лучшая карта +1 000$/мес' },
+            { k:'staff', img:'cat_imgs/biz_staff.webp',ic:'👔', t:'Сотрудники', min:5000,  best:2000,  lvl:1, res:25,
+              d:'Нанимаешь людей. Сильная команда потянет дело без тебя — слабая просто съест деньги.',
+              e:'лучшая карта +2 000$/мес' },
+            { k:'chain', img:'cat_imgs/biz_chain.webp',ic:'🏪', t:'Сеть',       min:50000, best:5000,  lvl:2, res:10,
+              d:'Вторая, третья точка. Сетью надо уметь управлять — иначе она утянет вниз.',
+              e:'лучшая карта +5 000$/мес' },
+            { k:'franch',img:'cat_imgs/biz_franch.webp',ic:'🌐', t:'Франшиза',   min:150000,best:10000, lvl:3, res:15,
+              d:'Твоё имя работает на тебя: другие открывают точки и платят роялти. Вершина строителя.',
+              e:'лучшая карта +10 000$/мес' }
+        ];
+        // ─── 🎴 ИСХОДЫ РАЗВИТИЯ (Ринат 20июл): вложил деньги — но как пойдёт, заранее не знает никто.
+        // Как в жизни: реклама может не выстрелить, маркетолог может кинуть, команда разбежаться.
+        // КУБИКА НЕТ. Из колоды выкладываются 4 карты рубашкой вниз — игрок тянет одну.
+        // Колода взвешена: провалов и середины много, настоящий бум редкий (3 из 20 ≈ 15%).
+        // Деньги НЕ покупают удачу: бюджет меняет РАЗМЕР эффекта, а шансы всегда одни и те же.
+        // Четыре исхода. add = сколько ДОБАВИТСЯ к пассиву дела ($/мес). Минус = дело просело.
+        // Тексты — Рината, дословно по смыслу: у каждой ступени свои четыре истории.
+        const BIZ_DECK = [
+            { k:'bad',  ic:'💀', col:'#cf9a9a' },
+            { k:'weak', ic:'🥱', col:'#9c988e' },
+            { k:'mid',  ic:'⚖️', col:'#8fb3e0' },
+            { k:'boom', ic:'🚀', col:'#efd8a3' }
+        ];
+        // Третье число — ДОЛЯ от лучшей карты этой ступени (u.best), а не абсолютные доллары.
+        // Так масштаб исходов honest на каждом уровне: −10% на рекламе это −100$, а на франшизе −1000$.
+        // Карты расставлены по тяжести: bad — самое дно, дальше легче.
+        const BIZ_STORY = {
+            ads: {
+                bad: ['СММщик кинул','Взял деньги, показал красивые графики и пропал. Ни ролика, ни клиентов.', -0.10],
+                weak:['Реклама не зашла','Ролик вышел скучным — его почти никто не досмотрел. Деньги на ветер.', 0],
+                mid: ['Просмотры есть, продаж нет','Ролик залетел на миллионы просмотров, но покупателей привёл мало. Еле отбил вложенное.', 0.10],
+                boom:['НАСТОЯЩИЙ БУМ','Тебя увидели все. О деле заговорили, пошёл поток клиентов — популярность работает на тебя.', 1]
+            },
+            staff: {
+                bad: ['Набрал слабых','«Эксперты» оказались пустыми — просто жрут твои деньги и время.', -0.10],
+                weak:['Давят твои замечания','Люди чувствуют давление от твоих дерзких замечаний и перестают расти.', 0],
+                mid: ['Один тянет, остальные подводят','Есть один сильный, но он постоянно требует повышения, а остальные не тянут.', 0.05],
+                boom:['Мощная команда','Они умнее и лучше тебя в своих сферах. Такая команда приводит дело к огромным результатам.', 1]
+            },
+            chain: {
+                bad: ['Сеть посыпалась','Постоянные жалобы, рейтинг падает, санитарные нормы нарушены. Дело в минусе.', -0.10],
+                weak:['Только просит помощи','Точки ломаются, сотрудники увольняются — ты всё время кого-то спасаешь вместо роста.', 0],
+                mid: ['Сеть есть, управления нет','Сеть сильная, но управляешь ты ей слабо — растёт еле-еле.', 0.05],
+                boom:['Лучшая сеть','Стала лучшей в своём деле. Её заметили крупные игроки и заходят к тебе деньгами.', 1]
+            },
+            franch: {
+                bad: ['Угасает — директор умер','В неё перестали вкладывать: было 50 точек в мире — осталось 5. Всё сыпется.', -0.20],
+                weak:['Неудачная франшиза','Партнёры принесли одни убытки, а имя потрепали. Ты в минусе.', -0.10],
+                mid: ['Штрафы вместо роялти','Франшиза мощная, но твои партнёры не держат регламент — и тебя постоянно штрафуют.', 0.05],
+                boom:['ЛУЧШАЯ В МИРЕ','Тебя заметили. За год сеть выросла на 20 точек — бренд работает вместо тебя.', 1]
+            }
+        };
+        // Сколько даёт карта в долларах на этой ступени
+        function bizAdd(key, out){
+            const u=BIZ_UPGRADES.find(x=>x.k===key); if(!u) return 0;
+            return Math.round((Number(u.best)||0) * (Number(BIZ_STORY[key][out][2])||0));
+        }
+        // ШАНСЫ. Базово (минимальный вход): провал 25%, слабо 30%, средне 30%, лучшая 15%.
+        // Ринат: «чем больше вкладываешь, тем вероятность лучшей карты выше». Вложил вдвое сверх
+        // минимума — шанс лучшей растёт, провала падает. Но провал возможен ВСЕГДА (кап 50/10).
+        function bizOdds(mult){          // mult = во сколько раз вложено больше минимума
+            const k = Math.max(1, Number(mult)||1);
+            // вход по минимуму → 15% на лучшую; вдесятеро больше → 75%. Провал не исчезает никогда.
+            const boom = Math.min(75, 15 + 7*(k-1));
+            const bad  = Math.max(5,  25 - 3*(k-1));
+            const rest = 100 - boom - bad;
+            return { bad:bad, weak:Math.round(rest*0.5), mid:rest-Math.round(rest*0.5), boom:boom };
+        }
+        function bizRollOutcome(mult){
+            const o = bizOdds(mult); let r = Math.random()*100;
+            for(const k of ['bad','weak','mid','boom']){ if((r -= o[k]) < 0) return k; }
+            return 'mid';
+        }
+        function bizCost(a, u){ return Math.max(500, Math.round((Number(a.cf)||0) * u.mult)); }
+        function bizLevel(a){ return Number(a.bizLvl)||0; }
+        function bizResist(a){ return Math.min(70, Number(a.resist)||0); }   // кап 70% — событие всегда что-то забирает
+        function openBizModal(pid, idx){ state.bizModal={pId:pid, idx:idx}; render(); }
+        function closeBizModal(){ state.bizModal=null; render(); }
+        // Шаг 1: выбрал ступень → выбираешь БЮДЖЕТ (шансы от него не зависят).
+        function doBizUpgrade(pid, idx, key){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            const a=(p.assets||[])[idx]; if(!a) return;
+            const u=BIZ_UPGRADES.find(x=>x.k===key); if(!u) return;
+            if(bizLevel(a) !== u.lvl){ alert('Сначала пройди предыдущую ступень развития.'); return; }
+            state.bizBudget={pId:pid, idx:idx, key:key};
+            state.bizModal=null; render();
+        }
+        function closeBizBudget(){ state.bizBudget=null; render(); }
+        // Шаг 2: игрок вписал сумму → списываем деньги и выкладываем 4 карты рубашкой вниз.
+        // Исход каждой карты уже определён (шансы зависят от вложенной суммы) — но игрок его не видит.
+        function chooseBizBudget(){
+            const m=state.bizBudget; if(!m) return;
+            const p=state.players.find(x=>x.id==m.pId); if(!p) return;
+            const a=(p.assets||[])[m.idx]; if(!a) return;
+            const u=BIZ_UPGRADES.find(x=>x.k===m.key); if(!u) return;
+            const el=document.getElementById('bizAmt');
+            const amt=Math.floor(Number(el&&el.value)||0);
+            if(amt < u.min){ alert('Минимальный вход в «'+u.t+'» — '+fmtN(u.min)+'$.'); return; }
+            if((Number(p.savings)||0) < amt){ alert('Не хватает кассы: у тебя '+fmtN(Math.round(Number(p.savings)||0))+'$.'); return; }
+            // деньги уходят СРАЗУ — как в жизни: заплатил, а результат ещё неизвестен
+            p.savings=Math.round(((Number(p.savings)||0)-amt)*100)/100;
+            const mult=amt/u.min;
+            const cards=[0,1,2,3].map(()=>bizRollOutcome(mult));
+            state.bizBudget=null;
+            state.bizDraw={ pId:m.pId, idx:m.idx, key:m.key, cost:amt, mult:mult, cards:cards, picked:null };
+            save(); render();
+        }
+        // Шаг 3: тянешь карту — исход применяется. Пассив меняется на фиксированную сумму.
+        function pickBizCard(i){
+            const m=state.bizDraw; if(!m || m.picked!==null) return;
+            const p=state.players.find(x=>x.id==m.pId); if(!p) return;
+            const a=(p.assets||[])[m.idx]; if(!a) return;
+            const u=BIZ_UPGRADES.find(x=>x.k===m.key); if(!u) return;
+            const key=m.cards[i]; const out=BIZ_DECK.find(d=>d.k===key); if(!out) return;
+            m.picked=i;
+            const story=BIZ_STORY[m.key][key], add=bizAdd(m.key, key);
+            const oldCf=Number(a.cf)||0;
+            const newCf=Math.max(0, oldCf+add);
+            a.cf=newCf;
+            if(key!=='bad'){
+                // ступень пройдена — идём дальше по лестнице
+                a.bizLvl=bizLevel(a)+1;
+                a.resist=Math.min(70, bizResist(a)+(key==='boom'?u.res:Math.round(u.res*0.4)));
+                a.price=Math.round((Number(a.price)||0)+m.cost*0.5);
+                a.note=u.ic+' '+u.t;
+            }
+            p.notify=(key==='bad'?'💀 ':u.ic+' ')+'«'+(a.title||'Бизнес')+'»: '+story[0]+'. '
+                     +(add>0?'Пассив +'+fmtN(add)+'$/мес.':(add<0?'Пассив '+fmtN(add)+'$/мес.':'Пассив не изменился.'))
+                     +(key==='bad'?' Ступень не пройдена — можно попробовать снова.':'');
+            m.result={ out:key, oldCf:oldCf, newCf:newCf, add:add };
+            save(); render();
+        }
+        function closeBizDraw(){ state.bizDraw=null; render(); }
+        // ── Экран выбора бюджета: честно показываем ВСЕ 4 исхода и их шансы ДО оплаты ──
+        function renderBizBudget(){
+            const m=state.bizBudget; if(!m) return '';
+            const p=state.players.find(x=>x.id==m.pId); if(!p) return '';
+            const a=(p.assets||[])[m.idx]; if(!a) return '';
+            const u=BIZ_UPGRADES.find(x=>x.k===m.key); if(!u) return '';
+            const cash=Number(p.savings)||0, st=BIZ_STORY[m.key];
+            const cur=Math.max(u.min, Math.floor(Number(m.amt)||u.min));   // сумма живёт в state — перерисовка её не сотрёт
+            const o0=bizOdds(cur/u.min);
+            const quick=[1,2,5,10].map(x=>`<button onclick="setBizAmt(${u.min*x})" class="btn" style="flex:1;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;padding:7px 3px;font-size:11.5px;font-weight:700;">${x===1?'минимум':'×'+x}</button>`).join('');
+            const rows=BIZ_DECK.map(d=>`<div style="display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--lx-line);">
+                <span style="font-size:17px;">${d.ic}</span>
+                <div style="flex:1;"><div style="font-weight:700;font-size:12.5px;color:${d.col};">${st[d.k][0]}
+                    <span id="odds_${d.k}" style="color:#6d6a62;font-weight:800;"> · ${o0[d.k]}%</span>
+                    <span style="float:right;font-family:ui-monospace,monospace;color:${bizAdd(m.key,d.k)>0?'#34d399':(bizAdd(m.key,d.k)<0?'#fca5a5':'#6d6a62')};">${bizAdd(m.key,d.k)>0?'+':''}${fmtN(bizAdd(m.key,d.k))}$</span></div>
+                <div style="font-size:11.5px;color:#9c988e;line-height:1.45;">${st[d.k][1]}</div></div></div>`).join('');
+            return `<div onclick="if(event.target===this)closeBizBudget()" style="position:fixed;inset:0;z-index:5270;background:rgba(4,5,8,.93);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;">
+                <div style="width:420px;max-width:100%;max-height:92vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;">
+                    <div style="text-align:center;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#b98a3e;font-weight:800;">${u.ic} ${u.t}</div>
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:19px;font-weight:700;color:#f3efe6;margin:4px 0 3px;">Сколько вложишь?</div>
+                    <div style="text-align:center;font-size:12px;color:#9c988e;margin-bottom:12px;">Минимум <b style="color:#efd8a3;">${fmtN(u.min)}$</b> · в кассе ${fmtN(Math.round(cash))}$</div>
+                    <input id="bizAmt" type="number" min="${u.min}" value="${cur}" oninput="bizOddsPaint()" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:800;font-size:17px;text-align:center;margin-bottom:7px;">
+                    <div style="display:flex;gap:6px;margin-bottom:12px;">${quick}</div>
+                    <div style="font-size:12.5px;color:#cdc8bd;line-height:1.55;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:12px;padding:11px 13px;margin-bottom:13px;">
+                        Чем больше вложишь, тем <b style="color:#f3efe6;">выше шанс лучшей карты</b> — но провал возможен всегда. Деньги улучшают шансы, а не гарантируют результат.
+                    </div>
+                    <div style="background:radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.07),transparent 70%),var(--lx-ink);border:1px solid var(--lx-gold-ln);border-radius:12px;padding:11px 13px;">
+                        <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#b98a3e;font-weight:800;margin-bottom:3px;">🎴 что может выпасть · <span id="oddsMult">вложение ×${Math.round(cur/u.min*10)/10}</span></div>
+                        ${rows}
+                    </div>
+                    <button onclick="chooseBizBudget()" class="btn" style="width:100%;margin-top:13px;padding:13px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">Вложить и тянуть карту</button>
+                    <button onclick="closeBizBudget()" class="btn btn-gray" style="width:100%;margin-top:7px;padding:11px;">Передумал</button>
+                </div></div>`;
+        }
+        function setBizAmt(v){
+            if(state.bizBudget) state.bizBudget.amt=v;
+            const el=document.getElementById('bizAmt'); if(el) el.value=v;
+            bizOddsPaint();
+        }
+        // Живой пересчёт шансов, пока игрок вписывает сумму: видно, как деньги двигают вероятность.
+        function bizOddsPaint(){
+            const m=state.bizBudget; if(!m) return;
+            const u=BIZ_UPGRADES.find(x=>x.k===m.key); if(!u) return;
+            const el=document.getElementById('bizAmt'); if(!el) return;
+            const amt=Math.max(u.min, Math.floor(Number(el.value)||0));
+            m.amt=amt;                                   // помним — переживёт фоновую перерисовку
+            const k=amt/u.min, o=bizOdds(k);
+            ['bad','weak','mid','boom'].forEach(x=>{
+                const n=document.getElementById('odds_'+x); if(n) n.textContent=' · '+o[x]+'%';
+            });
+            const mm=document.getElementById('oddsMult');
+            if(mm) mm.textContent='вложение ×'+(Math.round(k*10)/10);
+        }
+        // ── Экран четырёх карт: тянешь одну ──
+        function renderBizDraw(){
+            const m=state.bizDraw; if(!m) return '';
+            const p=state.players.find(x=>x.id==m.pId); if(!p) return '';
+            const a=(p.assets||[])[m.idx]; if(!a) return '';
+            const u=BIZ_UPGRADES.find(x=>x.k===m.key); if(!u) return '';
+            const st=BIZ_STORY[m.key];
+            if(m.picked===null){
+                const backs=[0,1,2,3].map(i=>`<button onclick="pickBizCard(${i})" style="flex:1;min-width:70px;aspect-ratio:2/3;border-radius:12px;cursor:pointer;background:radial-gradient(120% 80% at 50% 20%,rgba(217,184,119,.16),transparent 70%),linear-gradient(180deg,#1a1d26,#0c0f15);border:1px solid var(--lx-gold-ln);display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px -12px rgba(0,0,0,.9);">
+                    <span style="font-family:Georgia,serif;font-size:22px;color:#b98a3e;">VIA</span></button>`).join('');
+                return `<div style="position:fixed;inset:0;z-index:5280;background:rgba(4,5,8,.95);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                    <div style="width:420px;max-width:100%;text-align:center;">
+                        <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#b98a3e;font-weight:800;">${u.ic} ${u.t} · вложено ${fmtN(m.cost)}$</div>
+                        <div style="font-family:Georgia,serif;font-size:21px;font-weight:700;color:#f3efe6;margin:6px 0 4px;">Как пойдёт — тяни карту</div>
+                        <div style="font-size:12.5px;color:#9c988e;line-height:1.5;margin-bottom:16px;">Деньги уже вложены. Дальше решает не бюджет, а жизнь.</div>
+                        <div style="display:flex;gap:9px;justify-content:center;">${backs}</div>
+                    </div></div>`;
+            }
+            const out=BIZ_DECK.find(d=>d.k===m.cards[m.picked]);
+            const r=m.result, story=st[out.k];
+            const diff=r.newCf-r.oldCf;
+            return `<div style="position:fixed;inset:0;z-index:5280;background:rgba(4,5,8,.95);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:400px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid ${out.k==='scam'?'#7f3a3a':'var(--lx-gold-ln)'};border-radius:18px;padding:22px 20px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,.75);">
+                    <div style="font-size:44px;line-height:1;">${out.ic}</div>
+                    <div style="font-family:Georgia,serif;font-size:21px;font-weight:700;color:${out.col};margin:6px 0 6px;">${story[0]}</div>
+                    <div style="font-size:13px;color:#cdc8bd;line-height:1.6;margin-bottom:14px;">${story[1]}</div>
+                    <div style="background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:12px;padding:11px 13px;font-size:12.5px;color:#cdc8bd;line-height:1.7;">
+                        Вложено: <b style="color:#fca5a5;">${fmtN(m.cost)}$</b><br>
+                        Поток: <b>${fmtN(r.oldCf)}$</b> → <b style="color:${diff>0?'#34d399':'#9c988e'};">${fmtN(r.newCf)}$/мес</b> ${diff>0?`<span style="color:#34d399;">(+${fmtN(diff)})</span>`:''}
+                        ${out.k==='scam'?'<br><span style="color:#cf9a9a;">Ступень не пройдена — можешь попробовать снова.</span>':''}
+                    </div>
+                    <button onclick="closeBizDraw()" class="btn" style="width:100%;margin-top:14px;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">Дальше</button>
+                </div></div>`;
+        }
+        function renderBizModal(){
+            if(!state.bizModal) return '';
+            const p=state.players.find(x=>x.id==state.bizModal.pId); if(!p) return '';
+            const idx=state.bizModal.idx, a=(p.assets||[])[idx]; if(!a) return '';
+            const lvl=bizLevel(a), cf=Number(a.cf)||0, cash=Number(p.savings)||0;
+            const cards=BIZ_UPGRADES.map(u=>{
+                const cost=u.min;
+                const done=lvl>u.lvl, cur=lvl===u.lvl, afford=cash>=cost;
+                const bg = done?'rgba(52,211,153,.07)' : (cur?'radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.08),transparent 70%),var(--lx-ink)':'var(--lx-ink)');
+                const bd = done?'#2f6b52' : (cur?'var(--lx-gold-ln)':'var(--lx-line)');
+                const foot = done
+                    ? '<div style="font-size:12px;font-weight:800;color:#34d399;text-align:center;padding:8px 0 2px;">✓ уже сделано</div>'
+                    : cur
+                    ? `<button onclick="doBizUpgrade(${p.id},${idx},'${u.k}')" class="btn" style="width:100%;margin-top:9px;padding:11px;font-weight:800;${afford?'background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;':'background:#20242c;color:#6d6a62;'}">${afford?'Вложить от '+fmtN(cost)+'$':'Нужно от '+fmtN(cost)+'$ · не хватает '+fmtN(cost-Math.round(cash))+'$'}</button>`
+                    : `<div style="font-size:11.5px;color:#6d6a62;text-align:center;padding:9px 0 2px;">🔒 откроется после ступени «${(BIZ_UPGRADES[u.lvl-1]||{}).t||''}»</div>`;
+                return `<div style="background:${bg};border:1px solid ${bd};border-radius:14px;padding:13px 14px;margin-bottom:9px;${done?'opacity:.72;':''}">
+                    <div style="display:flex;align-items:center;gap:11px;">
+                        ${u.img
+                          ? `<img src="${u.img}" alt="" style="width:54px;height:54px;flex:0 0 auto;border-radius:10px;object-fit:cover;border:1px solid var(--lx-line);${done?'filter:grayscale(.5) brightness(.7);':''}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${u.ic}',style:'font-size:23px;'}))">`
+                          : `<span style="font-size:23px;">${u.ic}</span>`}
+                        <div style="flex:1;"><div style="font-weight:800;font-size:15px;color:#f3efe6;">${u.t}</div>
+                        <div style="font-size:11.5px;color:#b98a3e;font-weight:700;">${u.e}</div></div>
+                        <div style="text-align:right;font-family:ui-monospace,monospace;font-weight:800;font-size:13px;color:${done?'#6d6a62':'#efd8a3'};">от ${fmtN(cost)}$</div>
+                    </div>
+                    <div style="font-size:12px;color:#9c988e;line-height:1.5;margin-top:7px;">${u.d}</div>
+                    ${(!done&&cur)?`<div style="font-size:12px;color:#cdc8bd;margin-top:7px;">Вход от <b style="color:#efd8a3;">${fmtN(u.min)}$</b>. Вложишь больше — выше шанс лучшей карты.</div>`:''}
+                    ${foot}
+                </div>`;
+            }).join('');
+            return `<div onclick="if(event.target===this)closeBizModal()" style="position:fixed;inset:0;z-index:5250;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;">
+                <div style="width:430px;max-width:100%;max-height:90vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;box-shadow:0 30px 70px rgba(0,0,0,.7);">
+                    <div style="margin:-20px -18px 14px;height:118px;overflow:hidden;position:relative;border-radius:18px 18px 0 0;"><img src="cat_imgs/hero_ladder.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'"><div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,.15),rgba(11,14,20,.92));"></div></div>
+                    <div style="text-align:center;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#b98a3e;font-weight:800;">🏗️ Развитие дела</div>
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#f3efe6;margin:4px 0 2px;">${a.title||'Бизнес'}</div>
+                    <div style="text-align:center;font-size:12.5px;color:#9c988e;margin-bottom:13px;">Поток <b style="color:#34d399;">${fmtN(cf)}$/мес</b> · ступень <b style="color:#efd8a3;">${lvl}/4</b>${bizResist(a)?` · устойчивость <b style="color:#93c5fd;">${bizResist(a)}%</b>`:''}</div>
+                    <div style="font-size:12px;color:#cdc8bd;line-height:1.6;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:12px;padding:11px 13px;margin-bottom:13px;">
+                        Ты решаешь, <b style="color:#f3efe6;">во что и сколько</b> вложить — но как пойдёт, заранее не знает никто: из колоды выпадет одна из четырёх карт. Чем больше поток, тем дороже следующая ступень. Бюджет решает силу результата, но не защищает от провала. Устойчивость гасит удар мировых событий по твоему делу.
+                    </div>
+                    ${cards}
+                    <button onclick="closeBizModal()" class="btn btn-gray" style="width:100%;margin-top:6px;padding:11px;">Закрыть</button>
+                </div>
+            </div>`;
+        }
+
+        // ─── 🔒 ОКНО «КЛЕТКА ЗАКРЫТА» (фидбэк сестры #17, 19июл): игроки не знали, что в игре ЕСТЬ сделки,
+        // потому что все плашки открывает ведущий, а тап давал глухое «жди ведущего». Теперь тап по закрытой
+        // клетке объясняет, ЧТО это за клетка, что там можно получить и как она открывается. ───
+        const CELL_HELP = {
+            career:  ['🎯','Карьера','Кубик карьеры: почти всегда новый НАВЫК (+1–2% к зарплате, до +20%), редко — шанс сменить профессию. Вклад в себя.'],
+            skill:   ['💡','Навык','5 карт рубашкой вниз — тянешь одну. Навык поднимает твой доход навсегда.'],
+            gov:     ['🏛️','Государство','Карта от государства: льгота, субсидия, проверка или новый закон. Может дать, может забрать.'],
+            work:    ['💼','Работа','Рабочее событие: премия, переработка, повышение или неприятность на работе.'],
+            expense: ['💸','Расходы','Внезапный расход — жизнь выставляет счёт. Чем больше подушка, тем спокойнее.'],
+            tax:     ['🏦','Налоги','Налоговая клетка: платишь с дохода. Легальные способы снизить — через навыки и структуру активов.'],
+            svyaz:   ['🌐','Связи','Люди решают. Знакомство, которое даёт доступ к сделке, скидке или информации.'],
+            sdelka:  ['🤝','Сделки','Главный инструмент строителя: бизнес и недвижимость с ПОТОКОМ. Мелкие — по карману почти всем, крупные — когда поднялся. Именно тут делаются деньги, а не на бирже.'],
+            med:     ['⚕️','Медицина','Здоровье: лечение, страховка, восстановление. Игнорировать дороже, чем платить.'],
+            world:   ['🌍','Мировое событие','Событие двигает весь рынок сразу — акции, сырьё, бизнесы. Касается всех за столом.']
+        };
+        function showCellLocked(key){ state.cellLocked=key; render(); }
+        function closeCellLocked(){ state.cellLocked=null; render(); }
+        function renderCellLocked(){
+            if(!state.cellLocked) return '';
+            const h=CELL_HELP[state.cellLocked]; if(!h) return '';
+            const [ic,nm,tx]=h;
+            return `<div onclick="if(event.target===this)closeCellLocked()" style="position:fixed;inset:0;z-index:5300;background:rgba(4,5,8,.9);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:390px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-line);border-radius:18px;padding:22px 20px;box-shadow:0 30px 70px rgba(0,0,0,.7);">
+                    <div style="text-align:center;font-size:40px;line-height:1;">${ic}</div>
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:21px;font-weight:700;color:#f3efe6;margin:5px 0 3px;">${nm}</div>
+                    <div style="text-align:center;font-size:11px;color:#b98a3e;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:13px;">🔒 пока закрыта</div>
+                    <div style="font-size:13px;color:#cdc8bd;line-height:1.6;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:12px;padding:12px 14px;margin-bottom:12px;">${tx}</div>
+                    <div style="font-size:12.5px;color:#9c988e;line-height:1.6;background:radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.07),transparent 70%),var(--lx-ink);border:1px solid var(--lx-gold-ln);border-radius:12px;padding:12px 14px;">
+                        <b style="color:#efd8a3;">Как открыть:</b> дождись своего хода, брось кубик и попади на эту клетку — ведущий откроет её тебе, и кнопка загорится золотом с меткой ▶.
+                    </div>
+                    <button onclick="closeCellLocked()" class="btn" style="width:100%;margin-top:14px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понятно</button>
+                </div>
+            </div>`;
+        }
+        // ─── 🕯️ ОКНО «КАК ЗАСЛУЖИТЬ ДУШИ» (Ринат 19июл; фидбэк: непонятно как получить 5 душ) ───
+        const SOULS_HOWTO=[
+            ['🕯️','Служение людям','Помогаешь другим за столом, подсказываешь, делишься — ведущий это видит и даёт душу.'],
+            ['🦁','Непобедимый Лев','Упал на дно (пассив рухнул почти в ноль), но не сдался и поднялся обратно. Душа за стойкость.'],
+            ['🎲','Мудрый риск','Вкладываешь с умом — не всё в одну корзину и не в чистый азарт. Своё дело + разные активы.'],
+            ['🎯','Благие намерения','На пороге больших денег отдал, а не зажал. Щедрость, когда мог взять себе.'],
+            ['🙏','Благодарность','На вершине вернул наверх тому, кто дал. Благодарность, а не жадность.']
+        ];
+        function showSoulsInfo(){ state.soulsInfo=true; render(); }
+        function closeSoulsInfo(){ state.soulsInfo=false; render(); }
+        function renderSoulsInfo(){
+            if(!state.soulsInfo) return '';
+            return `<div onclick="if(event.target===this)closeSoulsInfo()" style="position:fixed;inset:0;z-index:5100;background:rgba(4,6,9,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:440px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:22px 20px;box-shadow:0 30px 70px rgba(0,0,0,.7);">
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:22px;font-weight:700;color:#efd8a3;">🕯️ Карты Души</div>
+                    <p style="text-align:center;font-size:12.5px;color:#9c988e;line-height:1.55;margin:8px 0 16px;">Души не купить. Каждая даётся за то, <b style="color:#cdc8bd;">какой ты</b> — за твои действия и характер в игре. Собери <b style="color:#efd8a3;">все 5</b>.</p>
+                    ${SOULS_HOWTO.map(([ic,nm,tx])=>`<div style="display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--lx-line);"><span style="font-size:24px;">${ic}</span><div><div style="font-weight:700;color:#f3efe6;font-size:14px;">${nm}</div><div style="font-size:12px;color:#9c988e;line-height:1.5;margin-top:2px;">${tx}</div></div></div>`).join('')}
+                    <div style="margin-top:14px;padding:12px;border-radius:11px;background:radial-gradient(120% 80% at 50% 0,rgba(217,184,119,.08),transparent 70%),var(--lx-ink);border:1px solid var(--lx-gold-ln);text-align:center;">
+                        <div style="font-family:Georgia,serif;font-size:15px;color:#efd8a3;font-weight:700;">🚪 Выход на духовный круг</div>
+                        <div style="font-size:12px;color:#cdc8bd;line-height:1.6;margin-top:5px;">Собери <b>5 душ</b> · закрой <b>все долги</b> · доведи <b>пассив до ×20 расходов</b> — и откроется 2-й круг.</div>
+                    </div>
+                    <button onclick="closeSoulsInfo()" class="btn" style="width:100%;margin-top:14px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понятно</button>
+                </div>
+            </div>`;
+        }
+        // ─── 🕯️ БЛАГОТВОРИТЕЛЬНОСТЬ (Ринат 19июл): значок в шапке → окно. Жертвуй любую сумму (растёт душа);
+        // крупные (от 5000$) копятся на АУКЦИОН. Бонусы/связь с картами душ — допилим по концепции Нины.
+        const CHARITY_AUCTION_MIN = 5000;   // от какой суммы пожертвование считается «крупным» (к аукциону)
+        const CHARITY_AUCTION_NEED = 3;     // сколько крупных нужно, чтобы открыть аукцион
+        function openCharity(){ state.charityModal=true; render(); }
+        function closeCharity(){ state.charityModal=false; render(); }
+        function doCharity(v){
+            const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            const amt=Math.floor(Number(v)||0);
+            if(!amt||amt<1){ alert('Впиши сумму пожертвования (число больше 0).'); return; }
+            if(amt>p.savings){ alert('Не хватает кассы. У тебя '+fmtN(p.savings)+'$.'); return; }
+            if(!confirm('Отдать '+fmtN(amt)+'$ на благотворительность? Деньги уйдут навсегда — но душа растёт.')) return;
+            p.savings=Math.round((p.savings-amt)*100)/100;
+            p.donatedTotal=Math.round(((Number(p.donatedTotal)||0)+amt)*100)/100;
+            if(amt>=CHARITY_AUCTION_MIN) p.bigDonations=(Number(p.bigDonations)||0)+1;
+            p.shadow=Math.max(0,(Number(p.shadow)||0));   // (не трогаем тень — это чистое добро)
+            state.charityModal=false;
+            const aucNow=(Number(p.bigDonations)||0)>=CHARITY_AUCTION_NEED;
+            p.notify='🕯️ Ты отдал '+fmtN(amt)+'$ на благотворительность. Щедрость запоминается.'+(amt>=CHARITY_AUCTION_MIN?(aucNow?' 🎟️ Аукцион открыт!':' 🎟️ +1 к аукциону.'):'');
+            save(); render();
+        }
+        function renderCharityModal(){
+            if(!state.charityModal) return '';
+            const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return '';
+            const big=Number(p.bigDonations)||0, need=CHARITY_AUCTION_NEED, aucOpen=big>=need, total=Number(p.donatedTotal)||0;
+            const quick=[1000,5000,10000].map(v=>`<button onclick="document.getElementById('charAmt').value=${v}" class="btn" style="flex:1;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;padding:8px 4px;font-size:12px;font-weight:700;">${fmtN(v)}</button>`).join('');
+            return `<div onclick="if(event.target===this)closeCharity()" style="position:fixed;inset:0;z-index:5200;background:rgba(4,5,8,.9);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:400px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.7),0 0 40px -12px var(--lx-gold);">
+                    <div style="height:3px;background:linear-gradient(90deg,transparent,#efd8a3,transparent);"></div>
+                    <div style="padding:20px;">
+                        <div style="text-align:center;font-size:40px;line-height:1;">🕯️</div>
+                        <div style="text-align:center;font-family:Georgia,serif;font-size:22px;font-weight:700;color:#efd8a3;margin:4px 0 3px;">Благотворительность</div>
+                        <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.55;margin-bottom:15px;">Отдавай любую сумму — как в жизни. Щедрость растит твою душу.${total>0?`<br>Всего отдано за игру: <b style="color:#efd8a3;">${fmtN(total)}$</b>.`:''}</div>
+                        <input id="charAmt" type="number" min="1" placeholder="Сумма пожертвования, $" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;margin-bottom:8px;">
+                        <div style="display:flex;gap:6px;margin-bottom:14px;">${quick}</div>
+                        <div style="background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:12px;padding:10px 14px;margin-bottom:13px;">
+                            <div style="display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:12.5px;color:#cdc8bd;line-height:1.45;"><span style="color:#5cb08b;font-size:15px;">🕯️</span><div>Шаг к <b style="color:#efd8a3;">карте души</b> — щедрость запоминается игрой.</div></div>
+                            <div style="display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:12.5px;color:#cdc8bd;line-height:1.45;"><span style="color:#5cb08b;font-size:15px;">✨</span><div><b style="color:#efd8a3;">Бонус за щедрость</b> <span style="color:#6d6a62;font-size:11px;">(допишем по концепции Нины)</span></div></div>
+                        </div>
+                        <div style="background:radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.08),transparent 70%),var(--lx-ink);border:1px solid var(--lx-gold-ln);border-radius:12px;padding:11px 13px;margin-bottom:16px;">
+                            <div style="display:flex;justify-content:space-between;font-size:11px;color:#9c988e;margin-bottom:7px;"><span>🎟️ ${aucOpen?'Аукцион открыт!':'До аукциона'} <span style="color:#6d6a62;">· крупные, от ${fmtN(CHARITY_AUCTION_MIN)}$</span></span><b style="color:#efd8a3;font-family:ui-monospace,monospace;">${Math.min(big,need)} / ${need}</b></div>
+                            <div style="height:7px;background:#0a0c10;border-radius:99px;overflow:hidden;border:1px solid var(--lx-line);"><div style="height:100%;width:${Math.min(100,big/need*100)}%;background:linear-gradient(90deg,#b48f4e,#efd8a3);"></div></div>
+                            <div style="font-size:10.5px;color:#6d6a62;margin-top:7px;text-align:center;">${aucOpen?'Можешь запросить аукцион у ведущего.':`Три крупных пожертвования (от ${fmtN(CHARITY_AUCTION_MIN)}$) — и откроется торг.`}</div>
+                        </div>
+                        <div style="display:flex;gap:9px;">
+                            <button onclick="closeCharity()" class="btn btn-gray" style="flex:1;">Отмена</button>
+                            <button onclick="doCharity(document.getElementById('charAmt').value)" class="btn" style="flex:1;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">Отдать 🕯️</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
         function renderMarketPanel(p){
             const m=state.market;
             if(!m||!m.assets) return '<div class="card"><div class="block-title">📈 Биржа</div><div style="color:#9ca3af;font-size:13px;">рынок загружается…</div></div>';
@@ -11082,7 +11683,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const ownIds=Object.keys(p.holdings);
             let holdHtml = ownIds.length ? ownIds.map(id=>{
                 const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, plPct=h.avg?((pr/h.avg-1)*100):0, plAbs=Math.round((pr-h.avg)*h.qty), c=plPct>=0?'#10b981':'#f43f5e';
-                return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellFrac('${id}',0.5)" class="btn" style="margin-top:4px;background:#c2792b;color:#fff;font-weight:700;" title="Продать половину позиции">½&nbsp;50%</button> <button onclick="sellWhole('${id}')" class="btn btn-orange" style="margin-top:4px;">Продать</button></div></div>`;
+                return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellFrac('${id}',0.5)" class="btn btn-sell" style="margin-top:4px;" title="Продать половину позиции">½&nbsp;50%</button> <button onclick="sellWhole('${id}')" class="btn btn-sell" style="margin-top:4px;">Продать</button></div></div>`;
             }).join('') : '<div style="color:#9ca3af;font-size:13px;">пока нет активов — открой биржу ниже и купи</div>';
             const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
             const alertHtml = ev.length ? ev.map(e=>`<div style="background:${e.kind==='КРАХ'?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${e.kind==='КРАХ'?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`).join('') : '';
@@ -11100,7 +11701,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const rows=sorted.length?sorted.map(({a,chg,invested})=>{
                     const c=chg>=0?'#10b981':'#f43f5e', arrow=chg>=0?'▲':'▼';
                     const cap=invested>0?` <span style="color:#efd8a3;font-size:11px;font-weight:700;">💰 ${fmtN(invested)}$</span>`:'';
-                    return `<div class="row-item"><div style="flex:1;"><b>${a.name}</b>${cap}<div style="font-size:12px;color:${c};font-weight:700;">${fmtPrice(a.price)}$ · ${arrow} ${fmtPct(chg)}</div></div><button onclick="openBuyModal('${a.id}')" class="btn" style="background:#10b981;color:#fff;">Купить</button></div>`;
+                    return `<div class="row-item"><div style="flex:1;"><b>${a.name}</b>${cap}<div style="font-size:12px;color:${c};font-weight:700;">${fmtPrice(a.price)}$ · ${arrow} ${fmtPct(chg)}</div></div><button onclick="openBuyModal('${a.id}')" class="btn btn-buy">Купить</button></div>`;
                 }).join(''):'<div style="color:#9ca3af;font-size:13px;padding:10px;text-align:center;">В этой категории пока нет активов.</div>';
                 // ℹ️ Прогноз доходности по вкладке (Ринат 19июл): «сколько даёт в год как в жизни»
                 const CAT_INFO={stock:['#5cb08b','📈 Акции — доли компаний. ~5–10%/год, стабильно. Большие деньги, тихо. Выигрывает терпеливый, кто держит и не дёргается.'],crypto:['#fbbf24','⚡ Крипта — ОПАСНО. Скачки ±50–60% за день, можно всё потерять. Но за 10–20 лет сильно выросла. Может взлететь — а может и нет.'],meme:['#f87171','☠️ Мем — риск потери 80–99%. Почти всегда обнуляются. На свой страх и риск — брокер не отвечает. Один из сотни срывает куш.'],metal:['#efd8a3','🥇 Металлы — тихая гавань. ~2–3%/год, медленно, но почти не падает. Сейф для больших денег.'],comm:['#efd8a3','🌾 Сырьё/нефть — стабильно, глубокий рынок, как золото.']};
@@ -11121,12 +11722,47 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${listHtml}
                 <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin:10px 0 4px;border-top:1px solid #1f2937;padding-top:10px;">💼 Мои активы (куплено)</div>
                 ${holdHtml}
-                ${ownIds.length?`<button onclick="sellAllAssets()" class="btn" style="width:100%;background:#b91c1c;color:#fff;font-weight:700;margin:6px 0 4px;">💸 Продать ВСЁ (${ownIds.length} поз.)</button>`:''}
+                ${ownIds.length?`<button onclick="sellAllAssets()" class="btn btn-sell" style="width:100%;margin:6px 0 4px;">💸 Продать ВСЁ (${ownIds.length} поз.)</button>`:''}
             </div>`;
         }
 
         // 🧾 ОКНО истории сделок: что, сколько, по чём, когда (открывается кнопкой).
         function setHistoryTab(t){ state.historyTab=t; render(); }
+        // ─── 📊 ЛИЧНЫЙ P&L ПО БИРЖЕ (#20, прямая просьба сестры 19июл): в отчёте сделок хочется видеть,
+        // в плюсе ты играешь или в минусе, чтобы корректировать поведение по ходу игры.
+        // Итог = (что получил с продаж) + (что сейчас стоит портфель) − (что вложил в покупки, с комиссией).
+        function renderTradePnl(p, all){
+            let spent=0, got=0, fees=0;
+            (all||[]).forEach(t=>{
+                const g=Number(t.gross)||0, f=Number(t.fee)||0; fees+=f;
+                if(t.side==='BUY') spent += g+f; else got += g-f;
+            });
+            const port = portfolioValue(p)||0;
+            const pnl  = got + port - spent;
+            const pct  = spent>0 ? (pnl/spent*100) : 0;
+            if(!spent && !got && !port) return '';
+            const col  = pnl>0 ? '#34d399' : (pnl<0 ? '#fca5a5' : '#cdc8bd');
+            const sign = pnl>0 ? '+' : '';
+            const verdict = !spent ? 'Сделок ещё не было.'
+                : (pnl>0 ? 'Ты в плюсе — торговля пока работает на тебя.'
+                : (pnl<0 ? 'Ты в минусе. Биржа — не единственный инструмент: бизнес и депозиты дают поток спокойнее.'
+                : 'Ровно в ноль.'));
+            const cell=(lbl,val,c)=>`<div style="flex:1;min-width:88px;padding:7px 4px;text-align:center;"><div style="font-size:9.5px;color:#6d6a62;text-transform:uppercase;letter-spacing:.09em;">${lbl}</div><div style="font-family:ui-monospace,monospace;font-weight:800;font-size:13px;color:${c||'#f3efe6'};margin-top:2px;">${val}</div></div>`;
+            return `<div style="margin:0 14px 10px;background:radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.06),transparent 70%),#0a0d12;border:1px solid var(--lx-gold-ln);border-radius:13px;overflow:hidden;">
+                <div style="text-align:center;padding:11px 10px 4px;">
+                    <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#b98a3e;font-weight:800;">📊 Твой итог по бирже</div>
+                    <div style="font-family:ui-monospace,monospace;font-size:26px;font-weight:800;color:${col};margin-top:4px;line-height:1.15;">${sign}${fmtN(Math.round(pnl))}$</div>
+                    <div style="font-size:11.5px;color:${col};">${spent>0?`${sign}${pct.toFixed(1)}% от вложенного`:''}</div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;border-top:1px solid #1f2937;">
+                    ${cell('вложил',fmtN(Math.round(spent))+'$','#fca5a5')}
+                    ${cell('получил',fmtN(Math.round(got))+'$','#34d399')}
+                    ${cell('портфель сейчас',fmtN(Math.round(port))+'$','#93c5fd')}
+                    ${cell('комиссии',fmtN(Math.round(fees))+'$','#fbbf24')}
+                </div>
+                <div style="border-top:1px solid #1f2937;padding:8px 12px;font-size:11.5px;color:#9c988e;line-height:1.5;text-align:center;">${verdict}</div>
+            </div>`;
+        }
         function renderHistoryModal(){
             if(!state.showHistory) return '';
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return '';
@@ -11156,6 +11792,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <div style="font-family:Georgia,serif;font-size:19px;font-weight:700;color:#efd8a3;">🧾 История сделок</div>
                         <button onclick="state.showHistory=false;paintOverlays();" class="btn btn-gray" style="flex:0 0 auto;">✕ Закрыть</button>
                     </div>
+                    ${renderTradePnl(p, all)}
                     <div style="display:flex;border-bottom:1px solid #1f2937;">${tbtn('BUY','🛒 Покупки',nBuy)}${tbtn('SELL','📤 Продажи',nSell)}</div>
                     <div style="overflow-y:auto;padding:4px 14px 16px;">${rows}</div>
                 </div>
@@ -11668,11 +12305,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                       + d5card(p.id,'cheat',D_IMG.g_thread,'-20%',V_GOLD,'Адский чит','#f3dc9b','Выбери человека','#d9c48f',
                           'Его сделка — твоя','#ffe9a8','Любая, что есть или что<br>купит. Он платит — тебе.','#b79c5f',BG_GOLD,1);
             }
+            // #19 (фидбэк сестры): дверь читалась как «просят 6-7к на благотворительность» — и её проходили мимо,
+            // не понимая, что это ДВЕРЬ ДУШИ, что порог по КАПИТАЛУ, что процент считается от капитала,
+            // и что выбор одноразовый. Теперь всё это сказано словами прямо над картами.
+            const doorWhat = (id==='d100')
+                ? 'Это <b style="color:#efd8a3;">разминка</b>: карту души здесь не дают — игра просто смотрит, как ты поступишь. Следующая дверь придёт на 500 000$.'
+                : (id==='d500')
+                ? 'Отдашь — получишь <b style="color:#efd8a3;">карту души «Благие намерения»</b>. Пройдёшь мимо или купишь — этой карты у тебя не будет уже никогда.'
+                : 'Отдашь — получишь <b style="color:#efd8a3;">карту души «Благодарность»</b>. Возьмёшь что угодно себе (даже мелочь) — карты души нет.';
             return `<div style="position:fixed;inset:0;background:rgba(4,6,9,.95);z-index:119;display:flex;
                 align-items:center;justify-content:center;padding:14px;overflow:auto;">
               <div style="max-width:660px;width:100%;text-align:center;">
+                <div style="max-width:520px;margin:0 auto 12px;height:130px;overflow:hidden;border-radius:16px;position:relative;"><img src="cat_imgs/hero_gate.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'"><div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(4,6,9,.1),rgba(4,6,9,.85));"></div></div>
+                <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#b98a3e;font-weight:800;margin-bottom:5px;">🚪 Дверь души</div>
                 <div style="font-family:Georgia,serif;font-size:20px;color:#f0f2f4;margin-bottom:4px;">${D.ttl}</div>
-                <div style="font-size:12.5px;color:#868c93;margin-bottom:16px;">${sub}</div>
+                <div style="font-size:12.5px;color:#868c93;margin-bottom:12px;">${sub}</div>
+                <div style="max-width:520px;margin:0 auto 16px;text-align:left;background:radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.07),transparent 70%),rgba(13,16,22,.9);border:1px solid var(--lx-gold-ln);border-radius:14px;padding:13px 15px;font-size:12.5px;color:#cdc8bd;line-height:1.6;">
+                  Твой <b style="color:#f3efe6;">капитал</b> (касса + акции + активы − долги) достиг <b style="color:#efd8a3;">${fmtN(D.at)}$</b> — сейчас он <b style="color:#f3efe6;">${fmtN(Math.round(cap))}$</b>. На этом пороге игра задаёт вопрос о душе, и ответить можно <b style="color:#f3efe6;">один раз</b>.<br><br>
+                  «Отдать» списывает <b style="color:#efd8a3;">${id==='d1m'?'10%':'5–10%'} от капитала</b>, то есть примерно <b style="color:#efd8a3;">${id==='d1m'?fmtN(Math.round(cap*0.10)):c5+' – '+c10}$</b> — это не мелкое пожертвование, а серьёзная сумма. ${doorWhat}
+                </div>
                 <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">${cards}</div>
               </div></div>`;
         }
@@ -12051,7 +12702,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <p style="color:#10b981; font-weight:bold; font-size:13px; margin-top:3px;">${p.prof.name} · Зарплата ${f.salary}$${f.skillBonus>0?` <span style="color:#a5b4fc;">(база ${p.prof.salary}$ +${Math.round(f.skillBonus*100)}% навыки)</span>`:''}</p>
                     </div>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-                        <button onclick="state.view='analytics';render();" class="btn" style="background:#4c1d95;color:#ddd6fe;" title="Таблица по всем игрокам">📊</button>
+                        <button onclick="openCharity()" class="btn" style="background:radial-gradient(120% 120% at 50% 0,rgba(217,184,119,.28),transparent 72%),#241a0c;color:#efd8a3;border:1px solid var(--lx-gold-ln);box-shadow:0 0 16px -7px var(--lx-gold);display:flex;align-items:center;gap:5px;font-weight:700;font-size:12px;padding:7px 11px;" title="Благотворительность — отдай, расти духом">🕯️ <span>Благотворительность</span>${(Number(p.donatedTotal)||0)>0?`<span style="font-size:10px;color:#b98a3e;font-weight:800;">${fmtN(Math.round(p.donatedTotal))}$</span>`:''}</button>
+                        <button onclick="state.view='analytics';render();" class="btn" style="background:#4c1d95;color:#ddd6fe;display:flex;align-items:center;gap:5px;font-weight:700;font-size:12px;padding:7px 11px;" title="Таблица по всем игрокам">📊 <span>Аналитика</span></button>
                         <button onclick="state.view='lobby';render();" class="btn btn-gray">← В лобби</button>
                     </div>
                 </div>
@@ -12081,10 +12733,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${free?`<div style="font-size:11px;color:#5cb08b;margin-top:7px;font-weight:700;">Пассив в ${WIN_MULT}× перекрыл расходы — ты СВОБОДЕН! 🎉</div>`:`<div style="font-size:11px;color:#9c988e;margin-top:7px;">До свободы ещё <b style="color:#efd8a3;">${fmtN(need)}$/мес</b> пассива.</div>`}
                   </div>
                   <div style="margin-top:13px;padding-top:13px;border-top:1px solid var(--lx-line);">
-                    <div style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:var(--lx-gold-br);margin-bottom:9px;">🎴 Карты души — дверь на 2-й круг</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:9px;">
+                      <span style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:var(--lx-gold-br);">🎴 Карты души — дверь на 2-й круг</span>
+                      <button onclick="showSoulsInfo()" style="background:rgba(217,184,119,.1);border:1px solid var(--lx-gold-ln);border-radius:8px;color:var(--lx-gold-br);font-size:11px;padding:4px 9px;cursor:pointer;font-weight:700;white-space:nowrap;">ℹ️ как заслужить</button>
+                    </div>
                     ${renderS5Slots(p)}
                   </div>
                 </div>`; })()}
+
+                <details class="sec"><summary>🏦 Депозиты <span class="sec-hint">— тихий рост без риска</span></summary>${renderDepositPanel(p)}</details>
 
                 <details class="sec" open><summary>📈 Биржа <span class="sec-hint">— торгуй в любой момент</span></summary><div class="sec-in">${renderMarketPanel(p)}</div></details>
 
@@ -12100,6 +12757,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         return `<div class="row-item"><div style="flex:1;"><b>${a.title||a.name||'Актив'}</b> <span style="font-size:10px;color:#9ca3af;">${tl}${a.qty?` · ${a.qty} шт`:''}</span>${cf>0?`<div style="font-size:12px;color:#10b981;font-weight:700;">+${fmtN(cf)}$/мес пассив</div>`:''}${(Number(a.liab)||0)>0?`<div style="font-size:11px;color:#f87171;">обязательства ${fmtN(a.liab)}$ (спишутся при продаже)</div>`:''}</div><div style="text-align:right;"><b>${fmtN(val)} $</b>${a.down?`<br><span style="font-size:10px;color:#6b7280;">взнос ${fmtN(a.down)}$</span>`:''}</div></div>`;
                     }).join('') : '<p style="font-size:12px;color:#9ca3af;">Пока нет бизнеса/недвижимости. Отсканируй QR карты сделок кнопкой «📷 Сканировать карту» — купленное появится здесь <b style="color:#22d3ee;">автоматически</b>.</p>'}
                 </div>
+                </div></details>
+
+                <details class="sec"${p2pInbox(p).length?' open':''}><summary>🤝 Друг на друге <span class="sec-hint">— займы и общие дела${p2pInbox(p).length?` · <b style="color:#efd8a3;">${p2pInbox(p).length} запрос(ов)</b>`:''}</span></summary><div class="sec-in">
+                ${renderP2P(p)}
                 </div></details>
 
                 <details class="sec"><summary>🎴 Клетки и действия <span class="sec-hint">— на что попал</span></summary><div class="sec-in">
@@ -12134,7 +12795,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                                 </div>
                                                 <div style="display:grid; grid-template-columns: 1fr auto; gap:8px;">
                                                     <input type="number" id="sellQty_${a.id}" placeholder="Сколько штук продать? (макс ${a.qty})" class="inp" min="1" max="${a.qty}" style="padding:6px 10px; font-size:12px;">
-                                                    <button onclick="sellStock(${a.id}, '${a.title.replace(/'/g,"\\'")}')" ${hasP?'disabled':''} class="btn btn-gray" style="padding:6px 12px; font-size:11px;">📤 Продать N шт</button>
+                                                    <button onclick="sellStock(${a.id}, '${a.title.replace(/'/g,"\\'")}')" ${hasP?'disabled':''} class="btn btn-sell" style="padding:6px 12px; font-size:11px;">📤 Продать N шт</button>
                                                 </div>
                                             </div>
                                         `;
@@ -12144,9 +12805,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                     const _typeLbl = a.type==='ESTATE'?'Недвижимость':a.type==='BUSINESS'?'Бизнес':'Актив';
                                     return `
                                         <div class="row-item" style="display:block; padding:12px;">
+                                            ${a.type==='BUSINESS'?`<div style="height:74px;overflow:hidden;border-radius:10px;position:relative;margin:-12px -12px 10px;"><img src="cat_imgs/hero_biz.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'"><div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,.1),rgba(11,14,20,.9));"></div></div>`:''}
                                             <div class="flex-between" style="margin-bottom:8px;">
                                                 <b>${a.title}</b>
-                                                <span class="badge ${a.type==='ESTATE'?'b-amber':a.type==='BUSINESS'?'b-green':'b-rose'}">${_typeLbl}</span>
+                                                <span class="badge ${a.type==='ESTATE'?'b-amber':a.type==='BUSINESS'?'b-green':'b-rose'}">${_typeLbl}${a.type==='BUSINESS'?' · '+bizSectorLabel(a):''}</span>
                                             </div>
                                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; font-size:12px; margin-bottom:10px;">
                                                 <div style="color:#9ca3af;">Цена покупки: <b style="color:#e5e7eb;">${_price}$</b></div>
@@ -12155,7 +12817,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                                 <div style="color:#9ca3af;">При продаже: <b style="color:#fbbf24;">${_sale}$</b></div>
                                             </div>
                                             ${a.note?`<div style="font-size:11px; color:#fbbf24; margin-bottom:8px;">⚡ ${a.note}</div>`:''}
-                                            <button onclick="send('SELL_ASSET', {aId:${a.id}, title:'${a.title.replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-gray" style="padding:4px 12px; font-size:11px;">📤 Продать (${_sale}$)</button>
+                                            ${bizLevel(a)?`<div style="font-size:11px;color:#efd8a3;margin-bottom:8px;">🏗️ Развит до ступени ${bizLevel(a)}/4${bizResist(a)?` · устойчивость ${bizResist(a)}%`:''}</div>`:''}
+                                            <div style="display:flex;gap:7px;">
+                                            ${_cf>0?`<button onclick="openBizModal(${p.id},${p.assets.indexOf(a)})" class="btn" style="flex:1;padding:4px 12px;font-size:11px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">🏗️ Развить дело</button>`:''}
+                                            <button onclick="send('SELL_ASSET', {aId:${a.id}, title:'${a.title.replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-sell" style="flex:0 0 auto;padding:4px 12px; font-size:11px;">📤 Продать (${_sale}$)</button>
+                                            </div>
                                         </div>
                                     `;
                                 }).join('')}
@@ -12221,6 +12887,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div></details>
 
                 <details class="sec"><summary>🏆 Путь к победе</summary><div class="sec-in">
+                <div style="margin:-2px 0 12px;height:110px;overflow:hidden;border-radius:14px;position:relative;"><img src="cat_imgs/hero_key.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'"><div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,.1),rgba(11,14,20,.88));"></div></div>
                 ${(()=>{
                   const dt=(Number(p.mLeft)||0)+(Number(p.eLeft)||0)+(Number(p.aLeft)||0)+(Number(p.ccLeft)||0)+(Number(p.rLeft)||0)+(Number(p.bankLoan)||0);
                   const soulN=(p.soul5||[]).length;
@@ -12250,6 +12917,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderMarketModal()}
                 ${renderMedModal()}
                 ${renderCatPopup()}
+                ${renderSoulsInfo()}
+                ${renderCellLocked()}
+                ${renderBizModal()}
+                ${renderBizBudget()}
+                ${renderBizDraw()}
+                ${renderLoanModal()}
+                ${renderPartnerModal()}
+                ${renderCharityModal()}
             `;
         }
 
@@ -13060,7 +13735,34 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // не уходит в минус, налоги капнуты. Эффект применяется ко всем p в state.players. ───
         const wStocks = (ps, f) => ps.forEach(p => (p.assets||[]).forEach(a => { if (a.type==='STOCK') a.now = Math.max(1, Math.round((a.now||a.price||1)*f)); }));
         const wOther  = (ps, f) => ps.forEach(p => (p.assets||[]).forEach(a => { if (a.type==='OTHER') a.now = Math.max(1, Math.round((a.now||a.price||1)*f)); }));
-        const wBiz    = (ps, f) => ps.forEach(p => (p.assets||[]).forEach(a => { if (a.type==='BUSINESS') a.cf = Math.max(0, Math.round((a.cf||0)*f)); }));
+        // ─── 🏭 СЕКТОРА БИЗНЕСА (#22, Ринат 19июл): событие бьёт не «по всем бизнесам вообще»,
+        // а по КОНКРЕТНЫМ отраслям — корона роняет общепит, но поднимает аренду; жара кормит напитки.
+        // Это делает диверсификацию осмысленной: держишь одну отрасль — ловишь удар целиком.
+        // Сектор определяется по названию карты (карты Рината именные), иначе «прочее».
+        const BIZ_SECTORS = {
+            food:      { t:'Еда и напитки', ic:'🍔', kw:['кофе','ресторан','кафе','пицц','еда','питан','напит','бар','пекарн','столов','фастфуд','вендинг','суши'] },
+            retail:    { t:'Торговля',      ic:'🛍️', kw:['магазин','розниц','торгов','лавка','бутик','киоск','маркет'] },
+            realty:    { t:'Аренда',        ic:'🏠', kw:['аренд','квартир','дом','недвиж','парковк','склад','офис','жиль','апарт'] },
+            tech:      { t:'Технологии',    ic:'💻', kw:['it','айти','онлайн','сайт','приложен','цифр','софт','интернет','стартап','сервер'] },
+            service:   { t:'Услуги',        ic:'🔧', kw:['салон','услуг','мойк','ремонт','парикмах','фитнес','клиник','студи','школ','химчист'] },
+            transport: { t:'Транспорт',     ic:'🚚', kw:['авто','такси','груз','перевоз','логист','доставк','фур'] }
+        };
+        function bizSector(a){
+            if(a && a.sector && BIZ_SECTORS[a.sector]) return a.sector;
+            const t=String((a&&a.title)||'').toLowerCase();
+            for(const k in BIZ_SECTORS){ if(BIZ_SECTORS[k].kw.some(w=>t.includes(w))) return k; }
+            return 'other';
+        }
+        function bizSectorLabel(a){ const s=BIZ_SECTORS[bizSector(a)]; return s ? s.ic+' '+s.t : '📦 Прочее'; }
+        // f — множитель потока. sec — сектор (или null = все бизнесы, как раньше).
+        // Устойчивость (сотрудники/сеть/франшиза) гасит ТОЛЬКО удар, подарки не режет.
+        const wBiz = (ps, f, sec) => ps.forEach(p => (p.assets||[]).forEach(a => {
+            if (a.type!=='BUSINESS') return;
+            if (sec && bizSector(a)!==sec) return;
+            let ff = f;
+            if (f < 1) { const r = Math.min(70, Number(a.resist)||0) / 100; ff = 1 - (1-f)*(1-r); }
+            a.cf = Math.max(0, Math.round((a.cf||0)*ff));
+        }));
         const wCash   = (ps, fn) => ps.forEach(p => { p.savings = Math.max(0, (Number(p.savings)||0) + Math.round(fn(p))); });
         const wTax    = (ps, d) => ps.forEach(p => { const cap=p.prof.taxes*2; p.taxMod = Math.max(-p.prof.taxes, Math.min(cap, (Number(p.taxMod)||0)+Math.round(d))); });
         const WORLD_EVENTS = [
@@ -13108,7 +13810,29 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             { w:5, emoji:'📊', title:'Дефолт по облигациям',    text:'Долговой кризис: с кассы у всех −12% (не в минус).',   apply:ps=>wCash(ps,p=>-(Number(p.savings)||0)*0.12) },
             { w:4, emoji:'⚡', title:'Массовый блэкаут',        text:'Нет света: доход бизнесов −10% у всех.',              apply:ps=>wBiz(ps,0.90) },
             { w:5, emoji:'🏠', title:'Ипотечный кризис',        text:'Пузырь лопнул: акции −15% у всех.',                   apply:ps=>wStocks(ps,0.85) },
-            { w:4, emoji:'🧫', title:'Новый штамм вируса',      text:'Снова локдаун: бизнесы −12% и мед-расход у всех.',    apply:ps=>{ wBiz(ps,0.88); wCash(ps,p=>-p.prof.salary*0.15); } }
+            { w:4, emoji:'🧫', title:'Новый штамм вируса',      text:'Снова локдаун: бизнесы −12% и мед-расход у всех.',    apply:ps=>{ wBiz(ps,0.88); wCash(ps,p=>-p.prof.salary*0.15); } },
+            // ─── 🏭 СЕКТОРНЫЕ СОБЫТИЯ И СЕЗОНЫ (#22): бьют по отраслям, а не по всем сразу.
+            // Держишь всё в одной отрасли — ловишь удар целиком; диверсифицировал — почти не заметил.
+            { w:6, emoji:'🦠', title:'Карантин в городе',       text:'Общепит и услуги закрыты (−35%), торговля −15%, а АРЕНДА выросла +15%: все сидят по домам.',
+              apply:ps=>{ wBiz(ps,0.65,'food'); wBiz(ps,0.65,'service'); wBiz(ps,0.85,'retail'); wBiz(ps,1.15,'realty'); } },
+            { w:6, emoji:'☀️', title:'Жаркое лето',             text:'Напитки и еда нарасхват: общепит +30%, торговля +10%.',
+              apply:ps=>{ wBiz(ps,1.30,'food'); wBiz(ps,1.10,'retail'); } },
+            { w:5, emoji:'❄️', title:'Суровая зима',            text:'Люди не выходят: общепит −20%, транспорт −20%, зато онлайн +20%.',
+              apply:ps=>{ wBiz(ps,0.80,'food'); wBiz(ps,0.80,'transport'); wBiz(ps,1.20,'tech'); } },
+            { w:5, emoji:'📦', title:'Бум доставки',            text:'Все заказывают домой: транспорт +35%, технологии +15%, розница −10%.',
+              apply:ps=>{ wBiz(ps,1.35,'transport'); wBiz(ps,1.15,'tech'); wBiz(ps,0.90,'retail'); } },
+            { w:5, emoji:'⛽', title:'Топливо подорожало',       text:'Транспорт задыхается −25%, доставка дорожает: торговля −8%.',
+              apply:ps=>{ wBiz(ps,0.75,'transport'); wBiz(ps,0.92,'retail'); } },
+            { w:5, emoji:'🏘️', title:'Жильё подорожало',        text:'Аренда +25% — арендодатели празднуют. Остальным дороже помещения: услуги −10%.',
+              apply:ps=>{ wBiz(ps,1.25,'realty'); wBiz(ps,0.90,'service'); } },
+            { w:4, emoji:'📉', title:'Лопнул техно-пузырь',      text:'Технологии рухнули −30%. Реальный сектор устоял.',
+              apply:ps=>wBiz(ps,0.70,'tech') },
+            { w:4, emoji:'🛍️', title:'Сезон распродаж',         text:'Люди тратят: торговля +25%, общепит +10%.',
+              apply:ps=>{ wBiz(ps,1.25,'retail'); wBiz(ps,1.10,'food'); } },
+            { w:4, emoji:'🏗️', title:'Город строит район',      text:'Новые кварталы: аренда +20%, услуги +15%, транспорт +10%.',
+              apply:ps=>{ wBiz(ps,1.20,'realty'); wBiz(ps,1.15,'service'); wBiz(ps,1.10,'transport'); } },
+            { w:4, emoji:'🧾', title:'Проверки в общепите',      text:'Новые нормы: общепит −20%, услуги −10%.',
+              apply:ps=>{ wBiz(ps,0.80,'food'); wBiz(ps,0.90,'service'); } }
         ];
         function openWorldModal(id){ if(!gate(id,'world')) return; state.worldDraw = { pId:id, done:false, result:null }; render(); }
         function closeWorldModal(){ state.worldDraw = null; render(); }
@@ -13803,6 +14527,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             let amt=parseInt(((prompt('Сколько вложить в «'+iv.t+'»? Минимум '+iv.min+'$:', iv.min))||'').replace(/[^0-9]/g,''))||iv.min;
             if(amt<iv.min) amt=iv.min;
             if((Number(p.savings)||0) < amt){ alert('Не хватает денег: нужно '+amt+'$, у тебя '+Math.round(Number(p.savings)||0)+'$'); return; }
+            // #18: последнее честное предупреждение — кубик бросается ПРЯМО СЕЙЧАС, не «когда-нибудь на рынке».
+            if(iv.risk && !confirm('⚠️ «'+iv.t+'» — '+iv.risk+'% ШАНС ПОТЕРЯТЬ '+(iv.loss==='all'?'ВСЁ':'ПОЛОВИНУ')+'.\n\nВкладываешь '+amt+'$. Розыгрыш происходит сразу: с вероятностью '+iv.risk+'% ты '+(iv.loss==='all'?'теряешь все '+amt+'$':'теряешь половину, '+Math.round(amt/2)+'$')+'.\n\nВкладываем?')) return;
             p.savings=Math.round(((Number(p.savings)||0)-amt)*100)/100;
             p.assets=p.assets||[];
             if(iv.risk){
@@ -14306,7 +15032,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 var ln=[['Доход','+'+iv.rate+'% каждый круг','#5cb08b'],['Минимум',iv.min+'$','']];
                 if(iv.term) ln.push(['Срок','~'+iv.term+' кругов','']);
                 if(iv.risk) ln.push(['Риск',iv.risk+'% — '+(iv.loss==='all'?'потерять всё':'потерять половину'),'#cf9a9a']);
-                cp={emoji:em,tag:tg,title:iv.t,desc:'Вложи сумму (от '+iv.min+'$) — получай +'+iv.rate+'% каждый круг.'+(iv.risk?' Но есть риск потери!':' Без риска.'),lines:ln,color:cl,apply:function(){resolveInvest(pid,iv);}};
+                var wr = iv.risk ? [
+                    iv.risk+'% ШАНС ПОТЕРЯТЬ '+(iv.loss==='all'?'ВСЁ ВЛОЖЕННОЕ':'ПОЛОВИНУ ВЛОЖЕННОГО'),
+                    'Это не «умеренный риск рынка», а бросок сразу при покупке: из 100 раз примерно '+iv.risk+' раз ты '+(iv.loss==='all'?'теряешь деньги целиком':'теряешь половину')+', и только '+(100-iv.risk)+' раз получаешь +'+iv.rate+'% каждый круг. Решай осознанно.'
+                ] : null;
+                cp={emoji:em,tag:tg,title:iv.t,desc:'Вложи сумму (от '+iv.min+'$) — получай +'+iv.rate+'% каждый круг.'+(iv.risk?'':' Без риска.'),warn:wr,lines:ln,color:cl,apply:function(){resolveInvest(pid,iv);}};
             }
             if(cp){ state.cardPreview=cp; state.view='player'; render(); }
         }
@@ -14321,6 +15051,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                   '<div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:'+(c.color||'#d9b877')+';font-weight:800;margin-top:6px;">'+(c.tag||'')+'</div>'+
                   '<div style="font-family:Georgia,serif;font-size:20px;font-weight:600;margin:6px 0 10px;">'+(c.title||'')+'</div>'+
                   (c.desc?'<p style="font-size:13px;color:#c3cde3;line-height:1.5;margin-bottom:12px;">'+c.desc+'</p>':'')+
+                  // #18 (фидбэк сестры): рискованное вложение = чистая лотерея. Пишем это КРУПНО и ЧЕСТНО,
+                  // чтобы человек выбирал осознанно, а не «взял умеренный риск» и получил кубик в лоб.
+                  (c.warn?'<div style="background:rgba(120,20,20,.30);border:1px solid #b91c1c;border-radius:12px;padding:12px 13px;margin-bottom:12px;text-align:left;">'+
+                     '<div style="font-size:15px;font-weight:800;color:#fca5a5;line-height:1.35;margin-bottom:5px;">⚠️ '+c.warn[0]+'</div>'+
+                     '<div style="font-size:12px;color:#e7bcbc;line-height:1.5;">'+c.warn[1]+'</div></div>':'')+
                   (lines?'<div style="text-align:left;border:1px solid var(--lx-line);border-radius:12px;overflow:hidden;margin-bottom:14px;">'+lines+'</div>':'')+
                   '<div style="display:flex;gap:8px;">'+
                     '<button onclick="applyCardPreview()" class="btn btn-green" style="flex:1;">✓ Применить</button>'+
@@ -14957,7 +15692,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p = state.players.find(x => x.id === id);
             if (!p) return false;
             if ((Number(p.jail)||0) > 0) { alert('🔒 Ты в тюрьме — доступна только лудка (казино). Отбывай ходы или откупись.'); return false; }
-            if (p.allow !== key) { alert('🔒 Жди — ведущий должен ОТКРЫТЬ тебе эту клетку.'); return false; }
+            if (p.allow !== key) { showCellLocked(key); return false; }   // #17: объясняем клетку, а не глухой блок
             p.allow = null; save();   // одноразовое: разрешение потрачено
             return true;
         }
