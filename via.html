@@ -10833,8 +10833,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Слой всплывающих окон (покупка/история/карта/событие). Рисуется отдельно от #app, поэтому
         // открытие/закрытие окна не перестраивает весь экран → нет мигания и рывка за окном.
         function renderOverlays(){
-            if (state.view !== 'player') return '';
-            const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return '';
+            // 🐞 (Ринат 21 июл: «попадают ли людям карты мировых событий?»). Игрокам — да.
+            // А ВЕДУЩЕМУ карточка не показывалась: слой всплывашек рисовался только на экране
+            // игрока, хотя рядом стоял комментарий «ведущий тоже увидит вместе со всеми».
+            // Он видел, что цены дёрнулись, но не видел, ЧТО случилось. Карту события показываем
+            // на любом экране, остальные окна — по-прежнему только в бланке.
+            if (state.view !== 'player') return renderWorldShow();
+            const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return renderWorldShow();
             return renderWorldShow() + renderHistoryModal() + renderBuyModal() + renderCardPreview();
         }
         function paintOverlays(){ const ov=document.getElementById('overlay'); if(ov) ov.innerHTML = renderOverlays(); }
@@ -13790,12 +13795,62 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             await autoBuyStock(p);                                     // должно молча не пройти
             autoToast('🔒 '+p.name+' ткнулся в закрытую биржу', '#6b7280');
         }
+        // 🏦 кредит банка. Заявка идёт ведущему на одобрение — бот одобрить сам не может,
+        // поэтому берём напрямую по той же формуле (10 центов с доллара в месяц считает calc).
+        // Путь одобрения проверяется живым игроком, а нам тут важна нагрузка на кассу и расходы.
+        function autoBankLoan(p){
+            if((Number(p.bankLoan)||0) > 0) return;                 // один кредит за раз
+            if((Number(p.savings)||0) > 20000) return;              // берут те, кому не хватает
+            const amt = 1000 * (1 + Math.floor(Math.random()*5));    // кратно 1000, как в игре
+            p.bankLoan = (Number(p.bankLoan)||0) + amt;
+            p.savings = Math.round(((Number(p.savings)||0) + amt)*100)/100;
+            save(p.id);
+            autoToast('🏦 '+p.name+' взял кредит '+fmtN(amt)+'$', '#b98a3e');
+        }
+        function autoRepayBank(p){
+            const owe = Number(p.bankLoan)||0;
+            if(owe <= 0 || (Number(p.savings)||0) < owe) return;
+            p.savings = Math.round(((Number(p.savings)||0) - owe)*100)/100;
+            p.bankLoan = 0; save(p.id);
+            autoToast('🏦 '+p.name+' закрыл кредит '+fmtN(owe)+'$', '#5cb08b');
+        }
+        // 💼 депозит: кладём по-настоящему в p.deposits (те же поля, что и у живого),
+        // иногда снимаем досрочно — тогда работает настоящий withdrawDeposit со штрафом 40%.
+        function autoDeposit(p){
+            if((p.deposits||[]).length >= 2) return;
+            const t = _rnd(DEPOSIT_TIERS);
+            const amt = Math.round((Number(p.savings)||0) * 0.15);
+            if(amt < 100) return;
+            p.savings = Math.round(((Number(p.savings)||0) - amt)*100)/100;
+            p.deposits = p.deposits || [];
+            p.deposits.push({id:uid(), amount:amt, tier:t.k, rate:t.rate, lock:t.lock, placedY:curYear()});
+            save(p.id);
+            autoToast('💼 '+p.name+' положил '+fmtN(amt)+'$ на «'+t.n+'»', '#8fb3e0');
+        }
+        async function autoWithdraw(p){
+            const ds = p.deposits || []; if(!ds.length) return;
+            const d = _rnd(ds);
+            await _asPlayer(p, ()=>{ withdrawDeposit(d.id); });      // настоящий путь, со штрафом
+            autoToast('💼 '+p.name+' снял вклад', '#cf9a9a');
+        }
+        // 🔒 откуп из тюрьмы — настоящий серверный путь (и теневой ход в закон души)
+        async function autoJailBuyout(p){
+            if((Number(p.jail)||0) <= 0) return;
+            try{
+                await fetch('/jail/buyout',{method:'POST',headers:{'Content-Type':'application/json'},
+                                            body:JSON.stringify({pid:p.id})});
+                autoToast('🔒 '+p.name+' откупился из тюрьмы', '#cf9a9a');
+            }catch(e){}
+        }
         // Что бот делает помимо клетки. Веса подобраны так, чтобы за прогон было потрогано ВСЁ.
+        // Слух живёт один круг — если вес мал, за партию наберётся 2-3 решения и мы ничего
+        // не проверим. Поднят до 40 (живой прогон 21 июл показал 1 решение за 40 секунд).
         const AUTO_ACTS=[
-            [autoRumor,       26], [autoBuyDeal,    20], [autoDevelopBiz, 16],
+            [autoRumor,       40], [autoBuyDeal,    18], [autoDevelopBiz, 16],
             [autoInbox,       14], [autoCharity,     8], [autoLoan,        8],
-            [autoPartner,      8], [autoSlot,        6], [autoSellAsset,   4],
-            [autoBuyClosed,    5],
+            [autoPartner,      8], [autoSlot,        8], [autoSellAsset,   4],
+            [autoBuyClosed,    4], [autoBankLoan,    8], [autoRepayBank,   5],
+            [autoDeposit,      8], [autoWithdraw,    4], [autoJailBuyout, 10],
         ];
         async function autoAction(p){
             const tot=AUTO_ACTS.reduce((s,x)=>s+x[1],0);
