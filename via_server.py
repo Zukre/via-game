@@ -447,6 +447,80 @@ def data_flusher():
                 print('flusher error:', e)
 
 
+# ═══ ВЛОЖЕНИЕ В СЕБЯ И СОЗДАНИЕ (спека VIA_SELF_CREATION_SPEC_2026_07_21.md) ═══
+# Тренинг НЕ даёт денег и НЕ трогает зарплату — он ключ к созданию и к колоде.
+# Держим на сервере, потому что здесь считаются деньги; клиент рисует те же цифры.
+SELF_TRAININGS = {
+    'ai':     {'name': 'ИИ и автоматизация 🤖',     'cost': 4000},
+    'sales':  {'name': 'Продажи 💼',                'cost': 3000},
+    'nego':   {'name': 'Переговоры 🤝',             'cost': 3500},
+    'brand':  {'name': 'Личный бренд ⭐',           'cost': 5000},
+    'stage':  {'name': 'Публичные выступления 🎤',  'cost': 2500},
+    'fin':    {'name': 'Финансовая грамотность 📊', 'cost': 2000},
+    'psy':    {'name': 'Психология и эмоции 🧠',    'cost': 3000},
+    'health': {'name': 'Здоровье и энергия 💪',     'cost': 2000},
+    'mkt':    {'name': 'Маркетинг и трафик 📣',     'cost': 3500},
+    'eng':    {'name': 'Английский 🗣️',             'cost': 2500},
+    'voice':  {'name': 'Курсы голоса 🎙️',           'cost': 2500},   # Ринат 22июл: открывает «Стать звездой»
+}
+# req — нужны ВСЕ; reqAny — достаточно одного; boost — двигают колоду 7/3 в сторону успеха.
+CREATIONS = {
+    'book':       {'name': 'Книга 📖',                 'cost': 10000, 'cf': 800,
+                   'req': [], 'reqAny': ['brand', 'stage'], 'boost': ['brand', 'sales', 'mkt', 'eng']},
+    'prog':       {'name': 'Программа 💻',             'cost': 10000, 'cf': 1000,
+                   'req': ['ai'], 'boost': ['ai', 'mkt', 'eng', 'sales']},
+    'course':     {'name': 'Онлайн-курс 🎓',           'cost': 8000,  'cf': 900,
+                   'req': ['sales', 'stage'], 'boost': ['stage', 'sales', 'brand', 'psy']},
+    'brandprod':  {'name': 'Свой бренд товара 🏷️',     'cost': 15000, 'cf': 2000,
+                   'req': ['mkt', 'sales'], 'boost': ['mkt', 'sales', 'nego', 'brand']},
+    'blog':       {'name': 'Блог и контент 📱',        'cost': 1500,  'cf': 300, 'grow': 150,
+                   'req': ['brand'], 'boost': ['brand', 'mkt', 'stage', 'psy']},
+    'mentor':     {'name': 'Наставничество 🧑‍🏫',       'cost': 2500,  'cf': 150,
+                   'req': [], 'boost': [], 'minSkills': 4, 'needFail': True},
+    # Ринат 22июл: путь артиста — кафе (100$/мес) → маленькие концерты (×2) → звезда города (×2)
+    'star':       {'name': 'Стать звездой 🌟',         'cost': 1500,  'cf': 100,
+                   'req': ['voice'], 'boost': ['stage', 'brand', 'mkt', 'psy']},
+}
+# Потолок колоды: шансы поднимают максимум 3 навыка. Купил десять — они откроют тебе все
+# созданиs, но гарантии не купишь. Выигрывает тот, кто заранее решил, КЕМ он становится,
+# и вложился прицельно. «Раскрыть СВОИ таланты» — значит выбрать, а не собрать всё.
+BOOST_CAP = 3
+
+# ─── РАЗВИТИЕ СОЗДАННОГО (Ринат 21 июл) ───
+# Три ступени. Первая — само творение. Каждая следующая УДВАИВАЕТ поток и стоит от своей же
+# цены: вторая столько же, третья втрое. Так книга за 10к вырастает с 800 до 3200 в месяц,
+# вложив всего 50к — вровень с хорошим бизнесом.
+# Проценты от маленького зерна не работали: 500к ради +480 в месяц окупались бы 86 лет,
+# а партия идёт 30. Поэтому удвоение, а не прибавка процента.
+# Развитие НЕ тянет колоду: лотерея была один раз, на входе. Дальше ты уже автор.
+DEV_COST_MULT = {2: 1.0, 3: 3.0}
+CREATION_STEPS = {
+    'book':      {2: 'Допечатка тиража',    3: 'Перевод и аудиоверсия'},
+    'prog':      {2: 'Платная подписка',    3: 'Мобильная версия'},
+    'course':    {2: 'Живые потоки',        3: 'Своя школа'},
+    'brandprod': {2: 'Своя точка продаж',   3: 'Франшиза'},
+    'blog':      {2: 'Реклама у тебя',      3: 'Своё медиа'},
+    'mentor':    {2: 'Групповые разборы',   3: 'Школа наставников'},
+    'star':      {2: 'Маленькие концерты',  3: 'Звезда своего города'},
+}
+
+# Цена растёт ступеньками (Ринат 21 июл): первый тренинг по базовой цене, 2-4 дороже на 20%,
+# с 5-го на 40%, с 9-го на 80%. Смысл: вход дёшев для бедного — лестница жива, — а собрать
+# всё подряд дорого, и человеку приходится ВЫБИРАТЬ, кем становиться.
+def train_mult(owned):
+    if owned <= 0:
+        return 1.0
+    if owned <= 3:
+        return 1.2
+    if owned <= 7:
+        return 1.4
+    return 1.8
+
+
+def train_price(key, owned):
+    return round(SELF_TRAININGS[key]['cost'] * train_mult(owned))
+
+
 DATA = load_data()
 # инициализируем живой рынок, если его ещё нет (первый запуск)
 if via_market and not DATA.get('market'):
@@ -924,6 +998,150 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return
+        if self.path.startswith('/self/'):
+            # ═══ ВЛОЖЕНИЕ В СЕБЯ И СОЗДАНИЕ (Ринат 21 июл, спека VIA_SELF_CREATION_SPEC_2026_07_21.md)
+            # Хребет: тренинг САМ ПО СЕБЕ не даёт ни тенге — он молчит, пока не применён.
+            # Деньги — в создании, но создать можно только то, подо что есть навык, и колода
+            # 7 провалов / 3 успеха сдвигается ровно на то, сколько ты в себя вложил.
+            # Вся тяга колоды и все списания — ЗДЕСЬ, под LOCK. Клиент только рисует: иначе
+            # повторится баг «деньги ушли и не пришли» (18 июл).
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw)
+                pid = req.get('pid')
+                with LOCK:
+                    pl = next((p for p in DATA['players'] if p.get('id') == pid), None)
+                    if pl is None:
+                        raise ValueError('player not found')
+                    pl.setdefault('selfSkills', [])
+                    pl.setdefault('creations', [])
+                    pl.setdefault('failExp', 0)
+
+                    if self.path == '/self/train':
+                        key = req.get('key')
+                        tr = SELF_TRAININGS.get(key)
+                        if tr is None:
+                            raise ValueError('unknown training')
+                        if key in pl['selfSkills']:
+                            self._send_json({'ok': False, 'reason': 'already'}, 200)
+                            return
+                        price = train_price(key, len(pl['selfSkills']))
+                        if float(pl.get('savings') or 0) < price:
+                            self._send_json({'ok': False, 'reason': 'not_enough', 'cost': price}, 200)
+                            return
+                        pl['savings'] = round(float(pl.get('savings') or 0) - price, 2)
+                        pl['selfSkills'].append(key)
+                        save_data(DATA)
+                        broadcast()
+                        self._send_json({'ok': True, 'key': key, 'cost': price})
+                        return
+
+                    if self.path == '/self/create':
+                        key = req.get('key')
+                        cr = CREATIONS.get(key)
+                        if cr is None:
+                            raise ValueError('unknown creation')
+                        have = set(pl['selfSkills'])
+                        missing = [r for r in cr['req'] if r not in have]
+                        if cr.get('reqAny'):
+                            missing = [] if (have & set(cr['reqAny'])) else [cr['reqAny'][0]]
+                        if cr.get('minSkills') and len(have) < cr['minSkills']:
+                            missing = ['_minSkills']
+                        if cr.get('needFail') and int(pl['failExp']) < 1:
+                            missing = ['_needFail']
+                        if missing:
+                            self._send_json({'ok': False, 'reason': 'locked', 'missing': missing}, 200)
+                            return
+                        if any(c.get('key') == key for c in pl['creations']):
+                            self._send_json({'ok': False, 'reason': 'already'}, 200)
+                            return
+                        if float(pl.get('savings') or 0) < cr['cost']:
+                            self._send_json({'ok': False, 'reason': 'not_enough', 'cost': cr['cost']}, 200)
+                            return
+
+                        # ── КОЛОДА 7 на 3. Каждый навык-усилитель меняет провал на успех.
+                        #    Плюс «опыт»: каждое прошлое падение снимает ещё одну карту провала.
+                        #    Пол — 2 провала: чуда без риска не бывает никогда.
+                        boost = min(BOOST_CAP, len([b for b in cr['boost'] if b in have])) + int(pl['failExp'])
+                        fails = max(2, 7 - boost)
+                        wins = 10 - fails
+                        deck = ['fail'] * fails + ['win'] * wins
+                        drawn = random.choice(deck)
+
+                        pl['savings'] = round(float(pl.get('savings') or 0) - cr['cost'], 2)
+                        won = (drawn == 'win')
+                        if won:
+                            pl.setdefault('assets', []).append({
+                                'id': int(time.time() * 1000) % 10**9,
+                                'kind': 'CREATION',        # ← неотчуждаемо: не кризис, не закон души, не продажа
+                                'ckey': key,               # чтобы развитие нашло свой актив
+                                'type': 'BUSINESS',
+                                'title': cr['name'],
+                                't': cr['name'],
+                                'price': cr['cost'],
+                                'cf': cr['cf'],
+                                'grow': cr.get('grow', 0),  # блог: +150 каждый круг
+                            })
+                            pl['creations'].append({'key': key, 'cf': cr['cf'], 'level': 1})
+                        else:
+                            pl['failExp'] = int(pl['failExp']) + 1
+                        save_data(DATA)
+                        broadcast()
+                        self._send_json({'ok': True, 'won': won, 'fails': fails, 'wins': wins,
+                                         'cost': cr['cost'], 'cf': cr['cf'] if won else 0,
+                                         'name': cr['name'], 'key': key})
+                        return
+
+                    if self.path == '/self/develop':
+                        key = req.get('key')
+                        cr = CREATIONS.get(key)
+                        if cr is None:
+                            raise ValueError('unknown creation')
+                        item = next((c for c in pl['creations'] if c.get('key') == key), None)
+                        if item is None:
+                            self._send_json({'ok': False, 'reason': 'not_created'}, 200)
+                            return
+                        lvl = int(item.get('level') or 1)
+                        if lvl >= 3:
+                            self._send_json({'ok': False, 'reason': 'max_level'}, 200)
+                            return
+                        nxt = lvl + 1
+                        price = round(cr['cost'] * DEV_COST_MULT[nxt])
+                        if float(pl.get('savings') or 0) < price:
+                            self._send_json({'ok': False, 'reason': 'not_enough', 'cost': price}, 200)
+                            return
+                        # 🩹 Ищем по КЛЮЧУ, а не по названию: после первой ступени актив
+                        # переименовывается («… · ур.2»), и поиск по имени переставал его находить —
+                        # запись росла, а поток в активе оставался старым. Ключ проставляем и старым.
+                        # Ищем ДО списания: иначе при сбое деньги уходят в никуда (баг 18 июл).
+                        hit = None
+                        for a in pl.get('assets', []):
+                            if a.get('kind') != 'CREATION':
+                                continue
+                            if a.get('ckey') == key or str(a.get('title') or '').startswith(cr['name']):
+                                hit = a
+                                break
+                        if hit is None:
+                            self._send_json({'ok': False, 'reason': 'asset_missing'}, 200)
+                            return
+                        newcf = int(item.get('cf') or cr['cf']) * 2   # ступень УДВАИВАЕТ поток
+                        pl['savings'] = round(float(pl.get('savings') or 0) - price, 2)
+                        item['level'] = nxt
+                        item['cf'] = newcf
+                        hit['ckey'] = key
+                        hit['cf'] = newcf
+                        hit['title'] = hit['t'] = f"{cr['name']} · ур.{nxt}"
+                        save_data(DATA)
+                        broadcast()
+                        self._send_json({'ok': True, 'key': key, 'level': nxt, 'cf': newcf,
+                                         'cost': price, 'step': CREATION_STEPS[key][nxt]})
+                        return
+
+                    raise ValueError('unknown self path')
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
         if self.path.startswith('/p2p/'):
             # ═══ ИГРОК ↔ ИГРОК (Ринат 19июл, задачи #23/#24): займы под % и партнёрство «скинуться на бизнес».
             # ВСЯ логика денег — здесь, на сервере, под LOCK. Клиент только рисует и шлёт намерение:
@@ -1014,6 +1232,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         if left <= 0.01:
                             borrower['p2pDebts'] = [x for x in borrower.get('p2pDebts', []) if x.get('id') != req.get('id')]
                             lender['p2pLoans'] = [x for x in lender.get('p2pLoans', []) if x.get('id') != req.get('id')]
+                            # ⚖️ репутация: вернул долг живому человеку полностью — свет (клиент читает helpedBack)
+                            borrower['helpedBack'] = int(borrower.get('helpedBack') or 0) + 1
                             borrower['notify'] = '✅ Долг перед %s закрыт полностью.' % lender.get('name', '')
                             lender['notify'] = '✅ %s вернул долг полностью: +%s$.' % (borrower.get('name', ''), int(pay))
                         else:

@@ -300,6 +300,28 @@
         details.sec>summary .sec-hint{font-family:system-ui; font-size:11px; font-weight:400; color:var(--lx-muted);}
         .sec-in{padding:0 13px 14px;}
         .sec-in>.card{margin-bottom:10px;} .sec-in>.card:last-child{margin-bottom:0;}
+
+        /* ─── 🧱 БЛАНК ПЛИТКАМИ (Ринат 21 июл: «убрать пустоты и долгое листание») ───
+           Закрытый раздел = маленькая плитка в сетке. Открытый = окно на весь экран.
+           Разметку разделов не меняли: всё держится на этих правилах. */
+        .sec-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px;}
+        @media(max-width:640px){ .sec-grid{grid-template-columns:repeat(2,1fr); gap:7px;} }
+        .sec-grid>details.sec{margin:0; min-height:74px;}
+        .sec-grid>details.sec>summary{padding:12px 10px; flex-direction:column; align-items:flex-start;
+            justify-content:center; gap:3px; font-size:13px; line-height:1.25; min-height:74px;}
+        .sec-grid>details.sec>summary::after{display:none;}
+        .sec-grid>details.sec>summary .sec-hint{display:none;}
+        /* открытая плитка — во весь экран, шапка прилипает сверху */
+        .sec-grid>details.sec[open]{position:fixed; inset:0; z-index:900; margin:0; border-radius:0;
+            overflow-y:auto; -webkit-overflow-scrolling:touch; box-shadow:none;}
+        .sec-grid>details.sec[open]>summary{position:sticky; top:0; z-index:2; flex-direction:row;
+            align-items:center; gap:10px; padding:15px; font-size:15px; min-height:0;
+            background:var(--lx-panel); border-bottom:1px solid var(--lx-gold-ln);}
+        .sec-grid>details.sec[open]>summary::after{display:block; content:"✕"; margin-left:auto;
+            font-size:20px; transform:none; color:var(--lx-gold-br);}
+        .sec-grid>details.sec[open]>summary .sec-hint{display:inline;}
+        /* раздел без плитки: живёт только как окно, открывается кнопкой снаружи */
+        .sec-grid>details.sec.tile-hidden:not([open]){display:none;}
         .soul-strip{background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel)); border:1px solid var(--lx-line);
             border-radius:15px; padding:12px 14px; margin-bottom:11px;}
         .soul-strip .ss-h{font-family:Georgia,serif; font-size:14px; font-weight:700; color:var(--lx-gold-br); margin-bottom:9px;}
@@ -10486,6 +10508,72 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             { key:'finlit', name:'Финансовая грамотность 📊', draft:'дешевле кредиты, видишь подсказки рынка' }
         ];
 
+        // ═══ ВЛОЖЕНИЕ В СЕБЯ И СОЗДАНИЕ (Ринат 21 июл, спека VIA_SELF_CREATION_SPEC_2026_07_21.md) ═══
+        // Хребет: тренинг САМ ПО СЕБЕ не даёт ни тенге — ни к зарплате, ни в отчёт. Он лежит как
+        // заряженное ружьё. Деньги — в создании, но создать можно только то, подо что есть навык.
+        // Цены и требования продублированы на сервере (via_server.py) — там же тяга колоды.
+        // ⚠️ Это НЕ p.skills: там старые карьерные навыки с процентом к зарплате, их не трогаем.
+        const SELF_TRAININGS = [
+            {key:'ai',     name:'ИИ и автоматизация 🤖',     cost:4000, note:'открывает Программу · на бирже видишь сектор вперёд'},
+            {key:'sales',  name:'Продажи 💼',                cost:3000, note:'активы и акции продаёшь на +10% дороже'},
+            {key:'nego',   name:'Переговоры 🤝',             cost:3500, note:'первый взнос в сделке −15%'},
+            {key:'brand',  name:'Личный бренд ⭐',           cost:5000, note:'сам пустой — но без него созданное выходит в тишину'},
+            {key:'stage',  name:'Публичные выступления 🎤',  cost:2500, note:'открывает Курс и Наставничество'},
+            {key:'fin',    name:'Финансовая грамотность 📊', cost:2000, note:'кредиты дешевле · видишь доходность ДО покупки'},
+            {key:'psy',    name:'Психология и эмоции 🧠',    cost:3000, note:'гасит половину удара события · держит от казино'},
+            {key:'health', name:'Здоровье и энергия 💪',     cost:2000, note:'закрывает Медицину · лишний ход раз в круг'},
+            {key:'mkt',    name:'Маркетинг и трафик 📣',     cost:3500, note:'бизнесы растут быстрее'},
+            {key:'eng',    name:'Английский 🗣️',             cost:2500, note:'международные сделки · зарубежный рынок'},
+            {key:'voice',  name:'Курсы голоса 🎙️',           cost:2500, note:'открывает путь «Стать звездой»'},   // Ринат 22июл
+        ];
+        // req — нужны ВСЕ; reqAny — хватит одного; boost — двигают колоду 7/3 в сторону успеха.
+        const CREATIONS = [
+            {key:'book',      name:'Книга 📖',            cost:10000, cf:800,  req:[], reqAny:['brand','stage'], boost:['brand','sales','mkt','eng']},
+            {key:'prog',      name:'Программа 💻',        cost:10000, cf:1000, req:['ai'],            boost:['ai','mkt','eng','sales']},
+            {key:'course',    name:'Онлайн-курс 🎓',      cost:8000,  cf:900,  req:['sales','stage'], boost:['stage','sales','brand','psy']},
+            {key:'brandprod', name:'Свой бренд товара 🏷️', cost:15000, cf:2000, req:['mkt','sales'],   boost:['mkt','sales','nego','brand']},
+            {key:'blog',      name:'Блог и контент 📱',   cost:1500,  cf:300,  grow:150, req:['brand'], boost:['brand','mkt','stage','psy']},
+            {key:'mentor',    name:'Наставничество 🧑‍🏫',  cost:2500,  cf:150,  req:[], boost:[], minSkills:4, needFail:true},
+            // Ринат 22июл: путь артиста. Ступень 1 — выступаешь в кафе (100$/мес),
+            // 2 — маленькие концерты (×2), 3 — звезда своего города (×2 ещё раз).
+            {key:'star',      name:'Стать звездой 🌟',    cost:1500,  cf:100,  req:['voice'], boost:['stage','brand','mkt','psy'], step1:'Выступаешь в кафе'},
+        ];
+        const BOOST_CAP = 3;   // шансы поднимают максимум 3 навыка — гарантию не купишь
+        // Развитие созданного: 3 ступени, каждая УДВАИВАЕТ поток. Вторая стоит как само творение,
+        // третья втрое. Развитие не тянет колоду — лотерея была один раз, на входе.
+        const DEV_COST_MULT = {2:1, 3:3};
+        const CREATION_STEPS = {
+            book:      {2:'Допечатка тиража',  3:'Перевод и аудиоверсия'},
+            prog:      {2:'Платная подписка',  3:'Мобильная версия'},
+            course:    {2:'Живые потоки',      3:'Своя школа'},
+            brandprod: {2:'Своя точка продаж', 3:'Франшиза'},
+            blog:      {2:'Реклама у тебя',    3:'Своё медиа'},
+            mentor:    {2:'Групповые разборы', 3:'Школа наставников'},
+            star:      {2:'Маленькие концерты',3:'Звезда своего города'},
+        };
+        const trainByKey = k => SELF_TRAININGS.find(t => t.key === k);
+        // Ступеньки цены (Ринат 21 июл): 1-й по базовой, 2-4 дороже на 20%, с 5-го на 40%, с 9-го на 80%.
+        // Те же числа считает сервер (train_mult) — он и списывает; здесь только показ.
+        function trainMult(owned){ return owned<=0?1 : owned<=3?1.2 : owned<=7?1.4 : 1.8; }
+        function trainPrice(p, t){ return Math.round(t.cost * trainMult((p.selfSkills||[]).length)); }
+        // Состав колоды ровно как на сервере: 7 провалов, каждый усилитель и каждое прошлое падение
+        // снимают по одной карте провала. Пол — 2 провала: чуда без риска не бывает никогда.
+        function deckOf(p, cr){
+            const have = new Set(p.selfSkills || []);
+            const boost = Math.min(BOOST_CAP, (cr.boost || []).filter(b => have.has(b)).length) + (Number(p.failExp) || 0);
+            const fails = Math.max(2, 7 - boost);
+            return {fails, wins: 10 - fails};
+        }
+        function creationLock(p, cr){
+            const have = new Set(p.selfSkills || []);
+            if (cr.minSkills && have.size < cr.minSkills) return `нужно ${cr.minSkills} любых навыка (есть ${have.size})`;
+            if (cr.needFail && !(Number(p.failExp) > 0)) return 'откроется после первого падения — учить можно только пережитым';
+            if (cr.reqAny && !cr.reqAny.some(k => have.has(k))) return 'нужен: ' + cr.reqAny.map(k => trainByKey(k).name).join(' или ');
+            const miss = (cr.req || []).filter(k => !have.has(k));
+            if (miss.length) return 'нужен: ' + miss.map(k => trainByKey(k).name).join(' + ');
+            return null;
+        }
+
         // SERVER_MODE: если открыто через http://localhost — используем общий Python-сервер
         // (sync между ВСЕМИ браузерами). file:// → fallback на localStorage (только Chrome).
         const SERVER_MODE = location.protocol === 'http:' || location.protocol === 'https:';
@@ -10795,11 +10883,33 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!(d instanceof HTMLDetailsElement)) return;
             const k = secKey(d); if(!k) return;
             if(d.open) _openSecs.add(k); else _openSecs.delete(k);
+            // 🧱 Плитки: открытая плитка занимает весь экран, поэтому открытой может быть
+            // только ОДНА — иначе два окна лягут друг на друга. Остальные закрываем.
+            if(d.open && d.parentElement && d.parentElement.classList.contains('sec-grid')){
+                d.parentElement.querySelectorAll('details.sec[open]').forEach(o => {
+                    if(o === d) return;
+                    o.open = false;
+                    const ok = secKey(o); if(ok) _openSecs.delete(ok);
+                });
+            }
         }, true);
+        // Открыть окно раздела снаружи (кнопкой), не имея плитки. Ищем по началу текста шапки.
+        function openSecWindow(label){
+            const all = document.querySelectorAll('.sec-grid>details.sec');
+            for(const d of all){
+                const s = d.querySelector('summary');
+                if(s && s.textContent.trim().startsWith(label)){ d.open = true; return; }
+            }
+        }
         function restoreSecs(root){
+            // 🧱 Плиток может быть восстановлена только ОДНА: это окна во весь экран.
+            let tileDone = false;
             (root || document).querySelectorAll('details').forEach(d => {
                 const k = secKey(d);
-                if(k && _openSecs.has(k) && !d.open) d.open = true;
+                if(!k || !_openSecs.has(k) || d.open) return;
+                const isTile = d.parentElement && d.parentElement.classList.contains('sec-grid');
+                if(isTile){ if(tileDone) { _openSecs.delete(k); return; } tileDone = true; }
+                d.open = true;
             });
         }
 
@@ -11950,6 +12060,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // крупные (от 5000$) копятся на АУКЦИОН. Бонусы/связь с картами душ — допилим по концепции Нины.
         const CHARITY_AUCTION_MIN = 5000;   // от какой суммы пожертвование считается «крупным» (к аукциону)
         const CHARITY_AUCTION_NEED = 3;     // сколько крупных нужно, чтобы открыть аукцион
+        const CHARITY_SOUL_NEED = 5;        // Ринат 22июл: столько РАЗ пожертвовал (любые суммы) → карта души
         function openCharity(){ state.charityModal=true; render(); }
         function closeCharity(){ state.charityModal=false; render(); }
         function doCharity(v){
@@ -11962,6 +12073,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.donatedTotal=Math.round(((Number(p.donatedTotal)||0)+amt)*100)/100;
             if(amt>=CHARITY_AUCTION_MIN) p.bigDonations=(Number(p.bigDonations)||0)+1;
             p.shadow=Math.max(0,(Number(p.shadow)||0));   // (не трогаем тень — это чистое добро)
+            // Ринат 22июл: карта души за благотворительность — за РАЗЫ, не за суммы.
+            // Отдал в пятый раз (сколько угодно — главное отдал) → «Благие намерения».
+            p.donations=(Number(p.donations)||0)+1;
+            const soulNow = (p.donations>=CHARITY_SOUL_NEED) && s5give(p,'intent');
             state.charityModal=false;
             const aucNow=(Number(p.bigDonations)||0)>=CHARITY_AUCTION_NEED;
             p.notify='🕯️ Ты отдал '+fmtN(amt)+'$ на благотворительность. Щедрость запоминается.'+(amt>=CHARITY_AUCTION_MIN?(aucNow?' 🎟️ Аукцион открыт!':' 🎟️ +1 к аукциону.'):'');
@@ -11982,7 +12097,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <input id="charAmt" type="number" min="1" placeholder="Сумма пожертвования, $" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;margin-bottom:8px;">
                         <div style="display:flex;gap:6px;margin-bottom:14px;">${quick}</div>
                         <div style="background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:12px;padding:10px 14px;margin-bottom:13px;">
-                            <div style="display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:12.5px;color:#cdc8bd;line-height:1.45;"><span style="color:#5cb08b;font-size:15px;">🕯️</span><div>Шаг к <b style="color:#efd8a3;">карте души</b> — щедрость запоминается игрой.</div></div>
+                            ${(()=>{ const dn=Number(p.donations)||0, dneed=CHARITY_SOUL_NEED, dhas=s5has(p,'intent');
+                              return `<div style="display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:12.5px;color:#cdc8bd;line-height:1.45;"><span style="color:#5cb08b;font-size:15px;">🕯️</span><div>${
+                                dhas ? `Карта души <b style="color:#efd8a3;">«Благие намерения»</b> уже у тебя — но щедрость игра помнит всегда.`
+                                     : `Карта души за щедрость: пожертвовал <b style="color:#efd8a3;">${Math.min(dn,dneed)} из ${dneed}</b> раз. Сумма не важна — важно, что отдаёшь.`}</div></div>`; })()}
                             <div style="display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:12.5px;color:#cdc8bd;line-height:1.45;"><span style="color:#5cb08b;font-size:15px;">✨</span><div><b style="color:#efd8a3;">Бонус за щедрость</b> <span style="color:#6d6a62;font-size:11px;">(допишем по концепции Нины)</span></div></div>
                         </div>
                         <div style="background:radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.08),transparent 70%),var(--lx-ink);border:1px solid var(--lx-gold-ln);border-radius:12px;padding:11px 13px;margin-bottom:16px;">
@@ -11997,6 +12115,150 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     </div>
                 </div>
             </div>`;
+        }
+        // ─── 🎓 РАЗВИВАТЬ СЕБЯ: тренинги (молчат) + создание (кормит) ───
+        function renderSelfPanel(p) {
+            const have = new Set(p.selfSkills || []);
+            const made = new Set((p.creations || []).map(c => c.key));
+            const cash = Number(p.savings) || 0;
+
+            const strip = SELF_TRAININGS.map(t => {
+                const on = have.has(t.key);
+                return `<div title="${t.name}" style="width:34px;height:34px;border-radius:9px;overflow:hidden;flex:0 0 auto;
+                    border:1px solid ${on?'var(--lx-gold-ln)':'var(--lx-line)'};opacity:${on?1:.28};filter:${on?'none':'grayscale(1)'};">
+                    <img src="cat_imgs/skill_${t.key}.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none'"></div>`;
+            }).join('');
+
+            const trainings = SELF_TRAININGS.map(t => {
+                const on = have.has(t.key), price = trainPrice(p, t), poor = cash < price;
+                return `<div class="card" style="padding:0;overflow:hidden;border-color:${on?'var(--lx-gold-ln)':'var(--lx-line)'};">
+                  <div style="height:92px;position:relative;">
+                    <img src="cat_imgs/skill_${t.key}.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;${on?'':'filter:grayscale(.7) brightness(.75);'}" onerror="this.style.display='none'">
+                    ${on?`<div style="position:absolute;top:6px;right:6px;background:rgba(11,14,20,.85);border:1px solid var(--lx-gold-ln);border-radius:7px;color:var(--lx-gold-br);font-size:10px;font-weight:800;padding:3px 7px;">ЕСТЬ</div>`:''}
+                  </div>
+                  <div style="padding:9px 10px 10px;">
+                    <div style="font-size:13px;font-weight:700;color:#f3efe6;">${t.name}</div>
+                    <div style="font-size:11px;color:var(--lx-muted);margin:3px 0 8px;line-height:1.35;">${t.note}</div>
+                    ${on ? `<div style="font-size:11px;color:#5cb08b;font-weight:700;">✓ навык твой навсегда</div>`
+                         : `<button onclick="doTrain('${t.key}')" ${poor?'disabled':''} class="btn" style="width:100%;padding:7px;font-size:12px;font-weight:700;${poor?'opacity:.45;':''}">${poor?'не хватает · '+fmtN(price)+'$':'Пройти · '+fmtN(price)+'$'}</button>
+                            ${price>t.cost?`<div style="font-size:10px;color:var(--lx-muted);margin-top:4px;text-align:center;">база ${fmtN(t.cost)}$ · каждый следующий навык дороже</div>`:''}`}
+                  </div></div>`;
+            }).join('');
+
+            const madeBy = {}; (p.creations || []).forEach(c => madeBy[c.key] = c);
+            const creations = CREATIONS.map(cr => {
+                const done = made.has(cr.key), lock = creationLock(p, cr), d = deckOf(p, cr), poor = cash < cr.cost;
+                const mine = madeBy[cr.key];
+                const lvl = mine ? (Number(mine.level) || 1) : 0;
+                const nxt = lvl + 1;
+                const devCost = lvl && lvl < 3 ? Math.round(cr.cost * DEV_COST_MULT[nxt]) : 0;
+                const devPoor = devCost > cash;
+                return `<div class="card" style="padding:0;overflow:hidden;border-color:${done?'#10b981':(lock?'var(--lx-line)':'var(--lx-gold-ln)')};">
+                  <div style="height:92px;position:relative;">
+                    <img src="cat_imgs/create_${cr.key}.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;${lock?'filter:grayscale(1) brightness(.55);':''}" onerror="this.style.display='none'">
+                  </div>
+                  <div style="padding:9px 10px 10px;">
+                    <div style="font-size:13px;font-weight:700;color:#f3efe6;">${cr.name}</div>
+                    <div style="font-size:11px;color:var(--lx-muted);margin:3px 0 6px;">${fmtN(cr.cost)}$ → ${fmtN(cr.cf)}$/мес навсегда${cr.grow?` · +${cr.grow}$ каждый круг`:''}</div>
+                    ${/* лестница видна ВСЕГДА, даже до создания: человек должен знать, ради чего вкладывается */''}
+                    <div style="font-size:10px;line-height:1.5;color:var(--lx-muted);border-top:1px dashed var(--lx-line);border-bottom:1px dashed var(--lx-line);padding:5px 0;margin-bottom:7px;">
+                      <span style="color:${lvl>=1?'#5cb08b':'#6d6a62'};">1 · ${cr.step1 || cr.name.replace(/\s*[^\wа-яА-ЯёЁ\s].*$/,'').trim()} — ${fmtN(cr.cf)}$</span><br>
+                      <span style="color:${lvl>=2?'#5cb08b':'#6d6a62'};">2 · ${CREATION_STEPS[cr.key][2]} — ${fmtN(cr.cf*2)}$ за ${fmtN(cr.cost)}$</span><br>
+                      <span style="color:${lvl>=3?'#5cb08b':'#6d6a62'};">3 · ${CREATION_STEPS[cr.key][3]} — ${fmtN(cr.cf*4)}$ за ${fmtN(cr.cost*3)}$</span>
+                    </div>
+                    ${done ? `<div style="font-size:11px;color:#5cb08b;font-weight:700;margin-bottom:6px;">✓ ступень ${lvl} из 3 · ${fmtN(mine.cf)}$/мес</div>
+                        ${lvl >= 3 ? `<div style="font-size:11px;color:var(--lx-gold-br);font-weight:700;">👑 развито до конца</div>`
+                          : `<button onclick="doDevelop('${cr.key}')" ${devPoor?'disabled':''} class="btn" style="width:100%;padding:7px;font-size:12px;font-weight:700;${devPoor?'opacity:.45;':''}">${CREATION_STEPS[cr.key][nxt]} · ${fmtN(devCost)}$</button>
+                             <div style="font-size:10px;color:var(--lx-muted);margin-top:4px;text-align:center;">поток удвоится: ${fmtN(mine.cf)} → ${fmtN(mine.cf*2)}$/мес</div>`}`
+                      : lock ? `<div style="font-size:11px;color:#cf9a9a;line-height:1.35;">🔒 ${lock}</div>`
+                      : `<div style="font-size:11px;color:var(--lx-gold-br);margin-bottom:7px;font-weight:700;">колода: ${d.fails} провала / ${d.wins} успеха</div>
+                         <button onclick="doCreate('${cr.key}')" ${poor?'disabled':''} class="btn" style="width:100%;padding:7px;font-size:12px;font-weight:700;${poor?'opacity:.45;':''}">${poor?'не хватает':'Создать · '+fmtN(cr.cost)+'$'}</button>`}
+                  </div></div>`;
+            }).join('');
+
+            return `<div class="sec-in">
+              <div class="card">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${strip}</div>
+                <div style="font-size:11px;color:var(--lx-muted);margin-top:9px;line-height:1.4;">
+                  Навыков собрано: <b style="color:#efd8a3;">${have.size} из ${SELF_TRAININGS.length}</b>${Number(p.failExp)>0?` · падений позади: <b style="color:#cf9a9a;">${p.failExp}</b> (каждое убирает одну карту провала)`:''}
+                </div>
+              </div>
+              <div class="block-title" style="margin-top:12px;">🎓 Вложить в себя <span style="font-weight:400;color:var(--lx-muted);font-size:11px;">— денег не приносит, открывает возможности</span></div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px;">${trainings}</div>
+              <div class="block-title" style="margin-top:16px;">✍️ Создать своё <span style="font-weight:400;color:var(--lx-muted);font-size:11px;">— вот где деньги, но можно и сгореть</span></div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px;">${creations}</div>
+            </div>`;
+        }
+
+        async function doTrain(key){
+            const p = me(); if(!p) return;
+            const t = trainByKey(key); if(!t) return;
+            if(!confirm(`Пройти «${t.name}» за ${fmtN(trainPrice(p,t))}$?\n\nВажно: сам по себе навык денег НЕ приносит. Он откроет создание и сдвинет колоду удачи.\nКаждый следующий навык будет дороже — выбирай, кем становишься.`)) return;
+            try{
+                const r = await fetch('/self/train',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:p.id, key})});
+                const j = await r.json();
+                if(j && j.ok===false) alert(j.reason==='not_enough' ? 'Не хватает денег: нужно '+fmtN(j.cost)+'$.' : 'Этот навык у тебя уже есть.');
+            }catch(e){ console.warn('self/train:',e); alert('Сеть подвела — попробуй ещё раз.'); }
+        }
+        async function doCreate(key){
+            const p = me(); if(!p) return;
+            const cr = CREATIONS.find(c => c.key===key); if(!cr) return;
+            const d = deckOf(p, cr);
+            if(!confirm(`Создать «${cr.name}» за ${fmtN(cr.cost)}$?\n\nКолода: ${d.fails} карты «не пошло» и ${d.wins} «пошло».\nПровал забирает деньги целиком — но даёт опыт.`)) return;
+            try{
+                const r = await fetch('/self/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:p.id, key})});
+                const j = await r.json();
+                if(j && j.ok===false){
+                    alert(j.reason==='not_enough' ? 'Не хватает денег: нужно '+fmtN(j.cost)+'$.'
+                        : j.reason==='already' ? 'Ты это уже создал.' : 'Пока закрыто — не хватает навыков.');
+                    return;
+                }
+                if(j && j.ok){ state.deckResult = j; render(); }
+            }catch(e){ console.warn('self/create:',e); alert('Сеть подвела — попробуй ещё раз.'); }
+        }
+        async function doDevelop(key){
+            const p = me(); if(!p) return;
+            const cr = CREATIONS.find(c => c.key===key); if(!cr) return;
+            const mine = (p.creations||[]).find(c => c.key===key); if(!mine) return;
+            const lvl = Number(mine.level)||1, nxt = lvl+1;
+            if(nxt > 3) return;
+            const cost = Math.round(cr.cost * DEV_COST_MULT[nxt]);
+            if(!confirm(`«${CREATION_STEPS[key][nxt]}» за ${fmtN(cost)}$?\n\nПоток удвоится: ${fmtN(mine.cf)} → ${fmtN(mine.cf*2)}$/мес.\nЭто не лотерея — ступень берётся наверняка.`)) return;
+            try{
+                const r = await fetch('/self/develop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:p.id, key})});
+                const j = await r.json();
+                if(j && j.ok===false) alert(j.reason==='not_enough' ? 'Не хватает денег: нужно '+fmtN(j.cost)+'$.' : j.reason==='max_level' ? 'Это уже развито до конца.' : 'Сначала создай это.');
+            }catch(e){ console.warn('self/develop:',e); alert('Сеть подвела — попробуй ещё раз.'); }
+        }
+        // Показ вытянутой карты. Состав колоды виден — в этом вся мораль ветки.
+        function renderDeckResult(){
+            const j = state.deckResult; if(!j) return '';
+            const win = !!j.won;
+            return `<div onclick="state.deckResult=null;render();" style="position:fixed;inset:0;z-index:950;background:rgba(6,8,12,.92);display:flex;align-items:center;justify-content:center;padding:18px;">
+              <div class="card" onclick="event.stopPropagation()" style="max-width:340px;text-align:center;border-color:${win?'#10b981':'#cf9a9a'};">
+                <img src="cat_imgs/deck_${win?'win':'fail'}.webp" alt="" style="width:100%;border-radius:12px;display:block;margin-bottom:11px;" onerror="this.style.display='none'">
+                <div style="font-family:Georgia,serif;font-size:19px;font-weight:700;color:${win?'#5cb08b':'#cf9a9a'};">${win?'ПОШЛО':'НЕ ПОШЛО'}</div>
+                <div style="font-size:13px;color:#f3efe6;margin-top:7px;line-height:1.45;">${win
+                  ? `«${j.name}» ожила и приносит <b style="color:#5cb08b;">${fmtN(j.cf)}$/мес</b> навсегда. Это нельзя отнять.`
+                  : `«${j.name}» не взлетела. ${fmtN(j.cost)}$ сгорели.<br><span style="color:var(--lx-muted);">Но опыт остался: следующая попытка легче, и открылось наставничество.</span>`}</div>
+                <div style="font-size:11px;color:var(--lx-muted);margin-top:10px;">в колоде было ${j.fails} провала / ${j.wins} успеха</div>
+                <button onclick="state.deckResult=null;render();" class="btn" style="width:100%;margin-top:12px;padding:9px;font-weight:700;">Закрыть</button>
+              </div></div>`;
+        }
+
+        // ─── 📈 Живой график строки биржи (Ринат 21июл: «биржа скучная»).
+        // Биржа без картинки движения — просто список чисел. Рисуем последние 24 точки истории
+        // лёгким SVG: без библиотек, без запросов, десяток строк на экран не тормозят.
+        function sparkline(hist, up){
+            const h = (hist||[]).slice(-24);
+            if(h.length < 2) return '<div style="flex:1;"></div>';
+            const lo = Math.min(...h), hi = Math.max(...h), span = (hi-lo)||1;
+            const W = 100, H = 26;
+            const pts = h.map((v,i)=>`${(i/(h.length-1)*W).toFixed(1)},${(H - (v-lo)/span*H).toFixed(1)}`).join(' ');
+            const col = up ? '#5cb08b' : '#cf9a9a';
+            return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1;height:26px;min-width:52px;display:block;">
+                <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".95"></polyline>
+              </svg>`;
         }
         function renderMarketPanel(p){
             const m=state.market;
@@ -12021,9 +12283,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     return {a, chg, invested: heldQty*a.price};
                 }).sort((x,y)=> (y.invested - x.invested) || (y.a.price - x.a.price));
                 const rows=sorted.length?sorted.map(({a,chg,invested})=>{
-                    const c=chg>=0?'#10b981':'#f43f5e', arrow=chg>=0?'▲':'▼';
-                    const cap=invested>0?` <span style="color:#efd8a3;font-size:11px;font-weight:700;">💰 ${fmtN(invested)}$</span>`:'';
-                    return `<div class="row-item"><div style="flex:1;"><b>${a.name}</b>${cap}<div style="font-size:12px;color:${c};font-weight:700;">${fmtPrice(a.price)}$ · ${arrow} ${fmtPct(chg)}</div></div><button onclick="openBuyModal('${a.id}')" class="btn btn-buy">Купить</button></div>`;
+                    const c=chg>=0?'#5cb08b':'#cf9a9a', arrow=chg>=0?'▲':'▼';
+                    const cap=invested>0?`<span style="color:var(--lx-gold-br);font-size:10.5px;font-weight:700;white-space:nowrap;">💰 ${fmtN(invested)}$</span>`:'';
+                    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--lx-line);border-radius:12px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));margin-bottom:6px;">
+                      <div style="flex:0 0 auto;min-width:76px;">
+                        <div style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:#f3efe6;line-height:1.1;">${a.name}</div>
+                        ${cap||`<div style="font-size:10.5px;color:#6d6a62;">—</div>`}
+                      </div>
+                      ${sparkline(a.history, chg>=0)}
+                      <div style="flex:0 0 auto;text-align:right;min-width:88px;">
+                        <div style="font-family:ui-monospace,monospace;font-size:14px;font-weight:700;color:#efd8a3;line-height:1.15;">${fmtPrice(a.price)}$</div>
+                        <div style="font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:${c};">${arrow} ${fmtPct(chg)}</div>
+                      </div>
+                      <button onclick="openBuyModal('${a.id}')" style="flex:0 0 auto;background:rgba(217,184,119,.10);border:1px solid var(--lx-gold-ln);border-radius:9px;color:var(--lx-gold-br);font-size:11.5px;font-weight:800;padding:7px 12px;cursor:pointer;">Купить</button>
+                    </div>`;
                 }).join(''):'<div style="color:#9ca3af;font-size:13px;padding:10px;text-align:center;">В этой категории пока нет активов.</div>';
                 // ℹ️ Прогноз доходности по вкладке (Ринат 19июл): «сколько даёт в год как в жизни»
                 const CAT_INFO={stock:['#5cb08b','📈 Акции — доли компаний. ~5–10%/год, стабильно. Большие деньги, тихо. Выигрывает терпеливый, кто держит и не дёргается.'],crypto:['#fbbf24','⚡ Крипта — ОПАСНО. Скачки ±50–60% за день, можно всё потерять. Но за 10–20 лет сильно выросла. Может взлететь — а может и нет.'],meme:['#f87171','☠️ Мем — риск потери 80–99%. Почти всегда обнуляются. На свой страх и риск — брокер не отвечает. Один из сотни срывает куш.'],metal:['#efd8a3','🥇 Металлы — тихая гавань. ~2–3%/год, медленно, но почти не падает. Сейф для больших денег.'],comm:['#efd8a3','🌾 Сырьё/нефть — стабильно, глубокий рынок, как золото.']};
@@ -12035,16 +12308,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <span>📈 Биржа · Год ${m.game_year||1}</span>
                     <button onclick="state.showHistory=true;paintOverlays();" title="История сделок (всего за игру)" style="background:#0e2a3a;border:1px solid #23324a;border-radius:9px;color:#7dd3fc;font-size:15px;padding:4px 10px;cursor:pointer;font-weight:700;">🧾${(()=>{const n=Number(p.tradeSeq)||((p.trades&&p.trades.length)||0);return n?` ${n}`:'';})()}</button>
                 </div>
-                <div id="mktTick" style="text-align:center;font-size:12px;font-weight:800;color:#7dd3fc;margin-bottom:6px;">⏳ …</div>
+                <div id="mktTick" style="text-align:center;font-family:ui-monospace,monospace;font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--lx-gold-br);background:rgba(217,184,119,.07);border:1px solid var(--lx-line);border-radius:8px;padding:5px 0;margin-bottom:8px;">⏳ …</div>
                 ${/* 🩹 «дерганная палка» (Ринат 21июл): плашка рождалась СКРЫТОЙ, а показывал её таймер раз
      в секунду. На каждой перерисовке она исчезала — содержимое прыгало вверх, через миг
      таймер возвращал её — прыгало вниз. И только при открытом окне покупки, как он и заметил.
      Теперь рождается сразу в нужном виде: пересборка её не гасит, прыгать нечему. */''}
                 <div id="buyTimer" style="position:fixed;right:18px;top:330px;z-index:900;width:152px;visibility:${buyWindowOpen()?'visible':'hidden'};text-align:center;background:#064e3b;color:#d1fae5;padding:9px 13px;border-radius:10px;font-weight:800;font-size:13px;border:1px solid #10b981;box-shadow:0 8px 26px -10px rgba(16,185,129,.75);">${buyWindowOpen()&&state.board?'🟢 Покупка открыта ВСЕМ: '+fmtLeft(state.board.buyWindowEndsAt):''}</div>
                 ${alertHtml}
-                <div style="font-size:13px;color:#a7f3d0;margin-bottom:6px;">💼 Портфель: <b>${fmtN(portfolioValue(p))} $</b> &nbsp;·&nbsp; 💰 Касса: <b>${fmtN(p.savings)} $</b></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                  <div style="border:1px solid var(--lx-line);border-radius:11px;padding:9px 11px;background:var(--lx-ink);">
+                    <div style="font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#9c988e;font-weight:700;">Портфель</div>
+                    <div style="font-family:ui-monospace,monospace;font-size:17px;font-weight:700;color:#efd8a3;margin-top:2px;">${fmtN(portfolioValue(p))}$</div>
+                  </div>
+                  <div style="border:1px solid var(--lx-line);border-radius:11px;padding:9px 11px;background:var(--lx-ink);">
+                    <div style="font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#9c988e;font-weight:700;">Касса</div>
+                    <div style="font-family:ui-monospace,monospace;font-size:17px;font-weight:700;color:#efd8a3;margin-top:2px;">${fmtN(p.savings)}$</div>
+                  </div>
+                </div>
                 <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">💸 Комиссия биржи сейчас: <b style="color:#fbbf24;">${(tradeFeePct(p)*100).toFixed(1)}%</b> на сделку <span style="color:#6b7280;">(спред ${(FEE_BASE*100).toFixed(1)}% + надбавка за частоту, до ${(FEE_CAP*100).toFixed(0)}%)</span></div>
-                <button onclick="state.showMarket=!state.showMarket;render();" class="btn" style="width:100%;margin:2px 0 8px;background:${state.showMarket?'#374151':'#2563eb'};color:#fff;">${state.showMarket?'Скрыть биржу ▲':'📈 Открыть биржу (купить активы) ▼'}</button>
+                <button onclick="state.showMarket=!state.showMarket;render();" style="width:100%;margin:2px 0 8px;padding:11px;cursor:pointer;border-radius:11px;font-family:Georgia,serif;font-size:14px;font-weight:700;letter-spacing:.02em;background:${state.showMarket?'var(--lx-ink)':'linear-gradient(180deg,#efd8a3,#d9b877)'};color:${state.showMarket?'var(--lx-gold-br)':'#20180a'};border:1px solid var(--lx-gold-ln);">${state.showMarket?'Свернуть торги ▲':'Открыть торги ▼'}</button>
                 ${listHtml}
                 <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin:10px 0 4px;border-top:1px solid #1f2937;padding-top:10px;">💼 Мои активы (куплено)</div>
                 ${holdHtml}
@@ -12488,9 +12770,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 p.savings = Math.max(0, (Number(p.savings)||0) - sum);
                 p.charity = (Number(p.charity)||0) + sum;
                 p.charityLast = { pct: Math.round(pct*100), sum: sum };
+                p.donations = (Number(p.donations)||0) + 1;              // «Отдать» на двери = тоже пожертвование (счёт разов)
+                p.donatedTotal = Math.round(((Number(p.donatedTotal)||0) + sum)*100)/100;
                 // 100к — разминка, карты не даёт. 500к — Благие намерения. Миллион — Благодарность.
                 if(id === 'd500') s5give(p, 'intent');
                 if(id === 'd1m')  s5give(p, 'grat');
+                if((Number(p.donations)||0) >= CHARITY_SOUL_NEED) s5give(p, 'intent');   // пятый раз отдал — карта, даже на первой двери
             }
             else if(choice === 'skip'){ /* 100к: не страшно, игра спросит ещё раз на 500к */ }
             else if(choice === 'coin'){ p.savings = (Number(p.savings)||0) + 1000; }
@@ -12513,6 +12798,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!(state.players||[]).some(x => x.id === Number(victimId))) return;
             p.cheatPick = false;
             p.cheatOn = Number(victimId);
+            p.betrayals = (Number(p.betrayals)||0) + 1;   // ⚖️ репутация помнит кидок и после прощения
             s5burn(p, 'cheat');
             save(p.id); render();
         }
@@ -12556,6 +12842,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function renderS5Burn(p){
             const why = p.soulBurn === 'cheat'
               ? { t:'Ты обокрал человека.', s:'Он сидит напротив. Он всё видел.' }
+              : p.soulBurn === 'rep'
+              ? { t:'Стол тебя запомнил.', s:'Не один раз. Не случайно. Раз за разом — против живых. Колода закрыта.' }
               : { t:'Молодец. Ты купил Карту.', s:'Знак был на карте. Ты его не искал.' };
             return `<div style="position:fixed;inset:0;background:rgba(3,1,1,.96);z-index:121;display:flex;
                 align-items:center;justify-content:center;padding:16px;">
@@ -12825,6 +13113,39 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                        : 0.10 * (light / 60) - 0.10 * (Math.min(dark,100) / 100);
             return {light, dark, bias};
         }
+        // ══════════ ⚖️ ШКАЛА РЕПУТАЦИИ ══════════ (Ринат 22июл)
+        // Одна шкала на игрока: каждый хороший поступок двигает вправо, каждый грязный — влево.
+        // Игрок её НЕ видит (закон молчит) — видит только ведущий на пульте.
+        // Считается из поступков заново каждый раз, поэтому её не затрёт ни один пуш сервера.
+        // Утонула ниже REP_CURSE_AT — значит человек СИСТЕМАТИЧЕСКИ играл против живых → колода сгорает.
+        const REP_CURSE_AT = -60;
+        function repScore(p){
+            if(!p) return {rep:0, good:[], bad:[]};
+            const st = pstat(p);
+            const G = [], B = [];
+            const g = (n, v, t) => { if(n > 0 && v > 0) G.push({v: v, t: t + ' ×' + n}); };
+            const b = (n, v, t) => { if(n > 0 && v > 0) B.push({v: v, t: t + ' ×' + n}); };
+            const dn = Number(p.donations)||0;
+            g(dn, dn*8, '🕯️ пожертвовал');
+            const hb = Number(p.helpedBack)||0;
+            g(hb, hb*6, '🤝 вернул долг человеку');
+            const cy = Number(p.cleanYears)||0;
+            g(cy, cy*3, '🌿 чистый год');
+            if(s5has(p,'service')) G.push({v:12, t:'🕊️ служение людям (от ведущего)'});
+            const sh = Number(p.shadow)||0;
+            b(sh, sh*8, '🌑 теневой ход (чёрный рынок / на лапу)');
+            const sp = Number(p.soulPoison)||0;
+            b(sp, sp*5, '☠️ яд в душе (карты пороков)');
+            const dy = Number(p.debtYears)||0;
+            b(dy, dy*4, '⛓️ год с висящим долгом');
+            const cx = Math.max(0, (Number(st.casinoPlays)||0) - LUDO_CARD_AT);
+            b(cx, cx*2, '🎰 кручение после Лудомана');
+            const bt = Number(p.betrayals)||0;
+            b(bt, bt*45, '🗡️ кинул живого человека');
+            const good = Math.min(100, G.reduce((s,x)=>s+x.v,0));
+            const bad  = Math.min(140, B.reduce((s,x)=>s+x.v,0));
+            return {rep: Math.max(-100, Math.min(100, Math.round(good - bad))), good:G, bad:B, g:good, b:bad};
+        }
         // Затухание казино: чем больше крутишь, тем меньше отдаёт. Пол — четверть.
         // Тот, кто зашёл дважды из любопытства, не увидит ничего: до 20-го кручения decay = 1.
         function casinoDecay(p){
@@ -12888,6 +13209,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(p.cursed && soulWeight(p).light >= SOUL_FORGIVE_AT){
                 p.cursed = false; p.soulBurn = null; p.soul5 = [];
                 p.notify = '🕊️ Колода снова открыта. Собирай заново.';
+                dirty = true;
+            }
+            // ⚖️ Ринат 22июл: проклятие не за одну ошибку — за накопленную ГРЯЗНУЮ репутацию.
+            // Много раз играл против живых (тень, кидки, взятки, долги, лудомания) → колода сгорает.
+            if(!p.cursed && repScore(p).rep <= REP_CURSE_AT && soulWeight(p).light < SOUL_FORGIVE_AT){
+                s5burn(p, 'rep');   // (свет ≥ порога прощения держит от повторного сгорания)
                 dirty = true;
             }
             if(soulBottomCheck(p)) dirty = true;
@@ -13168,6 +13495,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                       <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9c988e;font-weight:700;">💰 Касса</div>
                       <div style="font-family:ui-monospace,monospace;font-size:34px;font-weight:700;line-height:1;margin-top:5px;color:#efd8a3;">${fmtN(p.savings)}<span style="color:#d9b877;font-size:19px;margin-left:2px;">$</span></div>
                     </div>
+                    ${/* 🏦 Депозит переехал сюда из плитки (Ринат 21 июл): деньги лежат в кассе —
+                         значит и кнопка «вложить» должна быть у кассы, а не внизу списка. */''}
+                    <button onclick="openSecWindow('🏦 Депозиты')" style="background:rgba(217,184,119,.1);border:1px solid var(--lx-gold-ln);border-radius:10px;color:var(--lx-gold-br);font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">🏦 Депозит</button>
                     <span style="font-family:ui-monospace,monospace;font-weight:700;font-size:13px;color:${f.flow>=0?'#5cb08b':'#cf9a9a'};background:${f.flow>=0?'rgba(92,176,139,.12)':'rgba(207,154,154,.12)'};padding:5px 10px;border-radius:999px;white-space:nowrap;">${f.flow>=0?'▲ +':'▼ '}${fmtN(f.flow)}/мес</span>
                   </div>
                   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:14px 0 12px;">
@@ -13189,9 +13519,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                   </div>
                 </div>`; })()}
 
-                <details class="sec"><summary>🏦 Депозиты <span class="sec-hint">— тихий рост без риска</span></summary>${renderDepositPanel(p)}</details>
+                ${/* 🧱 Плитки (Ринат 21 июл): было 9 полос во всю ширину — до «Пути к победе» надо
+                     было крутить пол-экрана. Стало: сетка маленьких плиток, нажал — окно на весь
+                     экран. Разметка разделов НЕ тронута, всё решает .sec-grid в CSS. */''}
+                <div class="sec-grid">
 
-                <details class="sec" open><summary>📈 Биржа <span class="sec-hint">— торгуй в любой момент</span></summary><div class="sec-in">${renderMarketPanel(p)}</div></details>
+                <details class="sec"><summary>🎓 Развивать себя <span class="sec-hint">— тренинги и создание своего</span></summary>${renderSelfPanel(p)}</details>
+
+                ${/* плитки у депозитов нет — открывается кнопкой у кассы, а окно то же самое */''}
+                <details class="sec tile-hidden"><summary>🏦 Депозиты <span class="sec-hint">— тихий рост без риска</span></summary>${renderDepositPanel(p)}</details>
+
+                ${/* 🩹 21 июл: было `open` — биржа разворачивалась в списке. С плитками это значит
+                     «окно на весь экран», и при каждой перерисовке она вылезала поверх депозитов. */''}
+                <details class="sec"><summary>📈 Биржа <span class="sec-hint">— торгуй в любой момент</span></summary><div class="sec-in">${renderMarketPanel(p)}</div></details>
 
                 ${p.casinoOff ? '' : `<details class="sec"><summary>🎰 Казино</summary><div class="sec-in">${renderLuckPanel(p)}</div></details>`}
 
@@ -13207,7 +13547,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
                 </div></details>
 
-                <details class="sec"${p2pInbox(p).length?' open':''}><summary>🤝 Друг на друге <span class="sec-hint">— займы и общие дела${p2pInbox(p).length?` · <b style="color:#efd8a3;">${p2pInbox(p).length} запрос(ов)</b>`:''}</span></summary><div class="sec-in">
+                ${/* 🩹 21 июл: было авто-раскрытие при входящем запросе. С плитками это окно во весь
+                     экран, которое лезло бы поверх всего. Стало: счётчик прямо на плитке. */''}
+                <details class="sec"><summary>🤝 Друг на друге${p2pInbox(p).length?` <b style="color:#efd8a3;">· ${p2pInbox(p).length}</b>`:''} <span class="sec-hint">— займы и общие дела</span></summary><div class="sec-in">
                 ${renderP2P(p)}
                 </div></details>
 
@@ -13361,6 +13703,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                   </div>`; })()}
                 </div></details>
 
+                </div>${/* ← конец .sec-grid */''}
+
                 ${/* МОДАЛКИ вынесены в конец, вне сворачиваемых секций, чтобы всплывали поверх (внутри закрытого details они были бы скрыты) */''}
                 ${renderSkillModal()}
                 ${renderGovModal()}
@@ -13382,6 +13726,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderLoanModal()}
                 ${renderPartnerModal()}
                 ${renderCharityModal()}
+                ${renderDeckResult()}
             `;
         }
 
@@ -14078,6 +14423,28 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                         <br>🎯 До победы: <b style="color:${f.win?'#10b981':'#fbbf24'};">${f.win?'ПОБЕДА!':`${f.target-f.passive}$ пассива`}</b>
                                     </div>
 
+                                    <!-- ⚖️ ШКАЛА РЕПУТАЦИИ (видит только ведущий; Ринат 22июл) -->
+                                    ${(()=>{ const r=repScore(p); const pos=Math.max(2,Math.min(98,(r.rep+100)/2));
+                                        const col = p.cursed ? '#ff6a4d' : r.rep<=REP_CURSE_AT+20 ? '#f59e0b' : r.rep>=20 ? '#efd8a3' : '#9ca3af';
+                                        const tag = p.cursed ? '☠️ ПРОКЛЯТ' : r.rep<=REP_CURSE_AT+20 ? '⚠️ у края' : r.rep>=40 ? '🕊️ светлый' : r.rep>=0 ? 'ровно' : 'темнеет';
+                                        const li = x=>`<div style="display:flex;justify-content:space-between;padding:1px 0;"><span>${x.t}</span><b>${x.v>0?'':''}${x.v}</b></div>`;
+                                        return `<div style="background:#0c1018;border:1px solid #1f2937;border-radius:8px;padding:8px 10px;margin-bottom:8px;">
+                                        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:6px;">
+                                            <span style="color:#9ca3af;font-weight:700;">⚖️ РЕПУТАЦИЯ <span style="color:#4b5563;">· видишь только ты</span></span>
+                                            <b style="color:${col};font-family:ui-monospace,monospace;">${r.rep>0?'+':''}${r.rep} · ${tag}</b>
+                                        </div>
+                                        <div style="position:relative;height:9px;border-radius:99px;border:1px solid #1f2937;background:linear-gradient(90deg,#7f1d1d 0%,#3a1a14 ${((REP_CURSE_AT+100)/2)}%,#1f2430 50%,#5c4a22 78%,#b48f4e 100%);">
+                                            <div style="position:absolute;top:-3px;left:${pos}%;transform:translateX(-50%);width:5px;height:15px;border-radius:3px;background:${col};box-shadow:0 0 6px ${col};"></div>
+                                            <div style="position:absolute;top:-2px;left:${(REP_CURSE_AT+100)/2}%;width:1px;height:13px;background:#ff6a4d55;"></div>
+                                        </div>
+                                        <details style="margin-top:6px;"><summary style="cursor:pointer;font-size:10.5px;color:#6b7280;">из чего сложилась</summary>
+                                            <div style="font-size:10.5px;line-height:1.6;margin-top:4px;">
+                                                <div style="color:#7fd3ad;">${r.good.length?r.good.map(li).join(''):'<span style="color:#4b5563;">светлых дел пока нет</span>'}</div>
+                                                <div style="color:#e0a3a3;margin-top:3px;">${r.bad.length?r.bad.map(x=>`<div style="display:flex;justify-content:space-between;padding:1px 0;"><span>${x.t}</span><b>−${x.v}</b></div>`).join(''):'<span style="color:#4b5563;">грязи нет</span>'}</div>
+                                            </div>
+                                        </details>
+                                    </div>`; })()}
+
                                     <!-- ДАШБОРД-АНАЛИТИКА (копится всю игру, для разбора игрока) -->
                                     ${(()=>{ const s=pstat(p); const net=Math.round((s.casinoWon-s.casinoLost)*100)/100; return `<details style="margin-bottom:6px;">
                                         <summary style="cursor:pointer; font-size:12px; color:#a78bfa; font-weight:bold; padding:4px 0;">🧠 Аналитика игрока (копится)</summary>
@@ -14203,21 +14570,29 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Открытая ведущим клетка (p.allow) подсвечивается золотом.
         function renderCellChips(p){
             const chips=[
-                ['🎯','Карьера','career','careerRoll('+p.id+')','var(--c-career)'],
-                ['🃏','Навык','skill','openSkillModal('+p.id+')','var(--c-skill)'],
-                ['🏛️','Государство','gov','openGovModal('+p.id+')','var(--c-gov)'],
-                ['💼','Работа','work','openWorkModal('+p.id+')','var(--c-work)'],
-                ['💸','Расход','expense','openExpenseModal('+p.id+')','var(--c-tax)'],
-                ['🏦','Налог','tax','openTaxModal('+p.id+')','var(--c-tax)'],
-                ['🌐','Связи','svyaz','openSvyazModal('+p.id+')','var(--c-stock)'],
-                ['🤝','Мелкая сделка','sdelka','openSdelkaSmall('+p.id+')','#ec4899'],
-                ['🏢','Крупная сделка','sdelka','openSdelkaBig('+p.id+')','#ec4899'],
-                ['⚕️','Медицина','med','openMedModal('+p.id+')','var(--c-jail)']
+                // 6-й элемент — картинка клетки (cat_imgs). Эмодзи остаётся запасным вариантом,
+                // если файл не подгрузился: строка не должна ломаться из-за картинки.
+                ['🎯','Карьера','career','careerRoll('+p.id+')','var(--c-career)','cell_career'],
+                ['🃏','Навык','skill','openSkillModal('+p.id+')','var(--c-skill)','cell_skill'],
+                ['🏛️','Государство','gov','openGovModal('+p.id+')','var(--c-gov)','cell_gov'],
+                ['💼','Работа','work','openWorkModal('+p.id+')','var(--c-work)','cell_work'],
+                ['💸','Расход','expense','openExpenseModal('+p.id+')','var(--c-tax)','cell_expense'],
+                ['🏦','Налог','tax','openTaxModal('+p.id+')','var(--c-tax)','cell_tax'],
+                ['🌐','Связи','svyaz','openSvyazModal('+p.id+')','var(--c-stock)','cell_svyaz'],
+                ['🤝','Мелкая сделка','sdelka','openSdelkaSmall('+p.id+')','#ec4899','cell_deal_small'],
+                ['🏢','Крупная сделка','sdelka','openSdelkaBig('+p.id+')','#ec4899','cell_deal_big'],
+                ['⚕️','Медицина','med','openMedModal('+p.id+')','var(--c-jail)','cell_med']
             ];
             return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+chips.map(function(ch){
-                var ic=ch[0],nm=ch[1],typ=ch[2],fn=ch[3],col=ch[4];
+                var ic=ch[0],nm=ch[1],typ=ch[2],fn=ch[3],col=ch[4],img=ch[5];
                 var on=(p.allow===typ);
-                return '<button onclick="'+fn+'" style="display:flex;align-items:center;gap:8px;border-radius:12px;padding:12px 11px;cursor:pointer;text-align:left;font-weight:700;font-size:13px;background:'+(on?'rgba(217,184,119,.10)':'var(--lx-ink)')+';border:1px solid '+(on?'var(--lx-gold-ln)':'var(--lx-line)')+';color:var(--lx-text);'+(on?'box-shadow:0 0 16px -6px var(--lx-gold);':'')+'"><span style="width:9px;height:9px;border-radius:50%;background:'+col+';box-shadow:0 0 8px '+col+';flex:0 0 auto;"></span><span style="font-size:17px;">'+ic+'</span><span>'+nm+'</span>'+(on?'<span style="margin-left:auto;font-size:9.5px;color:var(--lx-gold-br);">▶</span>':'')+'</button>';
+                // картинка вместо эмодзи; не загрузилась — молча показываем эмодзи
+                var icHtml = img
+                    ? '<span style="width:38px;height:38px;border-radius:9px;overflow:hidden;flex:0 0 auto;border:1px solid '+(on?'var(--lx-gold-ln)':'var(--lx-line)')+';display:block;">'
+                      + '<img src="cat_imgs/'+img+'.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" '
+                      + 'onerror="this.parentNode.outerHTML=\'<span style=&quot;font-size:17px;&quot;>'+ic+'</span>\'"></span>'
+                    : '<span style="font-size:17px;">'+ic+'</span>';
+                return '<button onclick="'+fn+'" style="display:flex;align-items:center;gap:8px;border-radius:12px;padding:12px 11px;cursor:pointer;text-align:left;font-weight:700;font-size:13px;background:'+(on?'rgba(217,184,119,.10)':'var(--lx-ink)')+';border:1px solid '+(on?'var(--lx-gold-ln)':'var(--lx-line)')+';color:var(--lx-text);'+(on?'box-shadow:0 0 16px -6px var(--lx-gold);':'')+'"><span style="width:9px;height:9px;border-radius:50%;background:'+col+';box-shadow:0 0 8px '+col+';flex:0 0 auto;"></span>'+icHtml+'<span>'+nm+'</span>'+(on?'<span style="margin-left:auto;font-size:9.5px;color:var(--lx-gold-br);">▶</span>':'')+'</button>';
             }).join('')+'</div>';
         }
         function renderCareerPanel(p) {
