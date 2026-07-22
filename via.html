@@ -11431,7 +11431,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function p2pInbox(p){
             return (state.p2p||[]).filter(d=>d.status==='pending' && (d.to||[]).indexOf(p.id)>=0 && (d.accepted||[]).indexOf(p.id)<0);
         }
-        function openLoanModal(pid){ state.loanModal={pId:pid}; render(); }
+        function openLoanModal(pid){
+            const p=state.players.find(x=>x.id==pid);
+            if(p && !p2pOthers(p).length){ alert('За столом пока больше никого — давать в долг некому.'); return; }
+            state.loanModal={pId:pid}; render();
+        }
         function closeLoanModal(){ state.loanModal=null; render(); }
         function openPartnerModal(pid){ state.partnerModal={pId:pid, picked:[]}; render(); }
         // Партнёрство открывается ТОЛЬКО из окна отсканированной сделки — карта уже в руках.
@@ -11541,7 +11545,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:14px;">Свободные деньги могут работать. В кассе <b style="color:#f3efe6;">${fmtN(Math.round(p.savings))}$</b>.</div>
                     <select id="loanTo" class="inp" style="width:100%;margin-bottom:8px;"><option value="">Кому дать?</option>${others.map(o=>`<option value="${o.id}">${o.name}</option>`).join('')}</select>
                     <input id="loanAmt" type="number" min="1" placeholder="Сумма займа, $" class="inp" style="width:100%;margin-bottom:8px;font-family:ui-monospace,monospace;font-weight:700;">
-                    <input id="loanPct" type="number" min="0" max="20" value="10" placeholder="Процент (0–20)" class="inp" style="width:100%;margin-bottom:12px;font-family:ui-monospace,monospace;font-weight:700;">
+                    <div style="font-size:11px;color:#9c988e;margin:0 2px 4px;">Под какой процент? <span style="color:#6d6a62;">(0–20 · вернёт сумму + этот % сверху)</span></div>
+                    <div style="position:relative;margin-bottom:12px;">
+                        <input id="loanPct" type="number" min="0" max="20" value="10" placeholder="Процент (0–20)" class="inp" style="width:100%;padding-right:36px;font-family:ui-monospace,monospace;font-weight:700;">
+                        <span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);color:#efd8a3;font-weight:800;font-size:15px;pointer-events:none;">%</span>
+                    </div>
                     <div style="font-size:11.5px;color:#9c988e;line-height:1.5;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:10px;padding:9px 11px;margin-bottom:13px;">Деньги уйдут из кассы только после его согласия. Возврат — его решение и его совесть: игра долги за него не отдаёт.</div>
                     <button onclick="sendLoan(${p.id})" class="btn" style="width:100%;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">Отправить предложение</button>
                     <button onclick="closeLoanModal()" class="btn btn-gray" style="width:100%;margin-top:7px;padding:10px;">Отмена</button>
@@ -13497,7 +13505,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     </div>
                     ${/* 🏦 Депозит переехал сюда из плитки (Ринат 21 июл): деньги лежат в кассе —
                          значит и кнопка «вложить» должна быть у кассы, а не внизу списка. */''}
-                    <button onclick="openSecWindow('🏦 Депозиты')" style="background:rgba(217,184,119,.1);border:1px solid var(--lx-gold-ln);border-radius:10px;color:var(--lx-gold-br);font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">🏦 Депозит</button>
+                    ${/* Ринат 23июл: «Дать в долг» — рядом с депозитом у кассы, чтобы люди давали в долг */''}
+                    <div style="display:flex;flex-direction:column;gap:6px;">
+                      <button onclick="openSecWindow('🏦 Депозиты')" style="background:rgba(217,184,119,.1);border:1px solid var(--lx-gold-ln);border-radius:10px;color:var(--lx-gold-br);font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">🏦 Депозит</button>
+                      <button onclick="openLoanModal(${p.id})" style="background:rgba(92,176,139,.1);border:1px solid #234436;border-radius:10px;color:#7fd3ad;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">💰 Дать в долг</button>
+                    </div>
                     <span style="font-family:ui-monospace,monospace;font-weight:700;font-size:13px;color:${f.flow>=0?'#5cb08b':'#cf9a9a'};background:${f.flow>=0?'rgba(92,176,139,.12)':'rgba(207,154,154,.12)'};padding:5px 10px;border-radius:999px;white-space:nowrap;">${f.flow>=0?'▲ +':'▼ '}${fmtN(f.flow)}/мес</span>
                   </div>
                   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:14px 0 12px;">
