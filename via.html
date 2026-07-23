@@ -10777,7 +10777,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // 🛡️ (Ринат 19июл: «тик цен обновляет страницу, окна сбиваются») — НЕ дёргаем полную
             // перерисовку от тика рынка, когда открыто окно или крутится слот: картинка бы моргала,
             // барабаны слота сбивались, прокрутка прыгала. Живые цены догонят при закрытии окна / действии.
-            const _winOpen = !!(state.catPopup||state.soulsInfo||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.showHistory||state.doorOpen||state.soulCard);
+            const _winOpen = !!(state.catPopup||state.soulsInfo||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.bankModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.showHistory||state.doorOpen||state.soulCard);
             if (!_slotSpinning && (_nmChanged || (state.view === 'player' && !_winOpen))) safeRerender();
             _lastNonMarket = _nonMarket;
             // окно сделки перерисовалось (тик рынка/чужой ход) → блок проскальзывания сбросился,
@@ -11557,6 +11557,36 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${blocks.rest?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--lx-line);">${blocks.rest}</div>`:''}
                     ${(!blocks.any&&others.length)?'<p style="font-size:11px;color:#6d6a62;line-height:1.5;margin:10px 0 0;">В долю зовут прямо из карты сделки — кнопка «Партнёрство» появляется, когда ты отсканировал бизнес.</p>':''}
                     <button onclick="closeLoanModal()" class="btn btn-gray" style="width:100%;margin-top:10px;padding:10px;">Закрыть</button>
+                </div></div>`;
+        }
+        // ── 🏦 Кредит банка у кассы (Ринат 23июл: «перенесём где депозит — а то далеко и неудобно») ──
+        // Само окно — та же заявка ведущему (reqLoan/payBank), просто теперь в одном нажатии от кассы.
+        function renderBankModal(){
+            if(!state.bankModal) return '';
+            const p=state.players.find(x=>x.id==state.bankModal.pId); if(!p) return '';
+            const owe=Number(p.bankLoan)||0;
+            const pending=state.deals.some(d=>d.pId==p.id && d.type==='TAKE_LOAN' && d.status==='PENDING');
+            return `<div style="position:fixed;inset:0;z-index:5260;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:390px;max-width:100%;max-height:92vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;">
+                    <div style="text-align:center;font-size:36px;line-height:1;">🏦</div>
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#efd8a3;margin:4px 0 3px;">Кредит банка</div>
+                    <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:14px;">В кассе <b style="color:#f3efe6;">${fmtN(Math.round(p.savings))}$</b>${owe>0?` · долг банку <b style="color:#fca5a5;">${fmtN(owe)}$</b>`:''}</div>
+                    ${owe>0?`<div style="background:var(--lx-ink);border:1px solid rgba(217,184,119,.28);border-radius:12px;padding:11px 13px;margin-bottom:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+                            <div style="flex:1;">
+                                <div style="font-size:12.5px;font-weight:700;color:var(--lx-gold);">Кредит банка · 10% в месяц</div>
+                                <div style="font-size:11px;color:#9c988e;margin-top:2px;">платёж ${fmtN(Math.round(owe*0.10))}$/мес · самый дорогой долг в игре, гасится целиком</div>
+                            </div>
+                            <button onclick="state.bankModal=null;payBank()" class="btn btn-debt-gold" style="flex:0 0 auto;padding:8px 14px;">Погасить ${fmtN(owe)}$</button>
+                        </div>
+                    </div>`:''}
+                    <p style="font-size:12px;color:var(--lx-muted);line-height:1.55;margin:0 2px 10px;">Занимать кратно 1000$. Каждый занятый доллар просит 10 центов в месяц — 5000$ превращаются в 500$ платежа. Деньги придут в кассу после одобрения ведущим.</p>
+                    ${pending?'<div style="font-size:12px;color:#efd8a3;background:rgba(217,184,119,.08);border:1px solid var(--lx-gold-ln);border-radius:10px;padding:9px 11px;margin-bottom:12px;">⏳ Заявка уже у ведущего — деньги придут после одобрения.</div>':`
+                    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:2px;">
+                        <input type="number" id="bankAmt" placeholder="Сколько занять? ($1000, $2000...)" class="inp" step="1000" min="1000" style="font-family:ui-monospace,monospace;font-weight:700;">
+                        <button onclick="reqLoan('bankAmt')" class="btn btn-debt-gold" style="padding:10px 16px;">Запросить</button>
+                    </div>`}
+                    <button onclick="state.bankModal=null;render();" class="btn btn-gray" style="width:100%;margin-top:10px;padding:10px;">Закрыть</button>
                 </div></div>`;
         }
         // ═══ 💎 КОЛЛЕКЦИЯ И АУКЦИОН (Ринат 23июл, спека VIA_COLLECTION_AUCTION_SPEC_2026_07_23.md) ═══
@@ -13803,6 +13833,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="display:flex;flex-direction:column;gap:6px;">
                       <button onclick="openSecWindow('🏦 Депозиты')" style="background:rgba(217,184,119,.1);border:1px solid var(--lx-gold-ln);border-radius:10px;color:var(--lx-gold-br);font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">🏦 Депозит</button>
                       <button onclick="openLoanModal(${p.id})" style="background:rgba(92,176,139,.1);border:1px solid ${p2pInbox(p).length?'#b98a3e':'#234436'};border-radius:10px;color:#7fd3ad;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">💰 Дать в долг${p2pInbox(p).length?` <b style="color:#efd8a3;">· ${p2pInbox(p).length}</b>`:''}</button>
+                      ${/* Ринат 23июл: «Взять кредит» — тоже у кассы, а то далеко и неудобно */''}
+                      <button onclick="state.bankModal={pId:${p.id}};render();" style="background:rgba(207,154,154,.08);border:1px solid ${(Number(p.bankLoan)||0)>0?'#7f1d1d':'#3a2a2a'};border-radius:10px;color:#e0a8a8;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">💳 Кредит${(Number(p.bankLoan)||0)>0?` <b style="color:#fca5a5;">· ${fmtN(p.bankLoan)}$</b>`:''}</button>
                     </div>
                     <span style="font-family:ui-monospace,monospace;font-weight:700;font-size:13px;color:${f.flow>=0?'#5cb08b':'#cf9a9a'};background:${f.flow>=0?'rgba(92,176,139,.12)':'rgba(207,154,154,.12)'};padding:5px 10px;border-radius:999px;white-space:nowrap;">${f.flow>=0?'▲ +':'▼ '}${fmtN(f.flow)}/мес</span>
                   </div>
@@ -14035,6 +14067,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderBizBudget()}
                 ${renderBizDraw()}
                 ${renderLoanModal()}
+                ${renderBankModal()}
                 ${renderDarkReveal()}
                 ${renderPartnerModal()}
                 ${renderCharityModal()}
@@ -16601,11 +16634,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(); render();
         }
 
-        function reqLoan() {
-            const amt = Number(document.getElementById('loanAmount').value);
+        function reqLoan(elId) {
+            // elId: 'loanAmount' — форма в разделе долгов, 'bankAmt' — окно кнопки у кассы (Ринат 23июл)
+            const amt = Number((document.getElementById(elId || 'loanAmount') || {}).value);
             if (!amt || amt < 1000) { alert('Минимальная сумма $1000. Кратно тысяче.'); return; }
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            if (state.deals.some(d => d.pId == p.id && d.type === 'TAKE_LOAN' && d.status === 'PENDING')) {
+                alert('⏳ Заявка на кредит уже у ведущего — не дублируй, он вот-вот одобрит.'); return;
+            }
             state.deals.push({ id: uid(), pId: p.id, pName: p.name, type:'TAKE_LOAN', details:{amount: amt}, status:'PENDING' });
+            if (state.bankModal) { state.bankModal = null; p.notify = '🏦 Заявка на кредит ' + fmtN(amt) + '$ ушла ведущему. Деньги придут после одобрения.'; }
             save(); render();
         }
 
@@ -16725,7 +16763,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     p.notify = '🎉 ПОЗДРАВЛЯЕМ! Ведущий подтвердил твой выигрыш +' + d.details.payout + '$! 👑 Касса пополнена.';
                 }
                 else if (d.type === 'PAY_BANK') { const owe=Number(p.bankLoan)||0; p.savings=Math.round(((p.savings||0)-owe)*100)/100; p.bankLoan = 0; p.notify='🏦 Кредит банка закрыт: −'+fmtN(owe)+'$ с кассы.'; }
-                else if (d.type === 'TAKE_LOAN') { p.bankLoan += d.details.amount; p.savings = Math.round(((Number(p.savings)||0) + d.details.amount) * 100) / 100; }
+                else if (d.type === 'TAKE_LOAN') { p.bankLoan = (Number(p.bankLoan)||0) + d.details.amount; p.savings = Math.round(((Number(p.savings)||0) + d.details.amount) * 100) / 100; }
                 return p;
             });
             state.deals = state.deals.filter(dl => dl.id != dId);
