@@ -174,27 +174,45 @@ def tick_market(market):
         drift = price * (g / TICKS_PER_YEAR)
         new = price + revert + noise + drift
 
-        # 3) события крипты — только ВНЕ мёртвой зоны; частота/сила растут с volatility
+        # 3) события крипты — только ВНЕ мёртвой зоны; частота/сила растут с volatility.
+        # 🐞 Ринат 23июл «почему БТС упал на 93%? Эфир и солана так не падают же!»:
+        # руг −80..95% со смертью прилетал и КРУПНОЙ крипте (порог был vol>=8, а биток ~10-20).
+        # За 30 игровых лет биток почти гарантированно умирал. Теперь как в жизни:
+        # руг-со-смертью — ТОЛЬКО мемам; крупняк ловит редкую КРИПТО-ЗИМУ −25..45% и живёт дальше.
         if typ == "crypto" and a["vol"] >= 8 and cool <= 0:
-            crash_p = 0.004 + a["vol"] / 4000.0     # vol70 -> ~2.2%/тик (мемы умирают)
-            boom_p = 0.002 + a["vol"] / 8000.0      # мемы РЕДКО пампят (как тысячи мёртвых монет на Solane); редкий памп = икс
+            meme = a["vol"] >= MEME_VOL
+            if meme:
+                crash_p = 0.004 + a["vol"] / 4000.0     # vol70 -> ~2.2%/тик (мемы умирают)
+                boom_p = 0.002 + a["vol"] / 8000.0      # мемы РЕДКО пампят; редкий памп = икс
+            else:
+                crash_p = 0.0035                        # зима ~7% за игровой год — редкий шторм
+                boom_p = 0.005                          # ралли чаще обвала: циклы тянут вверх
             r = random.random()
             if r < crash_p:
-                # RUG: цена И ЯКОРЬ рушатся навсегда (−80..−95%) — скам может умереть, откупить дно = поймать нож
-                f = random.uniform(0.05, 0.20)
-                new = price * f
-                anchor = max(a["min"], anchor * f)
-                a["cool"] = COOLDOWN_TICKS
-                a["sick"] = 25              # монета «болеет»: якорь ползёт вниз ~25 тиков — обычно умирает, редко выкарабкивается
-                events.append({"id": a["id"], "name": a["name"], "kind": "КРАХ", "pct": round((f - 1) * 100)})
+                if meme:
+                    # RUG: цена И ЯКОРЬ рушатся навсегда (−80..−95%) — скам умирает, дно = падающий нож
+                    f = random.uniform(0.05, 0.20)
+                    new = price * f
+                    anchor = max(a["min"], anchor * f)
+                    a["cool"] = COOLDOWN_TICKS
+                    a["sick"] = 25          # «болеет»: якорь ползёт вниз ~25 тиков — обычно умирает
+                    events.append({"id": a["id"], "name": a["name"], "kind": "КРАХ", "pct": round((f - 1) * 100)})
+                else:
+                    # КРИПТО-ЗИМА крупняка: больно (−25..45%), но монета ЖИВАЯ — якорь проседает
+                    # мягче цены, и годовой цикл (CRYPTO_BLUE_GROWTH) вытаскивает её обратно.
+                    f = random.uniform(0.55, 0.75)
+                    new = price * f
+                    anchor = max(a["min"], anchor * random.uniform(0.78, 0.90))
+                    a["cool"] = COOLDOWN_TICKS
+                    events.append({"id": a["id"], "name": a["name"], "kind": "ОБВАЛ", "pct": round((f - 1) * 100)})
             elif r < crash_p + boom_p:
-                f = random.uniform(1.5, 3.0)
+                f = random.uniform(1.5, 3.0) if meme else random.uniform(1.2, 1.6)
                 new = price * f
                 if random.random() < BOOM_ANCHOR_CHANCE:
                     anchor = min(a["max"], anchor * random.uniform(1.2, 1.8))   # редкий РЕАЛЬНЫЙ пробой (якорь вверх)
                 # иначе временный спайк: якорь на месте → памп откатится, опоздавший на пике теряет
                 a["cool"] = COOLDOWN_TICKS
-                events.append({"id": a["id"], "name": a["name"], "kind": "БУМ", "pct": round((f - 1) * 100)})
+                events.append({"id": a["id"], "name": a["name"], "kind": "БУМ" if meme else "РАЛЛИ", "pct": round((f - 1) * 100)})
 
         new = max(a["min"], min(a["max"], new))
         a["anchor"] = round(anchor, 4 if anchor < 1 else 2)

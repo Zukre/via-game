@@ -1255,6 +1255,35 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return
+        if self.path == '/turn/move':
+            # 🔧 ПОПРАВКА ВЕДУЩЕГО (Ринат 23июл): «двигать фишки назад, вдруг неправильно ввёл».
+            # Чистый сдвиг позиции на ±delta клеток: БЕЗ зарплат, тюрьмы, детей, уровней и окон.
+            # Это исправление ошибки ввода, а не ход — эффекты уже случились (или не должны случиться).
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw)
+                pid = req.get('pid')
+                delta = max(-6, min(6, int(req.get('delta') or 0)))
+                if not delta:
+                    raise ValueError('delta 0')
+                with LOCK:
+                    sync_board_roster()
+                    b = DATA['board']
+                    if str(pid) not in [str(x) for x in b['order']]:
+                        raise ValueError('player not on board')
+                    cur = int(b['positions'].get(str(pid), 0))
+                    newpos = (cur + delta) % TRACK_LEN
+                    b['positions'][str(pid)] = newpos
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True, 'pid': pid, 'pos': newpos})
+            except Exception as e:
+                self.send_response(400)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(str(e).encode())
+            return
         if self.path == '/turn/next':
             try:
                 with LOCK:

@@ -12606,7 +12606,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellFrac('${id}',0.5)" class="btn btn-sell" style="margin-top:4px;" title="Продать половину позиции">½&nbsp;50%</button> <button onclick="sellWhole('${id}')" class="btn btn-sell" style="margin-top:4px;">Продать</button></div></div>`;
             }).join('') : '<div style="color:#9ca3af;font-size:13px;">пока нет активов — открой биржу ниже и купи</div>';
             const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
-            const alertHtml = ev.length ? ev.map(e=>`<div style="background:${e.kind==='КРАХ'?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${e.kind==='КРАХ'?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`).join('') : '';
+            const alertHtml = ev.length ? ev.map(e=>{const bad=(e.kind==='КРАХ'||e.kind==='ОБВАЛ');return `<div style="background:${bad?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${bad?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`;}).join('') : '';
             let listHtml='';
             if(state.showMarket){
                 const tab=state.marketTab||'crypto';
@@ -14182,7 +14182,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const gAng=(360/GAME_YEARS*(((gYear-1)%GAME_YEARS)+1)).toFixed(2);
             const centerHtml=`<div class="dcenter" style="left:${BCS}%;top:${BCH}%;right:${BCS}%;bottom:${BCH}%;"><div class="dial" style="--ang:${gAng}deg"><div class="dhalo"></div><img class="dface" src="${DIAL_IMG}" alt="путь твоей жизни"><div class="darc"></div><div class="dhand"><div class="dtip"></div><div class="dneedle"></div></div><div class="dlvl"><div class="dyear">ГОД ${gYear}</div><div class="dcap">ПУТЬ ТВОЕЙ ЖИЗНИ</div></div></div></div>`;
             const chips=b.order.map(pid=>`<span class="pchip${pid===turnPid?' turn':''}"><span class="dot" style="background:${boardColor(b,pid)}"></span>${nameOf(pid)}</span>`).join('');
-            const opts=b.order.map(pid=>`<option value="${pid}" ${pid===turnPid?'selected':''}>${nameOf(pid)}</option>`).join('');
+            // 🐞 (Ринат 23июл «боты не ходят, стоят на месте»): каждый broadcast (любая покупка
+            // за столом) перерисовывал пульт — выпадашка ТИХО сбрасывалась на ходящего, кубик
+            // стирался. Ведущий выбирал Романа, жал «Пойти» — а ходил опять ААА. Теперь выбор
+            // и вписанный кубик живут в state и переживают любую перерисовку.
+            const selPid=(state.boardSelPid!=null && b.order.some(x=>String(x)===String(state.boardSelPid))) ? state.boardSelPid : turnPid;
+            const opts=b.order.map(pid=>`<option value="${pid}" ${String(pid)===String(selPid)?'selected':''}>${nameOf(pid)}</option>`).join('');
             const cellName=(TRACK[b.positions[String(turnPid)]||0]||{}).n||'';
             const roll=b.lastRoll?` · выпало <b style="color:#fbbf24">${b.lastRoll.value}</b>`:'';
             return `
@@ -14213,10 +14218,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
                 <div style="text-align:center;margin:8px 0;">${chips}</div>
                 <div style="display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:6px;">
-                    <select id="boardPid" class="inp" style="width:auto;padding:9px;">${opts}</select>
-                    <input id="dieVal" type="number" min="1" max="6" placeholder="1–6" style="width:70px;padding:9px;border-radius:8px;border:1px solid #374151;background:#0b1020;color:#fff;text-align:center;font-weight:700;">
+                    <select id="boardPid" class="inp" style="width:auto;padding:9px;" onchange="state.boardSelPid=this.value;">${opts}</select>
+                    <input id="dieVal" type="number" min="1" max="6" placeholder="1–6" value="${state.dieDraft||''}" oninput="state.dieDraft=this.value;" style="width:70px;padding:9px;border-radius:8px;border:1px solid #374151;background:#0b1020;color:#fff;text-align:center;font-weight:700;">
                     <button onclick="boardRoll(true)" class="btn btn-blue" style="font-weight:800;">▶ Пойти</button>
                     <button onclick="boardRoll(false)" class="btn btn-gray" title="Апп сам кинет кубик за игрока">🎲 Апп кинет</button>
+                    ${/* 🔧 Ринат 23июл: «двигать фишки назад, вдруг неправильно ввёл» — поправка без эффектов */''}
+                    <button onclick="boardNudge(-1)" class="btn btn-gray" title="Поправка: фишка выбранного игрока на клетку НАЗАД. Чистый сдвиг — без зарплат, тюрьмы и уровней.">⬅ Фишку</button>
+                    <button onclick="boardNudge(1)" class="btn btn-gray" title="Поправка: фишка выбранного игрока на клетку ВПЕРЁД. Чистый сдвиг — без зарплат, тюрьмы и уровней.">Фишку ➡</button>
                     <button onclick="boardNext()" class="btn btn-gray">Ход дальше ▶</button>
                     <button onclick="hostDrawWorld()" class="btn" style="background:linear-gradient(90deg,#0891b2,#22d3ee);color:#fff;font-weight:800;" title="Раз в круг: тянет мировое событие, применяет ко ВСЕМ и показывает на всех экранах">🌍 Событие круга</button>
                 </div>
@@ -14239,7 +14247,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
             </div>`;
         }
-        function boardRoll(usePhysical){
+        async function boardRoll(usePhysical){
             const sel=document.getElementById('boardPid'); const pid=sel?Number(sel.value):null;
             if(!pid){ alert('Выбери игрока.'); return; }
             let value;
@@ -14247,11 +14255,27 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const el=document.getElementById('dieVal'); value=Math.max(1,Math.min(6,parseInt(el&&el.value,10)||0));
                 if(!value){ alert('Впиши, сколько выпало на кубике (1–6).'); return; }
             }
-            fetch('/turn/roll',{method:'POST',headers:{'Content-Type':'application/json'},
-                body:JSON.stringify(value?{pid,value}:{pid})})
-                .catch(e=>console.warn('roll:',e));
-                // Зарплата теперь начисляется САМА на сервере при проходе клетки «Зарплата» (Ринат 10июл).
-                // Клиентское авто-начисление убрано, чтобы не удваивать.
+            // 🐞 23июл: ошибка сервера раньше глоталась молча — фишка стояла, ведущий не понимал почему.
+            try{
+                const res = await fetch('/turn/roll',{method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(value?{pid,value}:{pid})});
+                if(!res.ok){ alert('🎲 Ход НЕ прошёл ('+(await res.text()||res.status)+'). Попробуй ещё раз.'); return; }
+                state.dieDraft='';        // ход сделан — кубик очищаем, выбор возвращаем к ходящему
+                state.boardSelPid=null;
+            }catch(e){ alert('🎲 Сервер не ответил — ход НЕ сделан. Проверь связь и попробуй ещё раз.'); }
+            // Зарплата теперь начисляется САМА на сервере при проходе клетки «Зарплата» (Ринат 10июл).
+            // Клиентское авто-начисление убрано, чтобы не удваивать.
+        }
+        // 🔧 Поправка ведущего (Ринат 23июл): сдвинуть фишку на клетку назад/вперёд БЕЗ эффектов.
+        // Ошибся с кубиком — вернул как было. Зарплату/тюрьму сдвиг не трогает: чистое перемещение.
+        async function boardNudge(delta){
+            const sel=document.getElementById('boardPid'); const pid=sel?Number(sel.value):null;
+            if(!pid){ alert('Выбери игрока.'); return; }
+            try{
+                const res = await fetch('/turn/move',{method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({pid:pid, delta:delta})});
+                if(!res.ok) alert('Фишка не сдвинулась: '+(await res.text()||res.status));
+            }catch(e){ alert('Сервер не ответил — фишка не сдвинулась.'); }
         }
         function boardNext(){
             fetch('/turn/next',{method:'POST',headers:{'Content-Type':'application/json'}}).catch(e=>console.warn('next:',e));
