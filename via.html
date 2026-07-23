@@ -14277,8 +14277,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 if(!res.ok) alert('Фишка не сдвинулась: '+(await res.text()||res.status));
             }catch(e){ alert('Сервер не ответил — фишка не сдвинулась.'); }
         }
-        function boardNext(){
-            fetch('/turn/next',{method:'POST',headers:{'Content-Type':'application/json'}}).catch(e=>console.warn('next:',e));
+        async function boardNext(){
+            // 🐞 (Ринат 23июл «боты ходят не по очереди, будто один»): раньше был fire-and-forget —
+            // autoStep не дожидался переключения хода и через 300мс читал СТАРЫЙ turnIdx (broadcast
+            // не успевал долететь) → крутил кубик снова за того же бота. Теперь ждём ответ и
+            // возвращаем новый turnIdx, чтобы цикл точно знал, чей ход настал.
+            try{
+                const r = await fetch('/turn/next',{method:'POST',headers:{'Content-Type':'application/json'}});
+                if(r.ok){ const j = await r.json(); return (j && typeof j.turnIdx==='number') ? j.turnIdx : null; }
+            }catch(e){ console.warn('next:',e); }
+            return null;
         }
         function boardStartTimer(){ fetch('/turn/timer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secs:120})}).catch(e=>console.warn('timer:',e)); }
         function boardStopTimer(){ fetch('/turn/timer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secs:0})}).catch(e=>console.warn('timer:',e)); }
@@ -14576,19 +14584,24 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         async function autoStep(){
             if(!state.autoPlay || !state.autoPlay.on) return;
             const speed=state.autoPlay.speed||2500;
+            // 🔄 Свежий turnIdx С СЕРВЕРА (авторитет очереди) — а не из локального стейта, который
+            // отстаёт на broadcast. Это и есть лекарство от «ходит один»: каждый тик берём того,
+            // чей ход РЕАЛЬНО настал, а не того, кто был активен прошлый раз.
+            await pollServer(true);
             const b=state.board;
             if(b && b.order && b.order.length){
                 const pid=b.order[b.turnIdx]; const p=state.players.find(x=>x.id==pid);
                 if(p){
-                    if((Number(p.jail)||0)>0){ autoGamble(p); await sleep(speed*0.6); boardNext(); }
+                    autoToast('🎲 Ход: '+p.name, boardColor(b,pid)||'#3b82f6');   // видно переключение
+                    if((Number(p.jail)||0)>0){ autoGamble(p); await sleep(speed*0.6); await boardNext(); }
                     else {
                         const val=1+Math.floor(Math.random()*6);
                         try{ await fetch('/turn/roll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid,value:val})}); }catch(e){}
                         await sleep(speed*0.5); await autoResolveCell(pid);
                         await sleep(speed*0.3); await autoAction(p);    // 🤖 бот пользуется всей игрой
-                        await sleep(speed*0.2); boardNext();
+                        await sleep(speed*0.2); await boardNext();      // ЖДЁМ переключения на следующего
                     }
-                } else { boardNext(); }
+                } else { await boardNext(); }
             }
             if(state.autoPlay && state.autoPlay.on) _autoTimer=setTimeout(autoStep, 300);
         }
