@@ -521,6 +521,369 @@ def train_price(key, owned):
     return round(SELF_TRAININGS[key]['cost'] * train_mult(owned))
 
 
+# ═══ 💎 КОЛЛЕКЦИЯ И АУКЦИОН (Ринат 23июл, спека VIA_COLLECTION_AUCTION_SPEC_2026_07_23.md) ═══
+# Дух: бизнес кормит, биржа играет, коллекция БОГАТЕЕТ МОЛЧА. Вещь не капает в поток —
+# она дорожает на бархате. Зачем собирать: сет темы = +200$/мес, легендарка = козырь двери,
+# ПОЛНАЯ коллекция (4 темы) = на большой круг пускают с 4 картами души из 5 (слово Рината).
+# Все деньги и вся судьба лотов — ЗДЕСЬ, под LOCK. Клиент только рисует и шлёт намерение.
+# Пять кругов редкости — как в больших играх (Ринат 23июл): серый (туфта) → голубой →
+# золотой → фиолетовый мифик → ТЁМНО-КРАСНЫЙ легендарный, при виде которого стол замолкает.
+# gray/blue — без лимита копий; gold — 2 копии на партию; mythic/legend — ПО ОДНОЙ, вышла и всё.
+COLLECTION_ITEMS = {
+    # Ринат 23июл: «мусора много, голда тоже много, легендарок побольше — их много в мире. Как в жизни».
+    # тема ВРЕМЯ ⌛
+    'watch':     {'name': 'Карманные часы',           'theme': 'time',   'rar': 'gray',   'base': 3000},
+    'compass':   {'name': 'Старый компас',            'theme': 'time',   'rar': 'gray',   'base': 3500},
+    'hourglass': {'name': 'Песочные часы капитана',   'theme': 'time',   'rar': 'blue',   'base': 6000},
+    'clock':     {'name': 'Каминные часы с боем',     'theme': 'time',   'rar': 'gold',   'base': 20000},
+    'astrolabe': {'name': 'Астролябия звездочёта',    'theme': 'time',   'rar': 'gold',   'base': 35000},
+    # тема ИСКУССТВО 🎻
+    'cup':       {'name': 'Фарфоровая чашка',         'theme': 'art',    'rar': 'gray',   'base': 2000},
+    'statue':    {'name': 'Статуэтка танцовщицы',     'theme': 'art',    'rar': 'blue',   'base': 5500},
+    'shkatulka': {'name': 'Музыкальная шкатулка',     'theme': 'art',    'rar': 'blue',   'base': 9000},
+    'violin':    {'name': 'Скрипка старого мастера',  'theme': 'art',    'rar': 'gold',   'base': 28000},
+    'painting':  {'name': 'Картина «Буря»',           'theme': 'art',    'rar': 'gold',   'base': 38000},
+    'goblet':    {'name': 'Кубок венецианского стекла', 'theme': 'art',  'rar': 'gold',   'base': 22000},
+    # тема СЛОВО 📜
+    'newspaper': {'name': 'Столетняя газета',         'theme': 'word',   'rar': 'gray',   'base': 1500},
+    'quill':     {'name': 'Перо писателя',            'theme': 'word',   'rar': 'gray',   'base': 2500},
+    'map':       {'name': 'Старая карта мира',        'theme': 'word',   'rar': 'blue',   'base': 7000},
+    'letter':    {'name': 'Письмо с сургучом',        'theme': 'word',   'rar': 'blue',   'base': 6500},
+    'firsted':   {'name': 'Первое издание',           'theme': 'word',   'rar': 'gold',   'base': 30000},
+    # тема СИЛА ⚔️
+    'horseshoe': {'name': 'Ржавая подкова',           'theme': 'power',  'rar': 'gray',   'base': 1000},
+    'coin':      {'name': 'Монета империи',           'theme': 'power',  'rar': 'gray',   'base': 4000},
+    'king':      {'name': 'Шахматный король',         'theme': 'power',  'rar': 'blue',   'base': 8000},
+    'helmet':    {'name': 'Шлем крестоносца',         'theme': 'power',  'rar': 'gold',   'base': 36000},
+    'blade':     {'name': 'Клинок дамасской стали',   'theme': 'power',  'rar': 'gold',   'base': 32000},
+    'kamcha':    {'name': 'Ханская камча',            'theme': 'power',  'rar': 'gold',   'base': 40000},
+    # 👑 ФИОЛЕТОВЫЕ МИФИКИ — по одному на партию. desc читает аукционист (Ринат 23июл).
+    'lion':      {'name': 'Чёрный лев',                'theme': 'legend', 'rar': 'mythic', 'base': 150000,
+                  'desc': 'Вырезан из цельного обсидиана мастером, чьё имя стёрло время. Говорят, он приносит хозяину хладнокровие в сделках.'},
+    'shogun':    {'name': 'Меч сёгуна',                'theme': 'legend', 'rar': 'mythic', 'base': 200000,
+                  'desc': 'Клинок последнего сёгуна. Волна закалки видна до сих пор — оружие, которое ни разу не проиграло.'},
+    'khan':      {'name': 'Сабля великого хана',       'theme': 'legend', 'rar': 'mythic', 'base': 250000,
+                  'desc': 'Золото и бирюза Великой степи. Такой саблей не рубили — ею правили.'},
+    'crown':     {'name': 'Корона забытого царства',   'theme': 'legend', 'rar': 'mythic', 'base': 300000,
+                  'desc': 'Царство исчезло с карт, а корона пережила всех, кто её носил. Рубины тёмные, как его история.'},
+    'necklace':  {'name': 'Ожерелье царицы',           'theme': 'legend', 'rar': 'mythic', 'base': 400000,
+                  'desc': 'Изумруды и жемчуг, помнящие шею царицы. Каждый камень — чья-то присяга.'},
+    # 🔴 ТЁМНО-КРАСНЫЕ ЛЕГЕНДАРКИ — по одной на партию, при виде которых стол замолкает
+    'egg':       {'name': 'Золотое яйцо ювелира',      'theme': 'legend', 'rar': 'legend', 'base': 600000,
+                  'desc': 'Последняя работа великого ювелира. Внутри — механизм, который никто не решается завести.'},
+    'mask':      {'name': 'Золотая маска фараона',     'theme': 'legend', 'rar': 'legend', 'base': 700000,
+                  'desc': 'Три тысячи лет молчания в чистом золоте и лазурите. Гробница, из которой её вынесли, засекречена.'},
+    'scepter':   {'name': 'Скипетр императора',        'theme': 'legend', 'rar': 'legend', 'base': 800000,
+                  'desc': 'Власть, отлитая в золоте, с рубином размером с сердце. Империя пала — скипетр остался.'},
+    'ring':      {'name': 'Перстень Клеопатры',        'theme': 'legend', 'rar': 'legend', 'base': 1000000,
+                  'desc': 'Изумрудный скарабей на золоте трёх империй. Эту руку целовали цари.'},
+    'diamond':   {'name': 'Чёрный бриллиант «Око ночи»', 'theme': 'legend', 'rar': 'legend', 'base': 900000,
+                  'desc': 'Редчайший чёрный бриллиант в мире. В его гранях горит фиолетовый огонь, который никто не смог объяснить.'},
+    # Живые сокровища и казахский пантеон (Ринат 23июл): цены как у арабов — миллионы.
+    'ram':       {'name': 'Дикий архар',               'theme': 'legend', 'rar': 'legend', 'base': 200000,
+                  'desc': 'Редчайшая порода горных архаров — чистейшие гены на земле. Для разведения и создания лучшего потомства в мире. Дикого не приручить — в этом и статус.'},
+    'eagle':     {'name': 'Золотой беркут',            'theme': 'legend', 'rar': 'legend', 'base': 500000,
+                  'desc': 'Царь неба Великой степи, отлитый в чистом золоте, с глазами из бирюзы. Символ тех, кто смотрит сверху.'},
+    'horse':     {'name': 'Золотой тулпар',            'theme': 'legend', 'rar': 'legend', 'base': 1500000,
+                  'desc': 'Крылатый конь степных легенд в чистом золоте. Говорят, кто владеет тулпаром — того не догнать ни в деле, ни в судьбе.'},
+    'stallion':  {'name': 'Арабский скакун',           'theme': 'legend', 'rar': 'legend', 'base': 3000000,
+                  'desc': 'Легендарный вороной производитель чистейшей арабской линии. Родословная длиннее, чем у иных королей. Для разведения и потомства, которое войдёт в историю. Торги — начало!'},
+    'altyn':     {'name': 'Золотой человек',           'theme': 'legend', 'rar': 'legend', 'base': 5000000,
+                  'desc': 'Алтын Адам. Воин Великой степи в доспехе из тысяч золотых пластин. Душа народа, отлитая в золоте. Национальное достояние — и сегодня оно на торгах.'},
+}
+COL_THEMES = ('time', 'art', 'word', 'power')       # сет = 3 вещи одной темы
+COL_GROWTH = (0.02, 0.04)   # антиквариат дорожает: +2..4% за игровой год, сам, молча
+AUC_START_PCT = 0.5         # старт лота = половина текущей цены
+AUC_LOT_SECONDS = 30        # таймер лота (Ринат 23июл: «60с долго, игра всего 3 часа» — было 60)
+AUC_ANTISNIPE = 10          # ставка в последние 10с продлевает на 10с (перебивание на флажке)
+AUC_MIN_STEP = 0.05         # шаг ставки — от +5%
+AUC_LOTS = 3                # лотов от игры за аукцион
+AUC_DARK_LOTS = 2           # тёмных лотов за аукцион
+# ── Анти-сухость (Ринат дал добро 23июл): резерв + Незнакомец + аукцион-праздник ──
+AUC_RESERVE_PCT = 0.75      # скрытый резерв лота игры: ниже 75% красной цены вещь не отдаём
+AUC_PERIOD = 18 * 60        # праздник сам, раз в ~2 круга стола (18 мин), ведущему не вспоминать
+AUC_WARN = 120              # объявление за 2 минуты: «готовьте деньги»
+WORLD_AUTO_GAP = 12 * 60    # мир не молчит дольше 12 мин: событие придёт само, даже если ходы стоят
+# НЕЗНАКОМЕЦ — таинственный коллекционер. За мусором приходит не всегда и торгуется вяло,
+# за легендарками — всегда и бешено. Может выиграть: мифик/легендарка уходит из мира навсегда.
+NPC_NAME = 'Незнакомец'
+NPC_RANGES = {'gray': (0.55, 0.85), 'blue': (0.60, 0.90), 'gold': (0.70, 1.00),
+              'mythic': (0.85, 1.15), 'legend': (0.85, 1.20)}   # потолок его торга, доля красной цены
+NPC_INTEREST = {'gray': 0.5, 'blue': 0.65, 'gold': 0.85}        # шанс, что вообще пришёл (остальные = 1.0)
+NPC_BID_CHANCE = 0.30       # шанс ставки на тик (2с) + всегда пытается на флажке
+DARK_PRICE = 4000           # цена запечатанного ящика
+DARK_WIN = 0.60             # правило Рината: 60% вещь дороже цены ящика, 40% — дешевле
+# Редкость лота с молотка: обычная 70% / редкая 25% / легендарка 5%.
+# Копии: обычных вещей в мире несколько, редких — по 2 на партию, легендарка — одна.
+RARE_COPIES = 2
+
+
+def col_prices():
+    ps = DATA.setdefault('colPrices', {})
+    for k, it in COLLECTION_ITEMS.items():
+        ps.setdefault(k, it['base'])
+    return ps
+
+
+def col_grow_prices():
+    ps = col_prices()
+    for k in ps:
+        ps[k] = round(ps[k] * (1 + random.uniform(*COL_GROWTH)))
+
+
+def _col_out_count(key):
+    """Сколько копий вещи уже живёт в коллекциях/эскроу — для лимитов редких и легендарок."""
+    n = 0
+    for p in DATA.get('players', []):
+        n += sum(1 for c in (p.get('collection') or []) if c.get('key') == key)
+    n += sum(1 for s in DATA.get('colSellQueue', []) if s.get('key') == key)
+    a = DATA.get('auction') or {}
+    cur = a.get('cur') or {}
+    if cur.get('item') == key and not cur.get('seller'):
+        n += 1
+    n += sum(1 for l in (a.get('queue') or []) if l.get('item') == key and not l.get('seller'))
+    return n
+
+
+def col_available(rar):
+    out = []
+    for k, it in COLLECTION_ITEMS.items():
+        if it['rar'] != rar:
+            continue
+        # мифик и легендарка — единственные в мире: вышла один раз и всё
+        if rar in ('mythic', 'legend') and (k in DATA.get('colLegendOut', []) or _col_out_count(k)):
+            continue
+        if rar == 'gold' and _col_out_count(k) >= RARE_COPIES:
+            continue
+        out.append(k)
+    return out
+
+
+def col_pick_lot(allow_legend=True):
+    """Вытянуть вещь для лота с молотка. Веса пяти кругов: серый 40 / голубой 30 /
+    золотой 22 / мифик 5 / легендарный 3. Редчайшее — редчайший гость молотка."""
+    r = random.random()
+    if allow_legend and r < 0.03:
+        order = ['legend', 'mythic', 'gold', 'blue', 'gray']
+    elif allow_legend and r < 0.08:
+        order = ['mythic', 'gold', 'blue', 'gray']
+    elif r < 0.30:
+        order = ['gold', 'blue', 'gray']
+    elif r < 0.60:
+        order = ['blue', 'gray', 'gold']
+    else:
+        order = ['gray', 'blue', 'gold']
+    for rar in order:
+        pool = col_available(rar)
+        if pool:
+            return random.choice(pool)
+    return None
+
+
+def _npc_ceiling(key):
+    """До скольки Незнакомец готов торговаться за эту вещь. 0 = не пришёл."""
+    it = COLLECTION_ITEMS.get(key) or {}
+    rar = it.get('rar', 'gray')
+    if random.random() > NPC_INTEREST.get(rar, 1.0):
+        return 0
+    lo, hi = NPC_RANGES.get(rar, (0.5, 0.8))
+    worth = col_prices().get(key, it.get('base') or 0)
+    return round(worth * random.uniform(lo, hi))
+
+
+def auction_settle_lot(a):
+    """Закрыть текущий лот: вещь победителю, деньги продавцу или в банк. Вызывать под LOCK."""
+    cur = a.get('cur')
+    if not cur:
+        return
+    key, price, bidder = cur.get('item'), float(cur.get('price') or 0), cur.get('bidder')
+    it = COLLECTION_ITEMS.get(key) or {}
+    log = a.setdefault('log', [])
+    # 🕴️ Незнакомец выиграл: вещь уходит из мира, продавцу-игроку — живые деньги
+    if bidder == 'npc':
+        if it.get('rar') in ('mythic', 'legend'):
+            DATA.setdefault('colLegendOut', []).append(key)   # ушла навсегда
+        if cur.get('seller') is not None:
+            seller = next((p for p in DATA['players'] if p.get('id') == cur['seller']), None)
+            if seller is not None:
+                seller['savings'] = round(float(seller.get('savings') or 0) + price, 2)
+                seller['p2pSeq'] = int(seller.get('p2pSeq') or 0) + 1
+                seller['notify'] = '🔨 «%s» забрал %s за %s$. Деньги в кассе.' % (it.get('name', key), NPC_NAME, int(price))
+        log.append({'item': key, 'price': price, 'name': NPC_NAME, 'sold': True, 'npc': True})
+        a['cur'] = None
+        return
+    winner = next((p for p in DATA['players'] if p.get('id') == bidder), None) if bidder is not None else None
+    # 🤫 Скрытый резерв лота игры: дешевле 75% красной цены мир вещь не отдаёт
+    if winner is not None and cur.get('res') and cur.get('seller') is None and price < float(cur['res']):
+        winner['notify'] = '🔨 «%s» снята с торгов — резерв не взят. Вещь вернулась в мир.' % it.get('name', key)
+        log.append({'item': key, 'price': price, 'name': None, 'sold': False, 'res': True})
+        a['cur'] = None
+        return
+    if winner is not None and float(winner.get('savings') or 0) >= price:
+        winner['savings'] = round(float(winner.get('savings') or 0) - price, 2)
+        # касса изменена сервером → двигаем p2pSeq, чтобы устаревший снимок бланка её не затёр
+        winner['p2pSeq'] = int(winner.get('p2pSeq') or 0) + 1
+        winner.setdefault('collection', []).append({'key': key, 'paid': price, 'at': int(time.time())})
+        winner['notify'] = '🔨 Твоя! «%s» за %s$ — в коллекции.' % (it.get('name', key), int(price))
+        if it.get('rar') in ('mythic', 'legend'):
+            DATA.setdefault('colLegendOut', []).append(key)
+        seller = None
+        if cur.get('seller') is not None:
+            seller = next((p for p in DATA['players'] if p.get('id') == cur['seller']), None)
+        if seller is not None:
+            seller['savings'] = round(float(seller.get('savings') or 0) + price, 2)
+            seller['p2pSeq'] = int(seller.get('p2pSeq') or 0) + 1
+            seller['notify'] = '🔨 «%s» продана с молотка за %s$.' % (it.get('name', key), int(price))
+        # лот от игры → деньги сгорают в банк: стол не заливаем
+        log.append({'item': key, 'price': price, 'name': winner.get('name'), 'sold': True})
+    else:
+        # никто не взял (или у победителя к закрытию не хватило) — вещь возвращается
+        if cur.get('seller') is not None:
+            owner = next((p for p in DATA['players'] if p.get('id') == cur['seller']), None)
+            if owner is not None:
+                owner.setdefault('collection', []).append(
+                    {'key': key, 'paid': float(cur.get('min') or 0), 'at': int(time.time())})
+                owner['notify'] = '🔨 «%s» не нашла покупателя — вернулась в коллекцию.' % it.get('name', key)
+        log.append({'item': key, 'price': 0, 'name': None, 'sold': False})
+    a['cur'] = None
+
+
+def auction_next_lot(a):
+    """Поставить следующий лот на молоток. Вызывать под LOCK."""
+    q = a.setdefault('queue', [])
+    if not q:
+        a['status'] = 'done'
+        a['doneAt'] = time.time()
+        return
+    lot = q.pop(0)
+    key = lot['item']
+    worth = col_prices().get(key, COLLECTION_ITEMS[key]['base'])
+    start = lot.get('min') or max(1, round(worth * AUC_START_PCT))
+    a['cur'] = {'item': key, 'price': start, 'start': start, 'bidder': None, 'bidderName': None,
+                'seller': lot.get('seller'), 'min': lot.get('min'),
+                # резерв только у лотов игры; у лота игрока его минималка и есть старт
+                'res': (round(worth * AUC_RESERVE_PCT) if lot.get('seller') is None else None),
+                'npcMax': _npc_ceiling(key),   # 🕴️ до скольки сегодня торгуется Незнакомец
+                'endsAt': time.time() + AUC_LOT_SECONDS}
+
+
+def auction_open(by):
+    """Собрать лоты и открыть торги. Вызывать под LOCK. Возвращает (ok, reason|лотов)."""
+    a = DATA.get('auction')
+    if a and a.get('status') == 'live':
+        return False, 'busy'
+    queue = []
+    allow_legend = True
+    for _ in range(AUC_LOTS):
+        k = col_pick_lot(allow_legend)
+        if k is None:
+            break
+        if COLLECTION_ITEMS[k]['rar'] in ('mythic', 'legend'):
+            allow_legend = False   # мифик/легендарка — не больше одной за аукцион
+        queue.append({'item': k, 'seller': None})
+    # вещи игроков, выставленные на продажу, идут после лотов игры
+    sq = DATA.get('colSellQueue', [])
+    queue.extend({'item': s['key'], 'seller': s['pid'], 'min': s.get('min')} for s in sq)
+    DATA['colSellQueue'] = []
+    if not queue:
+        return False, 'empty'
+    DATA['auction'] = {'status': 'live', 'openedBy': str(by or 'ведущий'),
+                       'queue': queue, 'cur': None, 'log': [],
+                       'darkLeft': AUC_DARK_LOTS, 'startedAt': time.time()}
+    auction_next_lot(DATA['auction'])
+    # расписание праздника: следующий сам через AUC_PERIOD, объявление ещё не делали
+    DATA['aucNextAt'] = time.time() + AUC_PERIOD
+    DATA['aucWarned'] = False
+    return True, len(queue) + 1
+
+
+def _notify_all(msg):
+    """Шепнуть всему столу. Вызывать под LOCK."""
+    for p in DATA.get('players', []):
+        p['notify'] = msg
+
+
+def auction_ticker():
+    """Фоновый поток: закрывает истёкшие лоты, торгуется за Незнакомца, открывает
+    аукцион-праздник по расписанию, страхует мировые события, растит цены антиквариата."""
+    while True:
+        time.sleep(2.0)
+        try:
+            with LOCK:
+                changed = False
+                now = time.time()
+                # рост цен: цепляемся к game_year живого рынка
+                gy = int(((DATA.get('market') or {}).get('game_year')) or 0)
+                if gy and gy != int(DATA.get('colYear') or 0):
+                    DATA['colYear'] = gy
+                    col_grow_prices()
+                    changed = True
+                a = DATA.get('auction')
+                if a and a.get('status') == 'live':
+                    cur = a.get('cur')
+                    if cur and now >= float(cur.get('endsAt') or 0):
+                        auction_settle_lot(a)
+                        auction_next_lot(a)
+                        changed = True
+                    elif not cur:
+                        auction_next_lot(a)
+                        changed = True
+                    elif cur:
+                        # 🕴️ НЕЗНАКОМЕЦ: вяло на мусор, бешено на легендарки, любит флажок
+                        left = float(cur.get('endsAt') or 0) - now
+                        price = float(cur.get('price') or 0)
+                        need = price if cur.get('bidder') is None else round(price * (1 + AUC_MIN_STEP))
+                        if (cur.get('npcMax') and cur.get('bidder') != 'npc'
+                                and need <= float(cur['npcMax'])
+                                and (random.random() < NPC_BID_CHANCE or left < 8)):
+                            cur['price'] = need
+                            cur['bidder'] = 'npc'
+                            cur['bidderName'] = NPC_NAME
+                            if left < AUC_ANTISNIPE:
+                                cur['endsAt'] = now + AUC_ANTISNIPE
+                            changed = True
+                else:
+                    # 🎪 ПРАЗДНИК ПО РАСПИСАНИЮ (Ринат: «забываю про аукцион — пусть автоматом»)
+                    nxt = float(DATA.get('aucNextAt') or 0)
+                    if not nxt:
+                        DATA['aucNextAt'] = now + AUC_PERIOD
+                    elif DATA.get('players'):
+                        if now >= nxt - AUC_WARN and not DATA.get('aucWarned'):
+                            DATA['aucWarned'] = True
+                            _notify_all('🔨 Через 2 минуты — АУКЦИОН! Готовьте деньги: молоток ждать не будет.')
+                            changed = True
+                        if now >= nxt:
+                            ok, _n = auction_open('мир')
+                            if ok:
+                                _notify_all('🔨 АУКЦИОН ОТКРЫТ — молоток стучит! Смотри плитку «Аукцион».')
+                            else:
+                                DATA['aucNextAt'] = now + AUC_PERIOD   # выставить нечего — перенесли
+                                DATA['aucWarned'] = False
+                            changed = True
+                # 🌍 СТРАХОВКА МИРА: событие раз в круг идёт от ходов, но если ходы стоят —
+                # мир всё равно живёт: не молчим дольше WORLD_AUTO_GAP
+                wl = float(DATA.get('worldLastAt') or 0)
+                if not wl:
+                    DATA['worldLastAt'] = now
+                elif DATA.get('players') and now - wl > WORLD_AUTO_GAP:
+                    try:
+                        we = next_world_event()
+                        DATA['world'] = we
+                        _fx = we.get('fx') or {}
+                        apply_market_shock(_fx)
+                        apply_business_shock(_fx.get('biz', 0))
+                        DATA['worldLastAt'] = now
+                        changed = True
+                    except Exception as _e:
+                        print('world auto error:', _e)
+                        DATA['worldLastAt'] = now   # не долбим каждые 2с
+                if changed:
+                    save_data(DATA)
+                    broadcast()
+        except Exception as e:
+            print('auction ticker error:', e)
+
+
 DATA = load_data()
 # инициализируем живой рынок, если его ещё нет (первый запуск)
 if via_market and not DATA.get('market'):
@@ -654,6 +1017,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 DATA['deals'] = []
                 DATA['market'] = via_market.init_market() if via_market else None
                 DATA['world'] = None
+                # 💎 коллекция: новая партия — новые легендарки, свежие цены, пустой молоток
+                DATA['auction'] = None
+                DATA['colPrices'] = {}
+                DATA['colLegendOut'] = []
+                DATA['colSellQueue'] = []
+                DATA['colYear'] = 0
+                DATA['aucNextAt'] = time.time() + AUC_PERIOD   # праздник придёт сам, часы с нуля
+                DATA['aucWarned'] = False
+                DATA['worldLastAt'] = time.time()
                 save_data(DATA)
                 broadcast()   # мгновенно: новая игра у всех
             self.send_response(200)
@@ -714,6 +1086,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                 # никогда не правит сам — он меняется только эндпоинтами /p2p/*.
                                 rec['p2pDebts'] = srv_prev.get('p2pDebts', rec.get('p2pDebts') or [])
                                 rec['p2pLoans'] = srv_prev.get('p2pLoans', rec.get('p2pLoans') or [])
+                                # 🔒 СЕРВЕР-АВТОРИТЕТ по коллекции (23июл): вещи двигают только /auction/*.
+                                # Иначе старый бланк победителя затирал вещь, положенную молотком.
+                                rec['collection'] = srv_prev.get('collection', rec.get('collection') or [])
+                                rec['darkLots'] = srv_prev.get('darkLots', rec.get('darkLots') or 0)
                                 # ⚠️ ГОНКА КАССЫ: перевод денег между игроками происходит на сервере, а бланк
                                 # получателя мог сняться ДО перевода — его save затёр бы пришедшие деньги.
                                 # p2pSeq растёт при каждом движении денег по p2p; снимок со старым seq
@@ -905,6 +1281,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             _fx = we.get('fx') or {}
                             apply_market_shock(_fx)                    # событие двигает биржу у всех
                             apply_business_shock(_fx.get('biz', 0))    # и денежный поток бизнесов игроков
+                            DATA['worldLastAt'] = time.time()          # страховка мира в тикере знает: мир говорил
                             b['turnsSinceAnchor'] = 0
                         else:
                             b['turnsSinceAnchor'] = tsa
@@ -1139,6 +1516,138 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         return
 
                     raise ValueError('unknown self path')
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path.startswith('/auction/'):
+            # ═══ 💎 АУКЦИОН (Ринат 23июл). Живой торг: лот, таймер, антиснайпер.
+            # Тёмный лот 60/40 — вещь приходит ВСЕГДА, просто иногда переплатил (это рынок, не казино).
+            # Деньги за лоты игры сгорают в банк; за лоты игроков — продавцу.
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw)
+                action = self.path[9:]
+                with LOCK:
+                    players = DATA['players']
+
+                    def find(pid):
+                        return next((p for p in players if p.get('id') == pid), None)
+
+                    if action == 'open':
+                        # Ведущий открывает торги всему столу (обычно они приходят сами, раз в ~2 круга).
+                        ok, res = auction_open(req.get('by'))
+                        if not ok:
+                            self._send_json({'ok': False, 'reason': res}, 200)
+                            return
+                        _notify_all('🔨 АУКЦИОН ОТКРЫТ — молоток стучит! Смотри плитку «Аукцион».')
+                        save_data(DATA)
+                        broadcast()
+                        self._send_json({'ok': True, 'lots': res})
+                        return
+
+                    a = DATA.get('auction')
+
+                    if action == 'bid':
+                        pl = find(req.get('pid'))
+                        if pl is None:
+                            raise ValueError('player not found')
+                        if not a or a.get('status') != 'live' or not a.get('cur'):
+                            self._send_json({'ok': False, 'reason': 'no_lot'}, 200)
+                            return
+                        cur = a['cur']
+                        if time.time() >= float(cur.get('endsAt') or 0):
+                            self._send_json({'ok': False, 'reason': 'closed'}, 200)
+                            return
+                        if cur.get('bidder') == pl.get('id'):
+                            self._send_json({'ok': False, 'reason': 'yours'}, 200)
+                            return
+                        if cur.get('seller') is not None and cur.get('seller') == pl.get('id'):
+                            # свою вещь не перебивают: разгон собственного лота — пустой цирк
+                            self._send_json({'ok': False, 'reason': 'own'}, 200)
+                            return
+                        price = float(cur.get('price') or 0)
+                        # первая ставка = старт; дальше шаг от +5%
+                        need = price if cur.get('bidder') is None else round(price * (1 + AUC_MIN_STEP))
+                        amount = round(float(req.get('amount') or need), 2)
+                        if amount < need:
+                            self._send_json({'ok': False, 'reason': 'low', 'need': need}, 200)
+                            return
+                        if float(pl.get('savings') or 0) < amount:
+                            self._send_json({'ok': False, 'reason': 'not_enough', 'need': amount}, 200)
+                            return
+                        cur['price'] = amount
+                        cur['bidder'] = pl.get('id')
+                        cur['bidderName'] = pl.get('name')
+                        left = float(cur.get('endsAt') or 0) - time.time()
+                        if left < AUC_ANTISNIPE:            # перебивание на флажке
+                            cur['endsAt'] = time.time() + AUC_ANTISNIPE
+                        save_data(DATA)
+                        broadcast()
+                        self._send_json({'ok': True, 'price': amount})
+                        return
+
+                    if action == 'dark':
+                        # Тёмный лот: фикс-цена, внутри вещь — 60% дороже ящика, 40% дешевле.
+                        pl = find(req.get('pid'))
+                        if pl is None:
+                            raise ValueError('player not found')
+                        if not a or a.get('status') != 'live':
+                            self._send_json({'ok': False, 'reason': 'no_auction'}, 200)
+                            return
+                        if int(a.get('darkLeft') or 0) <= 0:
+                            self._send_json({'ok': False, 'reason': 'sold_out'}, 200)
+                            return
+                        if float(pl.get('savings') or 0) < DARK_PRICE:
+                            self._send_json({'ok': False, 'reason': 'not_enough', 'need': DARK_PRICE}, 200)
+                            return
+                        # в тёмном ящике живут серые/голубые/золотые — мифик и легендарку
+                        # в ящик не заворачивают, они выходят только с молотка при всех
+                        ps = col_prices()
+                        ordinary = col_available('gray') + col_available('blue') + col_available('gold')
+                        rich = [k for k in ordinary if ps[k] > DARK_PRICE]
+                        poor = [k for k in ordinary if ps[k] <= DARK_PRICE]
+                        pool = rich if (random.random() < DARK_WIN and rich) else (poor or rich)
+                        if not pool:
+                            self._send_json({'ok': False, 'reason': 'sold_out'}, 200)
+                            return
+                        key = random.choice(pool)
+                        pl['savings'] = round(float(pl.get('savings') or 0) - DARK_PRICE, 2)
+                        pl['p2pSeq'] = int(pl.get('p2pSeq') or 0) + 1   # касса изменена сервером
+                        pl.setdefault('collection', []).append({'key': key, 'paid': DARK_PRICE, 'at': int(time.time())})
+                        pl['darkLots'] = int(pl.get('darkLots') or 0) + 1   # >5 за партию — жадность (закон души)
+                        a['darkLeft'] = int(a.get('darkLeft') or 0) - 1
+                        worth = ps.get(key, COLLECTION_ITEMS[key]['base'])
+                        a.setdefault('log', []).append({'item': key, 'price': DARK_PRICE,
+                                                        'name': pl.get('name'), 'sold': True, 'dark': True})
+                        save_data(DATA)
+                        broadcast()
+                        self._send_json({'ok': True, 'item': key, 'name': COLLECTION_ITEMS[key]['name'],
+                                         'paid': DARK_PRICE, 'worth': worth, 'lucky': worth > DARK_PRICE})
+                        return
+
+                    if action == 'sell':
+                        # Выставить свою вещь на следующие торги. Вещь уходит в эскроу сразу.
+                        pl = find(req.get('pid'))
+                        if pl is None:
+                            raise ValueError('player not found')
+                        key = req.get('key')
+                        col = pl.setdefault('collection', [])
+                        item = next((c for c in col if c.get('key') == key), None)
+                        if item is None:
+                            self._send_json({'ok': False, 'reason': 'not_yours'}, 200)
+                            return
+                        col.remove(item)
+                        minp = max(1, round(float(req.get('min') or 0))) or None
+                        DATA.setdefault('colSellQueue', []).append(
+                            {'pid': pl.get('id'), 'key': key, 'min': minp})
+                        pl['notify'] = '🔨 «%s» уйдёт с молотка на следующих торгах.' % COLLECTION_ITEMS.get(key, {}).get('name', key)
+                        save_data(DATA)
+                        broadcast()
+                        self._send_json({'ok': True})
+                        return
+
+                    raise ValueError('unknown auction action')
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return
@@ -1467,6 +1976,7 @@ def market_ticker():
 
 def main():
     threading.Thread(target=data_flusher, daemon=True).start()   # фоновая запись на диск пачкой
+    threading.Thread(target=auction_ticker, daemon=True).start()  # 💎 молоток: лоты, цены антиквариата
     if via_market:
         threading.Thread(target=market_ticker, daemon=True).start()
         n = len((DATA.get('market') or {}).get('assets', []))

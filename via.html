@@ -10740,6 +10740,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             state.rumor = j.rumor || null;           // 🗞️ слух о следующем звене цепочки мира
             state.board = j.board || null;           // поле (движок хода) — всегда свежее
             state.p2p = j.p2p || [];                 // сделки игрок↔игрок (#23/#24) — реестр целиком серверный
+            state.auction = j.auction || null;       // 🔨 живые торги — вся судьба лотов на сервере
+            state.colPrices = j.colPrices || null;   // 💎 цены антиквариата (дорожает молча, +2–4%/год)
             const sp = j.players || [];
             const sd = j.deals || [];
             sd.forEach(d => { if (d && d.id != null) _ackedDeals.add(d.id); });   // сервер показал заявку → запомнили
@@ -10770,12 +10772,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // перерисовывал экран (вспышка бланка). Бланк ведущего / аналитика / лобби живые цены НЕ
             // показывают → если с сервера пришёл ТОЛЬКО тик рынка (игроки/заявки/событие/поле не
             // менялись), полную перерисовку пропускаем. В player-виде рынок виден — там рендерим как раньше.
-            const _nonMarket = JSON.stringify([j.players||[], j.deals||[], j.world||null, j.board||null, j.p2p||[]]);
+            const _nonMarket = JSON.stringify([j.players||[], j.deals||[], j.world||null, j.board||null, j.p2p||[], j.auction||null]);
             const _nmChanged = (_nonMarket !== _lastNonMarket);
             // 🛡️ (Ринат 19июл: «тик цен обновляет страницу, окна сбиваются») — НЕ дёргаем полную
             // перерисовку от тика рынка, когда открыто окно или крутится слот: картинка бы моргала,
             // барабаны слота сбивались, прокрутка прыгала. Живые цены догонят при закрытии окна / действии.
-            const _winOpen = !!(state.catPopup||state.soulsInfo||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.partnerModal||state.charityModal||state.buyModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.showHistory||state.doorOpen||state.soulCard);
+            const _winOpen = !!(state.catPopup||state.soulsInfo||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.showHistory||state.doorOpen||state.soulCard);
             if (!_slotSpinning && (_nmChanged || (state.view === 'player' && !_winOpen))) safeRerender();
             _lastNonMarket = _nonMarket;
             // окно сделки перерисовалось (тик рынка/чужой ход) → блок проскальзывания сбросился,
@@ -11432,8 +11434,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return (state.p2p||[]).filter(d=>d.status==='pending' && (d.to||[]).indexOf(p.id)>=0 && (d.accepted||[]).indexOf(p.id)<0);
         }
         function openLoanModal(pid){
-            const p=state.players.find(x=>x.id==pid);
-            if(p && !p2pOthers(p).length){ alert('За столом пока больше никого — давать в долг некому.'); return; }
+            // 23июл: окно больше не блокируется «за столом никого» — тут теперь живут
+            // и входящие предложения, и мои долги/займы (бывший раздел «Друг на друге»)
             state.loanModal={pId:pid}; render();
         }
         function closeLoanModal(){ state.loanModal=null; render(); }
@@ -11506,8 +11508,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(r&&r.ok===false&&r.reason==='not_enough') alert('Не хватает кассы на такой платёж.');
             await pollServer(true); render();
         }
-        // ── Раздел бланка: входящие запросы + мои долги/займы + кнопки действий ──
-        function renderP2P(p){
+        // ── 💰 Всё «друг на друге» живёт в окне кнопки у кассы (Ринат 23июл: плитку заняли
+        //    коллекция и аукцион). Входящие + мои долги/займы + форма «дать в долг» — одно окно. ──
+        function p2pBlocksHtml(p){
             const inbox=p2pInbox(p);
             const debts=(p.p2pDebts||[]), loans=(p.p2pLoans||[]);
             const inboxHtml=inbox.map(d=>{
@@ -11526,23 +11529,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }).join('');
             const debtHtml=debts.map(d=>`<div class="row-item"><div style="flex:1;"><b>Должен ${d.toName||''}</b><div style="font-size:11px;color:#9c988e;">взял ${fmtN(d.amount)}$ под ${d.pct}%</div></div><div style="text-align:right;"><b style="color:#fca5a5;">${fmtN(d.due)}$</b><br><button onclick="p2pRepay(${d.id},${p.id},${d.due})" class="btn" style="margin-top:4px;padding:3px 10px;font-size:11px;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;">Вернуть</button></div></div>`).join('');
             const loanHtml=loans.map(d=>`<div class="row-item"><div style="flex:1;"><b>${d.fromName||''} должен тебе</b><div style="font-size:11px;color:#9c988e;">дал ${fmtN(d.amount)}$ под ${d.pct}%</div></div><b style="color:#34d399;">${fmtN(d.due)}$</b></div>`).join('');
-            return `${inboxHtml}
-                <div style="display:flex;gap:7px;margin-bottom:${(debts.length||loans.length)?'10px':'0'};">
-                    <button onclick="openLoanModal(${p.id})" class="btn" style="flex:1;padding:10px;font-weight:700;font-size:12.5px;background:var(--lx-ink);border:1px solid var(--lx-line);color:var(--lx-text);">💰 Дать в долг</button>
-                </div>
-                ${debtHtml}${loanHtml}
-                ${(!inbox.length&&!debts.length&&!loans.length)?'<p style="font-size:11.5px;color:#6d6a62;line-height:1.5;margin:0;">Свободные деньги можно дать другому игроку под процент: он растёт, ты зарабатываешь. А в долю зовут прямо из карты сделки — кнопка «Партнёрство» появляется, когда ты отсканировал бизнес.</p>':''}`;
+            return { inboxHtml, rest: debtHtml + loanHtml, any: !!(inbox.length||debts.length||loans.length) };
         }
         function renderLoanModal(){
             if(!state.loanModal) return '';
             const p=state.players.find(x=>x.id==state.loanModal.pId); if(!p) return '';
             const others=p2pOthers(p);
-            if(!others.length) return '';
-            return `<div style="position:fixed;inset:0;z-index:5260;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
-                <div style="width:390px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;">
-                    <div style="text-align:center;font-size:36px;line-height:1;">💰</div>
-                    <div style="text-align:center;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#efd8a3;margin:4px 0 3px;">Дать в долг</div>
-                    <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:14px;">Свободные деньги могут работать. В кассе <b style="color:#f3efe6;">${fmtN(Math.round(p.savings))}$</b>.</div>
+            const blocks=p2pBlocksHtml(p);
+            const formHtml = others.length ? `
                     <select id="loanTo" class="inp" style="width:100%;margin-bottom:8px;"><option value="">Кому дать?</option>${others.map(o=>`<option value="${o.id}">${o.name}</option>`).join('')}</select>
                     <input id="loanAmt" type="number" min="1" placeholder="Сумма займа, $" class="inp" style="width:100%;margin-bottom:8px;font-family:ui-monospace,monospace;font-weight:700;">
                     <div style="font-size:11px;color:#9c988e;margin:0 2px 4px;">Под какой процент? <span style="color:#6d6a62;">(0–20 · вернёт сумму + этот % сверху)</span></div>
@@ -11551,10 +11545,310 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);color:#efd8a3;font-weight:800;font-size:15px;pointer-events:none;">%</span>
                     </div>
                     <div style="font-size:11.5px;color:#9c988e;line-height:1.5;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:10px;padding:9px 11px;margin-bottom:13px;">Деньги уйдут из кассы только после его согласия. Возврат — его решение и его совесть: игра долги за него не отдаёт.</div>
-                    <button onclick="sendLoan(${p.id})" class="btn" style="width:100%;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">Отправить предложение</button>
-                    <button onclick="closeLoanModal()" class="btn btn-gray" style="width:100%;margin-top:7px;padding:10px;">Отмена</button>
+                    <button onclick="sendLoan(${p.id})" class="btn" style="width:100%;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">Отправить предложение</button>`
+                : '<p style="font-size:12px;color:#6d6a62;text-align:center;line-height:1.5;">За столом пока больше никого — давать в долг некому.</p>';
+            return `<div style="position:fixed;inset:0;z-index:5260;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:390px;max-width:100%;max-height:92vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;">
+                    <div style="text-align:center;font-size:36px;line-height:1;">💰</div>
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#efd8a3;margin:4px 0 3px;">Друг на друге</div>
+                    <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:14px;">Свободные деньги могут работать. В кассе <b style="color:#f3efe6;">${fmtN(Math.round(p.savings))}$</b>.</div>
+                    ${blocks.inboxHtml}
+                    ${formHtml}
+                    ${blocks.rest?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--lx-line);">${blocks.rest}</div>`:''}
+                    ${(!blocks.any&&others.length)?'<p style="font-size:11px;color:#6d6a62;line-height:1.5;margin:10px 0 0;">В долю зовут прямо из карты сделки — кнопка «Партнёрство» появляется, когда ты отсканировал бизнес.</p>':''}
+                    <button onclick="closeLoanModal()" class="btn btn-gray" style="width:100%;margin-top:10px;padding:10px;">Закрыть</button>
                 </div></div>`;
         }
+        // ═══ 💎 КОЛЛЕКЦИЯ И АУКЦИОН (Ринат 23июл, спека VIA_COLLECTION_AUCTION_SPEC_2026_07_23.md) ═══
+        // Дух: бизнес кормит, биржа играет, коллекция БОГАТЕЕТ МОЛЧА. Вся судьба лотов — на сервере
+        // (/auction/*), клиент только рисует и шлёт намерение. Каталог — зеркало COLLECTION_ITEMS
+        // сервера: клиенту нужны имена/картинки/родословные, деньги он не считает.
+        const COL_RAR = {
+            gray:   { t:'Серый круг',   c:'#9ca3af', ring:'#4b5563' },
+            blue:   { t:'Голубой круг', c:'#38bdf8', ring:'#1d5f80' },
+            gold:   { t:'Золотой круг', c:'#efd8a3', ring:'#8a6d3b' },
+            mythic: { t:'Мифик',        c:'#a78bfa', ring:'#6d28d9' },
+            legend: { t:'Легенда',      c:'#f87171', ring:'#b91c1c' },   // тёмно-красный: стол замолкает
+        };
+        const COL_ITEMS = {
+            // тема ВРЕМЯ ⌛
+            watch:     {name:'Карманные часы',            theme:'time',  rar:'gray'},
+            compass:   {name:'Старый компас',             theme:'time',  rar:'gray'},
+            hourglass: {name:'Песочные часы капитана',    theme:'time',  rar:'blue'},
+            clock:     {name:'Каминные часы с боем',      theme:'time',  rar:'gold'},
+            astrolabe: {name:'Астролябия звездочёта',     theme:'time',  rar:'gold'},
+            // тема ИСКУССТВО 🎻
+            cup:       {name:'Фарфоровая чашка',          theme:'art',   rar:'gray'},
+            statue:    {name:'Статуэтка танцовщицы',      theme:'art',   rar:'blue'},
+            shkatulka: {name:'Музыкальная шкатулка',      theme:'art',   rar:'blue'},
+            violin:    {name:'Скрипка старого мастера',   theme:'art',   rar:'gold'},
+            painting:  {name:'Картина «Буря»',            theme:'art',   rar:'gold'},
+            goblet:    {name:'Кубок венецианского стекла', theme:'art',  rar:'gold'},
+            // тема СЛОВО 📜
+            newspaper: {name:'Столетняя газета',          theme:'word',  rar:'gray'},
+            quill:     {name:'Перо писателя',             theme:'word',  rar:'gray'},
+            map:       {name:'Старая карта мира',         theme:'word',  rar:'blue'},
+            letter:    {name:'Письмо с сургучом',         theme:'word',  rar:'blue'},
+            firsted:   {name:'Первое издание',            theme:'word',  rar:'gold'},
+            // тема СИЛА ⚔️
+            horseshoe: {name:'Ржавая подкова',            theme:'power', rar:'gray'},
+            coin:      {name:'Монета империи',            theme:'power', rar:'gray'},
+            king:      {name:'Шахматный король',          theme:'power', rar:'blue'},
+            helmet:    {name:'Шлем крестоносца',          theme:'power', rar:'gold'},
+            blade:     {name:'Клинок дамасской стали',    theme:'power', rar:'gold'},
+            kamcha:    {name:'Ханская камча',             theme:'power', rar:'gold'},
+            // 👑 фиолетовые мифики — по одному на партию, desc читает аукционист вслух
+            lion:      {name:'Чёрный лев',                theme:'legend', rar:'mythic',
+                        desc:'Вырезан из цельного обсидиана мастером, чьё имя стёрло время. Говорят, он приносит хозяину хладнокровие в сделках.'},
+            shogun:    {name:'Меч сёгуна',                theme:'legend', rar:'mythic',
+                        desc:'Клинок последнего сёгуна. Волна закалки видна до сих пор — оружие, которое ни разу не проиграло.'},
+            khan:      {name:'Сабля великого хана',       theme:'legend', rar:'mythic',
+                        desc:'Золото и бирюза Великой степи. Такой саблей не рубили — ею правили.'},
+            crown:     {name:'Корона забытого царства',   theme:'legend', rar:'mythic',
+                        desc:'Царство исчезло с карт, а корона пережила всех, кто её носил. Рубины тёмные, как его история.'},
+            necklace:  {name:'Ожерелье царицы',           theme:'legend', rar:'mythic',
+                        desc:'Изумруды и жемчуг, помнящие шею царицы. Каждый камень — чья-то присяга.'},
+            // 🔴 тёмно-красные легендарки — единственные в мире
+            egg:       {name:'Золотое яйцо ювелира',      theme:'legend', rar:'legend',
+                        desc:'Последняя работа великого ювелира. Внутри — механизм, который никто не решается завести.'},
+            mask:      {name:'Золотая маска фараона',     theme:'legend', rar:'legend',
+                        desc:'Три тысячи лет молчания в чистом золоте и лазурите. Гробница, из которой её вынесли, засекречена.'},
+            scepter:   {name:'Скипетр императора',        theme:'legend', rar:'legend',
+                        desc:'Власть, отлитая в золоте, с рубином размером с сердце. Империя пала — скипетр остался.'},
+            ring:      {name:'Перстень Клеопатры',        theme:'legend', rar:'legend',
+                        desc:'Изумрудный скарабей на золоте трёх империй. Эту руку целовали цари.'},
+            diamond:   {name:'Чёрный бриллиант «Око ночи»', theme:'legend', rar:'legend',
+                        desc:'Редчайший чёрный бриллиант в мире. В его гранях горит фиолетовый огонь, который никто не смог объяснить.'},
+            ram:       {name:'Дикий архар',               theme:'legend', rar:'legend',
+                        desc:'Редчайшая порода горных архаров — чистейшие гены на земле. Для разведения и создания лучшего потомства в мире. Дикого не приручить — в этом и статус.'},
+            eagle:     {name:'Золотой беркут',            theme:'legend', rar:'legend',
+                        desc:'Царь неба Великой степи, отлитый в чистом золоте, с глазами из бирюзы. Символ тех, кто смотрит сверху.'},
+            horse:     {name:'Золотой тулпар',            theme:'legend', rar:'legend',
+                        desc:'Крылатый конь степных легенд в чистом золоте. Говорят, кто владеет тулпаром — того не догнать ни в деле, ни в судьбе.'},
+            stallion:  {name:'Арабский скакун',           theme:'legend', rar:'legend',
+                        desc:'Легендарный вороной производитель чистейшей арабской линии. Родословная длиннее, чем у иных королей. Для разведения и потомства, которое войдёт в историю. Торги — начало!'},
+            altyn:     {name:'Золотой человек',           theme:'legend', rar:'legend',
+                        desc:'Алтын Адам. Воин Великой степи в доспехе из тысяч золотых пластин. Душа народа, отлитая в золоте. Национальное достояние — и сегодня оно на торгах.'},
+        };
+        const COL_THEME_LBL = { time:'⌛ Время', art:'🎻 Искусство', word:'📜 Слово', power:'⚔️ Сила', legend:'👑 Легенды' };
+        function colPrice(k){
+            const it = COL_ITEMS[k] || {};
+            return Math.round(Number((state.colPrices || {})[k]) || Number(it.base) || 0) || 0;
+        }
+        // Картинка вещи. Подковы (col_horseshoe) пока нет — onerror прячет рамку, не ломая карточку.
+        // whole=true — вещь ЦЕЛИКОМ на тёмном бархате (Ринат 23июл: «книга обрезана, человек
+        // должен видеть, ЧТО идёт на торги»); без whole — заполнение кадра для мелких плиток.
+        function colImg(k, h, whole){
+            return `<div style="height:${h}px;overflow:hidden;border-radius:10px;position:relative;background:${whole?'radial-gradient(120% 100% at 50% 30%,#151a24,#07090d)':'#0a0c10'};">
+                <img src="cat_imgs/col_${k}.webp" alt="" style="width:100%;height:100%;object-fit:${whole?'contain':'cover'};display:block;" onerror="this.style.display='none'">
+                <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent ${whole?'72%':'45%'},rgba(11,14,20,${whole?'.55':'.88'}));"></div></div>`;
+        }
+        // ── 💎 Зал коллекции: мои вещи, темы, продажа с молотка ──
+        function renderColPanel(p){
+            const col = p.collection || [];
+            const worth = col.reduce((s,c)=>s+colPrice(c.key),0);
+            const themeChips = ['time','art','word','power'].map(t=>{
+                const have = new Set(col.filter(c=>(COL_ITEMS[c.key]||{}).theme===t).map(c=>c.key)).size;
+                const total = Object.values(COL_ITEMS).filter(i=>i.theme===t).length;
+                const full = have>=3;
+                return `<div style="background:${full?'radial-gradient(120% 120% at 50% 0,rgba(217,184,119,.22),transparent 70%),#12151c':'#0d1016'};border:1px solid ${full?'var(--lx-gold-ln)':'#242833'};border-radius:10px;padding:8px 10px;text-align:center;">
+                    <div style="font-size:11px;font-weight:700;color:${full?'#efd8a3':'#9c988e'};">${COL_THEME_LBL[t]}</div>
+                    <div style="font-family:ui-monospace,monospace;font-size:13px;font-weight:700;margin-top:2px;color:${full?'#efd8a3':'#6d6a62'};">${have} / 3${full?' ✓':''}</div></div>`;
+            }).join('');
+            const cards = col.map((c,i)=>{
+                const it = COL_ITEMS[c.key]; if(!it) return '';
+                const r = COL_RAR[it.rar]||COL_RAR.gray;
+                const now = colPrice(c.key), paid = Math.round(Number(c.paid)||0);
+                const dp = paid>0 ? Math.round((now-paid)/paid*100) : 0;
+                return `<div style="background:linear-gradient(180deg,#141821,#0e1117);border:1px solid ${r.ring};border-radius:13px;padding:9px;box-shadow:0 0 18px -10px ${r.c};">
+                    ${colImg(c.key, 110, true)}
+                    <div style="font-size:12.5px;font-weight:700;color:#f3efe6;margin-top:7px;line-height:1.3;">${it.name}</div>
+                    <div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${r.c};margin-top:2px;">${r.t}</div>
+                    <div style="font-size:11px;color:#9c988e;margin-top:5px;">взял за ${fmtN(paid)}$ → сейчас <b style="color:${now>=paid?'#5cb08b':'#cf9a9a'};">${fmtN(now)}$</b>${dp?` <span style="color:${dp>=0?'#5cb08b':'#cf9a9a'};">(${dp>0?'+':''}${dp}%)</span>`:''}</div>
+                    <button onclick="colSell(${p.id},'${c.key}')" class="btn" style="width:100%;margin-top:7px;padding:6px;font-size:11px;font-weight:700;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;">🔨 На торги</button>
+                </div>`;
+            }).join('');
+            return `<div class="card">
+                <div class="block-title">💎 Моя коллекция</div>
+                <div style="font-size:11.5px;color:#9c988e;line-height:1.55;margin-bottom:10px;">Вещь не капает в поток — она <b style="color:#efd8a3;">дорожает на бархате</b>, +2–4% в год, молча. Сет из 3 вещей одной темы и легендарки — вес твоего имени за столом: козырь на двери 2-го круга.</div>
+                ${col.length?`<div style="display:flex;justify-content:space-between;align-items:baseline;background:#0d1016;border:1px solid #242833;border-radius:11px;padding:9px 12px;margin-bottom:10px;">
+                    <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6d6a62;font-weight:700;">Красная цена коллекции</span>
+                    <b style="font-family:ui-monospace,monospace;font-size:17px;color:#efd8a3;">${fmtN(worth)}$</b></div>`:''}
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:11px;">${themeChips}</div>
+                ${col.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;">${cards}</div>`
+                             : '<p style="font-size:12px;color:#6d6a62;line-height:1.55;margin:0;">Коллекция пуста. Вещи приходят только с торгов: живой молоток и запечатанные ящики. Аукцион открывает ведущий — не пропусти.</p>'}
+            </div>`;
+        }
+        async function colSell(pid, key){
+            const it = COL_ITEMS[key]||{}; const now = colPrice(key);
+            const v = prompt('«'+(it.name||key)+'» уйдёт с молотка на СЛЕДУЮЩИХ торгах.\nКрасная цена сейчас '+fmtN(now)+'$.\n\nМинимальная ставка (старт торгов):', String(Math.max(1,Math.round(now*0.5))));
+            if(v===null) return;
+            const minp = Math.floor(Number(String(v).replace(/[^0-9]/g,''))||0);
+            if(minp<1) return;
+            try{
+                const r = await fetch('/auction/sell',{method:'POST',headers:{'Content-Type':'application/json'},
+                                                       body:JSON.stringify({pid:pid,key:key,min:minp})});
+                const j = await r.json();
+                if(j && j.ok===false) alert('Не получилось: вещь не найдена в коллекции.');
+            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
+            await pollServer(true); render();
+        }
+        // ── 🔨 Зал торгов: лот, живая ставка, антиснайпер, тёмные ящики ──
+        function renderAucPanel(p){
+            const a = state.auction;
+            const live = a && a.status==='live';
+            const logHtml = (a && (a.log||[]).length) ? `<div style="margin-top:11px;">
+                <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6d6a62;font-weight:700;margin-bottom:6px;">Молоток уже стукнул</div>
+                ${(a.log||[]).slice(-8).reverse().map(l=>{
+                    const it=COL_ITEMS[l.item]||{}; const r=COL_RAR[(it.rar)||'gray']||COL_RAR.gray;
+                    return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:5px 2px;border-bottom:1px solid #1a1e26;">
+                        <span style="color:${r.c};">${l.dark?'📦 ':''}${it.name||l.item}</span>
+                        <span style="color:${l.sold?'#9c988e':'#6d6a62'};white-space:nowrap;">${l.sold?`${fmtN(Math.round(l.price))}$ → <b style="color:${l.npc?'#a78bfa':'#efd8a3'};">${l.name||''}</b>`:(l.res?'резерв не взят':'не взяли')}</span></div>`;
+                }).join('')}</div>` : '';
+            if(!live){
+                return `<div class="card">
+                    <div style="border-radius:13px;overflow:hidden;position:relative;height:130px;margin-bottom:11px;">
+                        <img src="cat_imgs/col_auction.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.75) brightness(.8);" onerror="this.style.display='none'">
+                        <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,.2),rgba(11,14,20,.92));"></div>
+                        <div style="position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Аукционный дом VIA</div>
+                    </div>
+                    <div style="font-size:12.5px;color:#cdc8bd;line-height:1.6;text-align:center;">Молоток спит. Торги открывает <b style="color:#efd8a3;">ведущий</b> — и это праздник: живые ставки на 60 секунд, перебивание на флажке, вещи, которых в мире по одной.</div>
+                    <div style="font-size:11px;color:#6d6a62;line-height:1.5;text-align:center;margin-top:7px;">Свою вещь можно выставить заранее — кнопка «🔨 На торги» в коллекции.</div>
+                    ${state.isAdmin?`<button onclick="aucOpenTorgi()" class="btn" style="width:100%;margin-top:11px;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">🔨 ОТКРЫТЬ ТОРГИ</button>`:''}
+                    ${logHtml}
+                </div>`;
+            }
+            const cur = a.cur;
+            let lotHtml = '<p style="font-size:12px;color:#9c988e;text-align:center;margin:10px 0;">Следующий лот выходит на подиум…</p>';
+            if(cur){
+                const it = COL_ITEMS[cur.item]||{name:cur.item};
+                const r = COL_RAR[(it.rar)||'gray']||COL_RAR.gray;
+                const myLot = cur.seller!=null && cur.seller==p.id;
+                const iHold = cur.bidder!=null && cur.bidder==p.id;
+                const need = cur.bidder==null ? Math.round(cur.price) : Math.round(cur.price*1.05);
+                lotHtml = `<div style="background:linear-gradient(180deg,#151924,#0d1015);border:2px solid ${r.ring};border-radius:16px;padding:11px;box-shadow:0 0 34px -12px ${r.c};">
+                    ${colImg(cur.item, 210, true)}
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:9px;">
+                        <div style="font-family:Georgia,serif;font-size:17px;font-weight:700;color:#f3efe6;line-height:1.25;">${it.name}</div>
+                        <span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${r.c};white-space:nowrap;">${r.t}</span>
+                    </div>
+                    ${it.desc?`<div style="font-family:Georgia,serif;font-style:italic;font-size:12.5px;color:#b9b4a9;line-height:1.55;margin-top:5px;">${it.desc}</div>`:''}
+                    ${cur.seller!=null?`<div style="font-size:10.5px;color:#8fb3e0;margin-top:5px;">лот игрока${myLot?' — ТВОЙ, наблюдай за торгом':''}</div>`:''}
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:#0a0c10;border:1px solid #23272f;border-radius:11px;padding:9px 12px;margin-top:9px;">
+                        <div>
+                            <div style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#6d6a62;font-weight:700;">${cur.bidderName?`держит ${cur.bidderName}`:'старт торгов'}</div>
+                            <div style="font-family:ui-monospace,monospace;font-size:24px;font-weight:700;color:${iHold?'#5cb08b':'#efd8a3'};line-height:1.1;">${fmtN(Math.round(cur.price))}$</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#6d6a62;font-weight:700;">молоток через</div>
+                            <div id="aucTimer" data-ends="${cur.endsAt}" style="font-family:ui-monospace,monospace;font-size:24px;font-weight:700;color:#f3efe6;line-height:1.1;">—</div>
+                        </div>
+                    </div>
+                    ${myLot ? '' : iHold
+                        ? `<div style="font-size:12px;color:#5cb08b;font-weight:700;text-align:center;margin-top:9px;">Твоя ставка держит лот. Молчи и смотри на молоток.</div>`
+                        : `<div style="display:grid;grid-template-columns:1fr;gap:7px;margin-top:9px;">
+                            <button onclick="aucBid(${p.id},${need})" class="btn" style="padding:12px;font-weight:800;font-size:14px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">${cur.bidder==null?'ВЗЯТЬ СО СТАРТА':'ПЕРЕБИТЬ'} — ${fmtN(need)}$</button>
+                            <div style="display:grid;grid-template-columns:1fr auto;gap:7px;">
+                                <input id="aucAmt" type="number" min="${need}" placeholder="Своя ставка, от ${fmtN(need)}$" class="inp" style="padding:8px 11px;font-family:ui-monospace,monospace;font-weight:700;">
+                                <button onclick="aucBid(${p.id},0)" class="btn" style="padding:8px 14px;font-weight:700;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;">Ставлю</button>
+                            </div>
+                            <div style="font-size:10.5px;color:#6d6a62;text-align:center;">ставка в последние 10 секунд продлевает торг — перебивание на флажке живёт</div>
+                        </div>`}
+                </div>`;
+            }
+            const qn = (a.queue||[]).length;
+            const darkLeft = Number(a.darkLeft)||0;
+            return `<div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;">
+                    <div class="block-title" style="margin:0;">🔨 Торги идут</div>
+                    <span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#f87171;background:rgba(185,28,28,.14);border:1px solid #7f1d1d;border-radius:999px;padding:4px 10px;">● live</span>
+                </div>
+                ${lotHtml}
+                ${qn?`<div style="font-size:11px;color:#9c988e;text-align:center;margin-top:8px;">⏳ ждут молотка: ещё ${qn} лот${qn==1?'':qn<5?'а':'ов'}</div>`:''}
+                ${darkLeft>0?`<div style="display:flex;gap:10px;align-items:center;background:linear-gradient(180deg,#12151c,#0c0f14);border:1px solid #2b2f3a;border-radius:13px;padding:10px;margin-top:11px;">
+                    <div style="flex:0 0 74px;">${colImg('darklot',64)}</div>
+                    <div style="flex:1;">
+                        <div style="font-size:12.5px;font-weight:700;color:#cdc8bd;">📦 Запечатанный ящик · осталось ${darkLeft}</div>
+                        <div style="font-size:10.5px;color:#9c988e;line-height:1.45;margin-top:2px;">Внутри вещь — всегда. Шесть из десяти дороже цены ящика, четыре — дешевле. Это рынок, не казино.</div>
+                    </div>
+                    <button onclick="aucDark(${p.id})" class="btn" style="flex:0 0 auto;padding:9px 12px;font-weight:800;font-size:12px;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;white-space:nowrap;">4 000$</button>
+                </div>`:''}
+                ${logHtml}
+            </div>`;
+        }
+        async function aucBid(pid, amount){
+            if(!amount){
+                amount = Math.floor(Number((document.getElementById('aucAmt')||{}).value)||0);
+                if(amount<1){ alert('Впиши свою ставку числом.'); return; }
+            }
+            let j=null;
+            try{
+                const r = await fetch('/auction/bid',{method:'POST',headers:{'Content-Type':'application/json'},
+                                                      body:JSON.stringify({pid:pid, amount:amount})});
+                j = await r.json();
+            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
+            if(j && j.ok===false){
+                alert(j.reason==='low' ? 'Мало: сейчас нужно от '+fmtN(Math.round(j.need||0))+'$.'
+                    : j.reason==='not_enough' ? 'В кассе не хватает на такую ставку.'
+                    : j.reason==='yours' ? 'Твоя ставка и так держит лот.'
+                    : j.reason==='own' ? 'Это твой лот — свою вещь не перебивают.'
+                    : j.reason==='closed' ? 'Молоток уже стукнул.' : 'Лота нет — торги идут дальше.');
+            }
+            await pollServer(true); render();
+        }
+        async function aucDark(pid){
+            if(!confirm('Взять запечатанный ящик за 4 000$?\nВнутри вещь — всегда. Но что именно, узнаешь после оплаты.')) return;
+            let j=null;
+            try{
+                const r = await fetch('/auction/dark',{method:'POST',headers:{'Content-Type':'application/json'},
+                                                       body:JSON.stringify({pid:pid})});
+                j = await r.json();
+            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
+            if(j && j.ok===false){
+                alert(j.reason==='sold_out' ? 'Ящики кончились.' : j.reason==='not_enough' ? 'В кассе нет 4 000$.' : 'Сейчас нельзя — торгов нет.');
+                return;
+            }
+            if(j && j.ok){ state.darkReveal = j; }
+            await pollServer(true); render();
+        }
+        // Вскрытие ящика — маленький театр: вещь, красная цена, повезло или переплатил.
+        function renderDarkReveal(){
+            const d = state.darkReveal; if(!d) return '';
+            const it = COL_ITEMS[d.item]||{name:d.name||d.item};
+            const r = COL_RAR[(it.rar)||'gray']||COL_RAR.gray;
+            return `<div style="position:fixed;inset:0;z-index:5270;background:rgba(4,5,8,.93);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:360px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:2px solid ${r.ring};border-radius:18px;padding:18px 16px;box-shadow:0 0 44px -10px ${r.c};">
+                    <div style="text-align:center;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;margin-bottom:10px;">ящик вскрыт</div>
+                    ${colImg(d.item, 170, true)}
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:19px;font-weight:700;color:#f3efe6;margin-top:10px;">${it.name}</div>
+                    <div style="text-align:center;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:${r.c};margin-top:2px;">${r.t}</div>
+                    <div style="text-align:center;font-size:12.5px;color:#9c988e;line-height:1.55;margin-top:9px;">Заплатил <b style="color:#f3efe6;">${fmtN(Math.round(d.paid||0))}$</b> · красная цена — <b style="color:${d.lucky?'#5cb08b':'#cf9a9a'};">${fmtN(Math.round(d.worth||0))}$</b><br>${d.lucky?'Повезло: вещь дороже ящика.':'Переплатил — но вещь твоя, и она дорожает каждый год.'}</div>
+                    <button onclick="state.darkReveal=null;render();" class="btn" style="width:100%;margin-top:13px;padding:11px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">В коллекцию</button>
+                </div></div>`;
+        }
+        async function aucOpenTorgi(){
+            if(!confirm('Открыть аукцион всему столу?\nИгра выставит лоты, следом пойдут вещи игроков.')) return;
+            let j=null;
+            try{
+                const r = await fetch('/auction/open',{method:'POST',headers:{'Content-Type':'application/json'},
+                                                       body:JSON.stringify({by:'ведущий'})});
+                j = await r.json();
+            }catch(e){ alert('Сервер не ответил — попробуй ещё раз.'); return; }
+            if(j && j.ok===false){
+                alert(j.reason==='busy' ? 'Торги уже идут.' : 'Выставить нечего — все вещи разобраны.');
+                return;
+            }
+            await pollServer(true); render();
+        }
+        // Часы молотка: тикают точечно (textContent), не перерисовывая экран. Антиснайпер
+        // двигает endsAt на сервере — свежее время приезжает broadcast'ом в data-ends.
+        setInterval(()=>{
+            const el = document.getElementById('aucTimer'); if(!el) return;
+            const left = Math.max(0, Math.ceil(Number(el.dataset.ends||0) - Date.now()/1000));
+            el.textContent = left + 'с';
+            el.style.color = left<=10 ? '#f87171' : '#f3efe6';
+        }, 500);
+
         // ═══ 🤝 ПАРТНЁРСТВО (правило Рината, 20 июл) ═══
         // Было неправильно: «Общее дело» просило вписать РУКАМИ название, цену и поток — человек
         // сам придумывал себе бизнес. Теперь партнёрство живёт только внутри окна ОТСКАНИРОВАННОЙ
@@ -13508,7 +13802,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${/* Ринат 23июл: «Дать в долг» — рядом с депозитом у кассы, чтобы люди давали в долг */''}
                     <div style="display:flex;flex-direction:column;gap:6px;">
                       <button onclick="openSecWindow('🏦 Депозиты')" style="background:rgba(217,184,119,.1);border:1px solid var(--lx-gold-ln);border-radius:10px;color:var(--lx-gold-br);font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">🏦 Депозит</button>
-                      <button onclick="openLoanModal(${p.id})" style="background:rgba(92,176,139,.1);border:1px solid #234436;border-radius:10px;color:#7fd3ad;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">💰 Дать в долг</button>
+                      <button onclick="openLoanModal(${p.id})" style="background:rgba(92,176,139,.1);border:1px solid ${p2pInbox(p).length?'#b98a3e':'#234436'};border-radius:10px;color:#7fd3ad;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">💰 Дать в долг${p2pInbox(p).length?` <b style="color:#efd8a3;">· ${p2pInbox(p).length}</b>`:''}</button>
                     </div>
                     <span style="font-family:ui-monospace,monospace;font-weight:700;font-size:13px;color:${f.flow>=0?'#5cb08b':'#cf9a9a'};background:${f.flow>=0?'rgba(92,176,139,.12)':'rgba(207,154,154,.12)'};padding:5px 10px;border-radius:999px;white-space:nowrap;">${f.flow>=0?'▲ +':'▼ '}${fmtN(f.flow)}/мес</span>
                   </div>
@@ -13559,10 +13853,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
                 </div></details>
 
-                ${/* 🩹 21 июл: было авто-раскрытие при входящем запросе. С плитками это окно во весь
-                     экран, которое лезло бы поверх всего. Стало: счётчик прямо на плитке. */''}
-                <details class="sec"><summary>🤝 Друг на друге${p2pInbox(p).length?` <b style="color:#efd8a3;">· ${p2pInbox(p).length}</b>`:''} <span class="sec-hint">— займы и общие дела</span></summary><div class="sec-in">
-                ${renderP2P(p)}
+                ${/* 💎🔨 Ринат 23июл: «Друг на друге» ушёл в окно кнопки «Дать в долг» у кассы,
+                     а его место заняли коллекция и аукцион. LIVE-бейдж торгов — свечением рамки,
+                     НЕ текстом: _openSecs помнит окна по тексту шапки, смена текста закрыла бы окно. */''}
+                <details class="sec"><summary>💎 Коллекция <span class="sec-hint">— вещи, что дорожают молча</span></summary><div class="sec-in">
+                ${renderColPanel(p)}
+                </div></details>
+
+                <details class="sec"${(state.auction&&state.auction.status==='live')?' style="border-color:#7f1d1d;box-shadow:0 0 22px -10px #b91c1c;"':''}><summary>🔨 Аукцион <span class="sec-hint">— живой молоток, ставки на флажке</span></summary><div class="sec-in">
+                ${renderAucPanel(p)}
                 </div></details>
 
                 <details class="sec"><summary>🎴 Клетки и действия <span class="sec-hint">— на что попал</span></summary><div class="sec-in">
@@ -13736,6 +14035,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderBizBudget()}
                 ${renderBizDraw()}
                 ${renderLoanModal()}
+                ${renderDarkReveal()}
                 ${renderPartnerModal()}
                 ${renderCharityModal()}
                 ${renderDeckResult()}
@@ -14272,6 +14572,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <p style="font-size:12px; color:#9ca3af; margin-top:2px;">Все сделки игроков проходят через тебя · Игроков: <b>${state.players.length}</b> · Заявок: <b>${pending.length}</b></p>
                     </div>
                     <div style="display:flex; gap:8px;">
+                        <button onclick="aucOpenTorgi()" class="btn" style="background:#3b2a12;color:#efd8a3;border:1px solid #b98a3e;" title="Открыть аукцион всему столу: лоты игры + вещи игроков, живые ставки">🔨 Торги${(state.auction&&state.auction.status==='live')?' <span style="color:#f87171;">●</span>':''}</button>
                         <button onclick="state.view='serve';render();" class="btn" style="background:#1e3a5f;color:#bfdbfe;" title="Выдать карту души «Служение людям» тому, кто реально помогает за столом">🕯️ Служение</button>
                         <button onclick="reloadFromStorage(); render();" class="btn btn-blue" title="Подтянуть свежие данные из других вкладок">🔄 Обновить</button>
                         <button onclick="state.view='analytics';render();" class="btn" style="background:#4c1d95; color:#ddd6fe;" title="Сводная таблица по всем игрокам для анализа">📊 Аналитика</button>
