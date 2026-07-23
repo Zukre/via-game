@@ -11581,9 +11581,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         </div>
                     </div>`:''}
                     <p style="font-size:12px;color:var(--lx-muted);line-height:1.55;margin:0 2px 10px;">Занимать кратно 1000$. Каждый занятый доллар просит 10 центов в месяц — 5000$ превращаются в 500$ платежа. Деньги придут в кассу после одобрения ведущим.</p>
+                    ${(()=>{ const cap=bankCap(p), fl=Math.round(calc(p).flow);
+                       return `<div style="display:flex;justify-content:space-between;align-items:baseline;background:#0d1016;border:1px solid #242833;border-radius:10px;padding:8px 11px;margin-bottom:10px;">
+                        <span style="font-size:11px;color:#9c988e;">Банк смотрит на твой поток: <b style="color:${fl>0?'#5cb08b':'#cf9a9a'};">${fl>0?'+':''}${fmtN(fl)}$/мес</b> × 10</span>
+                        <b style="font-family:ui-monospace,monospace;font-size:14px;color:${cap>0?'#efd8a3':'#cf9a9a'};">${cap>0?'до '+fmtN(cap)+'$':'откажет'}</b></div>`; })()}
                     ${pending?'<div style="font-size:12px;color:#efd8a3;background:rgba(217,184,119,.08);border:1px solid var(--lx-gold-ln);border-radius:10px;padding:9px 11px;margin-bottom:12px;">⏳ Заявка уже у ведущего — деньги придут после одобрения.</div>':`
                     <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:2px;">
-                        <input type="number" id="bankAmt" placeholder="Сколько занять? ($1000, $2000...)" class="inp" step="1000" min="1000" style="font-family:ui-monospace,monospace;font-weight:700;">
+                        <input type="number" id="bankAmt" placeholder="Сколько занять? (кратно 1000$)" class="inp" step="1000" min="1000" max="${bankCap(p)}" style="font-family:ui-monospace,monospace;font-weight:700;">
                         <button onclick="reqLoan('bankAmt')" class="btn btn-debt-gold" style="padding:10px 16px;">Запросить</button>
                     </div>`}
                     <button onclick="state.bankModal=null;render();" class="btn btn-gray" style="width:100%;margin-top:10px;padding:10px;">Закрыть</button>
@@ -13830,7 +13834,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${/* 🏦 Депозит переехал сюда из плитки (Ринат 21 июл): деньги лежат в кассе —
                          значит и кнопка «вложить» должна быть у кассы, а не внизу списка. */''}
                     ${/* Ринат 23июл: «Дать в долг» — рядом с депозитом у кассы, чтобы люди давали в долг */''}
-                    <div style="display:flex;flex-direction:column;gap:6px;">
+                    ${/* Ринат 23июл (скрин со стрелками): депозит/дать в долг/кредит — В ЛИНИЮ, не в столб */''}
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
                       <button onclick="openSecWindow('🏦 Депозиты')" style="background:rgba(217,184,119,.1);border:1px solid var(--lx-gold-ln);border-radius:10px;color:var(--lx-gold-br);font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">🏦 Депозит</button>
                       <button onclick="openLoanModal(${p.id})" style="background:rgba(92,176,139,.1);border:1px solid ${p2pInbox(p).length?'#b98a3e':'#234436'};border-radius:10px;color:#7fd3ad;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">💰 Дать в долг${p2pInbox(p).length?` <b style="color:#efd8a3;">· ${p2pInbox(p).length}</b>`:''}</button>
                       ${/* Ринат 23июл: «Взять кредит» — тоже у кассы, а то далеко и неудобно */''}
@@ -14013,14 +14018,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     </div>
                 </div>
 
-                <div class="card" style="border-color:var(--lx-gold-ln); background:linear-gradient(180deg,rgba(217,184,119,.05),transparent);">
-                    <div class="block-title" style="color:var(--lx-gold-br);">🏦 Взять кредит банка</div>
-                    <p style="font-size:12px; color:var(--lx-muted); margin-bottom:12px; line-height:1.55;">Занимать кратно 1000$. Каждый занятый доллар просит 10 центов в месяц — 5000$ превращаются в 500$ платежа. Деньги придут в кассу после одобрения ведущим.</p>
-                    <div style="display:grid; grid-template-columns:1fr auto; gap:10px;">
-                        <input type="number" id="loanAmount" placeholder="Сколько занять? ($1000, $2000, $5000...)" class="inp" step="1000" min="1000">
-                        <button onclick="reqLoan()" ${hasP?'disabled':''} class="btn btn-debt-gold" style="padding:10px 18px;">Запросить</button>
-                    </div>
-                </div>
+                ${/* Ринат 23июл: форма «Взять кредит банка» УБРАНА отсюда — она теперь у кассы
+                     (кнопка «💳 Кредит», renderBankModal). Здесь остались только долги на погашение. */''}
                 </div></details>
 
                 <details class="sec"><summary>🏆 Путь к победе</summary><div class="sec-in">
@@ -14491,7 +14490,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function autoBankLoan(p){
             if((Number(p.bankLoan)||0) > 0) return;                 // один кредит за раз
             if((Number(p.savings)||0) > 20000) return;              // берут те, кому не хватает
-            const amt = 1000 * (1 + Math.floor(Math.random()*5));    // кратно 1000, как в игре
+            const cap = bankCap(p);                                  // 🏦 потолок 10× потока — как у живых
+            if(cap < 1000) return;                                   // банк боту тоже откажет
+            const amt = Math.min(1000 * (1 + Math.floor(Math.random()*5)), cap);
             p.bankLoan = (Number(p.bankLoan)||0) + amt;
             p.savings = Math.round(((Number(p.savings)||0) + amt)*100)/100;
             save(p.id);
@@ -16634,11 +16635,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(); render();
         }
 
+        // 🏦 ПОТОЛОК КРЕДИТА (правило Рината 23июл): банк даёт максимум 10× месячного потока.
+        // Поток 1000$/мес → максимум 10 000$ (платёж 10% как раз съест весь поток). Поток 1750 → 17 500.
+        // Поток уже учитывает платёж по старому кредиту — второй кредит сам собой даётся меньше.
+        function bankCap(p){
+            const f = calc(p);
+            return Math.floor(Math.max(0, Number(f.flow) || 0) * 10 / 1000) * 1000;
+        }
         function reqLoan(elId) {
-            // elId: 'loanAmount' — форма в разделе долгов, 'bankAmt' — окно кнопки у кассы (Ринат 23июл)
-            const amt = Number((document.getElementById(elId || 'loanAmount') || {}).value);
+            // Кредит просят из окна у кассы (id=bankAmt). Старая форма в «Долгах» убрана 23июл.
+            const amt = Number((document.getElementById(elId || 'bankAmt') || {}).value);
             if (!amt || amt < 1000) { alert('Минимальная сумма $1000. Кратно тысяче.'); return; }
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            const cap = bankCap(p);
+            if (cap < 1000) { alert('🏦 Банк отказал: твой месячный поток ' + fmtN(Math.round(calc(p).flow)) + '$ — платить нечем. Подними поток и приходи.'); return; }
+            if (amt > cap) { alert('🏦 Банк смотрит на поток: ' + fmtN(Math.round(calc(p).flow)) + '$/мес × 10 = максимум ' + fmtN(cap) + '$. Больше не дадут.'); return; }
             if (state.deals.some(d => d.pId == p.id && d.type === 'TAKE_LOAN' && d.status === 'PENDING')) {
                 alert('⏳ Заявка на кредит уже у ведущего — не дублируй, он вот-вот одобрит.'); return;
             }
@@ -16696,6 +16707,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const DEBT_FIELD = { PAY_MORTGAGE:'mLeft', PAY_EDU:'eLeft', PAY_AUTO:'aLeft', PAY_CC:'ccLeft', PAY_RETAIL:'rLeft', PAY_BANK:'bankLoan' };
         function appr(dId) {
             const d = state.deals.find(dl => dl.id == dId); if (!d) return;
+            // 🏦 ПОТОЛОК КРЕДИТА и на одобрении (Ринат 23июл): банк даёт максимум 10× потока.
+            // Старый клиент мог прислать заявку на любую сумму — ведущий её не пропустит.
+            if (d.type === 'TAKE_LOAN') {
+                const pl = state.players.find(x => x.id == d.pId);
+                const cap = pl ? bankCap(pl) : 0;
+                if ((Number(d.details.amount) || 0) > cap) {
+                    alert('🚫 Банк не даст «' + (pl ? pl.name : 'игрок') + '» столько: поток ' + fmtN(pl ? Math.round(calc(pl).flow) : 0) + '$/мес → максимум ' + fmtN(cap) + '$. Заявка отклонена — пусть просит меньше или растит поток.');
+                    state.deals = state.deals.filter(dl => dl.id != dId);
+                    save(); render();
+                    return;
+                }
+            }
             // ПОГАШЕНИЕ ДОЛГА СТОИТ ДЕНЕГ: проверяем кассу игрока ПЕРЕД одобрением. Не хватает — не одобряем.
             if (DEBT_FIELD[d.type]) {
                 const pl = state.players.find(x => x.id == d.pId);
