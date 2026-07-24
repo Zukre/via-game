@@ -617,6 +617,49 @@ DARK_WIN = 0.60             # правило Рината: 60% вещь доро
 # Копии: обычных вещей в мире несколько, редких — по 2 на партию, легендарка — одна.
 RARE_COPIES = 2
 
+# ── 🐄 ФЕРМА: серверный рост. Тикает раз в игровой год = 12 «месяцев» фермы ──
+FARM_MATURE_M = 2                    # месяцев до взрослости (решение развод/убой)
+FARM_BREED = {'hen': 6, 'duck': 6, 'sheep': 12, 'cow': 12, 'horse': 18, 'peacock': 12, 'trout': 0, 'hive': 12}
+FARM_BREED_CAP = 10                  # максимум голов в одном загоне (стадо в слоте)
+FARM_AGE_CAP = {'cheese': 10, 'wine': 15, 'whiskey': 20}   # потолок выдержки, лет
+FARM_PRODS = ['milk', 'eggs', 'honey', 'wool', 'feath', 'fish', 'meat']
+FARM_DRIFT = 0.03                    # +3%/год средний дрейф цены продукта (жизнь дорожает)
+FARM_VOL = 0.15                      # ±15% волатильность/год (живой рынок качается)
+FARM_TICK_SECONDS = 15               # реальных секунд на 1 МЕСЯЦ фермы (тюнинг темпа: меньше = быстрее видно рост)
+
+
+def farm_tick():
+    """1 МЕСЯЦ фермы. Идёт от реального времени (см. auction_ticker), не от года рынка —
+    чтобы скот рос ВСЕГДА, в любой игре. Взросление, разведение, выдержка, дрейф цен."""
+    mk = DATA.setdefault('market', {})
+    fp = mk.setdefault('farm', {})
+    for k in FARM_PRODS:
+        # месячный дрейф = годовой/12 + мелкая месячная вола
+        idx = fp.get(k, 1.0) * (1 + FARM_DRIFT / 12 + random.uniform(-FARM_VOL / 3, FARM_VOL / 3))
+        fp[k] = round(max(0.3, idx), 3)          # цена не падает ниже 0.3× (пол)
+    for p in DATA.get('players', []):
+        f = p.get('farm')
+        if not f:
+            continue
+        can_breed = 'breed' in (f.get('courses') or [])
+        for a in (f.get('animals') or []):
+            a['age'] = int(a.get('age', 0)) + 1
+            if not a.get('mature') and a['age'] >= FARM_MATURE_M:
+                a['mature'] = True
+            bi = FARM_BREED.get(a.get('kind'), 0)
+            if can_breed and bi and a.get('mature'):
+                a['bm'] = int(a.get('bm', 0)) + 1
+                while a['bm'] >= bi and int(a.get('count', 1)) < FARM_BREED_CAP:
+                    a['bm'] -= bi
+                    a['count'] = int(a.get('count', 1)) + 1
+        for b in (f.get('batches') or []):        # выдержка: копим месяцы → каждые 12 = +1 год
+            b['m'] = int(b.get('m', 0)) + 1
+            if b['m'] >= 12:
+                b['m'] -= 12
+                cap = FARM_AGE_CAP.get(b.get('kind'), 10)
+                if int(b.get('years', 0)) < cap:
+                    b['years'] = int(b.get('years', 0)) + 1
+
 
 def col_prices():
     ps = DATA.setdefault('colPrices', {})
@@ -812,7 +855,13 @@ def auction_ticker():
             with LOCK:
                 changed = False
                 now = time.time()
-                # рост цен: цепляемся к game_year живого рынка
+                # 🐄 ферма растёт от РЕАЛЬНОГО времени: 1 месяц каждые FARM_TICK_SECONDS секунд.
+                # Не завязано на год рынка — иначе в доигранной партии (рынок замер) скот не растёт.
+                if now - float(DATA.get('_farmLast') or 0) >= FARM_TICK_SECONDS:
+                    DATA['_farmLast'] = now
+                    farm_tick()
+                    changed = True
+                # рост цен антиквариата: цепляемся к game_year живого рынка
                 gy = int(((DATA.get('market') or {}).get('game_year')) or 0)
                 if gy and gy != int(DATA.get('colYear') or 0):
                     DATA['colYear'] = gy

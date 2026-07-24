@@ -10484,6 +10484,51 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
               initMortgage: 140000, initEdu: 70000, initAuto: 35000, initCC: 20000, initRetail: 25000 }
         ];
 
+        // ─── 🐄 ФЕРМА (Рынок скота) — ПУЛЬТ БАЛАНСА. Всё крутится тут, механика не трогается. ───
+        const FARM_CFG = {
+            land:  { small:{price:20000,   cap:6,   name:'Малый участок'},
+                     mid:  {price:35000,   cap:12,  name:'Среднее хозяйство'},
+                     big:  {price:50000,   cap:24,  name:'Большое хозяйство'},
+                     mega: {price:1000000, cap:120, name:'🏞️ Агроимперия'} },
+            barn:  6000,
+            courses: { base:2000, care:1500, poultry:1200, breed:2500, dairy:1000, cheese:3000,
+                       bees:2000, fish:2500, plants:2000, wine:4000, whiskey:5000, butcher:2000 },
+            courseName: { base:'🎓 Фермерство (база)', care:'🐮 Уход за скотом', poultry:'🐣 Птицеводство',
+                          breed:'🧬 Разведение', dairy:'🥛 Молочное дело', cheese:'🧀 Сыроварение',
+                          bees:'🐝 Пчеловодство', fish:'🐟 Рыбоводство', plants:'🌱 Растениеводство',
+                          wine:'🍷 Виноделие', whiskey:'🥃 Винокурня', butcher:'🔪 Убой (мясник)' },
+            // buy=цена, need=нужные курсы, yield=база продукта/мес, prod=ключ цены,
+            // breed=интервал развода(мес,0=нет), meat=разовый убой$, img=картинка, name=подпись
+            animals: {
+                hen:    {buy:60,   need:['poultry'],      yield:12,  prod:'eggs',  breed:6,  meat:50,   img:'farm_hen',    name:'🐔 Курица',  meatImg:'farm_poultry'},
+                duck:   {buy:90,   need:['poultry'],      yield:16,  prod:'eggs',  breed:6,  meat:110,  img:'farm_duck',   name:'🦆 Утка',    meatImg:'farm_duckmeat'},
+                sheep:  {buy:300,  need:['care'],         yield:20,  prod:'wool',  breed:12, meat:400,  img:'farm_sheep',  name:'🐑 Баран',   meatImg:'farm_lamb'},
+                cow:    {buy:1500, need:['care','dairy'], yield:180, prod:'milk',  breed:12, meat:1200, img:'farm_cow',    name:'🐄 Корова',  meatImg:'farm_beef'},
+                horse:  {buy:3000, need:['care'],         yield:0,   prod:null,    breed:18, meat:2500, img:'farm_horse',  name:'🐴 Лошадь',  meatImg:'farm_kazy'},
+                peacock:{buy:500,  need:['care'],         yield:30,  prod:'feath', breed:12, meat:700,  img:'farm_peacock',name:'🦚 Павлин',  meatImg:'farm_peacockmeat'},
+                trout:  {buy:200,  need:['fish'],         yield:60,  prod:'fish',  breed:0,  meat:0,    img:'farm_trout',  name:'🐟 Форель',  meatImg:'farm_fishmeat'},
+                hive:   {buy:250,  need:['bees'],         yield:40,  prod:'honey', breed:12, meat:0,    img:'farm_bees',   name:'🐝 Улей',    meatImg:null},
+            },
+            aging:   { cheese:{rate:0.15, cap:10, need:'cheese'}, wine:{rate:0.20, cap:15, need:'wine'},
+                       whiskey:{rate:0.25, cap:20, need:'whiskey'} },
+            manager: { wage:600 },
+            mature:  2,                       // месяцев до взросления → тогда решаешь развод/убой
+            price:   { drift:0.0025, vol:0.06 }, // помесячный дрейф вверх + волатильность индексов
+        };
+        // индекс живой цены продукта (Task 7 наполнит state.market.farm; пока безопасно =1)
+        function priceIdx(prod){ const f = state.market && state.market.farm; return (f && f[prod]) ? f[prod] : 1; }
+        // месячный доход фермы = Σ по зрелым животным yield×count×живая цена
+        function farmIncome(p){
+            if(!p || !p.farm) return 0;
+            let inc = 0;
+            for(const a of (p.farm.animals || [])){
+                const cfg = FARM_CFG.animals[a.kind];
+                if(!cfg || !cfg.prod || !a.mature) continue;
+                inc += cfg.yield * (a.count || 1) * priceIdx(cfg.prod);
+            }
+            return Math.round(inc);
+        }
+
         // ─── КАРЬЕРА: 10 навыков (d10). pct = прибавка к зарплате; кап суммарно +20%. ───
         const CAREER_SKILLS = [
             { key:'kurs',   name:'Курсы квалификации 🎓', pct:0.02, note:'+2% к зарплате' },
@@ -10822,7 +10867,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const salary = Math.round(baseSalary * (1 + skillBonus));
             // 🕯️ ДНО (закон души 2.0): бизнесы перестают кормить — поток ×0.7. Нигде не объявлено,
             // человек просто видит, что дела пошли хуже. Выход — сменить поведение (soulYearTick).
-            const passive = Math.round(p.assets.reduce((s, a) => s + Number(a.cf || 0), 0) * (p.bottom ? 0.7 : 1));
+            const farmInc = farmIncome(p);
+            const farmWage = (p.farm && p.farm.manager) ? FARM_CFG.manager.wage : 0;
+            const passive = Math.round(p.assets.reduce((s, a) => s + Number(a.cf || 0), 0) * (p.bottom ? 0.7 : 1)) + farmInc;
             const income = salary + passive;
 
             const taxDisc = Math.min(90, Math.max(0, Number(p.taxDiscPct) || 0));   // 🔒 тюрьма: «продавил силой» → скидка к налогам
@@ -10837,12 +10884,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const childExp = p.children * p.prof.childCost;
             const bankPay = Math.round(p.bankLoan * 0.10);
 
-            const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay;
+            const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay + farmWage;
             const flow = income - totalExp;
             const target = totalExp * WIN_MULT;   // ПОБЕДА: пассив ≥ WIN_MULT × расходов (см. WIN_MULT выше)
 
             return { salary, baseSalary, skillBonus, passive, income, taxes, mortgagePay, eduPay, autoPay, ccPay, retailPay,
-                     otherExp, childExp, bankPay, totalExp, flow, target,
+                     otherExp, childExp, bankPay, farmInc, farmWage, totalExp, flow, target,
                      win: passive >= target };
         }
         // 5 УРОВНЕЙ «Путь свободы» (центр поля): по доле пассив/расходы. L5 = свобода (пассив ≥ расходов).
@@ -10932,6 +10979,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else if (state.view === 'admin') renderAdmin(app);
             else if (state.view === 'analytics') renderAnalytics(app);
             else if (state.view === 'serve') app.innerHTML = renderServe();   // 🕯️ ведущий выдаёт Служение
+            else if (state.view === 'farm') renderFarm(app);                  // 🐄 Рынок скота / ферма
             app.setAttribute('data-view', state.view);
             restoreSecs(app);                         // раскрытое человеком остаётся раскрытым
             if (_sameView) {                          // та же страница — держим позицию, не прыгаем
@@ -13867,18 +13915,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                      экран. Разметка разделов НЕ тронута, всё решает .sec-grid в CSS. */''}
                 <div class="sec-grid">
 
-                <details class="sec"><summary>🎓 Развивать себя <span class="sec-hint">— тренинги и создание своего</span></summary>${renderSelfPanel(p)}</details>
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_training.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🎓 Развивать себя <span class="sec-hint">— тренинги и создание своего</span></summary><div class="sec-in">${winCover('win_training')}${renderSelfPanel(p)}</div></details>
 
                 ${/* плитки у депозитов нет — открывается кнопкой у кассы, а окно то же самое */''}
-                <details class="sec tile-hidden"><summary>🏦 Депозиты <span class="sec-hint">— тихий рост без риска</span></summary>${renderDepositPanel(p)}</details>
+                <details class="sec tile-hidden"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_deposit.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏦 Депозиты <span class="sec-hint">— тихий рост без риска</span></summary><div class="sec-in">${winCover('win_deposit')}${renderDepositPanel(p)}</div></details>
 
                 ${/* 🩹 21 июл: было `open` — биржа разворачивалась в списке. С плитками это значит
                      «окно на весь экран», и при каждой перерисовке она вылезала поверх депозитов. */''}
-                <details class="sec"><summary>📈 Биржа <span class="sec-hint">— торгуй в любой момент</span></summary><div class="sec-in">${renderMarketPanel(p)}</div></details>
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_market.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">📈 Биржа <span class="sec-hint">— торгуй в любой момент</span></summary><div class="sec-in">${winCover('win_market')}${renderMarketPanel(p)}</div></details>
 
-                ${p.casinoOff ? '' : `<details class="sec"><summary>🎰 Казино</summary><div class="sec-in">${renderLuckPanel(p)}</div></details>`}
+                <div class="card" style="border:2px solid #f59e0b; background:linear-gradient(135deg,rgba(180,120,40,0.20),rgba(90,60,25,0.08)); text-align:center;">
+                    <img src="cat_imgs/farm_market.webp" alt="Ферма" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:10px;" loading="lazy">
+                    <div class="block-title" style="color:#fcd34d; border:none; justify-content:center;">🐄 Рынок скота и ферма</div>
+                    <p style="font-size:13px; color:#fde68a; margin-bottom:10px;">${p.farm ? 'Твоё хозяйство ждёт — зайди, вырасти и продай. Терпение кормит.' : 'Купи землю, выучись ремеслу и построй живое дело. Всё надо изучать.'}</p>
+                    <button onclick="openFarm()" class="btn" style="background:linear-gradient(90deg,#f59e0b,#d97706); color:#111; font-weight:900; font-size:15px; padding:12px 22px;">${p.farm ? '🚜 Войти в ферму' : '🌱 Начать ферму'}</button>
+                </div>
 
-                <details class="sec"><summary>🛒 Мои активы <span class="sec-hint">— бизнес, недвижимость</span></summary><div class="sec-in">
+                ${p.casinoOff ? '' : `<details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_casino.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🎰 Казино</summary><div class="sec-in">${winCover('win_casino')}${renderLuckPanel(p)}</div></details>`}
+
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_assets.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🛒 Мои активы <span class="sec-hint">— бизнес, недвижимость</span></summary><div class="sec-in">${winCover('win_assets')}
                 <div class="card">
                     <div class="block-title">🛒 Мои активы (бизнес · недвижимость · прочее)</div>
                     ${(p.assets&&p.assets.length) ? p.assets.map(a=>{
@@ -13893,19 +13948,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${/* 💎🔨 Ринат 23июл: «Друг на друге» ушёл в окно кнопки «Дать в долг» у кассы,
                      а его место заняли коллекция и аукцион. LIVE-бейдж торгов — свечением рамки,
                      НЕ текстом: _openSecs помнит окна по тексту шапки, смена текста закрыла бы окно. */''}
-                <details class="sec"><summary>💎 Коллекция <span class="sec-hint">— вещи, что дорожают молча</span></summary><div class="sec-in">
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_collection.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">💎 Коллекция <span class="sec-hint">— вещи, что дорожают молча</span></summary><div class="sec-in">${winCover('win_collection')}
                 ${renderColPanel(p)}
                 </div></details>
 
-                <details class="sec"${(state.auction&&state.auction.status==='live')?' style="border-color:#7f1d1d;box-shadow:0 0 22px -10px #b91c1c;"':''}><summary>🔨 Аукцион <span class="sec-hint">— живой молоток, ставки на флажке</span></summary><div class="sec-in">
+                <details class="sec"${(state.auction&&state.auction.status==='live')?' style="border-color:#7f1d1d;box-shadow:0 0 22px -10px #b91c1c;"':''}><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_auction.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🔨 Аукцион <span class="sec-hint">— живой молоток, ставки на флажке</span></summary><div class="sec-in">${winCover('win_auction')}
                 ${renderAucPanel(p)}
                 </div></details>
 
-                <details class="sec"><summary>🎴 Клетки и действия <span class="sec-hint">— на что попал</span></summary><div class="sec-in">
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_actions.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🎴 Клетки и действия <span class="sec-hint">— на что попал</span></summary><div class="sec-in">${winCover('win_actions')}
                 ${renderCellChips(p)}
                 </div></details>
 
-                <details class="sec"><summary>💼 Доход и расходы <span class="sec-hint">— зарплата, налоги, платежи</span></summary><div class="sec-in">
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_income.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">💼 Доход и расходы <span class="sec-hint">— зарплата, налоги, платежи</span></summary><div class="sec-in">${winCover('win_income')}
                 <div class="grid-2">
                     <div class="card">
                         <div class="block-title">📈 Доходы</div>
@@ -13996,7 +14051,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
                 </div></details>
 
-                <details class="sec"><summary>🏦 Долги и кредит <span class="sec-hint">— погашение, банк</span></summary><div class="sec-in">
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_debt.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏦 Долги и кредит <span class="sec-hint">— погашение, банк</span></summary><div class="sec-in">${winCover('win_debt')}
                 <div class="card">
                     <div class="block-title">📋 Пассивы (долги на погашение)</div>
                     <div class="grid-2" style="margin:0; gap:10px;">
@@ -14022,7 +14077,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                      (кнопка «💳 Кредит», renderBankModal). Здесь остались только долги на погашение. */''}
                 </div></details>
 
-                <details class="sec"><summary>🏆 Путь к победе</summary><div class="sec-in">
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_victory.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏆 Путь к победе</summary><div class="sec-in">${winCover('win_victory')}
                 <div style="margin:-2px 0 12px;height:110px;overflow:hidden;border-radius:14px;position:relative;"><img src="cat_imgs/hero_key.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'"><div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,.1),rgba(11,14,20,.88));"></div></div>
                 ${(()=>{
                   const dt=(Number(p.mLeft)||0)+(Number(p.eLeft)||0)+(Number(p.aLeft)||0)+(Number(p.ccLeft)||0)+(Number(p.rLeft)||0)+(Number(p.bankLoan)||0);
@@ -14614,6 +14669,129 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function setAutoSpeed(ms){ state.autoPlay=state.autoPlay||{on:false,speed:2500}; state.autoPlay.speed=Number(ms)||2500; render(); }
 
         function renderServeRoute(){ return renderServe(); }
+
+        // ═══════════════ 🐄 ФЕРМА / РЫНОК СКОТА (клиент) ═══════════════
+        function farmMe(){ return state.players.find(x=>x.id==state.currentPlayerId); }
+        function farmImg(name, h){ return name ? `<img src="cat_imgs/${name}.webp" style="width:100%;${h?`max-height:${h}px;object-fit:cover;`:''}border-radius:12px;display:block;" loading="lazy">` : ''; }
+        // 🖼️ Обложки окон теперь живут ФОНОМ на плитке (в summary style), поэтому внутри окна
+        // картинку не дублируем — winCover возвращает пусто (оставлен как no-op в местах вставки).
+        function winCover(n){ return ''; }
+        function farmSpend(p, amt){ p.savings = Math.round((p.savings - amt)*100)/100; }
+        function farmHasCourses(p, need){ return (need||[]).every(c => (p.farm.courses||[]).includes(c)); }
+        function openFarm(){ const p=farmMe(); if(!p) return; state.view='farm'; state.farmTab = p.farm ? 'mine' : 'buy'; render(); }
+
+        function renderFarm(app){
+            const p = farmMe();
+            if(!p){ state.view='lobby'; render(); return; }
+            const tab = state.farmTab || (p.farm ? 'mine' : 'buy');
+            const tabBtn = (key,label) => `<button onclick="state.farmTab='${key}';render();" class="btn" style="flex:1;background:${tab===key?'#f59e0b':'#374151'};color:${tab===key?'#111':'#e5e7eb'};font-weight:800;padding:10px 6px;">${label}</button>`;
+            let body='';
+            if(!p.farm)             body = renderFarmBuy(p);
+            else if(tab==='mine')   body = renderFarmMine(p);
+            else if(tab==='buy')    body = renderFarmBuy(p);
+            else if(tab==='learn')  body = renderFarmLearn(p);
+            else if(tab==='market') body = renderFarmMarket(p);
+            const L = p.farm ? FARM_CFG.land[p.farm.land] : null;
+            app.innerHTML = `
+                <div class="card flex-between" style="background:#1f2937;">
+                    <div><h2 style="font-size:20px;font-weight:800;">🐄 Рынок скота и ферма</h2>
+                    <p style="color:#fcd34d;font-size:12px;margin-top:2px;">💰 Касса: <b>${Math.round(p.savings)} $</b>${L?` · 🌾 ${L.name} (${p.farm.capUsed}/${L.cap})`:''}</p></div>
+                    <button onclick="state.view='player';render();" class="btn btn-gray">← Назад в бланк</button>
+                </div>
+                ${p.farm ? `<div style="display:flex;gap:6px;margin-bottom:12px;">${tabBtn('mine','🌾 Ферма')}${tabBtn('buy','🛒 Купить')}${tabBtn('learn','🎓 Учёба')}${tabBtn('market','📈 Рынок')}</div>` : ''}
+                ${body}
+            `;
+        }
+
+        function renderFarmBuy(p){
+            if(!p.farm){
+                return `<div class="card"><div class="block-title">🌍 Купи землю — начни хозяйство</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Земля не для бродяги. Чем больше берёшь — тем дороже, но и вмещает больше живого.</p>
+                    ${farmImg('farm_land',180)}
+                    <div style="display:grid;gap:10px;margin-top:12px;">
+                    ${Object.keys(FARM_CFG.land).map(k=>{const L=FARM_CFG.land[k];return `<div class="row-item"><div style="flex:1;"><b>${L.name}</b><div style="font-size:12px;color:#9ca3af;">вместимость ${L.cap} голов/грядок</div></div><button onclick="farmBuyLand('${k}')" class="btn btn-green">${L.price}$</button></div>`;}).join('')}
+                    </div></div>`;
+            }
+            let out='';
+            if(!p.farm.barn){
+                out += `<div class="card"><div class="block-title">🏡 Построй ферму (амбар)</div>${farmImg('farm_barn',180)}<p style="font-size:12px;color:#9ca3af;margin:10px 0;">Без амбара скот держать негде.</p><button onclick="farmBuildBarn()" class="btn btn-amber" style="width:100%;">Построить за ${FARM_CFG.barn}$</button></div>`;
+            }
+            const hasBase = (p.farm.courses||[]).includes('base');
+            out += `<div class="card"><div class="block-title">🐮 Купить скот</div>`;
+            if(!p.farm.barn) out += `<p style="color:#f59e0b;font-size:13px;">Сначала построй амбар ↑</p>`;
+            else if(!hasBase) out += `<p style="color:#f59e0b;font-size:13px;">Сначала выучи «Фермерство» на вкладке 🎓 Учёба.</p>`;
+            out += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:10px;">`;
+            for(const kind in FARM_CFG.animals){
+                const c=FARM_CFG.animals[kind];
+                const locked = !p.farm.barn || !hasBase || !farmHasCourses(p,c.need);
+                const needTxt = c.need.map(n=>FARM_CFG.courseName[n]).join(', ');
+                out += `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}</div><div style="font-size:11px;color:#9ca3af;">${c.prod?`продукт ~${c.yield}$/мес`:'на развод / мясо'}</div>${locked?`<div style="font-size:10px;color:#f59e0b;margin-top:4px;">нужен курс: ${needTxt}</div>`:''}<button onclick="farmBuyAnimal('${kind}')" ${locked?'disabled':''} class="btn ${locked?'btn-gray':'btn-green'}" style="width:100%;margin-top:6px;">${c.buy}$</button></div>`;
+            }
+            out += `</div></div>`;
+            return out;
+        }
+
+        function renderFarmLearn(p){
+            const learned = p.farm.courses||[];
+            const hasBase = learned.includes('base');
+            return `<div class="card"><div class="block-title">🎓 Учёба — всё надо изучать</div>
+                <p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Каждое ремесло — отдельный курс. Стоит денег, хода НЕ отнимает. Сначала «Фермерство».</p>
+                ${farmImg('farm_skill',160)}
+                <div style="display:grid;gap:8px;margin-top:12px;">
+                ${Object.keys(FARM_CFG.courses).map(k=>{
+                    const price=FARM_CFG.courses[k], done=learned.includes(k);
+                    const locked = !done && k!=='base' && !hasBase;
+                    return `<div class="row-item"><div style="flex:1;"><b>${FARM_CFG.courseName[k]}</b></div>${done?'<b style="color:#10b981;font-size:12px;">✅ изучено</b>':`<button onclick="farmLearn('${k}')" ${locked?'disabled':''} class="btn ${locked?'btn-gray':'btn-blue'}">${locked?'нужна база':price+'$'}</button>`}</div>`;
+                }).join('')}
+                </div></div>`;
+        }
+
+        function renderFarmMine(p){
+            const animals = p.farm.animals||[];
+            let out = `<div class="card"><div class="block-title">🌾 Моё хозяйство</div>`;
+            out += `<div class="row-item" style="border-color:#6366f1;"><div style="flex:1;"><b>👔 Управляющий</b><div style="font-size:11px;color:#9ca3af;">${p.farm.manager?`нанят · −${FARM_CFG.manager.wage}$/мес · ферма работает сама`:'наёмник ведёт хозяйство, пока ты живёшь'}</div></div>${p.farm.manager?`<button onclick="farmManager(false)" class="btn btn-gray">Уволить</button>`:`<button onclick="farmManager(true)" class="btn btn-amber">Нанять ${FARM_CFG.manager.wage}$/мес</button>`}</div>`;
+            if(!animals.length){ out += `<p style="color:#9ca3af;font-size:13px;margin-top:10px;">Скота пока нет — загляни в 🛒 Купить.</p></div>`; return out; }
+            out += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:12px;">`;
+            animals.forEach(a=>{
+                const c=FARM_CFG.animals[a.kind];
+                const canButcher=(p.farm.courses||[]).includes('butcher') && c.meat>0;
+                out += `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}${(a.count||1)>1?` ×${a.count}`:''}</div>`;
+                if(!a.mature){ out += `<div style="font-size:11px;color:#f59e0b;">растёт (${a.age||0}/${FARM_CFG.mature} мес)</div>`; }
+                else {
+                    const hasBreed = (p.farm.courses||[]).includes('breed');
+                    if(c.prod) out += `<div style="font-size:11px;color:#10b981;">даёт ~${Math.round(c.yield*(a.count||1)*priceIdx(c.prod))}$/мес</div>`;
+                    out += `<div style="font-size:10px;color:#fcd34d;font-weight:700;margin-top:4px;">✅ Выросла — выбирай судьбу:</div>`;
+                    if(c.breed>0) out += hasBreed
+                        ? `<div style="font-size:10px;color:#a7f3d0;margin-top:2px;">🧬 В стаде — плодится сама</div>`
+                        : `<div style="font-size:10px;color:#9ca3af;margin-top:2px;">🧬 развод — нужен курс «Разведение»</div>`;
+                    if(c.meat>0) out += canButcher
+                        ? `<button onclick="farmSlaughter('${a.aid}')" class="btn btn-orange" style="width:100%;padding:4px;font-size:11px;margin-top:4px;">🔪 На убой · ${Math.round(c.meat*priceIdx('meat'))}$</button>`
+                        : `<div style="font-size:10px;color:#9ca3af;margin-top:2px;">🔪 убой — нужен курс «Мясник»</div>`;
+                }
+                out += `</div>`;
+            });
+            out += `</div></div>`;
+            return out;
+        }
+
+        function renderFarmMarket(p){
+            const f = (state.market && state.market.farm) || {};
+            const labels = {milk:'🥛 Молоко',eggs:'🥚 Яйца',honey:'🍯 Мёд',wool:'🧶 Шерсть',feath:'🪶 Перья',fish:'🐟 Форель',meat:'🥩 Мясо (за убой)'};
+            const rows = Object.keys(labels).map(k=>{const idx=f[k]||1;const chg=(idx-1)*100;const col=chg>=0?'#10b981':'#f43f5e';return `<div class="row-item"><span>${labels[k]}</span><b style="color:${col};">${idx.toFixed(2)}× · ${chg>=0?'+':''}${chg.toFixed(0)}%</b></div>`;}).join('');
+            return `<div class="card"><div class="block-title">📈 Рынок продуктов (живая цена)</div>
+                <p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Цены за годы ползут вверх, но качаются. Твой доход умножается на них. Быстрые продукты идут в поток сами.</p>
+                ${rows}
+                <p style="font-size:11px;color:#6b7280;margin-top:12px;">Выдержка (сыр, вино, виски) и продажа мяса на бирже — в следующем слое.</p>
+            </div>`;
+        }
+
+        function farmBuyLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||p.farm) return; if(p.savings<L.price){ alert('Не хватает кассы. Нужно '+L.price+'$'); return; } farmSpend(p,L.price); p.farm={land:size,barn:false,capUsed:0,courses:[],animals:[],batches:[],manager:false}; state.farmTab='buy'; save(p.id); render(); alert('🌍 Куплена земля: '+L.name+'! Теперь построй амбар.'); }
+        function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ alert('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); alert('🏡 Амбар построен! Выучи «Фермерство» и заводи скот.'); }
+        function farmLearn(key){ const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); alert('🎓 Изучено: '+FARM_CFG.courseName[key]+'! Ход не потрачен.'); }
+        function farmBuyAnimal(kind){ const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } if(p.farm.capUsed>=L.cap){ alert('Ферма заполнена ('+L.cap+'). Нужна земля больше.'); return; } if(p.savings<c.buy){ alert('Не хватает кассы. Нужно '+c.buy+'$'); return; } farmSpend(p,c.buy); p.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,count:1}); p.farm.capUsed++; save(p.id); render(); alert('✅ Куплено: '+c.name+'! Подрастёт за '+FARM_CFG.mature+' мес — тогда решишь: развод или убой.'); }
+        function farmSlaughter(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c.meat||!a.mature) return; if(!p.farm.courses.includes('butcher')){ alert('Нужен курс «Убой (мясник)».'); return; } const pay=Math.round(c.meat*priceIdx('meat')); farmSpend(p,-pay); if((a.count||1)>1){ a.count--; } else { p.farm.animals=p.farm.animals.filter(x=>x.aid!==aid); p.farm.capUsed=Math.max(0,p.farm.capUsed-1); } save(p.id); render(); alert('🔪 '+c.name+' на мясо: +'+pay+'$'); }
+        function farmManager(on){ const p=farmMe(); if(!p||!p.farm) return; p.farm.manager=!!on; save(p.id); render(); }
+
         function renderAdmin(app) {
             const pending = state.deals.filter(d => d.status === 'PENDING');
             // ходящий игрок — наверх списка и с подсветкой, чтоб ведущий не искал
@@ -15929,7 +16107,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 isM: false, isE: pr.initEdu===0, isA: false, isCC: false, isR: false,
                 mLeft: pr.initMortgage, eLeft: pr.initEdu, aLeft: pr.initAuto,
                 ccLeft: pr.initCC, rLeft: pr.initRetail,
-                assets: [], skills: [], lifeSkills: {}, taxMod: 0, jail: 0, jailCount: 0, allow: null,
+                assets: [], skills: [], lifeSkills: {}, taxMod: 0, jail: 0, jailCount: 0, allow: null, farm: null,
                 otherExpPct: 0, taxDiscPct: 0, jailPress: 0, jailPending: null, ownedCards: [], skillTries: 0,
                 trades: [], soulCard: null, soulSeen: {}, soulPoison: 0, shadow: 0, lastCell: 0, joinYear: null,
                 soul5: [], doorsDone: {}, doorOpen: null, soulNew: null, soulBurn: null, cursed: false, briefSeen: false,
