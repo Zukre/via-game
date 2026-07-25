@@ -12588,6 +12588,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             </div>`;
         }
 
+        // 🩹 ФИКС: панель «Развивать себя» звала me(), а такой функции не было —
+        // кнопки Пройти/Создать/Развить молча падали. Возвращаем текущего игрока, как farmMe().
+        function me(){ return state.players.find(x=>x.id==state.currentPlayerId); }
         async function doTrain(key){
             const p = me(); if(!p) return;
             const t = trainByKey(key); if(!t) return;
