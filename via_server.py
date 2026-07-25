@@ -622,7 +622,7 @@ FARM_MATURE_M = 2                    # месяцев до взрослости 
 FARM_BREED = {'hen': 6, 'duck': 6, 'sheep': 12, 'cow': 12, 'horse': 18, 'peacock': 12, 'trout': 0, 'hive': 12}
 FARM_BREED_CAP = 10                  # максимум голов в одном загоне (стадо в слоте)
 FARM_AGE_CAP = {'cheese': 10, 'wine': 15, 'whiskey': 20}   # потолок выдержки, лет
-FARM_PRODS = ['milk', 'eggs', 'honey', 'wool', 'feath', 'fish', 'meat']
+FARM_PRODS = ['milk', 'eggs', 'honey', 'wool', 'feath', 'fish', 'meat', 'flowers', 'fruits', 'micro', 'fert']
 FARM_DRIFT = 0.03                    # +3%/год средний дрейф цены продукта (жизнь дорожает)
 FARM_VOL = 0.15                      # ±15% волатильность/год (живой рынок качается)
 FARM_TICK_SECONDS = 15               # реальных секунд на 1 МЕСЯЦ фермы (тюнинг темпа: меньше = быстрее видно рост)
