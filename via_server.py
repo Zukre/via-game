@@ -619,7 +619,8 @@ RARE_COPIES = 2
 
 # ── 🐄 ФЕРМА: серверный рост. Тикает раз в игровой год = 12 «месяцев» фермы ──
 FARM_MATURE_M = 2                    # месяцев до взрослости (решение развод/убой)
-FARM_BREED = {'hen': 6, 'duck': 6, 'sheep': 12, 'cow': 12, 'horse': 18, 'peacock': 12, 'trout': 0, 'hive': 12}
+FARM_BREED = {'hen': 6, 'duck': 6, 'sheep': 12, 'cow': 12, 'horse': 18, 'peacock': 12, 'trout': 6, 'hive': 12}
+FARM_MALES = {'bull': 'cow', 'rooster': 'hen', 'drake': 'duck', 'stallion': 'horse', 'ram_male': 'sheep', 'peahen': 'peacock'}  # производитель → какой вид плодит (пава для павлина)
 FARM_BREED_CAP = 10                  # максимум голов в одном загоне (стадо в слоте)
 FARM_AGE_CAP = {'cheese': 10, 'wine': 15, 'whiskey': 20}   # потолок выдержки, лет
 FARM_PRODS = ['milk', 'eggs', 'honey', 'wool', 'feath', 'fish', 'meat', 'flowers', 'fruits', 'micro', 'fert']
@@ -642,12 +643,26 @@ def farm_tick():
         if not f:
             continue
         can_breed = 'breed' in (f.get('courses') or [])
+        # какие виды имеют самца-производителя в стаде
+        males_present = set()
+        for a in (f.get('animals') or []):
+            m = FARM_MALES.get(a.get('kind'))
+            if m and int(a.get('count', 1) or 1) >= 1:
+                males_present.add(m)
         for a in (f.get('animals') or []):
             a['age'] = int(a.get('age', 0)) + 1
             if not a.get('mature') and a['age'] >= FARM_MATURE_M:
                 a['mature'] = True
-            bi = FARM_BREED.get(a.get('kind'), 0)
-            if can_breed and bi and a.get('mature'):
+            kind = a.get('kind')
+            bi = FARM_BREED.get(kind, 0)
+            # плодится ли: пчёлы сами, форель от ≥2 рыб, павлину нужна пава, остальным — самец
+            if kind == 'hive':
+                breeds = True
+            elif kind == 'trout':
+                breeds = int(a.get('count', 1)) >= 2
+            else:
+                breeds = kind in males_present
+            if can_breed and bi and a.get('mature') and breeds:
                 a['bm'] = int(a.get('bm', 0)) + 1
                 while a['bm'] >= bi and int(a.get('count', 1)) < FARM_BREED_CAP:
                     a['bm'] -= bi

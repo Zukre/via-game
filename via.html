@@ -10505,14 +10505,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 sheep:  {buy:300,  need:['care'],         yield:20,  prod:'wool',  breed:12, meat:400,  img:'farm_sheep',  name:'🐑 Баран',   meatImg:'farm_lamb'},
                 cow:    {buy:1500, need:['care','dairy'], yield:180, prod:'milk',  breed:12, meat:1200, img:'farm_cow',    name:'🐄 Корова',  meatImg:'farm_beef'},
                 horse:  {buy:3000, need:['care'],         yield:0,   prod:null,    breed:18, meat:2500, img:'farm_horse',  name:'🐴 Лошадь',  meatImg:'farm_kazy'},
-                peacock:{buy:500,  need:['care'],         yield:30,  prod:'feath', breed:12, meat:700,  img:'farm_peacock',name:'🦚 Павлин',  meatImg:'farm_peacockmeat'},
-                trout:  {buy:200,  need:['fish'],         yield:60,  prod:'fish',  breed:0,  meat:0,    img:'farm_trout',  name:'🐟 Форель',  meatImg:'farm_fishmeat'},
+                peacock:{buy:500,  need:['care'],         yield:30,  prod:'feath', breed:12, meat:0,    img:'farm_peacock',name:'🦚 Павлин',  meatImg:null},
+                trout:  {buy:200,  need:['fish'],         yield:60,  prod:'fish',  breed:6,  meat:0,    img:'farm_trout',  name:'🐟 Форель',  meatImg:'farm_fishmeat'},
                 hive:   {buy:250,  need:['bees'],         yield:40,  prod:'honey', breed:12, meat:0,    img:'farm_bees',   name:'🐝 Улей',    meatImg:null},
                 // 🌱 КУЛЬТУРЫ (растениеводство) — как скот, но без разведения и убоя: дают доход по живой цене
                 flowers:{buy:200,  need:['plants'],       yield:40,  prod:'flowers',breed:0,  meat:0,    img:'farm_flowers',name:'🌹 Цветы',   meatImg:null, crop:true},
                 fruits: {buy:300,  need:['plants'],       yield:55,  prod:'fruits', breed:0,  meat:0,    img:'farm_fruits', name:'🍎 Фрукты',  meatImg:null, crop:true},
                 micro:  {buy:150,  need:['plants'],       yield:35,  prod:'micro',  breed:0,  meat:0,    img:'farm_microgreens',name:'🌱 Микрозелень',meatImg:null, crop:true},
                 fert:   {buy:100,  need:['plants'],       yield:25,  prod:'fert',   breed:0,  meat:0,    img:'farm_fertilizer',name:'💩 Удобрения',meatImg:null, crop:true},
+                // 🐂 САМЦЫ-ПРОИЗВОДИТЕЛИ — только для разведения (male=какой вид плодят), под нож не идут, продукта не дают
+                bull:    {buy:2500, need:['care','breed'],    yield:0, prod:null, breed:0, meat:0, img:'farm_bull',     name:'🐂 Бык',                 male:'cow'},
+                rooster: {buy:120,  need:['poultry','breed'], yield:0, prod:null, breed:0, meat:0, img:'farm_rooster',  name:'🐓 Петух',               male:'hen'},
+                drake:   {buy:180,  need:['poultry','breed'], yield:0, prod:null, breed:0, meat:0, img:'farm_drake',    name:'🦆 Селезень',            male:'duck'},
+                stallion:{buy:5000, need:['care','breed'],    yield:0, prod:null, breed:0, meat:0, img:'farm_stallion', name:'🐎 Жеребец',             male:'horse'},
+                ram_male:{buy:600,  need:['care','breed'],    yield:0, prod:null, breed:0, meat:0, img:'farm_ram_male', name:'🐏 Баран-производитель', male:'sheep'},
+                peahen:  {buy:300,  need:['care','breed'],    yield:0, prod:null, breed:0, meat:0, img:'farm_peahen',   name:'🦚 Пава (самка)',        male:'peacock'},
             },
             // 🍷 ВЫДЕРЖКА: заложил → годами дорожает → продал. layCost=закладка, baseSell=цена в год 0, rate=прирост/год
             aging:   { cheese:{rate:0.15, cap:10, need:'cheese',  layCost:300, baseSell:400,  imgYoung:'farm_cheese_young', imgAged:'farm_cheese_aged', name:'🧀 Сыр'},
@@ -14685,6 +14692,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function winCover(n){ return ''; }
         function farmSpend(p, amt){ p.savings = Math.round((p.savings - amt)*100)/100; }
         function farmHasCourses(p, need){ return (need||[]).every(c => (p.farm.courses||[]).includes(c)); }
+        // будет ли стадо плодиться: пчёлы/павлин сами, форель от ≥2 рыб, остальным нужен самец-производитель
+        function farmBreeds(p, a){ const c=FARM_CFG.animals[a.kind]; if(!c||!c.breed) return false; const k=a.kind; if(k==='hive') return true; if(k==='trout') return (a.count||1)>=2; return (p.farm.animals||[]).some(x=>{const xc=FARM_CFG.animals[x.kind]; return xc&&xc.male===k&&(x.count||1)>=1;}); }
         // слить одинаковый скот в ОДИН загон (стадо), пересчитать занятость: 1 вид = 1 карточка
         function farmMergeHerds(p){
             if(!p||!p.farm||!Array.isArray(p.farm.animals)) return;
@@ -14740,7 +14749,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const c=FARM_CFG.animals[kind];
                 const locked = !p.farm.barn || !hasBase || !farmHasCourses(p,c.need);
                 const needTxt = c.need.map(n=>FARM_CFG.courseName[n]).join(', ');
-                const desc = c.crop ? `урожай ~${c.yield}$/мес` : (c.prod?`продукт ~${c.yield}$/мес`:'на развод / мясо');
+                const desc = c.male ? 'для приплода стаду' : c.crop ? `урожай ~${c.yield}$/мес` : (c.prod?`продукт ~${c.yield}$/мес`:'на развод / мясо');
                 return `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}</div><div style="font-size:11px;color:#9ca3af;">${desc}</div>${locked?`<div style="font-size:10px;color:#f59e0b;margin-top:4px;">нужен курс: ${needTxt}</div>`:''}<button onclick="farmBuyAnimal('${kind}')" ${locked?'disabled':''} class="btn ${locked?'btn-gray':'btn-green'}" style="width:100%;margin-top:6px;">${c.buy}$${c.crop?'':'/гол'}</button></div>`;
             };
             const kinds = Object.keys(FARM_CFG.animals);
@@ -14781,16 +14790,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 let s = `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}${(a.count||1)>1?` ×${a.count}`:''}</div>`;
                 if(!a.mature){ s += `<div style="font-size:11px;color:#f59e0b;">растёт (${a.age||0}/${FARM_CFG.mature} мес)</div>`; }
                 else if(c.crop){ s += `<div style="font-size:11px;color:#10b981;">приносит ~${Math.round(c.yield*(a.count||1)*priceIdx(c.prod))}$/мес</div>`; }
+                else if(c.male){ s += `<div style="font-size:11px;color:#a5b4fc;margin-top:2px;">🧬 Для приплода стаду — под нож не идёт.</div>`; }
                 else {
                     const hasBreed = (p.farm.courses||[]).includes('breed');
                     if(c.prod) s += `<div style="font-size:11px;color:#10b981;">даёт ~${Math.round(c.yield*(a.count||1)*priceIdx(c.prod))}$/мес</div>`;
-                    s += `<div style="font-size:10px;color:#fcd34d;font-weight:700;margin-top:4px;">✅ Выросла — выбирай судьбу:</div>`;
-                    if(c.breed>0) s += hasBreed
-                        ? `<div style="font-size:10px;color:#a7f3d0;margin-top:2px;">🧬 В стаде — плодится сама</div>`
-                        : `<div style="font-size:10px;color:#9ca3af;margin-top:2px;">🧬 развод — нужен курс «Разведение»</div>`;
+                    if(c.breed>0){
+                        if(!hasBreed) s += `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">🧬 развод — нужен курс «Разведение»</div>`;
+                        else if(farmBreeds(p,a)) s += `<div style="font-size:10px;color:#a7f3d0;margin-top:3px;">🧬 плодится в стаде</div>`;
+                        else s += `<div style="font-size:10px;color:#f59e0b;margin-top:3px;">🧬 ${a.kind==='trout'?'нужно ≥2 рыбы':'нужен самец-производитель'} для приплода</div>`;
+                    }
                     if(c.meat>0) s += canButcher
                         ? `<button onclick="farmSlaughter('${a.aid}')" class="btn btn-orange" style="width:100%;padding:4px;font-size:11px;margin-top:4px;">🔪 На убой · ${Math.round(c.meat*priceIdx('meat'))}$</button>`
-                        : `<div style="font-size:10px;color:#9ca3af;margin-top:2px;">🔪 убой — нужен курс «Мясник»</div>`;
+                        : `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">🔪 убой — нужен курс «Мясник»</div>`;
                 }
                 return s + `</div>`;
             };
