@@ -304,7 +304,7 @@
         /* ─── 🧱 БЛАНК ПЛИТКАМИ (Ринат 21 июл: «убрать пустоты и долгое листание») ───
            Закрытый раздел = маленькая плитка в сетке. Открытый = окно на весь экран.
            Разметку разделов не меняли: всё держится на этих правилах. */
-        .sec-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px;}
+        .sec-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; align-items:start;}
         @media(max-width:640px){ .sec-grid{grid-template-columns:repeat(2,1fr); gap:7px;} }
         .sec-grid>details.sec{margin:0; min-height:74px;}
         .sec-grid>details.sec>summary{padding:12px 10px; flex-direction:column; align-items:flex-start;
@@ -13913,6 +13913,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${/* 🧱 Плитки (Ринат 21 июл): было 9 полос во всю ширину — до «Пути к победе» надо
                      было крутить пол-экрана. Стало: сетка маленьких плиток, нажал — окно на весь
                      экран. Разметка разделов НЕ тронута, всё решает .sec-grid в CSS. */''}
+                <div class="card" style="border:2px solid #f59e0b; background:linear-gradient(135deg,rgba(180,120,40,0.20),rgba(90,60,25,0.08)); text-align:center; margin-bottom:10px;">
+                    <img src="cat_imgs/farm_market.webp" alt="Ферма" style="width:100%; max-height:180px; object-fit:cover; border-radius:12px; margin-bottom:10px;" loading="lazy">
+                    <div class="block-title" style="color:#fcd34d; border:none; justify-content:center;">🐄 Рынок скота и ферма</div>
+                    <p style="font-size:13px; color:#fde68a; margin-bottom:10px;">${p.farm ? 'Твоё хозяйство ждёт — зайди, вырасти и продай. Терпение кормит.' : 'Купи землю, выучись ремеслу и построй живое дело. Всё надо изучать.'}</p>
+                    <button onclick="openFarm()" class="btn" style="background:linear-gradient(90deg,#f59e0b,#d97706); color:#111; font-weight:900; font-size:15px; padding:12px 22px;">${p.farm ? '🚜 Войти в ферму' : '🌱 Начать ферму'}</button>
+                </div>
+
                 <div class="sec-grid">
 
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_training.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🎓 Развивать себя <span class="sec-hint">— тренинги и создание своего</span></summary><div class="sec-in">${winCover('win_training')}${renderSelfPanel(p)}</div></details>
@@ -13923,13 +13930,6 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${/* 🩹 21 июл: было `open` — биржа разворачивалась в списке. С плитками это значит
                      «окно на весь экран», и при каждой перерисовке она вылезала поверх депозитов. */''}
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_market.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">📈 Биржа <span class="sec-hint">— торгуй в любой момент</span></summary><div class="sec-in">${winCover('win_market')}${renderMarketPanel(p)}</div></details>
-
-                <div class="card" style="border:2px solid #f59e0b; background:linear-gradient(135deg,rgba(180,120,40,0.20),rgba(90,60,25,0.08)); text-align:center;">
-                    <img src="cat_imgs/farm_market.webp" alt="Ферма" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:10px;" loading="lazy">
-                    <div class="block-title" style="color:#fcd34d; border:none; justify-content:center;">🐄 Рынок скота и ферма</div>
-                    <p style="font-size:13px; color:#fde68a; margin-bottom:10px;">${p.farm ? 'Твоё хозяйство ждёт — зайди, вырасти и продай. Терпение кормит.' : 'Купи землю, выучись ремеслу и построй живое дело. Всё надо изучать.'}</p>
-                    <button onclick="openFarm()" class="btn" style="background:linear-gradient(90deg,#f59e0b,#d97706); color:#111; font-weight:900; font-size:15px; padding:12px 22px;">${p.farm ? '🚜 Войти в ферму' : '🌱 Начать ферму'}</button>
-                </div>
 
                 ${p.casinoOff ? '' : `<details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_casino.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🎰 Казино</summary><div class="sec-in">${winCover('win_casino')}${renderLuckPanel(p)}</div></details>`}
 
@@ -14678,7 +14678,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function winCover(n){ return ''; }
         function farmSpend(p, amt){ p.savings = Math.round((p.savings - amt)*100)/100; }
         function farmHasCourses(p, need){ return (need||[]).every(c => (p.farm.courses||[]).includes(c)); }
-        function openFarm(){ const p=farmMe(); if(!p) return; state.view='farm'; state.farmTab = p.farm ? 'mine' : 'buy'; render(); }
+        // слить одинаковый скот в ОДИН загон (стадо), пересчитать занятость: 1 вид = 1 карточка
+        function farmMergeHerds(p){
+            if(!p||!p.farm||!Array.isArray(p.farm.animals)) return;
+            const by={};
+            for(const a of p.farm.animals){
+                const k=a.kind; if(!FARM_CFG.animals[k]) continue;
+                if(!by[k]) by[k]={aid:a.aid||('a'+Math.random().toString(36).slice(2)),kind:k,age:a.age||0,mature:!!a.mature,count:a.count||1,bm:a.bm||0};
+                else { by[k].count+=(a.count||1); by[k].mature=by[k].mature||!!a.mature; by[k].age=Math.max(by[k].age,a.age||0); by[k].bm=Math.max(by[k].bm,a.bm||0); }
+            }
+            p.farm.animals=Object.values(by);
+            p.farm.capUsed=p.farm.animals.length;
+        }
+        function openFarm(){ const p=farmMe(); if(!p) return; if(p.farm){ farmMergeHerds(p); save(p.id); } state.view='farm'; state.farmTab = p.farm ? 'mine' : 'buy'; render(); }
 
         function renderFarm(app){
             const p = farmMe();
@@ -14725,7 +14737,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const c=FARM_CFG.animals[kind];
                 const locked = !p.farm.barn || !hasBase || !farmHasCourses(p,c.need);
                 const needTxt = c.need.map(n=>FARM_CFG.courseName[n]).join(', ');
-                out += `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}</div><div style="font-size:11px;color:#9ca3af;">${c.prod?`продукт ~${c.yield}$/мес`:'на развод / мясо'}</div>${locked?`<div style="font-size:10px;color:#f59e0b;margin-top:4px;">нужен курс: ${needTxt}</div>`:''}<button onclick="farmBuyAnimal('${kind}')" ${locked?'disabled':''} class="btn ${locked?'btn-gray':'btn-green'}" style="width:100%;margin-top:6px;">${c.buy}$</button></div>`;
+                out += `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}</div><div style="font-size:11px;color:#9ca3af;">${c.prod?`продукт ~${c.yield}$/мес`:'на развод / мясо'}</div>${locked?`<div style="font-size:10px;color:#f59e0b;margin-top:4px;">нужен курс: ${needTxt}</div>`:''}<button onclick="farmBuyAnimal('${kind}')" ${locked?'disabled':''} class="btn ${locked?'btn-gray':'btn-green'}" style="width:100%;margin-top:6px;">${c.buy}$/гол</button></div>`;
             }
             out += `</div></div>`;
             return out;
@@ -14788,8 +14800,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmBuyLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||p.farm) return; if(p.savings<L.price){ alert('Не хватает кассы. Нужно '+L.price+'$'); return; } farmSpend(p,L.price); p.farm={land:size,barn:false,capUsed:0,courses:[],animals:[],batches:[],manager:false}; state.farmTab='buy'; save(p.id); render(); alert('🌍 Куплена земля: '+L.name+'! Теперь построй амбар.'); }
         function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ alert('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); alert('🏡 Амбар построен! Выучи «Фермерство» и заводи скот.'); }
         function farmLearn(key){ const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); alert('🎓 Изучено: '+FARM_CFG.courseName[key]+'! Ход не потрачен.'); }
-        function farmBuyAnimal(kind){ const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } if(p.farm.capUsed>=L.cap){ alert('Ферма заполнена ('+L.cap+'). Нужна земля больше.'); return; } if(p.savings<c.buy){ alert('Не хватает кассы. Нужно '+c.buy+'$'); return; } farmSpend(p,c.buy); p.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,count:1}); p.farm.capUsed++; save(p.id); render(); alert('✅ Куплено: '+c.name+'! Подрастёт за '+FARM_CFG.mature+' мес — тогда решишь: развод или убой.'); }
-        function farmSlaughter(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c.meat||!a.mature) return; if(!p.farm.courses.includes('butcher')){ alert('Нужен курс «Убой (мясник)».'); return; } const pay=Math.round(c.meat*priceIdx('meat')); farmSpend(p,-pay); if((a.count||1)>1){ a.count--; } else { p.farm.animals=p.farm.animals.filter(x=>x.aid!==aid); p.farm.capUsed=Math.max(0,p.farm.capUsed-1); } save(p.id); render(); alert('🔪 '+c.name+' на мясо: +'+pay+'$'); }
+        function farmBuyAnimal(kind){ const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); if(!existing && p.farm.capUsed>=L.cap){ alert('Ферма заполнена ('+L.cap+' загонов). Нужна земля больше.'); return; } const qty=parseInt((prompt('Сколько голов «'+c.name+'» купить? Цена '+c.buy+'$ за голову.\nМожно сразу сотню или тысячу — сколько потянет касса.','1')||'0'),10); if(!qty||qty<1) return; const cost=c.buy*qty; if(p.savings<cost){ alert('Не хватает кассы. Нужно '+cost+'$ за '+qty+' голов, есть '+Math.round(p.savings)+'$'); return; } farmSpend(p,cost); if(existing){ existing.count=(existing.count||1)+qty; } else { p.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,count:qty}); p.farm.capUsed=(p.farm.animals||[]).length; } save(p.id); render(); const tot=((p.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; alert('✅ Куплено '+qty+' голов «'+c.name+'» (−'+cost+'$)! Всего в стаде: '+tot+' гол.'); }
+        function farmSlaughter(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c.meat||!a.mature) return; if(!p.farm.courses.includes('butcher')){ alert('Нужен курс «Убой (мясник)».'); return; } const have=a.count||1; const per=Math.round(c.meat*priceIdx('meat')); const qty=parseInt((prompt('Сколько голов «'+c.name+'» под нож? Есть '+have+'. Мясо '+per+'$/гол.',have)||'0'),10); if(!qty||qty<1) return; const n=Math.min(qty,have); const pay=per*n; farmSpend(p,-pay); a.count=have-n; if(a.count<=0){ p.farm.animals=p.farm.animals.filter(x=>x.aid!==aid); p.farm.capUsed=Math.max(0,p.farm.capUsed-1); } save(p.id); render(); alert('🔪 Под нож '+n+' голов «'+c.name+'»: +'+pay+'$'); }
         function farmManager(on){ const p=farmMe(); if(!p||!p.farm) return; p.farm.manager=!!on; save(p.id); render(); }
 
         function renderAdmin(app) {
