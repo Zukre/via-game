@@ -4,8 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VIA GAME</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      /* Telegram Mini App — полный экран на телефоне. Вне Телеграма НИЧЕГО не делает. */
+      (function(){
+        try{
+          var tg = window.Telegram && window.Telegram.WebApp;
+          if(!tg || !tg.platform || tg.platform==='unknown') return; // не внутри Телеграма
+          tg.ready();
+          try{ tg.expand(); }catch(e){}
+          if(typeof tg.requestFullscreen==='function'){ try{ tg.requestFullscreen(); }catch(e){} }
+          if(typeof tg.disableVerticalSwipes==='function'){ try{ tg.disableVerticalSwipes(); }catch(e){} }
+          try{ tg.setHeaderColor && tg.setHeaderColor('#0d1016'); }catch(e){}
+          try{ tg.setBackgroundColor && tg.setBackgroundColor('#0d1016'); }catch(e){}
+          document.documentElement.classList.add('tg-app');
+          window.TG = tg; // серверный автологин по tg.initDataUnsafe.user подключим позже
+        }catch(e){}
+      })();
+    </script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* Telegram fullscreen: отступ под чёлку/статус-бар и нижнюю полосу */
+        html.tg-app body { padding-top: calc(var(--tg-content-safe-area-inset-top, env(safe-area-inset-top, 0px)) + 10px); }
+        html.tg-app #overlay { padding-bottom: var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
         :root{ --lx-gold:#d9b877; --lx-gold-br:#efd8a3; --lx-gold-ln:rgba(217,184,119,.20);
                --lx-panel:#14171e; --lx-panel2:#171b23; --lx-ink:#0d1016; --lx-line:#242833;
                --lx-text:#f3efe6; --lx-muted:#9c988e; --lx-faint:#6d6a62; --lx-em:#5cb08b; --lx-rose:#cf9a9a; }
@@ -10434,7 +10455,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 </script>
 
     <!-- Плавающий индикатор данных (правый верх) — всегда видно содержимое localStorage -->
-    <div id="debugBar" style="position:fixed; top:8px; right:8px; background:#0b0f19; border:1px solid #1f2937; padding:6px 12px; border-radius:8px; font-size:11px; color:#9ca3af; z-index:1000; font-family:monospace;">
+    <div id="debugBar" style="display:none;">
         💾 LS: загрузка...
     </div>
 
@@ -10481,16 +10502,31 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
             { id: 9, name: 'Юрист ⚖️', salary: 12000, taxes: 2400,
               mortgagePay: 2200, eduPay: 1400, autoPay: 900, ccPay: 700, retailPay: 500, otherExp: 3300, childCost: 200, savings: 4000,
-              initMortgage: 140000, initEdu: 70000, initAuto: 35000, initCC: 20000, initRetail: 25000 }
+              initMortgage: 140000, initEdu: 70000, initAuto: 35000, initCC: 20000, initRetail: 25000 },
+
+            { id: 10, name: 'IT-Разработчик 💻', salary: 11500, taxes: 2300,
+              mortgagePay: 1600, eduPay: 0, autoPay: 700, ccPay: 600, retailPay: 500, otherExp: 3400, childCost: 200, savings: 5000,
+              initMortgage: 100000, initEdu: 0, initAuto: 25000, initCC: 22000, initRetail: 18000 },
+
+            { id: 11, name: 'Блогер 🎥', salary: 8500, taxes: 1700,
+              mortgagePay: 1400, eduPay: 0, autoPay: 800, ccPay: 700, retailPay: 600, otherExp: 3500, childCost: 180, savings: 3000,
+              initMortgage: 60000, initEdu: 0, initAuto: 30000, initCC: 20000, initRetail: 20000 }
         ];
 
         // ─── 🐄 ФЕРМА (Рынок скота) — ПУЛЬТ БАЛАНСА. Всё крутится тут, механика не трогается. ───
         const FARM_CFG = {
-            land:  { small:{price:20000,   cap:6,   name:'Малый участок'},
-                     mid:  {price:35000,   cap:12,  name:'Среднее хозяйство'},
-                     big:  {price:50000,   cap:24,  name:'Большое хозяйство'},
-                     mega: {price:1000000, cap:120, name:'🏞️ Агроимперия'} },
+            // slots = сколько СТРОЕНИЙ влезет на землю (Ринат 26июл: 50 ангаров на клочок не воткнёшь).
+            //   Большие территории стоят ДОРОГО. Поголовье лимитит уже само строение (FARM_BUILDINGS.cap).
+            // чем больше берёшь — тем дороже (Ринат 27июл: вдруг нужен «гектар», а потом 10 или 100). 7 ступеней.
+            land:  { small:{price:20000,    slots:2,   name:'Малый участок'},
+                     mid:  {price:70000,    slots:4,   name:'Среднее хозяйство'},
+                     big:  {price:200000,   slots:7,   name:'Большое хозяйство'},
+                     large:{price:500000,   slots:13,  name:'Крупное хозяйство'},
+                     mega: {price:1200000,  slots:25,  name:'🏞️ Агроимперия'},
+                     giga: {price:4000000,  slots:60,  name:'🌍 Латифундия'},
+                     titan:{price:12000000, slots:150, name:'🏔️ Аграрный холдинг'} },
             barn:  6000,
+            feed:  25,                        // 🌾 корм/содержание за ГОЛОВУ в месяц (черновик — Ринат тюнит). Большое стадо ест — не станок.
             courses: { base:2000, care:1500, poultry:1200, breed:2500, dairy:1000, cheese:3000,
                        bees:2000, fish:2500, plants:2000, wine:4000, whiskey:5000, butcher:2000 },
             courseName: { base:'🎓 Фермерство (база)', care:'🐮 Уход за скотом', poultry:'🐣 Птицеводство',
@@ -10509,39 +10545,124 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 trout:  {buy:200,  need:['fish'],         yield:60,  prod:'fish',  breed:6,  meat:0,    img:'farm_trout',  name:'🐟 Форель',  meatImg:'farm_fishmeat'},
                 hive:   {buy:250,  need:['bees'],         yield:40,  prod:'honey', breed:12, meat:0,    img:'farm_bees',   name:'🐝 Улей',    meatImg:null},
                 // 🌱 КУЛЬТУРЫ (растениеводство) — как скот, но без разведения и убоя: дают доход по живой цене
-                flowers:{buy:200,  need:['plants'],       yield:40,  prod:'flowers',breed:0,  meat:0,    img:'farm_flowers',name:'🌹 Цветы',   meatImg:null, crop:true},
+                roses:  {buy:250,  need:['plants'],       yield:60,  prod:'flowers',breed:0,  meat:0,    img:'farm_roses',  name:'🌹 Розы',    meatImg:null, crop:true},
+                violets:{buy:150,  need:['plants'],       yield:35,  prod:'flowers',breed:0,  meat:0,    img:'farm_violets',name:'🪻 Фиалки',  meatImg:null, crop:true},
+                lilac:  {buy:200,  need:['plants'],       yield:45,  prod:'flowers',breed:0,  meat:0,    img:'farm_lilac',  name:'💜 Сирень',  meatImg:null, crop:true},
+                grapes: {buy:300,  need:['plants'],       yield:55,  prod:'fruits', breed:0,  meat:0,    img:'farm_grapes', name:'🍇 Виноград',meatImg:null, crop:true},
                 fruits: {buy:300,  need:['plants'],       yield:55,  prod:'fruits', breed:0,  meat:0,    img:'farm_fruits', name:'🍎 Фрукты',  meatImg:null, crop:true},
                 micro:  {buy:150,  need:['plants'],       yield:35,  prod:'micro',  breed:0,  meat:0,    img:'farm_microgreens',name:'🌱 Микрозелень',meatImg:null, crop:true},
                 fert:   {buy:100,  need:['plants'],       yield:25,  prod:'fert',   breed:0,  meat:0,    img:'farm_fertilizer',name:'💩 Удобрения',meatImg:null, crop:true},
-                // 🐂 САМЦЫ-ПРОИЗВОДИТЕЛИ — только для разведения (male=какой вид плодят), под нож не идут, продукта не дают
-                bull:    {buy:2500, need:['care','breed'],    yield:0, prod:null, breed:0, meat:0, img:'farm_bull',     name:'🐂 Бык',                 male:'cow'},
-                rooster: {buy:120,  need:['poultry','breed'], yield:0, prod:null, breed:0, meat:0, img:'farm_rooster',  name:'🐓 Петух',               male:'hen'},
-                drake:   {buy:180,  need:['poultry','breed'], yield:0, prod:null, breed:0, meat:0, img:'farm_drake',    name:'🦆 Селезень',            male:'duck'},
-                stallion:{buy:5000, need:['care','breed'],    yield:0, prod:null, breed:0, meat:0, img:'farm_stallion', name:'🐎 Жеребец',             male:'horse'},
-                ram_male:{buy:600,  need:['care','breed'],    yield:0, prod:null, breed:0, meat:0, img:'farm_ram_male', name:'🐏 Баран-производитель', male:'sheep'},
-                peahen:  {buy:300,  need:['care','breed'],    yield:0, prod:null, breed:0, meat:0, img:'farm_peahen',   name:'🦚 Пава (самка)',        male:'peacock'},
+                // 🐂 САМЦЫ-ПРОИЗВОДИТЕЛИ (male=какой вид плодят). Продукта не дают, но НА УБОЙ ИДУТ (Ринат/Александр 27июл):
+                //   зарезал единственного производителя → разведение этого вида останавливается. Освобождает место.
+                bull:    {buy:2500, need:['care','breed'],    yield:0, prod:null, breed:0, meat:1000, img:'farm_bull',     name:'🐂 Бык',                 male:'cow',     meatImg:'farm_beef'},
+                rooster: {buy:120,  need:['poultry','breed'], yield:0, prod:null, breed:0, meat:40,   img:'farm_rooster',  name:'🐓 Петух',               male:'hen',     meatImg:'farm_poultry'},
+                drake:   {buy:180,  need:['poultry','breed'], yield:0, prod:null, breed:0, meat:90,   img:'farm_drake',    name:'🦆 Селезень',            male:'duck',    meatImg:'farm_duckmeat'},
+                stallion:{buy:5000, need:['care','breed'],    yield:0, prod:null, breed:0, meat:2000, img:'farm_stallion', name:'🐎 Жеребец',             male:'horse',   meatImg:'farm_kazy'},
+                ram_male:{buy:600,  need:['care','breed'],    yield:0, prod:null, breed:0, meat:350,  img:'farm_ram_male', name:'🐏 Баран-производитель', male:'sheep',   meatImg:'farm_lamb'},
+                peahen:  {buy:300,  need:['care','breed'],    yield:0, prod:null, breed:0, meat:200,  img:'farm_peahen',   name:'🦚 Пава (самка)',        male:'peacock', meatImg:'farm_peacockmeat'},
             },
-            // 🍷 ВЫДЕРЖКА: заложил → годами дорожает → продал. layCost=закладка, baseSell=цена в год 0, rate=прирост/год
-            aging:   { cheese:{rate:0.15, cap:10, need:'cheese',  layCost:300, baseSell:400,  imgYoung:'farm_cheese_young', imgAged:'farm_cheese_aged', name:'🧀 Сыр'},
-                       wine:  {rate:0.20, cap:15, need:'wine',    layCost:500, baseSell:700,  imgYoung:'farm_wine',    imgAged:'farm_wine',    name:'🍷 Вино'},
-                       whiskey:{rate:0.25, cap:20, need:'whiskey', layCost:800, baseSell:1000, imgYoung:'farm_whiskey', imgAged:'farm_whiskey', name:'🥃 Виски'} },
+            // 🍷 ВЫДЕРЖКА: заложил → годами дорожает → продал. layCost=деньги на процесс, baseSell=цена в год 0, rate=прирост/год
+            //   ЧЕСТНАЯ ЦЕПОЧКА (Ринат 26июл): нужно СЫРЬЁ. src=ресурс, srcQty=сколько на 1 партию.
+            //   Сыр из молока (корова копит), вино из винограда (фрукты), виски из спирта (виноград ×2).
+            //   Кол-во партий ограничено сырьём → «количество сыра» больше не из воздуха.
+            aging:   { cheese:{rate:0.15, cap:10, need:'cheese',  layCost:120, baseSell:400,  src:'milk',   srcName:'🥛 молоко',   srcQty:120, imgYoung:'farm_cheese_young', imgAged:'farm_cheese_aged', name:'🧀 Сыр'},
+                       wine:  {rate:0.20, cap:15, need:'wine',    layCost:150, baseSell:700,  src:'fruits', srcName:'🍇 виноград', srcQty:55,  imgYoung:'farm_wine',    imgAged:'farm_wine',    name:'🍷 Вино'},
+                       whiskey:{rate:0.25, cap:20, need:'whiskey', layCost:200, baseSell:1000, src:'fruits', srcName:'🥃 спирт (виноград)', srcQty:110, imgYoung:'farm_whiskey', imgAged:'farm_whiskey', name:'🥃 Виски'} },
+            matureY: 1,                        // 🕰️ лет до взросления скота (часы = год с сервера)
             manager: { wage:600 },
             mature:  2,                       // месяцев до взросления → тогда решаешь развод/убой
             price:   { drift:0.0025, vol:0.06 }, // помесячный дрейф вверх + волатильность индексов
         };
+        // 🏗️ СТРОЕНИЯ (Ринат 26июл): каждое вмещает КОНКРЕТНОЕ число — не тысячи. Хочешь больше → апгрейд (up).
+        //   cap=база мест, up={price,cap}=улучшение до 2-го уровня. species=какие виды тут живут. Числа — черновик.
+        const FARM_BUILDINGS = {
+            hangar:    {name:'🏚️ Ангар',   price:8000, cap:12, img:'farm_hangar',    up:{price:12000, cap:30},  species:['cow','bull','horse','stallion','sheep','ram_male','peacock','peahen'], note:'коровы, лошади, овцы, павлины'},
+            aviary:    {name:'🐔 Вольер',  price:3000, cap:40, img:'farm_aviary',    up:{price:5000,  cap:100}, species:['hen','rooster'], note:'куры'},
+            duckpond:  {name:'🦆 Озерцо',  price:3500, cap:40, img:'farm_duckpond',  up:{price:5500,  cap:100}, species:['duck','drake'], note:'утки'},
+            pond:      {name:'🐟 Озеро',   price:5000, cap:60, img:'farm_pond',      up:{price:8000,  cap:150}, species:['trout'], note:'рыба'},
+            apiary:    {name:'🐝 Пасека',  price:2500, cap:30, img:'farm_bees',      up:{price:4000,  cap:80},  species:['hive'], note:'ульи'},
+            greenhouse:{name:'🌿 Теплица', price:6000, cap:24, img:'farm_greenhouse',up:{price:9000,  cap:60},  species:['roses','violets','lilac','grapes','fruits','micro','fert','flowers'], note:'цветы, микрозелень, виноград'},
+        };
+        const FARM_CELLAR_CAP = 12;   // 🍷 сколько партий выдержки помещается в погреб (апгрейд позже)
+        function farmHouseOf(kind){ for(const b in FARM_BUILDINGS){ if(FARM_BUILDINGS[b].species.indexOf(kind)>=0) return b; } return null; }
+        function farmBuildingCap(p,bkey){ const B=FARM_BUILDINGS[bkey]; if(!B||!p.farm||!p.farm.buildings||!p.farm.buildings[bkey]) return 0; return (p.farm.buildings[bkey].lvl>=2 && B.up)?B.up.cap:B.cap; }
+        function farmBuildingUsed(p,bkey){ if(!p.farm) return 0; return (p.farm.animals||[]).reduce((s,a)=>s+(farmHouseOf(a.kind)===bkey?(Number(a.count)||1):0),0); }
         // индекс живой цены продукта (Task 7 наполнит state.market.farm; пока безопасно =1)
-        function priceIdx(prod){ const f = state.market && state.market.farm; return (f && f[prod]) ? f[prod] : 1; }
+        // Живой рынок фермы: если сервер даёт цены — берём их; иначе ДЕТЕРМИНИРОВАННЫЙ годовой индекс
+        // (одинаковый у всех — год с сервера). Цены «дышат» волнами по годам, у разных продуктов пики
+        // в разные годы → ЦИКЛЫ: выгодно продать/зарезать в нужный момент. Диапазон ~0.70..1.30.
+        function farmPriceIdx(prod, yr){
+            let h=0; const s=String(prod||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0;
+            const phase=(h%100)/100*Math.PI*2;
+            return Math.round((1 + 0.30*Math.sin(yr*0.7 + phase))*100)/100;
+        }
+        function priceIdx(prod){ const f = state.market && state.market.farm; if(f && f[prod]) return f[prod]; return farmPriceIdx(prod, curYear()); }
         // месячный доход фермы = Σ по зрелым животным yield×count×живая цена
+        // сырьё-ресурсы (молоко/виноград) НЕ капают деньгами — они идут в склад на переработку (честная цепочка)
+        const FARM_RAW = ['milk','fruits'];
         function farmIncome(p){
             if(!p || !p.farm) return 0;
             let inc = 0;
             for(const a of (p.farm.animals || [])){
                 const cfg = FARM_CFG.animals[a.kind];
                 if(!cfg || !cfg.prod || !a.mature) continue;
+                if(FARM_RAW.indexOf(cfg.prod) >= 0) continue;   // сырьё → в склад, не в кассу
                 inc += cfg.yield * (a.count || 1) * priceIdx(cfg.prod);
             }
             return Math.round(inc);
         }
+        // 🕰️ ЛЕНИВЫЕ ЧАСЫ ФЕРМЫ (без фонового тика — конфликтов между игроками нет).
+        // Часы = игровой год с сервера curYear(). Считаем при заходе на ферму и закладке.
+        function farmMature(p){   // скот взрослеет через FARM_CFG.matureY лет после покупки
+            if(!p || !p.farm || !Array.isArray(p.farm.animals)) return;
+            const y = curYear();
+            for(const a of p.farm.animals){
+                if(a.by == null) a.by = 1;                       // старый скот (без метки) — созрел давно
+                if(!a.mature && (y - a.by) >= (FARM_CFG.matureY||1)) a.mature = true;
+            }
+        }
+        function farmHarvest(p){  // молоко/виноград копятся в склад со зрелых животных за прошедшие годы
+            if(!p || !p.farm) return;
+            p.farm.stock = p.farm.stock || {};
+            const y = curYear();
+            const last = (p.farm.harvY == null) ? y : p.farm.harvY;
+            const dy = Math.max(0, y - last);
+            if(dy > 0){
+                for(const a of (p.farm.animals || [])){
+                    const cfg = FARM_CFG.animals[a.kind];
+                    if(!cfg || !cfg.prod || !a.mature) continue;
+                    if(FARM_RAW.indexOf(cfg.prod) < 0) continue;
+                    p.farm.stock[cfg.prod] = (p.farm.stock[cfg.prod]||0) + cfg.yield*(a.count||1)*dy;
+                }
+                p.farm.harvY = y;
+            }
+        }
+        // 🧬 ПРИПЛОД (Ринат/Александр): разводимые стада растут по годам — но СТРОГО в пределах вместимости
+        // строения и только при самце-производителе + курсе «Разведение» (farmBreeds). Не станок: рост ограничен.
+        function farmBreedTick(p){
+            if(!p || !p.farm || !Array.isArray(p.farm.animals)) return;
+            const y = curYear();
+            const last = (p.farm.breedY == null) ? y : p.farm.breedY;
+            const dy = Math.max(0, y - last);
+            if(dy <= 0) return;
+            for(const a of p.farm.animals){
+                const cfg = FARM_CFG.animals[a.kind];
+                if(!cfg || cfg.male || cfg.crop || !cfg.breed || !a.mature) continue;
+                if(!farmBreeds(p,a)) continue;                       // нужен самец + курс (внутри farmBreeds)
+                const perYear = cfg.breed<=6 ? 0.5 : (cfg.breed<=12 ? 0.3 : 0.2);
+                let grow = Math.floor((Number(a.count)||1) * perYear * dy);
+                if(grow <= 0) continue;
+                const house = farmHouseOf(a.kind);
+                const room = farmBuildingCap(p,house) - farmBuildingUsed(p,house);   // не выше вместимости
+                grow = Math.min(grow, Math.max(0, room));
+                if(grow > 0) a.count = (Number(a.count)||1) + grow;
+            }
+            p.farm.capUsed = farmHeads(p);
+            p.farm.breedY = y;
+        }
+        function farmClock(p){ farmMature(p); farmHarvest(p); farmBreedTick(p); }   // прогнать часы разом
+        function farmHeads(p){ return (p && p.farm && Array.isArray(p.farm.animals)) ? p.farm.animals.reduce((s,a)=>s+(Number(a.count)||1),0) : 0; }
+        function farmFeed(p){ return (p && p.farm) ? farmHeads(p)*(FARM_CFG.feed||0) : 0; }
 
         // ─── КАРЬЕРА: 10 навыков (d10). pct = прибавка к зарплате; кап суммарно +20%. ───
         const CAREER_SKILLS = [
@@ -10574,7 +10695,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // ⚠️ Это НЕ p.skills: там старые карьерные навыки с процентом к зарплате, их не трогаем.
         const SELF_TRAININGS = [
             {key:'ai',     name:'ИИ и автоматизация 🤖',     cost:4000, note:'открывает Программу · на бирже видишь сектор вперёд'},
-            {key:'sales',  name:'Продажи 💼',                cost:3000, note:'активы и акции продаёшь на +10% дороже'},
+            {key:'sales',  name:'Продажи 💼',                cost:3000, note:'активы и акции продаёшь на +5% дороже'},
             {key:'nego',   name:'Переговоры 🤝',             cost:3500, note:'первый взнос в сделке −15%'},
             {key:'brand',  name:'Личный бренд ⭐',           cost:5000, note:'сам пустой — но без него созданное выходит в тишину'},
             {key:'stage',  name:'Публичные выступления 🎤',  cost:2500, note:'открывает Курс и Наставничество'},
@@ -10725,6 +10846,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 // а именно они меняются на каждую покупку и заказывали пересборку зря.
                 // Смотрим только на то, что на этом экране реально нарисовано.
                 if (state.view === 'analytics') return base + '|' + JSON.stringify(state.players || []);
+                // 🩹 ТРЯСКА ФЕРМЫ (Ринат 25июл + Кирилл «на другом экране трясётся вся игра»):
+                // экран фермы падал в общую ветку и следил за ВСЕМИ игроками → каждая покупка бота
+                // на бирже пересобирала ферму вместе с картинками. На ферме видно только СВОЁ
+                // хозяйство, кассу и цены рынка. Чужих игроков не смотрим — ферма не дёргается.
+                if (state.view === 'farm') {
+                    const me = (state.players||[]).find(x => x.id == state.currentPlayerId);
+                    return base + '|' + (state.farmTab||'') + '|'
+                         + JSON.stringify(me ? { f: me.farm||null, s: Math.round(Number(me.savings)||0) } : null)
+                         + '|' + JSON.stringify((state.market||{}).farm||{});
+                }
                 // 🩹 ЭКРАН ПОЛЯ (скрин Рината 21 июл: поле поймано в момент пересборки — клетки
                 // съехали, картинки схлопнулись). На поле видно ТОЛЬКО имена, фишки и таймеры.
                 // Кассы там нет — а именно она менялась на каждую покупку бота и заказывала
@@ -10883,6 +11014,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // человек просто видит, что дела пошли хуже. Выход — сменить поведение (soulYearTick).
             const farmInc = farmIncome(p);
             const farmWage = (p.farm && p.farm.manager) ? FARM_CFG.manager.wage : 0;
+            const farmFeedExp = farmFeed(p);   // 🌾 корм за голову — большое стадо ест, не станок
             const passive = Math.round(p.assets.reduce((s, a) => s + Number(a.cf || 0), 0) * (p.bottom ? 0.7 : 1)) + farmInc;
             const income = salary + passive;
 
@@ -10898,12 +11030,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const childExp = p.children * p.prof.childCost;
             const bankPay = Math.round(p.bankLoan * 0.10);
 
-            const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay + farmWage;
+            const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay + farmWage + farmFeedExp;
             const flow = income - totalExp;
             const target = totalExp * WIN_MULT;   // ПОБЕДА: пассив ≥ WIN_MULT × расходов (см. WIN_MULT выше)
 
             return { salary, baseSalary, skillBonus, passive, income, taxes, mortgagePay, eduPay, autoPay, ccPay, retailPay,
-                     otherExp, childExp, bankPay, farmInc, farmWage, totalExp, flow, target,
+                     otherExp, childExp, bankPay, farmInc, farmWage, farmFeed: farmFeedExp, totalExp, flow, target,
                      win: passive >= target };
         }
         // 5 УРОВНЕЙ «Путь свободы» (центр поля): по доле пассив/расходы. L5 = свобода (пассив ≥ расходов).
@@ -11014,8 +11146,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // на любом экране, остальные окна — по-прежнему только в бланке.
             if (state.view !== 'player') return renderWorldShow();
             const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return renderWorldShow();
-            return renderWorldShow() + renderHistoryModal() + renderBuyModal() + renderCardPreview();
+            return renderWorldShow() + renderHistoryModal() + renderBuyModal() + renderCardPreview() + renderMyTurnPopup();
         }
+        // 🎲 Личный попап «Твой ход» — показывается тому, чей ход настал, закрывается крестиком/кнопкой.
+        function renderMyTurnPopup(){
+            if(!state.myTurnPopup) return '';
+            return `<div style="position:fixed;inset:0;z-index:5400;background:rgba(4,5,8,.78);display:flex;align-items:center;justify-content:center;padding:18px;" onclick="closeMyTurnPopup()">
+                <div onclick="event.stopPropagation()" style="position:relative;background:linear-gradient(180deg,#1a1f2b,#12151d);border:1px solid var(--lx-gold);border-radius:18px;padding:26px 22px;max-width:340px;text-align:center;box-shadow:0 20px 60px -20px rgba(0,0,0,.8);">
+                    <button onclick="closeMyTurnPopup()" style="position:absolute;top:8px;right:10px;background:none;border:none;color:#9c988e;font-size:22px;line-height:1;cursor:pointer;">×</button>
+                    <div style="font-size:44px;margin-bottom:8px;">🎲</div>
+                    <div style="font-family:Georgia,serif;font-size:22px;font-weight:800;color:var(--lx-gold-br);margin-bottom:6px;">Твой ход!</div>
+                    <div style="font-size:13px;color:#cdc8bd;line-height:1.5;margin-bottom:16px;">Кидай кубик и ходи. Удачи!</div>
+                    <button onclick="closeMyTurnPopup()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Погнали 🎲</button>
+                </div></div>`;
+        }
+        function closeMyTurnPopup(){ state.myTurnPopup=false; paintOverlays(); }
         function paintOverlays(){ const ov=document.getElementById('overlay'); if(ov) ov.innerHTML = renderOverlays(); }
 
         function renderLobby(app) {
@@ -11133,7 +11278,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(p && (Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
             // ⚠️ МЕМ-ГЕЙТ (Ринат 19июл): при заходе в мем — окно риска с подтверждением. Без «понимаю» не пускаем.
             if(p && assetCat(a)==='meme' && !p.memeOk){
-                if(!confirm('☠️ МЕМКОИН «'+a.name+'» — ЭКСТРЕМАЛЬНЫЙ РИСК.\n\nРиск потери 80–99%. Мемы почти всегда обнуляются. Торгуешь на СВОЙ страх и риск — брокер НЕ несёт ответственности за твою торговлю.\n\nПодтверждаешь, что заходишь на свой риск?')) return;
+                if(!localStorage.getItem('memeRiskAck')){
+                    if(!confirm('☠️ МЕМКОИН «'+a.name+'» — ЭКСТРЕМАЛЬНЫЙ РИСК.\n\nРиск потери 80–99%. Мемы почти всегда обнуляются. Торгуешь на СВОЙ страх и риск — брокер НЕ несёт ответственности за твою торговлю.\n\nПодтверждаешь, что заходишь на свой риск? (спросим один раз)')) return;
+                    localStorage.setItem('memeRiskAck','1');
+                }
                 p.memeOk=true;   // подтвердил — эту партию больше не спрашиваем
             }
             state.buyModal={assetId:String(id), qty:0}; paintOverlays(); slipSoon('buy');
@@ -11290,10 +11438,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const proceeds=Math.round(q*fill*100)/100;
             const feePct=tradeFeePct(p); const fee=Math.round(proceeds*feePct*100)/100; const net=Math.round((proceeds-fee)*100)/100;
             const st=pstat(p); st.sells++; st.sellAmt=Math.round((st.sellAmt+proceeds)*100)/100; st.feePaid=Math.round(((st.feePaid||0)+fee)*100)/100;
-            const h=p.holdings[id]; h.qty-=q; if(h.qty<=0) delete p.holdings[id];
+            const h=p.holdings[id]; const cost=Math.round(q*(Number(h.avg)||0)*100)/100; const profit=Math.round((net-cost)*100)/100; h.qty-=q; if(h.qty<=0) delete p.holdings[id];
             p.savings=Math.round((p.savings+net)*100)/100;
             logTrade(p,'SELL',a.name,q,fill,proceeds,fee);
-            return {name:a.name,qty:q,fill,p0,proceeds,fee,net,feePct};
+            return {name:a.name,qty:q,fill,p0,proceeds,fee,net,feePct,profit};
         }
         async function sellAsset(id){
             const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(id);
@@ -11311,7 +11459,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             lastSaveT=Date.now();                   // защита от гонки: пока идёт сделка, push не подменяет state.players
             const r=await sellHolding(p,id,q); save(); render();
             if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Твой объём просадил рынок: витрина была '+r.p0+'$, выход по ~'+r.fill+'$/шт.') : '';
-                alert('✅ Продано '+r.qty+' «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ ('+(r.feePct*100).toFixed(1)+'%) → +'+fmtN(r.net)+'$ в кассу'+moved); }
+                alert('✅ Продано '+r.qty+' «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ ('+(r.feePct*100).toFixed(1)+'%) → +'+fmtN(r.net)+'$ в кассу · чистая прибыль по позиции '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$'+moved); }
         }
         // Продать ВСЮ позицию по одному активу (кнопка «Продать» у актива).
         async function sellWhole(id){
@@ -11321,7 +11469,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             lastSaveT=Date.now();
             const r=await sellHolding(p,id,have); save(); render();
             if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Объём просадил рынок: витрина '+r.p0+'$, выход по ~'+r.fill+'$.') : '';
-                alert('✅ Продано всё «'+r.name+'» ('+fmtN(r.qty)+' шт) по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу'+moved); }
+                alert('✅ Продано всё «'+r.name+'» ('+fmtN(r.qty)+' шт) по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу · чистая прибыль по позиции '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$'+moved); }
         }
         // Продать ДОЛЮ позиции (Ринат 18июл: кнопка 50%). frac=0.5 → половина (округляем вниз, минимум 1 шт).
         async function sellFrac(id, frac){
@@ -11333,7 +11481,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const r=await sellHolding(p,id,q); save(); render();
             if(r){ const left = (p.holdings&&p.holdings[id]) ? (Number(p.holdings[id].qty)||0) : 0;
                 const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Объём просадил рынок: витрина '+r.p0+'$, выход по ~'+r.fill+'$.') : '';
-                alert('✅ Продано '+fmtN(r.qty)+' шт «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу. Осталось '+fmtN(left)+' шт.'+moved); }
+                alert('✅ Продано '+fmtN(r.qty)+' шт «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу · чистая прибыль '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$. Осталось '+fmtN(left)+' шт.'+moved); }
         }
         async function sellAllAssets(){
             const pid=state.currentPlayerId;
@@ -11368,7 +11516,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function setMarketTab(t){
             state.marketTab=t;
             const p=state.players.find(x=>x.id==state.currentPlayerId);
-            if(p && CAT_POPUP[t]){ p.catSeen=p.catSeen||{}; if(!p.catSeen[t]){ p.catSeen[t]=true; state.catPopup=t; } }
+            if(p && CAT_POPUP[t]){ p.catSeen=p.catSeen||{}; if(!p.catSeen[t]){ p.catSeen[t]=true; state.catPopup=t; save(p.id); } }
             render();
         }
         function closeCatPopup(){ state.catPopup=null; render(); }
@@ -12142,7 +12290,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const price=Number(a.price)||0, cf=Number(a.cf)||0;
             return (a.type==='BUSINESS' && cf>0) ? Math.max(price, Math.round(cf*WIN_MULT)) : price;
         }
-        function assetSale(a){ return Math.max(0, bizValue(a) - (Number(a.liab)||0)); }
+        function hasSkill(p,k){ return !!p && (p.selfSkills||[]).indexOf(k)>=0; }
+        function assetSale(a, p){
+            let v = Math.max(0, bizValue(a) - (Number(a.liab)||0));
+            if(hasSkill(p,'sales')) v = Math.round(v*1.05);   // навык «Продажи»: активы дороже на 5%
+            return v;
+        }
         // ─── ПАРТНЁРЫ: владелец развил дело → поток вырос У ВСЕХ (правило Рината, 20 июл).
         // Партнёр не платит за развитие и не решает — но его доля растёт вместе с делом.
         // a.cfTotal — полный поток дела, a.cf — доля владельца. Скидывались поровну, значит
@@ -12245,7 +12398,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 a.cf=Math.max(0, oldCf+add);
             }
             const newCf=Number(a.cf)||0;
-            if(key!=='bad'){
+            const passed=(key!=='bad' && key!=='weak');   // «не зашла» тоже НЕ засчитывает ступень — вкладывай снова
+            if(passed){
                 // ступень пройдена — идём дальше по лестнице
                 a.bizLvl=bizLevel(a)+1;
                 a.resist=Math.min(70, bizResist(a)+(key==='boom'?u.res:Math.round(u.res*0.4)));
@@ -12253,8 +12407,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 a.note=u.ic+' '+u.t;
             }
             p.notify=(key==='bad'?'💀 ':u.ic+' ')+'«'+(a.title||'Бизнес')+'»: '+story[0]+'. '
-                     +(add>0?'Пассив +'+fmtN(add)+'$/мес.':(add<0?'Пассив '+fmtN(add)+'$/мес.':'Пассив не изменился.'))
-                     +(key==='bad'?' Ступень не пройдена — можно попробовать снова.':'');
+                     +(add>0?(passed?'Круто! Улучшение прошло успешно. Пассив +'+fmtN(add)+'$/мес.':'Пассив +'+fmtN(add)+'$/мес.'):(add<0?'Пассив '+fmtN(add)+'$/мес.':'Пассив не изменился.'))
+                     +(!passed?' Ступень не пройдена — можно попробовать снова.':'');
             m.result={ out:key, oldCf:oldCf, newCf:newCf, add:add };
             save(); render();
         }
@@ -12714,7 +12868,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
      в секунду. На каждой перерисовке она исчезала — содержимое прыгало вверх, через миг
      таймер возвращал её — прыгало вниз. И только при открытом окне покупки, как он и заметил.
      Теперь рождается сразу в нужном виде: пересборка её не гасит, прыгать нечему. */''}
-                <div id="buyTimer" style="position:fixed;right:18px;top:330px;z-index:900;width:152px;visibility:${buyWindowOpen()?'visible':'hidden'};text-align:center;background:#064e3b;color:#d1fae5;padding:9px 13px;border-radius:10px;font-weight:800;font-size:13px;border:1px solid #10b981;box-shadow:0 8px 26px -10px rgba(16,185,129,.75);">${buyWindowOpen()&&state.board?'🟢 Покупка открыта ВСЕМ: '+fmtLeft(state.board.buyWindowEndsAt):''}</div>
+                <div id="buyTimer" style="position:fixed;left:12px;bottom:78px;z-index:900;pointer-events:none;visibility:${buyWindowOpen()?'visible':'hidden'};text-align:center;background:rgba(6,78,59,.94);color:#d1fae5;padding:5px 11px;border-radius:999px;font-weight:800;font-size:12px;border:1px solid #10b981;box-shadow:0 6px 16px -8px rgba(16,185,129,.7);">${buyWindowOpen()&&state.board?'🟢 Покупка '+fmtLeft(state.board.buyWindowEndsAt):''}</div>
                 ${alertHtml}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
                   <div style="border:1px solid var(--lx-line);border-radius:11px;padding:9px 11px;background:var(--lx-ink);">
@@ -12727,6 +12881,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                   </div>
                 </div>
                 <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">💸 Комиссия биржи сейчас: <b style="color:#fbbf24;">${(tradeFeePct(p)*100).toFixed(1)}%</b> на сделку <span style="color:#6b7280;">(спред ${(FEE_BASE*100).toFixed(1)}% + надбавка за частоту, до ${(FEE_CAP*100).toFixed(0)}%)</span></div>
+                <div style="font-size:11px;color:#8a8378;background:#0d1016;border:1px solid #242833;border-radius:8px;padding:7px 9px;margin-bottom:8px;line-height:1.5;">🧭 Как в жизни: комиссию берут <b>и на покупке, и на продаже</b> (это спред). Поэтому суета мелкими сделками съедается в ноль. Биржа — не про мелкий пассив, а про <b style="color:#cdc8bd;">поймать момент</b>: в разное время «горит» разный рынок (то крипта, то акции, то сырьё). Кто это видит — тот и зарабатывает.</div>
                 <button onclick="state.showMarket=!state.showMarket;render();" style="width:100%;margin:2px 0 8px;padding:11px;cursor:pointer;border-radius:11px;font-family:Georgia,serif;font-size:14px;font-weight:700;letter-spacing:.02em;background:${state.showMarket?'var(--lx-ink)':'linear-gradient(180deg,#efd8a3,#d9b877)'};color:${state.showMarket?'var(--lx-gold-br)':'#20180a'};border:1px solid var(--lx-gold-ln);">${state.showMarket?'Свернуть торги ▲':'Открыть торги ▼'}</button>
                 ${listHtml}
                 <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin:10px 0 4px;border-top:1px solid #1f2937;padding-top:10px;">💼 Мои активы (куплено)</div>
@@ -13705,6 +13860,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `<div style="background:#3f1d1d;color:#fecaca;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">⏳ Сейчас ходит <b>${nm(tp)}</b> — жди свой ход. Твои действия отключены (только казино и общее окно покупки).${nextTxt}</div>`;
         }
         function updateTurnPlate(){
+            // 🎲 Личный попап «Твой ход» на ФРОНТЕ перехода (был не мой ход → стал мой). Только на своём экране.
+            try{
+                const b=state.board;
+                if(b && Array.isArray(b.order) && b.order.length && state.currentPlayerId!=null){
+                    const isMy = String(b.order[b.turnIdx])===String(state.currentPlayerId);
+                    if(isMy && state._wasMyTurn===false){ state.myTurnPopup=true; paintOverlays(); }
+                    state._wasMyTurn = isMy;
+                }
+            }catch(e){}
             const el=document.getElementById('turnPlate'); if(!el) return;
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
             const html=turnPlateHtml(p);
@@ -13745,7 +13909,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const col = Math.abs(slipPct) < 0.5 ? '#34d399' : (bad ? '#f87171' : '#fbbf24');
             const arrow = slipPct >= 0 ? '▲' : '▼';
             let head;
-            if(Math.abs(slipPct) < 0.05) head = `📊 Стакан держит: пройдёт по витрине <b>${fmtPrice(shelf)}$</b>/шт — проскальзывания нет.`;
+            if(Math.abs(slipPct) < 0.05) head = `📊 Стакан держит: ориентир по витрине <b>${fmtPrice(shelf)}$</b>/шт. <span style="font-size:11.5px;color:#9c988e;">Точная цена зафиксируется в момент сделки — рынок живой, может чуть дёрнуться (особенно у мемов).</span>`;
             else if(side==='buy') head = `📊 Витрина <b>${fmtPrice(shelf)}$</b> → твоя цена <b style="color:${col};">~${fmtPrice(fill)}$</b>/шт <b style="color:${col};">${arrow} ${Math.abs(slipPct).toFixed(1)}%</b><br><span style="font-size:11.5px;color:#9c988e;">Твой объём сам двигает цену вверх — чем больше берёшь, тем дороже.</span>`;
             else head = `📊 Витрина <b>${fmtPrice(shelf)}$</b> → выход по <b style="color:${col};">~${fmtPrice(fill)}$</b>/шт <b style="color:${col};">${arrow} ${Math.abs(slipPct).toFixed(1)}%</b><br><span style="font-size:11.5px;color:#9c988e;">Твой объём продавливает цену вниз — чем больше сливаешь, тем дешевле.</span>`;
             const tail = (side==='buy')
@@ -13790,7 +13954,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             lastSaveT = Date.now();
             const r = await sellHolding(p, id, q); save(); render();
             if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Твой объём просадил рынок: витрина была '+r.p0+'$, выход по ~'+r.fill+'$/шт.') : '';
-                alert('✅ Продано '+fmtN(r.qty)+' «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу'+moved); }
+                alert('✅ Продано '+fmtN(r.qty)+' «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу · чистая прибыль по позиции '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$'+moved); }
         }
         function renderSellModal(){
             const m = state.sellModal; if(!m) return '';
@@ -14011,7 +14175,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                         `;
                                     }
                                     const _price = Number(a.price||0), _liab = Number(a.liab||0), _cf = Number(a.cf||0);
-                                    const _sale = assetSale(a);   // дело стоит 20 своих потоков
+                                    const _sale = assetSale(a, p);   // дело стоит 20 своих потоков (+навык Продажи)
                                     const _typeLbl = a.type==='ESTATE'?'Недвижимость':a.type==='BUSINESS'?'Бизнес':'Актив';
                                     return `
                                         <div class="row-item" style="display:block; padding:12px;">
@@ -14032,13 +14196,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                             ${/* 🤝 доля в чужом деле: партнёр не владеет — не развивает и не продаёт */''}
                                             ${a.partnerOf
                                               ? `<div style="flex:1;font-size:11px;color:#9c988e;line-height:1.4;padding:3px 0;">🤝 Твоя доля в чужом деле. Развивает владелец — поток растёт и тебе.</div>`
-                                              : `${_cf>0?`<button onclick="openBizModal(${p.id},${p.assets.indexOf(a)})" class="btn" style="flex:1;padding:4px 12px;font-size:11px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">🏗️ Развить дело</button>`:''}
+                                              : `${(a.type==='BUSINESS'||_cf>0)?`<button onclick="openBizModal(${p.id},${p.assets.indexOf(a)})" class="btn" style="flex:1;padding:4px 12px;font-size:11px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">🏗️ Развить дело</button>`:''}
                                             <button onclick="send('SELL_ASSET', {aId:${a.id}, sale:${_sale}, title:'${a.title.replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-sell" style="flex:0 0 auto;padding:4px 12px; font-size:11px;">📤 Продать (${_sale}$)</button>`}
                                             </div>
                                         </div>
                                     `;
                                 }).join('')}
                         </div>
+                        ${p.farm && (f.farmInc||0)!==0 ? `<div class="row-item" style="background:#14251b;"><span>🌾 Ферма (продукция):</span><b style="color:#10b981;">+${f.farmInc} $</b></div>` : ''}
                         <div class="sub-section">
                             <div class="row-item" style="background:#064e3b; border-color:#10b981;">
                                 <b>Общий доход:</b>
@@ -14058,6 +14223,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <div class="row-item" style="opacity:0.5;"><span>Прочие расходы:</span><span>${f.otherExp} $</span></div>
                         <div class="row-item" style="background:#1e1b4b;"><span>Расходы на детей (${p.children}):</span><b style="color:#ef4444;">${f.childExp} $</b></div>
                         <div class="row-item" style="background:#1e1b4b;"><span>Платёж по кредиту банка:</span><b style="color:#ef4444;">${f.bankPay} $</b></div>
+                        ${(f.farmFeed||0)>0?`<div class="row-item" style="background:#14251b;"><span>🌾 Корм и содержание фермы (${farmHeads(p)} гол):</span><b style="color:#ef4444;">${f.farmFeed} $</b></div>`:''}
+                        ${(f.farmWage||0)>0?`<div class="row-item" style="background:#14251b;"><span>👔 Управляющий фермы:</span><b style="color:#ef4444;">${f.farmWage} $</b></div>`:''}
                         <div class="sub-section">
                             <div class="row-item" style="background:#7f1d1d; border-color:#ef4444;">
                                 <b>Общий расход:</b>
@@ -14269,7 +14436,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
      в секунду. На каждой перерисовке она исчезала — содержимое прыгало вверх, через миг
      таймер возвращал её — прыгало вниз. И только при открытом окне покупки, как он и заметил.
      Теперь рождается сразу в нужном виде: пересборка её не гасит, прыгать нечему. */''}
-                <div id="buyTimer" style="position:fixed;right:18px;top:330px;z-index:900;width:152px;visibility:${buyWindowOpen()?'visible':'hidden'};text-align:center;background:#064e3b;color:#d1fae5;padding:9px 13px;border-radius:10px;font-weight:800;font-size:13px;border:1px solid #10b981;box-shadow:0 8px 26px -10px rgba(16,185,129,.75);">${buyWindowOpen()&&state.board?'🟢 Покупка открыта ВСЕМ: '+fmtLeft(state.board.buyWindowEndsAt):''}</div>
+                <div id="buyTimer" style="position:fixed;left:12px;bottom:78px;z-index:900;pointer-events:none;visibility:${buyWindowOpen()?'visible':'hidden'};text-align:center;background:rgba(6,78,59,.94);color:#d1fae5;padding:5px 11px;border-radius:999px;font-weight:800;font-size:12px;border:1px solid #10b981;box-shadow:0 6px 16px -8px rgba(16,185,129,.7);">${buyWindowOpen()&&state.board?'🟢 Покупка '+fmtLeft(state.board.buyWindowEndsAt):''}</div>
                 <div style="text-align:center;margin-bottom:8px;color:#e9eefb;font-weight:800;">
                     🎲 Ходит: <span style="color:${tcol}">${nameOf(turnPid)}</span> · клетка <b>${cellName}</b>${roll}
                     &nbsp; <span id="turnTimer" style="color:#93c5fd;"></span>
@@ -14384,7 +14551,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             const open=buyWindowOpen();
             const bt=document.getElementById('buyTimer');
-            if(bt){ bt.textContent = open ? ('🟢 Покупка открыта ВСЕМ: '+fmtLeft(b.buyWindowEndsAt)) : '';
+            if(bt){ bt.textContent = open ? ('🟢 Покупка '+fmtLeft(b.buyWindowEndsAt)) : '';
                     // 🩹 НЕ трогаем display: место под плашку зарезервировано всегда.
                     // Раньше таймер её схлопывал, и страница прыгала вверх-вниз каждую секунду.
                     bt.style.visibility = open?'visible':'hidden'; }
@@ -14554,7 +14721,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 📤 продажа дела — заявка ведущему (проверяем очередь и зачисление денег)
         async function autoSellAsset(p){
             const a=(p.assets||[]).find(x=>x && !x.partnerOf); if(!a) return;
-            await _asPlayer(p, ()=>{ send('SELL_ASSET',{aId:a.id, sale:assetSale(a), title:String(a.title||'Дело')}); });
+            await _asPlayer(p, ()=>{ send('SELL_ASSET',{aId:a.id, sale:assetSale(a, p), title:String(a.title||'Дело')}); });
             autoToast('📤 '+p.name+' продаёт «'+(a.title||'дело')+'»', '#cf9a9a');
         }
         // 🗞️ решение по слуху — настоящий rumorChoose
@@ -14703,13 +14870,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const by={};
             for(const a of p.farm.animals){
                 const k=a.kind; if(!FARM_CFG.animals[k]) continue;
-                if(!by[k]) by[k]={aid:a.aid||('a'+Math.random().toString(36).slice(2)),kind:k,age:a.age||0,mature:!!a.mature,count:a.count||1,bm:a.bm||0};
-                else { by[k].count+=(a.count||1); by[k].mature=by[k].mature||!!a.mature; by[k].age=Math.max(by[k].age,a.age||0); by[k].bm=Math.max(by[k].bm,a.bm||0); }
+                if(!by[k]) by[k]={aid:a.aid||('a'+Math.random().toString(36).slice(2)),kind:k,age:a.age||0,mature:!!a.mature,count:a.count||1,bm:a.bm||0,by:(a.by!=null?a.by:1)};
+                else { by[k].count+=(a.count||1); by[k].mature=by[k].mature||!!a.mature; by[k].age=Math.max(by[k].age,a.age||0); by[k].bm=Math.max(by[k].bm,a.bm||0); by[k].by=Math.min(by[k].by,(a.by!=null?a.by:1)); }
             }
             p.farm.animals=Object.values(by);
-            p.farm.capUsed=p.farm.animals.length;
+            p.farm.capUsed=farmHeads(p);
         }
-        function openFarm(){ const p=farmMe(); if(!p) return; if(p.farm){ farmMergeHerds(p); save(p.id); } state.view='farm'; state.farmTab = p.farm ? 'mine' : 'buy'; render(); }
+        function openFarm(){ const p=farmMe(); if(!p) return; if(p.farm){ farmMergeHerds(p); farmClock(p); save(p.id); } state.view='farm'; state.farmTab = p.farm ? 'mine' : 'buy'; render(); }
 
         function renderFarm(app){
             const p = farmMe();
@@ -14726,7 +14893,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             app.innerHTML = `
                 <div class="card flex-between" style="background:#1f2937;">
                     <div><h2 style="font-size:20px;font-weight:800;">🐄 Рынок скота и ферма</h2>
-                    <p style="color:#fcd34d;font-size:12px;margin-top:2px;">💰 Касса: <b>${Math.round(p.savings)} $</b>${L?` · 🌾 ${L.name} (${p.farm.capUsed}/${L.cap})`:''}</p></div>
+                    <p style="color:#fcd34d;font-size:12px;margin-top:2px;">💰 Касса: <b>${Math.round(p.savings)} $</b>${L?` · 🌾 ${L.name} (${Object.keys(p.farm.buildings||{}).length}/${L.slots} строений · ${farmHeads(p)} гол · корм −${farmFeed(p)}$/мес)`:''}</p></div>
                     <button onclick="state.view='player';render();" class="btn btn-gray">← Назад в бланк</button>
                 </div>
                 ${p.farm ? `<div style="display:flex;gap:6px;margin-bottom:12px;">${tabBtn('mine','🌾 Ферма')}${tabBtn('buy','🛒 Купить')}${tabBtn('learn','🎓 Учёба')}${tabBtn('market','📈 Рынок')}</div>` : ''}
@@ -14740,20 +14907,50 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Земля не для бродяги. Чем больше берёшь — тем дороже, но и вмещает больше живого.</p>
                     ${farmImg('farm_land',180)}
                     <div style="display:grid;gap:10px;margin-top:12px;">
-                    ${Object.keys(FARM_CFG.land).map(k=>{const L=FARM_CFG.land[k];return `<div class="row-item"><div style="flex:1;"><b>${L.name}</b><div style="font-size:12px;color:#9ca3af;">вместимость ${L.cap} голов/грядок</div></div><button onclick="farmBuyLand('${k}')" class="btn btn-green">${L.price}$</button></div>`;}).join('')}
+                    ${Object.keys(FARM_CFG.land).map(k=>{const L=FARM_CFG.land[k];return `<div class="row-item"><div style="flex:1;"><b>${L.name}</b><div style="font-size:12px;color:#9ca3af;">${L.slots} мест под строения</div></div><button onclick="farmBuyLand('${k}')" class="btn btn-green">${fmtN(L.price)}$</button></div>`;}).join('')}
                     </div></div>`;
             }
             let out='';
             if(!p.farm.barn){
                 out += `<div class="card"><div class="block-title">🏡 Построй ферму (амбар)</div>${farmImg('farm_barn',180)}<p style="font-size:12px;color:#9ca3af;margin:10px 0;">Без амбара скот держать негде.</p><button onclick="farmBuildBarn()" class="btn btn-amber" style="width:100%;">Построить за ${FARM_CFG.barn}$</button></div>`;
             }
+            if(p.farm.barn){
+                const _bl=p.farm.buildings||{}; const _bn=Object.keys(_bl).length; const _L=FARM_CFG.land[p.farm.land];
+                out += `<div class="card"><div class="block-title">🏗️ Строения</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Каждый вид живёт в своём строении, и туда влезает лишь столько-то — не тысячи. Мест на земле: <b style="color:#fcd34d;">${_bn}/${_L.slots}</b> (большая земля вмещает больше строений).</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">`;
+                for(const _bk in FARM_BUILDINGS){ const B=FARM_BUILDINGS[_bk]; const has=!!_bl[_bk]; const cap=has?farmBuildingCap(p,_bk):B.cap; const used=has?farmBuildingUsed(p,_bk):0;
+                    out += `<div class="card" style="padding:8px;margin:0;">${farmImg(B.img)}<div style="font-weight:800;margin-top:6px;">${B.name}</div><div style="font-size:11px;color:#9ca3af;">${B.note}</div>`;
+                    if(has){ out += `<div style="font-size:11px;color:#fcd34d;margin-top:3px;">вмещает ${used}/${cap}${_bl[_bk].lvl>=2?' · макс':''}</div>`;
+                        if(B.up && _bl[_bk].lvl<2) out += `<button onclick="farmUpgradeStructure('${_bk}')" class="btn btn-blue" style="width:100%;margin-top:6px;font-size:11px;">⬆️ до ${B.up.cap} · ${fmtN(B.up.price)}$</button>`;
+                        out += `<button onclick="farmDemolish('${_bk}')" class="btn btn-gray" style="width:100%;margin-top:4px;font-size:10px;">🧹 Снести (вернуть ${fmtN(Math.round(B.price*0.4))}$)</button>`;
+                    } else { const noSlot=_bn>=_L.slots;
+                        out += `<div style="font-size:11px;color:#9ca3af;margin-top:3px;">вмещает до ${B.cap}</div><button onclick="farmBuildStructure('${_bk}')" ${noSlot?'disabled':''} class="btn ${noSlot?'btn-gray':'btn-green'}" style="width:100%;margin-top:6px;font-size:11px;">${noSlot?'нет места на земле':'Построить · '+fmtN(B.price)+'$'}</button>`;
+                    }
+                    out += `</div>`;
+                }
+                out += `</div></div>`;
+                // ⬆️ Улучшить землю (доплата разницы) — если есть куда расти
+                const _order=Object.keys(FARM_CFG.land); const _ci=_order.indexOf(p.farm.land); const _bigger=_order.slice(_ci+1);
+                if(_bigger.length){
+                    out += `<div class="card"><div class="block-title">🌍 Расширить землю</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Доплачиваешь только разницу — всё хозяйство остаётся, слотов под строения становится больше.</p><div style="display:grid;gap:8px;">`;
+                    for(const _s of _bigger){ const NL=FARM_CFG.land[_s]; const diff=NL.price-_L.price;
+                        out += `<div class="row-item"><div style="flex:1;"><b>${NL.name}</b><div style="font-size:11px;color:#9ca3af;">${NL.slots} слотов · было ${_L.slots}</div></div><button onclick="farmUpgradeLand('${_s}')" class="btn btn-amber">доплата ${fmtN(diff)}$</button></div>`;
+                    }
+                    out += `</div></div>`;
+                }
+            }
             const hasBase = (p.farm.courses||[]).includes('base');
             const buyCard = (kind)=>{
                 const c=FARM_CFG.animals[kind];
-                const locked = !p.farm.barn || !hasBase || !farmHasCourses(p,c.need);
+                const _bk=farmHouseOf(kind); const _B=FARM_BUILDINGS[_bk]; const _hasB=!!(p.farm.buildings||{})[_bk];
+                const _noCourse = !hasBase || !farmHasCourses(p,c.need);
+                const locked = !p.farm.barn || _noCourse || !_hasB;
                 const needTxt = c.need.map(n=>FARM_CFG.courseName[n]).join(', ');
-                const desc = c.male ? 'для приплода стаду' : c.crop ? `урожай ~${c.yield}$/мес` : (c.prod?`продукт ~${c.yield}$/мес`:'на развод / мясо');
-                return `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}</div><div style="font-size:11px;color:#9ca3af;">${desc}</div>${locked?`<div style="font-size:10px;color:#f59e0b;margin-top:4px;">нужен курс: ${needTxt}</div>`:''}<button onclick="farmBuyAnimal('${kind}')" ${locked?'disabled':''} class="btn ${locked?'btn-gray':'btn-green'}" style="width:100%;margin-top:6px;">${c.buy}$${c.crop?'':'/гол'}</button></div>`;
+                const lockTxt = _noCourse ? ('нужен курс: '+needTxt) : (!_hasB ? ('🏗️ нужно строение: '+(_B?_B.name:'?')) : '');
+                const desc = c.male ? 'для приплода стаду'
+                    : (c.prod && FARM_RAW.indexOf(c.prod)>=0) ? (c.prod==='milk'?'🥛 молоко → сыроварня':'🍇 виноград → вино/виски')
+                    : c.crop ? `урожай ~${c.yield}$/мес`
+                    : (c.prod?`продукт ~${c.yield}$/мес`:'на развод / мясо');
+                return `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}</div><div style="font-size:11px;color:#9ca3af;">${desc}</div>${locked&&lockTxt?`<div style="font-size:10px;color:#f59e0b;margin-top:4px;">${lockTxt}</div>`:''}<button onclick="farmBuyAnimal('${kind}')" ${locked?'disabled':''} class="btn ${locked?'btn-gray':'btn-green'}" style="width:100%;margin-top:6px;">${fmtN(c.buy)}$${c.crop?'':'/гол'}</button></div>`;
             };
             const kinds = Object.keys(FARM_CFG.animals);
             const livestockKinds = kinds.filter(k=>!FARM_CFG.animals[k].crop);
@@ -14791,12 +14988,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const c=FARM_CFG.animals[a.kind];
                 const canButcher=(p.farm.courses||[]).includes('butcher') && c.meat>0;
                 let s = `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}${(a.count||1)>1?` ×${a.count}`:''}</div>`;
-                if(!a.mature){ s += `<div style="font-size:11px;color:#f59e0b;">растёт (${a.age||0}/${FARM_CFG.mature} мес)</div>`; }
-                else if(c.crop){ s += `<div style="font-size:11px;color:#10b981;">приносит ~${Math.round(c.yield*(a.count||1)*priceIdx(c.prod))}$/мес</div>`; }
-                else if(c.male){ s += `<div style="font-size:11px;color:#a5b4fc;margin-top:2px;">🧬 Для приплода стаду — под нож не идёт.</div>`; }
+                if(!a.mature){ const left=Math.max(0,(a.by!=null?a.by:1)+(FARM_CFG.matureY||1)-curYear()); s += `<div style="font-size:11px;color:#f59e0b;">🌱 растёт — созреет ${left<=0?'в этом году':'через '+left+' г.'}</div>`; }
+                else if(c.crop){ s += FARM_RAW.indexOf(c.prod)>=0
+                    ? `<div style="font-size:11px;color:#fcd34d;">🍇 даёт виноград для вина/виски — копится в погреб</div>`
+                    : `<div style="font-size:11px;color:#10b981;">приносит ~${Math.round(c.yield*(a.count||1)*priceIdx(c.prod))}$/мес</div>`; }
+                else if(c.male){ s += `<div style="font-size:11px;color:#a5b4fc;margin-top:2px;">🧬 Производитель — плодит стадо. Зарежешь → приплод этого вида остановится.</div>`;
+                    if(c.meat>0) s += canButcher
+                        ? `<button onclick="farmSlaughter('${a.aid}')" class="btn btn-orange" style="width:100%;padding:4px;font-size:11px;margin-top:4px;">🔪 На убой · ${Math.round(c.meat*priceIdx('meat'))}$</button>`
+                        : `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">🔪 убой — нужен курс «Мясник»</div>`;
+                }
                 else {
                     const hasBreed = (p.farm.courses||[]).includes('breed');
-                    if(c.prod) s += `<div style="font-size:11px;color:#10b981;">даёт ~${Math.round(c.yield*(a.count||1)*priceIdx(c.prod))}$/мес</div>`;
+                    if(c.prod) s += FARM_RAW.indexOf(c.prod)>=0
+                        ? `<div style="font-size:11px;color:#fcd34d;">🥛 даёт молоко для сыроварни — копится в погреб</div>`
+                        : `<div style="font-size:11px;color:#10b981;">даёт ~${Math.round(c.yield*(a.count||1)*priceIdx(c.prod))}$/мес</div>`;
                     if(c.breed>0){
                         if(!hasBreed) s += `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">🧬 развод — нужен курс «Разведение»</div>`;
                         else if(farmBreeds(p,a)) s += `<div style="font-size:10px;color:#a7f3d0;margin-top:3px;">🧬 плодится в стаде</div>`;
@@ -14814,14 +15019,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!livestock.length && !crops.length){ out += `<p style="color:#9ca3af;font-size:13px;margin-top:10px;">Пусто — загляни в 🛒 Купить.</p>`; }
             out += `</div>`;
             // 🍷 ПОГРЕБ ВЫДЕРЖКИ
-            out += `<div class="card"><div class="block-title">🍷 Погреб выдержки</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Заложи и жди годами — чем дольше, тем дороже. Терпение кормит.</p>`;
+            out += `<div class="card"><div class="block-title">🍷 Погреб выдержки</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Из своего сырья: 🥛 молоко → 🧀 сыр, 🍇 виноград → 🍷 вино и 🥃 виски. Заложил → годами дорожает. Терпение кормит.</p>`;
+            const _stk = p.farm.stock||{};
+            const _milk=Math.floor(Number(_stk.milk)||0), _fruit=Math.floor(Number(_stk.fruits)||0);
+            out += `<div style="font-size:12px;color:#fcd34d;margin-bottom:8px;">📦 Склад сырья: 🥛 молоко <b>${_milk}</b> · 🍇 виноград <b>${_fruit}</b> · погреб <b>${(p.farm.batches||[]).length}/${FARM_CELLAR_CAP}</b> <span style="color:#9ca3af;">— сырьё копится с годами</span></div>`;
             out += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">`;
-            for(const k in FARM_CFG.aging){ const cfg=FARM_CFG.aging[k]; const has=(p.farm.courses||[]).includes(cfg.need); out += `<button onclick="farmLayBatch('${k}')" ${has?'':'disabled'} class="btn ${has?'btn-amber':'btn-gray'}" style="flex:1;min-width:120px;font-size:12px;">Заложить ${cfg.name} · ${cfg.layCost}$${has?'':' 🔒'}</button>`; }
+            for(const k in FARM_CFG.aging){ const cfg=FARM_CFG.aging[k];
+                const okC=(p.farm.courses||[]).includes(cfg.need);
+                const haveSrc=Math.floor(Number((_stk)[cfg.src])||0); const okS=haveSrc>=cfg.srcQty; const en=okC&&okS;
+                const tail = !okC ? ' 🔒курс' : (!okS ? ` · мало ${cfg.srcName} (${haveSrc}/${cfg.srcQty})` : '');
+                out += `<button onclick="farmLayBatch('${k}')" ${en?'':'disabled'} class="btn ${en?'btn-amber':'btn-gray'}" style="flex:1;min-width:130px;font-size:12px;">Заложить ${cfg.name} · ${cfg.srcQty} ${cfg.srcName}${tail}</button>`; }
             out += `</div>`;
             const batches=p.farm.batches||[];
             if(!batches.length){ out += `<p style="font-size:12px;color:#6b7280;">Погреб пуст. Заложи что-нибудь и дай настояться.</p>`; }
             else { out += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">`;
-                batches.slice().sort((x,y)=>(y.years||0)-(x.years||0)).forEach(b=>{ const cfg=FARM_CFG.aging[b.kind]; if(!cfg) return; const yrs=b.years||0; const img=yrs>=3?cfg.imgAged:cfg.imgYoung; const val=batchValue(b);
+                batches.slice().sort((x,y)=>batchYears(y)-batchYears(x)).forEach(b=>{ const cfg=FARM_CFG.aging[b.kind]; if(!cfg) return; const yrs=batchYears(b); const img=yrs>=3?cfg.imgAged:cfg.imgYoung; const val=batchValue(b);
                     out += `<div class="card" style="padding:8px;margin:0;">${farmImg(img)}<div style="font-weight:800;margin-top:6px;">${cfg.name}</div><div style="font-size:11px;color:${yrs>=5?'#fcd34d':'#9ca3af'};">выдержка ${yrs} лет${yrs>=cfg.cap?' (макс)':''}</div><button onclick="farmSellBatch('${b.bid}')" class="btn btn-green" style="width:100%;padding:5px;font-size:11px;margin-top:6px;">💰 Продать · ${val}$</button></div>`;
                 });
                 out += `</div>`;
@@ -14833,23 +15045,46 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function renderFarmMarket(p){
             const f = (state.market && state.market.farm) || {};
             const labels = {milk:'🥛 Молоко',eggs:'🥚 Яйца',honey:'🍯 Мёд',wool:'🧶 Шерсть',feath:'🪶 Перья',fish:'🐟 Форель',meat:'🥩 Мясо (за убой)',flowers:'🌹 Цветы',fruits:'🍎 Фрукты',micro:'🌱 Микрозелень',fert:'💩 Удобрения'};
-            const rows = Object.keys(labels).map(k=>{const idx=f[k]||1;const chg=(idx-1)*100;const col=chg>=0?'#10b981':'#f43f5e';return `<div class="row-item"><span>${labels[k]}</span><b style="color:${col};">${idx.toFixed(2)}× · ${chg>=0?'+':''}${chg.toFixed(0)}%</b></div>`;}).join('');
+            const rows = Object.keys(labels).map(k=>{const idx=priceIdx(k);const chg=(idx-1)*100;const col=chg>=0?'#10b981':'#f43f5e';const hot=idx>=1.15?' 🔥':(idx<=0.85?' 🧊':'');return `<div class="row-item"><span>${labels[k]}${hot}</span><b style="color:${col};">${idx.toFixed(2)}× · ${chg>=0?'+':''}${chg.toFixed(0)}%</b></div>`;}).join('');
             return `<div class="card"><div class="block-title">📈 Рынок продуктов (живая цена)</div>
-                <p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Цены за годы ползут вверх, но качаются. Твой доход умножается на них. Быстрые продукты идут в поток сами.</p>
+                <p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Цены качаются по годам ЦИКЛАМИ — у каждого продукта свой пик. 🔥 сейчас дорого (продавай/режь), 🧊 дёшево (придержи). Твой доход умножается на этот индекс.</p>
                 ${rows}
-                <p style="font-size:11px;color:#6b7280;margin-top:12px;">Выдержка (сыр, вино, виски) и продажа мяса на бирже — в следующем слое.</p>
+                <p style="font-size:11px;color:#6b7280;margin-top:12px;">Кто ловит момент — тот и зарабатывает. Сырьё (молоко/виноград) не продаётся напрямую — идёт в погреб на сыр/вино/виски.</p>
             </div>`;
         }
 
-        function farmBuyLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||p.farm) return; if(p.savings<L.price){ alert('Не хватает кассы. Нужно '+L.price+'$'); return; } farmSpend(p,L.price); p.farm={land:size,barn:false,capUsed:0,courses:[],animals:[],batches:[],manager:false}; state.farmTab='buy'; save(p.id); render(); alert('🌍 Куплена земля: '+L.name+'! Теперь построй амбар.'); }
+        function farmBuyLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||p.farm) return; if(p.savings<L.price){ alert('Не хватает кассы. Нужно '+L.price+'$'); return; } farmSpend(p,L.price); p.farm={land:size,barn:false,capUsed:0,courses:[],animals:[],batches:[],manager:false,buildings:{}}; state.farmTab='buy'; save(p.id); render(); alert('🌍 Куплена земля: '+L.name+'! Теперь построй амбар.'); }
+        // ⬆️ Улучшить землю с ДОПЛАТОЙ РАЗНИЦЫ (Александр 27июл): всё хозяйство остаётся, просто больше слотов.
+        function farmUpgradeLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||!p.farm) return; const cur=FARM_CFG.land[p.farm.land]; if(!cur){ return; } const diff=L.price-cur.price; if(diff<=0){ alert('Это не больше текущей земли.'); return; } if(p.savings<diff){ alert('Не хватает кассы. Доплата разницы: '+fmtN(diff)+'$ (было '+fmtN(cur.price)+', станет '+fmtN(L.price)+').'); return; } farmSpend(p,diff); p.farm.land=size; save(p.id); render(); alert('🌍 Земля расширена до «'+L.name+'» за доплату '+fmtN(diff)+'$! Теперь мест под строения: '+L.slots+'. Всё хозяйство на месте.'); }
+        function farmBuildStructure(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } p.farm.buildings=p.farm.buildings||{}; if(p.farm.buildings[bkey]){ alert('«'+B.name+'» уже построено.'); return; } const L=FARM_CFG.land[p.farm.land]; const built=Object.keys(p.farm.buildings).length; if(built>=L.slots){ alert('🌍 На этой земле мест под строения нет ('+built+'/'+L.slots+'). Купи землю больше — большие территории дороже.'); return; } if(p.savings<B.price){ alert('Не хватает кассы. «'+B.name+'» стоит '+B.price+'$.'); return; } farmSpend(p,B.price); p.farm.buildings[bkey]={lvl:1}; save(p.id); render(); alert('🏗️ Построено: «'+B.name+'» — вмещает '+B.cap+'. Теперь заводи туда живность.'); }
+        // 🧹 Снести строение и освободить слот (Александр 27июл: не быть прикованным к первому выбору). Возврат 40%.
+        function farmDemolish(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!(p.farm.buildings||{})[bkey]) return; if(farmBuildingUsed(p,bkey)>0){ alert('🚧 В «'+B.name+'» ещё есть живность. Сначала продай или зарежь всех оттуда, потом сноси.'); return; } const back=Math.round(B.price*0.4); if(!confirm('Снести «'+B.name+'»? Вернётся '+fmtN(back)+'$ (40%), место освободится.')) return; delete p.farm.buildings[bkey]; farmSpend(p,-back); save(p.id); render(); alert('🧹 «'+B.name+'» снесено. +'+fmtN(back)+'$, место свободно.'); }
+        function farmUpgradeStructure(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B||!B.up) return; const b=(p.farm.buildings||{})[bkey]; if(!b){ alert('Сначала построй строение.'); return; } if(b.lvl>=2){ alert('«'+B.name+'» уже улучшено до максимума.'); return; } if(p.savings<B.up.price){ alert('Не хватает кассы. Улучшение стоит '+B.up.price+'$.'); return; } farmSpend(p,B.up.price); b.lvl=2; save(p.id); render(); alert('⬆️ «'+B.name+'» улучшено — теперь вмещает '+B.up.cap+'.'); }
         function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ alert('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); alert('🏡 Амбар построен! Выучи «Фермерство» и заводи скот.'); }
         function farmLearn(key){ const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); alert('🎓 Изучено: '+FARM_CFG.courseName[key]+'! Ход не потрачен.'); }
-        function farmBuyAnimal(kind){ const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); if(!existing && p.farm.capUsed>=L.cap){ alert('Ферма заполнена ('+L.cap+' загонов). Нужна земля больше.'); return; } const unit=c.crop?'':'голов '; const qty=parseInt((prompt('Сколько '+unit+'«'+c.name+'» купить? Цена '+c.buy+'$.\nМожно сразу сотню или тысячу — сколько потянет касса.','1')||'0'),10); if(!qty||qty<1) return; const cost=c.buy*qty; if(p.savings<cost){ alert('Не хватает кассы. Нужно '+cost+'$ за '+qty+' '+(unit||'шт')+', есть '+Math.round(p.savings)+'$'); return; } farmSpend(p,cost); if(existing){ existing.count=(existing.count||1)+qty; } else { p.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,count:qty}); p.farm.capUsed=(p.farm.animals||[]).length; } save(p.id); render(); const tot=((p.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; alert('✅ Куплено '+qty+' '+unit+'«'+c.name+'» (−'+cost+'$)! Всего: '+tot+'.'); }
-        function farmSlaughter(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c.meat||!a.mature) return; if(!p.farm.courses.includes('butcher')){ alert('Нужен курс «Убой (мясник)».'); return; } const have=a.count||1; const per=Math.round(c.meat*priceIdx('meat')); const qty=parseInt((prompt('Сколько голов «'+c.name+'» под нож? Есть '+have+'. Мясо '+per+'$/гол.',have)||'0'),10); if(!qty||qty<1) return; const n=Math.min(qty,have); const pay=per*n; farmSpend(p,-pay); a.count=have-n; if(a.count<=0){ p.farm.animals=p.farm.animals.filter(x=>x.aid!==aid); p.farm.capUsed=Math.max(0,p.farm.capUsed-1); } save(p.id); render(); alert('🔪 Под нож '+n+' голов «'+c.name+'»: +'+pay+'$'); }
+        function farmBuyAnimal(kind){ const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const B=FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(!p.farm.buildings || !p.farm.buildings[bkey]){ alert('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).'); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.'); return; } const unit=c.crop?'':'голов '; const qty=parseInt((prompt('Сколько '+unit+'«'+c.name+'» купить? Цена '+c.buy+'$.\nСвободно '+_room+' в «'+B.name+'» ('+_used+'/'+_cap+').','1')||'0'),10); if(!qty||qty<1) return; if(qty>_room){ alert('🏗️ Влезет только '+_room+' — «'+B.name+'» вмещает '+_cap+', занято '+_used+'. Возьми меньше или улучши строение.'); return; } const cost=c.buy*qty; if(p.savings<cost){ alert('Не хватает кассы. Нужно '+cost+'$ за '+qty+' '+(unit||'шт')+', есть '+Math.round(p.savings)+'$'); return; } farmSpend(p,cost); if(existing){ existing.count=(existing.count||1)+qty; } else { p.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,by:curYear(),count:qty}); } p.farm.capUsed=farmHeads(p); save(p.id); render(); const tot=((p.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; alert('✅ Куплено '+qty+' '+unit+'«'+c.name+'» (−'+cost+'$)! Всего: '+tot+'.'); }
+        function farmSlaughter(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c.meat||!a.mature) return; if(!p.farm.courses.includes('butcher')){ alert('Нужен курс «Убой (мясник)».'); return; } const have=a.count||1; const per=Math.round(c.meat*priceIdx('meat')); const qty=parseInt((prompt('Сколько голов «'+c.name+'» под нож? Есть '+have+'. Мясо '+per+'$/гол.',have)||'0'),10); if(!qty||qty<1) return; const n=Math.min(qty,have); const pay=per*n; farmSpend(p,-pay); a.count=have-n; if(a.count<=0){ p.farm.animals=p.farm.animals.filter(x=>x.aid!==aid); } p.farm.capUsed=farmHeads(p); save(p.id); render(); alert('🔪 Под нож '+n+' голов «'+c.name+'»: +'+pay+'$'); }
         function farmManager(on){ const p=farmMe(); if(!p||!p.farm) return; p.farm.manager=!!on; save(p.id); render(); }
         // 🍷 ВЫДЕРЖКА: заложил → годами дорожает → продал. Цена = базовая × (1+rate)^годы (кап по виду).
-        function batchValue(b){ const cfg=FARM_CFG.aging[b.kind]; if(!cfg) return 0; const yrs=Math.min(b.years||0, cfg.cap); return Math.round(cfg.baseSell*Math.pow(1+cfg.rate, yrs)); }
-        function farmLayBatch(kind){ const p=farmMe(); const cfg=FARM_CFG.aging[kind]; if(!p||!cfg||!p.farm) return; if(!(p.farm.courses||[]).includes(cfg.need)){ alert('Нужен курс: '+FARM_CFG.courseName[cfg.need]); return; } if(p.savings<cfg.layCost){ alert('Не хватает кассы. Закладка стоит '+cfg.layCost+'$'); return; } farmSpend(p,cfg.layCost); p.farm.batches=p.farm.batches||[]; p.farm.batches.push({bid:'b'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,years:0,m:0}); save(p.id); render(); alert('🍷 Заложено: '+cfg.name+'! Годами дорожает — терпи, и продашь дороже.'); }
+        // выдержка в годах — лениво от года закладки (часы = год с сервера)
+        function batchYears(b){ const cfg=FARM_CFG.aging[b.kind]; if(!cfg) return 0; const laid=(b.layY!=null)?b.layY:curYear(); return Math.min(cfg.cap, Math.max(0,(b.years||0)+(curYear()-laid))); }
+        function batchValue(b){ const cfg=FARM_CFG.aging[b.kind]; if(!cfg) return 0; return Math.round(cfg.baseSell*Math.pow(1+cfg.rate, batchYears(b))); }
+        function farmLayBatch(kind){
+            const p=farmMe(); const cfg=FARM_CFG.aging[kind]; if(!p||!cfg||!p.farm) return;
+            if(!(p.farm.courses||[]).includes(cfg.need)){ alert('Нужен курс: '+FARM_CFG.courseName[cfg.need]); return; }
+            if((p.farm.batches||[]).length >= FARM_CELLAR_CAP){ alert('🍷 Погреб полон ('+FARM_CELLAR_CAP+' партий). Продай выдержанное, чтобы освободить место.'); return; }
+            farmClock(p);                                    // подтянуть накопленное сырьё
+            p.farm.stock = p.farm.stock || {};
+            const have = Math.floor(Number(p.farm.stock[cfg.src])||0);
+            if(have < cfg.srcQty){ alert('Не хватает сырья: нужно '+cfg.srcQty+' '+cfg.srcName+', есть '+have+'.\n'+(cfg.src==='milk'?'Заведи коров и дай им год — молоко копится.':'Посади виноград/фрукты и дай им год — урожай копится.')); return; }
+            if(p.savings<cfg.layCost){ alert('Не хватает кассы на процесс. Нужно '+cfg.layCost+'$'); return; }
+            p.farm.stock[cfg.src] = have - cfg.srcQty;        // сырьё потрачено — количество ограничено
+            farmSpend(p,cfg.layCost);
+            p.farm.batches=p.farm.batches||[];
+            p.farm.batches.push({bid:'b'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,years:0,layY:curYear()});
+            save(p.id); render();
+            alert('🍷 Заложено: '+cfg.name+'! Ушло '+cfg.srcQty+' '+cfg.srcName+'. Годами дорожает — терпи, и продашь дороже.');
+        }
         function farmSellBatch(bid){ const p=farmMe(); if(!p||!p.farm) return; const b=(p.farm.batches||[]).find(x=>x.bid===bid); if(!b) return; const cfg=FARM_CFG.aging[b.kind]; const val=batchValue(b); farmSpend(p,-val); p.farm.batches=p.farm.batches.filter(x=>x.bid!==bid); save(p.id); render(); alert('💰 Продано: '+cfg.name+' выдержки '+(b.years||0)+' лет — +'+val+'$ в кассу!'); }
 
         function renderAdmin(app) {
@@ -15346,7 +15581,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 // 🔴 резкий бум (редко, выживаемо)
                 { w:5,  run:()=>{ const h=Math.max(50,Math.round(baseTax*(0.18+0.03*yr))); const before=Number(p.taxMod)||0; addTax(h); const got=(Number(p.taxMod)||0)-before; return {emoji:'💥',title:'Налоговая реформа',text:`Крупный рост: налоги +${got}$/мес. Держись.`}; }},
                 { w:4,  run:()=>{ const h=Math.max(40,Math.round(baseTax*0.12)); addTax(h); const cap=Math.round(Math.max(0,Number(p.savings)||0)*0.5+sal*0.5); const f=Math.min(Math.round(sal*(0.25+0.05*yr)),Math.max(sal,cap)); const r=pay(f); return {emoji:'📉',title:'Кризис/девальвация',text:`Налоги +${h}$/мес и сбор ${note(f,r)}. Выкарабкивайся.`}; }},
-                { w:3,  run:()=>{ const cap=Math.round(Math.max(0,Number(p.savings)||0)*0.5+sal*0.6); const f=Math.min(Math.round(sal*(0.30+0.05*yr)),Math.max(sal,cap)); const r=pay(f); return {emoji:'🧮',title:'Доначисление налоговой',text:`Доначислили ${note(f,r)}.`}; }},
+                { w:3,  run:()=>{ const cap=Math.round(Math.max(0,Number(p.savings)||0)*0.5+sal*0.6); const f=Math.min(Math.round(sal*(0.30+0.05*yr)),Math.max(sal,cap)); const r=pay(f); return {emoji:'🧮',title:'Доначисление налога',text:`🔻 Налоговая доначислила — с вас СПИСАЛИ ${note(f,r)}.`}; }},
                 // ✨ повезло (редко)
                 { w:3,  run:()=>{ const back=Math.max(15,Math.round(baseTax*0.18)); addTax(-back); return {emoji:'✨',title:'Налоговая льгота',text:`Вычет: налоги −${back}$/мес. Повезло!`}; }},
                 { w:3,  run:()=>{ const b=Math.max(80,Math.round(sal*0.15)); p.savings=(Number(p.savings)||0)+b; return {emoji:'💸',title:'Субсидия/пособие',text:`Господдержка +${b}$ в кассу.`}; }},
@@ -16922,6 +17157,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const amt = Number((document.getElementById(elId || 'bankAmt') || {}).value);
             if (!amt || amt < 1000) { alert('Минимальная сумма $1000. Кратно тысяче.'); return; }
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
+            if ((Number(p.bankLoan)||0) > 0) { alert('🏦 У тебя уже есть кредит ' + fmtN(p.bankLoan) + '$. Один кредит за раз — сначала закрой старый, потом бери новый.'); return; }
             const cap = bankCap(p);
             if (cap < 1000) { alert('🏦 Банк отказал: твой месячный поток ' + fmtN(Math.round(calc(p).flow)) + '$ — платить нечем. Подними поток и приходи.'); return; }
             if (amt > cap) { alert('🏦 Банк смотрит на поток: ' + fmtN(Math.round(calc(p).flow)) + '$/мес × 10 = максимум ' + fmtN(cap) + '$. Больше не дадут.'); return; }
@@ -17012,7 +17248,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     // кнопка обещала «Продать (5000$)» и молча забирала дело даром.
                     // Считаем сумму заново на месте одобрения (заявка могла ждать, поток вырасти).
                     const _a = (p.assets||[]).find(a => a.id == d.details.aId);
-                    let _got = _a ? assetSale(_a) : (Number(d.details.sale)||0);
+                    let _got = _a ? assetSale(_a, p) : (Number(d.details.sale)||0);
                     // 🤝 продаётся дело с партнёрами: они скидывались — им и доля от продажи.
                     // Их зеркала гаснут: потока больше нет, дела больше нет.
                     const _mates = (_a && _a.mates) || [];
@@ -17035,7 +17271,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     const dd = d.details;
                     if (p.holdings && p.holdings[dd.assetId]) {
                         const sq = Math.min(dd.qty, p.holdings[dd.assetId].qty);
-                        p.savings = Math.round(((p.savings || 0) + sq * dd.price) * 100) / 100;
+                        const _sm = hasSkill(p,'sales') ? 1.05 : 1;   // навык «Продажи»: акции дороже на 5%
+                        p.savings = Math.round(((p.savings || 0) + sq * dd.price * _sm) * 100) / 100;
                         p.holdings[dd.assetId].qty -= sq;
                         if (p.holdings[dd.assetId].qty <= 0) delete p.holdings[dd.assetId];
                     }
@@ -17061,7 +17298,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     p.notify = '🎉 ПОЗДРАВЛЯЕМ! Ведущий подтвердил твой выигрыш +' + d.details.payout + '$! 👑 Касса пополнена.';
                 }
                 else if (d.type === 'PAY_BANK') { const owe=Number(p.bankLoan)||0; p.savings=Math.round(((p.savings||0)-owe)*100)/100; p.bankLoan = 0; p.notify='🏦 Кредит банка закрыт: −'+fmtN(owe)+'$ с кассы.'; }
-                else if (d.type === 'TAKE_LOAN') { p.bankLoan = (Number(p.bankLoan)||0) + d.details.amount; p.savings = Math.round(((Number(p.savings)||0) + d.details.amount) * 100) / 100; }
+                else if (d.type === 'TAKE_LOAN') {
+                    if ((Number(p.bankLoan)||0) > 0) { p.notify='🏦 Кредит не выдан: у тебя уже есть непогашенный кредит. Один за раз.'; }
+                    else { p.bankLoan = (Number(p.bankLoan)||0) + d.details.amount; p.savings = Math.round(((Number(p.savings)||0) + d.details.amount) * 100) / 100; }
+                }
                 return p;
             });
             state.deals = state.deals.filter(dl => dl.id != dId);
