@@ -10918,9 +10918,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const trainByKey = k => SELF_TRAININGS.find(t => t.key === k);
         // Ступеньки цены (Ринат 21 июл): 1-й по базовой, 2-4 дороже на 20%, с 5-го на 40%, с 9-го на 80%.
         // Те же числа считает сервер (train_mult) — он и списывает; здесь только показ.
-        function trainMult(owned){ return Math.min(5, 1 + Math.max(0,owned)*0.2); }   // каждый купленный навык +20% к цене следующего (растёт непрерывно, не упирается в потолок). Ринат 28июл
+        function trainMult(owned){ return Math.min(5, 1 + Math.max(0,owned)*0.3); }   // каждый купленный навык +30% к цене следующего (Ринат 28июл, было 0.2)
         function trainPrice(p, t){ return Math.round(t.cost * trainMult((p.selfSkills||[]).length)); }
-        function createMult(made){ return Math.min(5, 1 + Math.max(0,made)*0.2); }   // каждое созданное дело +20% к цене следующего. Ринат 28июл
+        function createMult(made){ return Math.min(5, 1 + Math.max(0,made)*0.3); }   // каждое созданное дело +30% к цене следующего. Ринат 28июл (было 0.2)
+        const CREATE_YIELD = 0.30;   // 🟢 доход создания = 30% от цены/мес (Ринат 28июл). Синхронно с сервером CREATE_YIELD.
+        function crCf(cr){ return Math.round((cr.cost||0) * CREATE_YIELD); }   // ожидаемый поток создания
         function createPrice(p, cr){ return Math.round(cr.cost * createMult((p.creations||[]).length)); }
         // Состав колоды ровно как на сервере: 7 провалов, каждый усилитель и каждое прошлое падение
         // снимают по одной карте провала. Пол — 2 провала: чуда без риска не бывает никогда.
@@ -11324,13 +11326,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             app.setAttribute('data-view', state.view);
             restoreSecs(app);                         // раскрытое человеком остаётся раскрытым
             if (_secSy > 0) {                         // и позицию прокрутки ВНУТРИ открытого окна тоже держим
-                const _os2 = app.querySelector('.sec-grid>details.sec[open]');
-                if (_os2) { _os2.scrollTop = _secSy; requestAnimationFrame(() => { _os2.scrollTop = _secSy; }); }
+                // 🩹 (Ринат 28июл «дёргается при изучении навыка»): картинки грузятся НЕСКОЛЬКО кадров
+                // и каждый раз сдвигают контент — держим прокрутку окна раздела упорно, ~8 кадров.
+                let _n=0; const _fix=()=>{ const o=app.querySelector('.sec-grid>details.sec[open]'); if(o && o.scrollTop!==_secSy) o.scrollTop=_secSy; if(++_n<8) requestAnimationFrame(_fix); };
+                _fix();
             }
             if (_sameView) {                          // та же страница — держим позицию, не прыгаем
+                // 🩹 (Ринат 28июл «дёргается при покупке строения»): каскад рендеров + дозагрузка картинок
+                // прыгали страницей; держим scrollY упорно несколько кадров, пока всё встанет.
                 window.scrollTo(0, _sy);
-                // и ещё раз следующим кадром: картинки/шрифты встают ПОСЛЕ и снова сдвигают страницу
-                requestAnimationFrame(() => { if (window.scrollY !== _sy) window.scrollTo(0, _sy); });
+                let _m=0; const _fixW=()=>{ if(window.scrollY!==_sy) window.scrollTo(0,_sy); if(++_m<8) requestAnimationFrame(_fixW); };
+                requestAnimationFrame(_fixW);
             }
             updateDebugBar();
             paintOverlays();   // всплывающие окна рисуем в отдельный слой — их появление не пересобирает #app
@@ -12911,12 +12917,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                   </div>
                   <div style="padding:9px 10px 10px;">
                     <div style="font-size:13px;font-weight:700;color:#f3efe6;">${cr.name}</div>
-                    <div style="font-size:11px;color:var(--lx-muted);margin:3px 0 6px;">${fmtN(cr.cost)}$ → ${fmtN(cr.cf)}$/мес навсегда${cr.grow?` · +${cr.grow}$ каждый круг`:''}</div>
+                    <div style="font-size:11px;color:var(--lx-muted);margin:3px 0 6px;">${fmtN(cr.cost)}$ → ${fmtN(crCf(cr))}$/мес навсегда${cr.grow?` · +${cr.grow}$ каждый круг`:''}</div>
                     ${/* лестница видна ВСЕГДА, даже до создания: человек должен знать, ради чего вкладывается */''}
                     <div style="font-size:10px;line-height:1.5;color:var(--lx-muted);border-top:1px dashed var(--lx-line);border-bottom:1px dashed var(--lx-line);padding:5px 0;margin-bottom:7px;">
-                      <span style="color:${lvl>=1?'#5cb08b':'#6d6a62'};">1 · ${cr.step1 || cr.name.replace(/\s*[^\wа-яА-ЯёЁ\s].*$/,'').trim()} — ${fmtN(cr.cf)}$</span><br>
-                      <span style="color:${lvl>=2?'#5cb08b':'#6d6a62'};">2 · ${CREATION_STEPS[cr.key][2]} — ${fmtN(cr.cf*2)}$ за ${fmtN(cr.cost)}$</span><br>
-                      <span style="color:${lvl>=3?'#5cb08b':'#6d6a62'};">3 · ${CREATION_STEPS[cr.key][3]} — ${fmtN(cr.cf*4)}$ за ${fmtN(cr.cost*3)}$</span>
+                      <span style="color:${lvl>=1?'#5cb08b':'#6d6a62'};">1 · ${cr.step1 || cr.name.replace(/\s*[^\wа-яА-ЯёЁ\s].*$/,'').trim()} — ${fmtN(crCf(cr))}$</span><br>
+                      <span style="color:${lvl>=2?'#5cb08b':'#6d6a62'};">2 · ${CREATION_STEPS[cr.key][2]} — ${fmtN(crCf(cr)*2)}$ за ${fmtN(cr.cost)}$</span><br>
+                      <span style="color:${lvl>=3?'#5cb08b':'#6d6a62'};">3 · ${CREATION_STEPS[cr.key][3]} — ${fmtN(crCf(cr)*4)}$ за ${fmtN(cr.cost*3)}$</span>
                     </div>
                     ${done ? `<div style="font-size:11px;color:#5cb08b;font-weight:700;margin-bottom:6px;">✓ ступень ${lvl} из 3 · ${fmtN(mine.cf)}$/мес</div>
                         ${lvl >= 3 ? `<div style="font-size:11px;color:var(--lx-gold-br);font-weight:700;">👑 развито до конца</div>`
@@ -14228,15 +14234,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${p.notify ? `<div style="background:linear-gradient(90deg,#10b981,#059669);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>${p.notify}</span><button onclick="clearNotify()" class="btn" style="background:#fff;color:#059669;flex:0 0 auto;">ОК</button></div>` : ''}
                 ${(Number(p.jail)||0)>0 ? `<div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fff;padding:16px 14px;border-radius:12px;margin-bottom:10px;text-align:center;border:2px solid #fca5a5;box-shadow:0 0 22px rgba(239,68,68,.45);">
                     <div style="font-size:22px;font-weight:900;letter-spacing:1px;">🔒 ТЫ В ТЮРЬМЕ</div>
-                    <div style="font-size:13px;margin:6px 0 6px;">Сидишь ещё <b>${p.jail}</b> ход(ов). Работают только <b style="color:#c4b5fd;">🎰 КАЗИНО</b> и <b style="color:#6ee7b7;">📈 ПРОДАЖА АКЦИЙ</b>. Остальное закрыто — жди, пока ходы дойдут до тебя.</div>
+                    <div style="font-size:13px;margin:6px 0 6px;">Сидишь ещё <b>${p.jail}</b> ход(ов). Клетки закрыты, но внутри есть дела: 🎰 казино, 📈 продажа акций, и ниже — работа, сделка, адвокат на досрочку.</div>
                     <div style="font-size:12px;margin-bottom:8px;color:#fecaca;">🔢 За игру ты сидел <b>${Number(p.jailCount)||1}</b> раз(а). Срок уходит сам, когда ходы доходят до тебя — ничего нажимать не надо. Хочешь выйти сразу — откупись.</div>
                     ${(()=>{ const up=(Number(p.otherExpPct)||0)+(Number(p.jailPress)||0), dn=Number(p.taxDiscPct)||0; if(!up&&!dn) return ''; const parts=[]; if(up) parts.push(`+${up}% к прочим расходам`); if(dn) parts.push(`−${dn}% к налогам`); return `<div style="font-size:11px;margin-bottom:10px;color:#fecaca;background:rgba(0,0,0,.22);border-radius:8px;padding:6px 8px;">🩸 Следы тюрьмы (навсегда): ${parts.join(' · ')}${(Number(p.jailPress)||0)?` <span style="color:#fca5a5;">· давление сидки +${Number(p.jailPress)||0}%</span>`:''}</div>`; })()}
                     <button onclick="jailBuyout(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;">💸 Дать на лапу (10% котла −${fmtN(Math.round(tableCashSum()*0.10))}$)</button>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px;">
+                        <button onclick="jailWork(${p.id})" class="btn" style="background:${p.jailWorkedTurn?'#374151':'#3a2f12'};color:#efd8a3;border:1px solid #6b551f;font-size:12px;padding:8px 12px;">🔨 Работа +300$</button>
+                        <button onclick="jailCellmateDeal(${p.id})" class="btn" style="background:${p.jailDealTurn?'#374151':'#3a2f12'};color:#efd8a3;border:1px solid #6b551f;font-size:12px;padding:8px 12px;">🤝 Сделка с сокамерником</button>
+                        <button onclick="jailLawyerAppeal(${p.id})" class="btn" style="background:${p.jailAppealTurn?'#374151':'#3a2f12'};color:#efd8a3;border:1px solid #6b551f;font-size:12px;padding:8px 12px;">⚖️ Адвокат — досрочка 2000$</button>
+                    </div>
+                    <div style="font-size:10px;color:#fecaca;margin-top:6px;">Одно дело за ход. 🔨 подзаработать · 🤝 рискнуть ставкой (60% навар / 40% кинут) · ⚖️ шанс выйти раньше.</div>
                 </div>` : ''}
                 <div id="turnPlate">${turnPlateHtml(p)}</div>
                 ${p.allow ? `<div style="background:linear-gradient(90deg,#065f46,#047857);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">✅ Ведущий ОТКРЫЛ клетку: ${ALLOW_LABEL[p.allow]||p.allow}. Жми её кнопку и тяни карту.</div>` : `<div style="background:#1f2937;color:#9ca3af;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-size:12px;text-align:center;">🔒 Клетки закрыты. Попал на клетку → жди, пока ведущий откроет её тебе.</div>`}
                 <button onclick="startScan()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;font-size:15px;padding:14px;margin-bottom:12px;box-shadow:0 10px 26px rgba(217,184,119,.22);">📷 Сканировать карту</button>
-                <div class="card flex-between">
+                <div class="card flex-between" style="flex-wrap:wrap;gap:8px;">
                     <div>
                         <h2 style="font-size:21px; font-weight:800;"><span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${playerColor(p.id)};border:1px solid #0f172a;box-shadow:0 0 8px ${playerColor(p.id)};vertical-align:middle;margin-right:7px;"></span>${p.name} <span style="font-size:13px;color:${playerColor(p.id)};font-weight:800;">(${playerColorName(p.id)})</span></h2>
                         <p style="color:#10b981; font-weight:bold; font-size:13px; margin-top:3px;">${p.prof.name} · Зарплата ${f.salary}$${f.skillBonus>0?` <span style="color:#a5b4fc;">(база ${p.prof.salary}$ +${Math.round(f.skillBonus*100)}% навыки)</span>`:''}</p>
@@ -14256,7 +14268,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                   return `
                 <!-- ШАПКА БЛАНКА (по макету): касса + 3 квадратика + полоса победы -->
                 <div style="background:linear-gradient(180deg,#171b23,#14171e);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:16px 18px;margin-bottom:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);">
-                  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;">
+                  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                     <div>
                       <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9c988e;font-weight:700;">💰 Касса</div>
                       <div style="font-family:ui-monospace,monospace;font-size:34px;font-weight:700;line-height:1;margin-top:5px;color:#efd8a3;">${fmtN(p.savings)}<span style="color:#d9b877;font-size:19px;margin-left:2px;">$</span></div>
@@ -15289,16 +15301,24 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmBuyLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||p.farm) return; if(p.savings<L.price){ alert('Не хватает кассы. Нужно '+L.price+'$'); return; } farmSpend(p,L.price); p.farm={land:size,barn:false,capUsed:0,courses:[],animals:[],batches:[],manager:false,buildings:{}}; state.farmTab='buy'; save(p.id); render(); alert('🌍 Куплена земля: '+L.name+'! Теперь построй амбар.'); }
         // ⬆️ Улучшить землю с ДОПЛАТОЙ РАЗНИЦЫ (Александр 27июл): всё хозяйство остаётся, просто больше слотов.
         function farmUpgradeLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||!p.farm) return; const cur=FARM_CFG.land[p.farm.land]; if(!cur){ return; } const diff=L.price-cur.price; if(diff<=0){ alert('Это не больше текущей земли.'); return; } if(p.savings<diff){ alert('Не хватает кассы. Доплата разницы: '+fmtN(diff)+'$ (было '+fmtN(cur.price)+', станет '+fmtN(L.price)+').'); return; } farmSpend(p,diff); p.farm.land=size; save(p.id); render(); alert('🌍 Земля расширена до «'+L.name+'» за доплату '+fmtN(diff)+'$! Теперь мест под строения: '+L.slots+'. Всё хозяйство на месте.'); }
-        function farmBuildStructure(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } p.farm.buildings=p.farm.buildings||{}; if(p.farm.buildings[bkey]){ alert('«'+B.name+'» уже построено.'); return; } const L=FARM_CFG.land[p.farm.land]; const built=Object.keys(p.farm.buildings).length; if(built>=L.slots){ alert('🌍 На этой земле мест под строения нет ('+built+'/'+L.slots+'). Купи землю больше — большие территории дороже.'); return; } if(p.savings<B.price){ alert('Не хватает кассы. «'+B.name+'» стоит '+B.price+'$.'); return; } farmSpend(p,B.price); p.farm.buildings[bkey]={lvl:1}; save(p.id); render(); alert('🏗️ Построено: «'+B.name+'» — вмещает '+B.cap+'. Теперь заводи туда живность.'); }
+        function farmBuildStructure(bkey){ const _sy=window.scrollY; const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } p.farm.buildings=p.farm.buildings||{}; if(p.farm.buildings[bkey]){ alert('«'+B.name+'» уже построено.'); return; } const L=FARM_CFG.land[p.farm.land]; const built=Object.keys(p.farm.buildings).length; if(built>=L.slots){ alert('🌍 На этой земле мест под строения нет ('+built+'/'+L.slots+'). Купи землю больше — большие территории дороже.'); return; } if(p.savings<B.price){ alert('Не хватает кассы. «'+B.name+'» стоит '+B.price+'$.'); return; } farmSpend(p,B.price); p.farm.buildings[bkey]={lvl:1}; save(p.id); render(); alert('🏗️ Построено: «'+B.name+'» — вмещает '+B.cap+'. Теперь заводи туда живность.'); farmKeepScroll(_sy); }
         // 🧹 Снести строение и освободить слот (Александр 27июл: не быть прикованным к первому выбору). Возврат 40%.
         function farmDemolish(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!(p.farm.buildings||{})[bkey]) return; if(farmBuildingUsed(p,bkey)>0){ alert('🚧 В «'+B.name+'» ещё есть живность. Сначала продай или зарежь всех оттуда, потом сноси.'); return; } const back=Math.round(B.price*0.4); if(!confirm('Снести «'+B.name+'»? Вернётся '+fmtN(back)+'$ (40%), место освободится.')) return; delete p.farm.buildings[bkey]; farmSpend(p,-back); save(p.id); render(); alert('🧹 «'+B.name+'» снесено. +'+fmtN(back)+'$, место свободно.'); }
         function farmUpgradeStructure(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B||!B.up) return; const b=(p.farm.buildings||{})[bkey]; if(!b){ alert('Сначала построй строение.'); return; } if(b.lvl>=2){ alert('«'+B.name+'» уже улучшено до максимума.'); return; } if(p.savings<B.up.price){ alert('Не хватает кассы. Улучшение стоит '+B.up.price+'$.'); return; } farmSpend(p,B.up.price); b.lvl=2; save(p.id); render(); alert('⬆️ «'+B.name+'» улучшено — теперь вмещает '+B.up.cap+'.'); }
         function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ alert('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); alert('🏡 Амбар построен! Выучи «Фермерство» и заводи скот.'); }
-        function farmLearn(key){ const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); alert('🎓 Изучено: '+FARM_CFG.courseName[key]+'! Ход не потрачен.'); }
-        function farmBuyAnimal(kind){ const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const B=FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(!p.farm.buildings || !p.farm.buildings[bkey]){ alert('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).'); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.'); return; } const unit=c.crop?'':'голов '; const qty=parseInt((prompt('Сколько '+unit+'«'+c.name+'» купить? Цена '+c.buy+'$.\nСвободно '+_room+' в «'+B.name+'» ('+_used+'/'+_cap+').','1')||'0'),10); if(!qty||qty<1) return; if(qty>_room){ alert('🏗️ Влезет только '+_room+' — «'+B.name+'» вмещает '+_cap+', занято '+_used+'. Возьми меньше или улучши строение.'); return; } const cost=c.buy*qty; if(p.savings<cost){ alert('Не хватает кассы. Нужно '+cost+'$ за '+qty+' '+(unit||'шт')+', есть '+Math.round(p.savings)+'$'); return; } farmSpend(p,cost); if(existing){ existing.count=(existing.count||1)+qty; } else { p.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,by:curYear(),count:qty}); } p.farm.capUsed=farmHeads(p); save(p.id); render(); const tot=((p.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; alert('✅ Куплено '+qty+' '+unit+'«'+c.name+'» (−'+cost+'$)! Всего: '+tot+'.'); }
+        function farmLearn(key){ const _sy=window.scrollY; const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); alert('🎓 Изучено: '+FARM_CFG.courseName[key]+'! Ход не потрачен.'); farmKeepScroll(_sy); }
+        function farmBuyAnimal(kind){ const _sy=window.scrollY; const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const B=FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(!p.farm.buildings || !p.farm.buildings[bkey]){ alert('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).'); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.'); return; } farmAskQty({ title:'Купить «'+c.name+'»', note:'Цена '+fmtN(c.buy)+'$/'+(c.crop?'шт':'гол')+' · свободно '+_room+' в «'+B.name+'»', def:1, min:1, max:_room, okLabel:'Купить',
+                preview:(q)=>{ const cost=c.buy*q; const pp=farmMe(); return 'Итого <b>'+fmtN(cost)+'$</b>'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
+                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=c.buy*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } const ex=(pp.farm.animals||[]).find(x=>x.kind===kind); farmSpend(pp,cost); if(ex){ ex.count=(ex.count||1)+qty; } else { pp.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,by:curYear(),count:qty}); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); const tot=((pp.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; farmToast('✅ Куплено '+qty+' «'+c.name+'» — всего '+tot); } }); }
         // 🧹 УБРАТЬ / УТИЛИЗИРОВАТЬ (Ринат 27июл): культуры и живность без убоя — выкосить/убрать, освободить место. Возврат 30% цены.
-        function farmCull(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c) return; const have=a.count||1; const per=Math.max(1,Math.round((c.buy||0)*0.3)); const word=c.crop?'выкосить/убрать':'убрать'; const qty=parseInt((prompt('Сколько «'+c.name+'» '+word+'? Есть '+have+'. Вернётся ~'+per+'$/шт (30%).',have)||'0'),10); if(!qty||qty<1) return; const n=Math.min(qty,have); const pay=per*n; farmSpend(p,-pay); a.count=have-n; if(a.count<=0){ p.farm.animals=p.farm.animals.filter(x=>x.aid!==aid); } p.farm.capUsed=farmHeads(p); save(p.id); render(); alert('🧹 Убрано '+n+' «'+c.name+'»: +'+pay+'$, место освободилось.'); }
-        function farmSlaughter(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c.meat||!a.mature) return; if(!p.farm.courses.includes('butcher')){ alert('Нужен курс «Убой (мясник)».'); return; } const have=a.count||1; const per=Math.round(c.meat*priceIdx('meat')); const qty=parseInt((prompt('Сколько голов «'+c.name+'» под нож? Есть '+have+'. Мясо ~'+per+'$/гол — пойдёт на склад.',have)||'0'),10); if(!qty||qty<1) return; const n=Math.min(qty,have); a.count=have-n; if(a.count<=0){ p.farm.animals=p.farm.animals.filter(x=>x.aid!==aid); } p.farm.stock=p.farm.stock||{}; p.farm.stock.meat=(Number(p.farm.stock.meat)||0)+c.meat*n; p.farm.meatFreshY=curYear(); p.farm.capUsed=farmHeads(p); save(p.id); render(); alert('🔪 Под нож '+n+' голов «'+c.name+'» → мясо на склад'+(p.farm.fridge?'':' ⚠️ без 🧊 холодильника протухнет за год')+'. Продай во вкладке 📦 Склад.'); }
+        function farmCull(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c) return; const have=a.count||1; const per=Math.max(1,Math.round((c.buy||0)*0.3)); const word=c.crop?'Выкосить/убрать':'Убрать';
+            farmAskQty({ title:word+' «'+c.name+'»', note:'Есть '+have+'. Вернётся ~'+fmtN(per)+'$/шт (30% цены).', def:have, min:1, max:have, okLabel:'Убрать',
+                preview:(q)=>'Вернётся <b>'+fmtN(per*q)+'$</b>',
+                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm) return; const aa=(pp.farm.animals||[]).find(x=>x.aid===aid); if(!aa) return; const hv=aa.count||1; const n=Math.min(qty,hv); const pay=per*n; farmSpend(pp,-pay); aa.count=hv-n; if(aa.count<=0){ pp.farm.animals=pp.farm.animals.filter(x=>x.aid!==aid); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); farmToast('🧹 Убрано '+n+' «'+c.name+'»: +'+fmtN(pay)+'$'); } }); }
+        function farmSlaughter(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c.meat||!a.mature) return; if(!p.farm.courses.includes('butcher')){ farmToast('Нужен курс «Убой (мясник)»'); return; } const have=a.count||1; const per=Math.round(c.meat*priceIdx('meat'));
+            farmAskQty({ title:'На убой «'+c.name+'»', note:'Есть '+have+'. Мясо ~'+fmtN(per)+'$/гол → на склад'+(p.farm.fridge?'':' (без 🧊 протухнет за год)'), def:have, min:1, max:have, okLabel:'На убой',
+                preview:(q)=>'Мяса на склад ~<b>'+fmtN(per*q)+'$</b>',
+                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm) return; const aa=(pp.farm.animals||[]).find(x=>x.aid===aid); if(!aa) return; const hv=aa.count||1; const n=Math.min(qty,hv); aa.count=hv-n; if(aa.count<=0){ pp.farm.animals=pp.farm.animals.filter(x=>x.aid!==aid); } pp.farm.stock=pp.farm.stock||{}; pp.farm.stock.meat=(Number(pp.farm.stock.meat)||0)+c.meat*n; pp.farm.meatFreshY=curYear(); pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); farmToast('🔪 Под нож '+n+' «'+c.name+'» → мясо на склад'); } }); }
         function farmBuyFridge(){ const p=farmMe(); if(!p||!p.farm) return; if(p.farm.fridge){ alert('🧊 Холодильник уже есть.'); return; } if(p.savings<FARM_CFG.fridge){ alert('Не хватает кассы. Холодильник стоит '+fmtN(FARM_CFG.fridge)+'$.'); return; } farmSpend(p,FARM_CFG.fridge); p.farm.fridge=true; save(p.id); render(); alert('🧊 Холодильник куплен! Теперь мясо на складе хранится долго и не тухнет.'); }
         function farmManager(on){ const p=farmMe(); if(!p||!p.farm) return; p.farm.manager=!!on; save(p.id); render(); }
         function farmBuyMilker(){ const p=farmMe(); if(!p||!p.farm) return; if(p.savings<FARM_CFG.milker){ alert('Не хватает кассы. Доильный аппарат стоит '+fmtN(FARM_CFG.milker)+'$.'); return; } farmSpend(p,FARM_CFG.milker); p.farm.milkers=farmMilkers(p)+1; p.farm.milker=true; save(p.id); render(); alert('🥛 Куплен доильный аппарат! Нужен по одному на каждую корову — сейчас аппаратов: '+farmMilkers(p)+', коров: '+farmCowHeads(p)+'.'); }
@@ -15329,13 +15349,45 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmSellAllStock(){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; let total=0, any=false; for(const prod in FARM_STOCK_LABELS){ const units=Math.floor(Number(st[prod])||0); if(units>0){ total+=Math.round(units*priceIdx(prod)); st[prod]=0; any=true; } } if(!any){ alert('Склад пуст — продавать нечего.'); return; } p.farm.meatFreshY=null; farmSpend(p,-total); save(p.id); render(); alert('💰 Продан весь склад — +'+fmtN(total)+'$ в кассу!'); }
         // 🌾 ОКНО КОЛИЧЕСТВА корма (Ринат 28июл): впиши, сколько купить; видно цену и на сколько лет хватит.
         function farmCloseModal(){ const m=document.getElementById('farmModal'); if(m) m.remove(); }
+        // 🩹 (Ринат 28июл «покупаешь животных — кидает вверх»): нативные prompt/alert сбрасывают прокрутку,
+        // а render запоминает уже верх. Запоминаем позицию ДО окна и упорно держим её после, ~10 кадров.
+        function farmKeepScroll(sy){ let n=0; const f=()=>{ if(window.scrollY!==sy) window.scrollTo(0,sy); if(++n<10) requestAnimationFrame(f); }; requestAnimationFrame(f); }
+        // 🔔 внутренний тост вместо нативного alert — не дёргает страницу
+        function farmToast(msg){ const t=document.createElement('div'); t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:9500;background:#14251b;border:1px solid #234436;color:#d1fae5;padding:10px 16px;border-radius:12px;font-weight:700;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:90vw;text-align:center;'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>{ t.style.transition='opacity .4s'; t.style.opacity='0'; setTimeout(()=>t.remove(),400); }, 1800); }
+        // 🪟 внутреннее окно ввода КОЛИЧЕСТВА (замена нативного prompt — без прыжка страницы)
+        function farmAskQty(o){
+            farmCloseModal();
+            window._fq={ ok:o.onOk||null, prev:o.preview||null, min:(o.min||1), max:(o.max||999999) };
+            const def=Math.max(window._fq.min, Math.min(window._fq.max, o.def||1));
+            const step=(window._fq.max>=20)?10:1;
+            const m=document.createElement('div'); m.id='farmModal';
+            m.style.cssText='position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:20px;';
+            m.innerHTML=`<div style="background:#14171e;border:1px solid #3a6ea5;border-radius:14px;max-width:340px;width:100%;padding:18px;box-sizing:border-box;">
+                <div style="font-weight:800;font-size:16px;margin-bottom:4px;">${o.title||''}</div>
+                <div style="font-size:12px;color:#9ca3af;margin-bottom:12px;">${o.note||''}</div>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+                    <button onclick="farmQtyStep(${-step})" class="btn btn-gray" style="padding:8px 12px;flex:0 0 auto;">−${step}</button>
+                    <input id="farmQtyInput" type="number" min="${window._fq.min}" value="${def}" oninput="farmQtyPreview()" style="flex:1;min-width:0;width:100%;text-align:center;font-size:18px;font-weight:800;padding:8px;border-radius:8px;border:1px solid #3a6ea5;background:#0d1016;color:#f3efe6;box-sizing:border-box;">
+                    <button onclick="farmQtyStep(${step})" class="btn btn-gray" style="padding:8px 12px;flex:0 0 auto;">+${step}</button>
+                </div>
+                <div id="farmQtyPrev" style="font-size:13px;color:#fcd34d;margin-bottom:14px;min-height:18px;"></div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="farmCloseModal()" class="btn btn-gray" style="flex:1;">Отмена</button>
+                    <button onclick="farmQtyConfirm()" class="btn btn-amber" style="flex:2;">${o.okLabel||'ОК'}</button>
+                </div></div>`;
+            document.body.appendChild(m); farmQtyPreview();
+        }
+        function farmQtyClamp(){ const i=document.getElementById('farmQtyInput'); const f=window._fq||{min:1,max:999999}; if(!i) return f.min; return Math.max(f.min, Math.min(f.max, parseInt(i.value,10)||0)); }
+        function farmQtyStep(d){ const i=document.getElementById('farmQtyInput'); if(!i) return; const f=window._fq||{min:1,max:999999}; i.value=Math.max(f.min, Math.min(f.max, (parseInt(i.value,10)||0)+d)); farmQtyPreview(); }
+        function farmQtyPreview(){ const o=document.getElementById('farmQtyPrev'); const f=window._fq; if(!o||!f) return; o.innerHTML = f.prev ? f.prev(farmQtyClamp()) : ''; }
+        function farmQtyConfirm(){ const f=window._fq; const q=farmQtyClamp(); farmCloseModal(); if(f&&f.ok) f.ok(q); }
         function farmFeedNeed(p,ft){ const use=(FARM_CFG.usePerHeadYr||12); let need=0; for(const a of ((p&&p.farm&&p.farm.animals)||[])){ if(farmFeedType(a.kind)===ft) need+=(Number(a.count)||1)*use; } return need; }
         function farmFeedBuyWindow(ft){ const p=farmMe(); if(!p||!p.farm) return; const T=(FARM_CFG.feedTypes||{})[ft]; if(!T) return; const unit=T.bundle.cost/T.bundle.qty; const need=farmFeedNeed(p,ft); const have=Math.floor(Number((p.farm.feedStores||{})[ft])||0); const def=Math.max(T.bundle.qty, Math.max(0,Math.ceil(need)-have)||T.bundle.qty); const step=Math.max(10,Math.round(T.bundle.qty/2)); farmCloseModal(); const m=document.createElement('div'); m.id='farmModal'; m.style.cssText='position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:20px;'; m.innerHTML=`<div style="background:#14171e;border:1px solid #3a6ea5;border-radius:14px;max-width:340px;width:100%;padding:18px;">
                 <div style="font-weight:800;font-size:16px;margin-bottom:4px;">${T.name} — купить корм</div>
                 <div style="font-size:12px;color:#9ca3af;margin-bottom:12px;">Цена ${unit.toFixed(2)}$/шт. Запас ${fmtN(have)} · нужно ~${Math.round(need)}/год. Впиши, сколько взять.</div>
                 <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
                     <button onclick="farmFeedQtyStep('${ft}',${-step})" class="btn btn-gray" style="padding:8px 12px;">−${step}</button>
-                    <input id="farmQtyInput" type="number" min="1" value="${def}" oninput="farmFeedQtyPreview('${ft}')" style="flex:1;text-align:center;font-size:18px;font-weight:800;padding:8px;border-radius:8px;border:1px solid #3a6ea5;background:#0d1016;color:#f3efe6;">
+                    <input id="farmQtyInput" type="number" min="1" value="${def}" oninput="farmFeedQtyPreview('${ft}')" style="flex:1;min-width:0;width:100%;text-align:center;font-size:18px;font-weight:800;padding:8px;border-radius:8px;border:1px solid #3a6ea5;background:#0d1016;color:#f3efe6;">
                     <button onclick="farmFeedQtyStep('${ft}',${step})" class="btn btn-gray" style="padding:8px 12px;">+${step}</button>
                 </div>
                 <div id="farmQtyPrev" style="font-size:13px;color:#fcd34d;margin-bottom:14px;"></div>
@@ -17857,7 +17909,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const JAIL_FIGHT_REWARD   = 5;    // «продавил силой» (1 из 4) → −% к налогам навсегда
         const JAIL_FIGHT_CARDS    = 4;    // тянем 1 из 4: 3 ломают, 1 победная
         function jailSubmit(id){
-            state.players = state.players.map(x => x.id==id ? {...x, otherExpPct:(Number(x.otherExpPct)||0)+JAIL_SUBMIT_PENALTY, jailPending:'submit'} : x);
+            state.players = state.players.map(x => x.id==id ? {...x, otherExpPct:(Number(x.otherExpPct)||0)+JAIL_SUBMIT_PENALTY, jailPending:'submit', arrestStance:'broken'} : x);
             save(id); render();
         }
         function jailFight(id){
@@ -17869,21 +17921,117 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             state.players = state.players.map(x => {
                 if(x.id!=id) return x;
                 return won
-                    ? {...x, taxDiscPct:(Number(x.taxDiscPct)||0)+JAIL_FIGHT_REWARD, jailPending:'won'}
-                    : {...x, otherExpPct:(Number(x.otherExpPct)||0)+JAIL_SUBMIT_PENALTY, jailPending:'lost'};
+                    ? {...x, taxDiscPct:(Number(x.taxDiscPct)||0)+JAIL_FIGHT_REWARD, jailPending:'won', arrestStance:'won'}
+                    : {...x, otherExpPct:(Number(x.otherExpPct)||0)+JAIL_SUBMIT_PENALTY, jailPending:'lost', arrestStance:'broken'};
             });
             save(id); render();
         }
-        // экран результата закрывает сам игрок — карту надо разглядеть
+        // экран результата закрывает сам игрок — карту надо разглядеть; дальше СУД (тюрьма 2.0)
         function jailResultClose(id){
-            state.players = state.players.map(x => x.id==id ? {...x, jailPending:null} : x);
+            state.players = state.players.map(x => x.id==id ? {...x, jailPending:'trial', trialLuck:(Math.floor(Math.random()*3)-1), trialLawyer:null} : x);
             save(id); render();
         }
+        // ─── ⚖️ СУД (тюрьма 2.0): приговор от репутации + поведения на аресте + удачи + адвоката ───
+        const JAIL_LAWYER_TRIAL_MIN = 2000;   // адвокат на суде: max(2000, 8% кассы)
+        function jailSentence(p){
+            const rep = Number(p.repScore)||0;
+            let turns = rep>=40 ? 2 : (rep>=-20 ? 3 : (rep>=-60 ? 4 : 5));   // база по репутации
+            if(p.arrestStance==='won') turns -= 1;         // продавил — судья уважает
+            else if(p.arrestStance==='broken') turns -= 1; // сломлен — судья мягче сроком (клеймо уже висит)
+            turns += (Number(p.trialLuck)||0);             // карта удачи ±1
+            let fine = Math.round((Number(p.savings)||0)*0.06 * (1 + Math.max(0,-rep)/100));
+            fine = Math.max(500, fine);
+            if(p.trialLawyer==='win'){ turns -= 1; fine = Math.round(fine*0.5); }   // адвокат помог
+            turns = Math.max(1, Math.min(6, turns));
+            return { turns, fine };
+        }
+        function jailTrialLawyerFee(p){ return Math.max(JAIL_LAWYER_TRIAL_MIN, Math.round((Number(p.savings)||0)*0.08)); }
+        // после отправки авторитетного срока флаг снимаем локально — чтобы следующий save не перебивал серверный декремент
+        function jailStripWrite(id){ state.players = state.players.map(x=> (x.id==id && x._jailWrite) ? (function(){var c={...x}; delete c._jailWrite; return c;})() : x); }
+        function jailTrialHireLawyer(id){
+            const p=state.players.find(x=>x.id==id); if(!p) return;
+            if(p.trialLawyer){ return; }
+            const fee=jailTrialLawyerFee(p);
+            if((Number(p.savings)||0)<fee){ alert('Не хватает кассы на адвоката: нужно '+fmtN(fee)+'$.'); return; }
+            const win = Math.random()<0.6;   // 60% адвокат помогает
+            state.players = state.players.map(x=> x.id==id ? {...x, savings:Math.round(((Number(x.savings)||0)-fee)*100)/100, trialLawyer:(win?'win':'fail')} : x);
+            save(id); render();
+        }
+        function jailTrialVerdict(id){
+            const p=state.players.find(x=>x.id==id); if(!p) return;
+            const s=jailSentence(p);
+            state.players = state.players.map(x=>{
+                if(x.id!=id) return x;
+                const fine=Math.min(s.fine, Number(x.savings)||0);          // спишем сколько есть в кассе
+                return {...x, jail:s.turns, jailPending:null, _jailWrite:true,
+                        savings:Math.round(((Number(x.savings)||0)-fine)*100)/100,
+                        repScore:(Number(x.repScore)||0)-5,                 // отсидка бьёт репутацию
+                        trialLuck:null, trialLawyer:null, arrestStance:null,
+                        notify:'⚖️ Приговор: '+s.turns+' ход(ов), штраф '+fmtN(fine)+'$. Сиди и выбирай дела внутри.'};
+            });
+            save(id); jailStripWrite(id); render();
+        }
+        // ─── 🏭 ДЕЛА В ТЮРЬМЕ: работа, сделка с сокамерником, адвокат на досрочку ───
+        function jailWork(id){
+            const p=state.players.find(x=>x.id==id); if(!p||(Number(p.jail)||0)<=0) return;
+            if(p.jailWorkedTurn){ alert('🔨 В этот ход ты уже отработал. Дождись следующего.'); return; }
+            state.players = state.players.map(x=> x.id==id ? {...x, savings:Math.round(((Number(x.savings)||0)+300)*100)/100, jailWorkedTurn:true} : x);
+            save(id); render(); alert('🔨 Работа на зоне: +300$.');
+        }
+        function jailCellmateDeal(id){
+            const p=state.players.find(x=>x.id==id); if(!p||(Number(p.jail)||0)<=0) return;
+            if(p.jailDealTurn){ alert('🤝 В этот ход сделка уже была. Дождись следующего.'); return; }
+            const stake=parseInt((prompt('🤝 Сделка с сокамерником. Сколько ставишь? (60% — навар +75%, 40% — кинут). Касса '+fmtN(Math.round(Number(p.savings)||0))+'$.','500')||'0'),10);
+            if(!stake||stake<1) return;
+            if(stake>(Number(p.savings)||0)){ alert('Столько нет в кассе.'); return; }
+            const win=Math.random()<0.6;
+            const delta = win ? Math.round(stake*0.75) : -stake;
+            state.players = state.players.map(x=> x.id==id ? {...x, savings:Math.round(((Number(x.savings)||0)+delta)*100)/100, jailDealTurn:true} : x);
+            save(id); render();
+            alert(win ? ('🤝 Сокамерник не подвёл — навар +'+fmtN(Math.round(stake*0.75))+'$!') : ('🤝 Тебя кинули — потерял '+fmtN(stake)+'$.'));
+        }
+        function jailLawyerAppeal(id){
+            const p=state.players.find(x=>x.id==id); if(!p||(Number(p.jail)||0)<=0) return;
+            if(p.jailAppealTurn){ alert('⚖️ В этот ход адвокат уже подавал. Дождись следующего.'); return; }
+            const fee=2000;
+            if((Number(p.savings)||0)<fee){ alert('Не хватает на адвоката: нужно '+fmtN(fee)+'$.'); return; }
+            const win=Math.random()<0.4;   // 40% на досрочку
+            state.players = state.players.map(x=>{
+                if(x.id!=id) return x;
+                const nj = win ? Math.max(0,(Number(x.jail)||0)-1) : (Number(x.jail)||0);
+                return {...x, savings:Math.round(((Number(x.savings)||0)-fee)*100)/100, jail:nj, _jailWrite:true, jailAppealTurn:true};
+            });
+            save(id); jailStripWrite(id); render();
+            alert(win ? '⚖️ Адвокат добился досрочки — минус ход!' : '⚖️ Суд отказал. Деньги ушли, срок прежний.');
+        }
         function renderJailModal(p){
+            // ── ⚖️ СУД: судья назначает срок и штраф (тюрьма 2.0) ──
+            if(p.jailPending==='trial'){
+                const s=jailSentence(p); const fee=jailTrialLawyerFee(p);
+                const rep=Number(p.repScore)||0;
+                const repTxt = rep>=40?'чистая — судья мягче':(rep>=-20?'обычная':(rep>=-60?'подмочена — жёстче':'на дне — по полной'));
+                const stanceTxt = p.arrestStance==='won'?'ты продавил на аресте — судья уважает (−1 ход)':(p.arrestStance==='broken'?'тебя сломали — судья добьёт мягче сроком':'');
+                const lawyerBlock = p.trialLawyer==='win'
+                    ? `<div style="color:#6ee7b7;font-size:13px;margin:6px 0;">🕴️ Адвокат отработал: −1 ход и −50% штрафа.</div>`
+                    : (p.trialLawyer==='fail'
+                        ? `<div style="color:#fca5a5;font-size:13px;margin:6px 0;">🕴️ Адвокат не смог — деньги ушли впустую.</div>`
+                        : `<button onclick="jailTrialHireLawyer(${p.id})" class="btn" style="background:#1f2937;color:#e5e7eb;border:1px solid #b98a3e;font-weight:800;padding:10px 18px;margin:6px 0;">🕴️ Нанять адвоката · ${fmtN(fee)}$</button>`);
+                return `<div style="position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 50% 28%,#14100a,#08080c);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;text-align:center;overflow:auto;">
+                    <img src="cat_imgs/jail_court.webp" alt="" style="width:min(64vw,240px);aspect-ratio:1;object-fit:cover;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.75),0 0 30px -6px rgba(217,184,119,.4);">
+                    <div style="font-family:Georgia,serif;font-size:26px;font-weight:800;letter-spacing:.06em;margin:12px 0 4px;color:#efd8a3;">⚖️ СУД</div>
+                    <p style="max-width:440px;color:#d8c39a;font-size:13px;line-height:1.5;margin:0 0 8px;">Репутация: <b>${repTxt}</b>.${stanceTxt?` ${stanceTxt}.`:''}</p>
+                    <div style="background:rgba(0,0,0,.3);border:1px solid var(--lx-gold-ln);border-radius:12px;padding:12px 16px;margin:6px 0;">
+                        <div style="font-size:15px;color:#f3efe6;">Приговор: <b style="color:#fbbf24;">${s.turns}</b> ход(ов) · штраф <b style="color:#fca5a5;">${fmtN(s.fine)}$</b></div>
+                    </div>
+                    ${lawyerBlock}
+                    <button onclick="jailTrialVerdict(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;padding:12px 32px;font-size:15px;margin-top:8px;">Выслушать приговор</button>
+                    <p style="color:#8a7f7f;font-size:11px;margin-top:14px;">Штраф спишется сразу; не хватит — остаток в долг. Потом сидишь и выбираешь дела внутри.</p>
+                </div>`;
+            }
             // ── результат: карта переворачивается и показывает, что с тобой сделали ──
             if(p.jailPending==='won' || p.jailPending==='lost' || p.jailPending==='submit'){
                 const won = p.jailPending==='won';
-                const img = won ? JAIL_IMG_WON : JAIL_IMG_LOST;
+                const img = won ? 'cat_imgs/jail_won.webp' : 'cat_imgs/jail_lost.webp';   // 🎨 новые карты исхода
                 const ttl = won ? 'ТЫ ДОГОВОРИЛСЯ' : 'ТЕБЯ ЗАЖАЛИ';
                 const txt = won
                     ? 'Один шанс из четырёх — и он твой. Ты не дрогнул, не полез в драку и не стал просить. Тебя услышали и отступили: <b style="color:#6ee7b7;">−'+JAIL_FIGHT_REWARD+'% к налогам НАВСЕГДА</b>.'
