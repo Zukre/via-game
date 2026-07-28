@@ -14,6 +14,7 @@ VIA — локальный сервер синхронизации.
 """
 import http.server
 import json
+import math
 import os
 import queue
 import random
@@ -521,17 +522,21 @@ CREATION_STEPS = {
 # с 5-го на 40%, с 9-го на 80%. Смысл: вход дёшев для бедного — лестница жива, — а собрать
 # всё подряд дорого, и человеку приходится ВЫБИРАТЬ, кем становиться.
 def train_mult(owned):
-    if owned <= 0:
-        return 1.0
-    if owned <= 3:
-        return 1.2
-    if owned <= 7:
-        return 1.4
-    return 1.8
+    # каждый купленный навык +20% к цене следующего (растёт непрерывно, до ×5). Ринат 28июл
+    return min(5.0, 1.0 + max(0, owned) * 0.2)
 
 
 def train_price(key, owned):
     return round(SELF_TRAININGS[key]['cost'] * train_mult(owned))
+
+
+def create_mult(made):
+    # каждое уже созданное дело +20% к цене следующего (растёт непрерывно, до ×5). Ринат 28июл
+    return min(5.0, 1.0 + max(0, made) * 0.2)
+
+
+def create_price(key, made):
+    return round(CREATIONS[key]['cost'] * create_mult(made))
 
 
 # ═══ 💎 КОЛЛЕКЦИЯ И АУКЦИОН (Ринат 23июл, спека VIA_COLLECTION_AUCTION_SPEC_2026_07_23.md) ═══
@@ -637,8 +642,13 @@ FARM_MALES = {'bull': 'cow', 'rooster': 'hen', 'drake': 'duck', 'stallion': 'hor
 FARM_BREED_CAP = 10                  # максимум голов в одном загоне (стадо в слоте)
 FARM_AGE_CAP = {'cheese': 10, 'wine': 15, 'whiskey': 20}   # потолок выдержки, лет
 FARM_PRODS = ['milk', 'eggs', 'honey', 'wool', 'feath', 'fish', 'meat', 'flowers', 'fruits', 'micro', 'fert']
-FARM_DRIFT = 0.03                    # +3%/год средний дрейф цены продукта (жизнь дорожает)
-FARM_VOL = 0.15                      # ±15% волатильность/год (живой рынок качается)
+# 📈 РЕАЛИСТИЧНЫЕ цены продуктов (Ринат 28июл: было слишком круто — блуждание ±5%/мес компаундило вверх).
+# Модель: медленный тренд ~3%/год (как еда дорожает в жизни) + мягкие циклы у каждого продукта свой пик,
+# с возвратом к тренду — цена качается около реального тренда, а не убегает.
+FARM_DRIFT = 0.03                    # +3%/год реалистичный рост цен на продукты
+FARM_CYCLE_AMP = 0.10                # ±10% мягкие циклы вокруг тренда (было ±15% случайного блуждания)
+FARM_REVERT = 0.30                   # сила возврата к целевой цене (чтобы не убегало)
+FARM_NOISE = 0.008                   # крошечный месячный шум
 FARM_TICK_SECONDS = 15               # реальных секунд на 1 МЕСЯЦ фермы (тюнинг темпа: меньше = быстрее видно рост)
 
 
@@ -647,10 +657,17 @@ def farm_tick():
     чтобы скот рос ВСЕГДА, в любой игре. Взросление, разведение, выдержка, дрейф цен."""
     mk = DATA.setdefault('market', {})
     fp = mk.setdefault('farm', {})
-    for k in FARM_PRODS:
-        # месячный дрейф = годовой/12 + мелкая месячная вола
-        idx = fp.get(k, 1.0) * (1 + FARM_DRIFT / 12 + random.uniform(-FARM_VOL / 3, FARM_VOL / 3))
-        fp[k] = round(max(0.3, idx), 3)          # цена не падает ниже 0.3× (пол)
+    month = int(fp.get('_month', 0)) + 1
+    trend = (1 + FARM_DRIFT) ** (min(month, 360) / 12.0)    # медленный рост, но потолок ~30 лет (≈2.4×) — не убегает на долгом сервере
+    for i, k in enumerate(FARM_PRODS):
+        phase = i * 0.9                            # у каждого продукта свой пик в своё время
+        cycle = 1 + FARM_CYCLE_AMP * math.sin(month * 0.12 + phase)   # мягкий цикл, период ~4 года
+        target = trend * cycle
+        cur = fp.get(k, 1.0)
+        idx = cur + (target - cur) * FARM_REVERT + random.uniform(-FARM_NOISE, FARM_NOISE)
+        # держим в реалистичном коридоре вокруг тренда — не убегает
+        fp[k] = round(min(trend * 1.3, max(trend * 0.7, idx)), 3)
+    fp['_month'] = month
     for p in DATA.get('players', []):
         f = p.get('farm')
         if not f:
@@ -1539,8 +1556,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         if any(c.get('key') == key for c in pl['creations']):
                             self._send_json({'ok': False, 'reason': 'already'}, 200)
                             return
-                        if float(pl.get('savings') or 0) < cr['cost']:
-                            self._send_json({'ok': False, 'reason': 'not_enough', 'cost': cr['cost']}, 200)
+                        price = create_price(key, len(pl['creations']))   # прогрессивная цена: чем больше создал, тем дороже
+                        if float(pl.get('savings') or 0) < price:
+                            self._send_json({'ok': False, 'reason': 'not_enough', 'cost': price}, 200)
                             return
 
                         # ── КОЛОДА 7 на 3. Каждый навык-усилитель меняет провал на успех.
@@ -1552,7 +1570,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         deck = ['fail'] * fails + ['win'] * wins
                         drawn = random.choice(deck)
 
-                        pl['savings'] = round(float(pl.get('savings') or 0) - cr['cost'], 2)
+                        pl['savings'] = round(float(pl.get('savings') or 0) - price, 2)
                         won = (drawn == 'win')
                         if won:
                             pl.setdefault('assets', []).append({
@@ -1562,7 +1580,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                 'type': 'BUSINESS',
                                 'title': cr['name'],
                                 't': cr['name'],
-                                'price': cr['cost'],
+                                'price': price,
                                 'cf': cr['cf'],
                                 'grow': cr.get('grow', 0),  # блог: +150 каждый круг
                             })
