@@ -10587,6 +10587,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // 🏗️ СОДЕРЖАНИЕ БОЛЬШОЙ ФЕРМЫ (Ринат 27июл): всё тянет ПАССИВ. Большая земля — дороже водопровод.
             waterMainByLand: {small:1000, mid:2000, big:5000, large:10000, mega:25000, giga:60000, titan:150000},  // 🚰 провести воду (разово)
             waterPerHeadMo: 3,                // 🚰 водопровод: авто-вода $/гол/мес (пассив). Взамен ручной воды и падежа по воде.
+            waterMainBaseMo: 300,             // 🚰 базовая плата за водопровод/мес — сама инфраструктура стоит денег, даже без скота (Ринат 29июл)
+            autoFeedBaseMo: 250,              // 🌾 базовая плата за авто-корм/мес (Ринат 29июл: подключил разом — плати ежемесячно)
+            vetBaseMo: 200,                   // 💉 базовая плата за ветслужбу/мес (Ринат 29июл)
             autoFeedPerHeadMo: 6,             // 🌾 авто-корм $/гол/мес (пассив, дороже ручного — но без падежа по корму).
             workerWage: 500,                  // 👷 зарплата фермера/мес (пассив)
             selfHeads: 50,                    // 👤 столько голов тянешь САМ — маленькой ферме работники НЕ нужны
@@ -10823,10 +10826,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmHeads(p){ return (p && p.farm && Array.isArray(p.farm.animals)) ? p.farm.animals.reduce((s,a)=>s+(Number(a.count)||1),0) : 0; }
         function farmFeed(p){ return (p && p.farm) ? farmHeads(p)*(FARM_CFG.feed||0) : 0; }
         // 🏗️ Содержание большой фермы — всё тянет пассив (Ринат 27июл)
-        function farmWaterCost(p){ return (p && p.farm && p.farm.waterMain) ? farmHeads(p)*(FARM_CFG.waterPerHeadMo||0) : 0; }
-        function farmAutoFeedCost(p){ return (p && p.farm && p.farm.autoFeed) ? farmHeads(p)*(FARM_CFG.autoFeedPerHeadMo||0) : 0; }
+        function farmWaterCost(p){ return (p && p.farm && p.farm.waterMain) ? (FARM_CFG.waterMainBaseMo||0)+farmHeads(p)*(FARM_CFG.waterPerHeadMo||0) : 0; }   // база + за голову
+        function farmAutoFeedCost(p){ return (p && p.farm && p.farm.autoFeed) ? (FARM_CFG.autoFeedBaseMo||0)+farmHeads(p)*(FARM_CFG.autoFeedPerHeadMo||0) : 0; }
         function farmSelfCap(p){ return (FARM_CFG.selfHeads||50) + ((p&&p.farm&&p.farm.tractor)?(FARM_CFG.tractorSelfBoost||0):0); }   // 🚜 трактор поднимает «сам тянешь»
-        function farmVetCost(p){ return (p && p.farm && p.farm.vaccinated) ? farmHeads(p)*(FARM_CFG.vetPerHeadMo||0) : 0; }
+        function farmVetCost(p){ return (p && p.farm && p.farm.vaccinated) ? (FARM_CFG.vetBaseMo||0)+farmHeads(p)*(FARM_CFG.vetPerHeadMo||0) : 0; }
         // 👔👷 ИЕРАРХИЯ ТРУДА (Ринат 27июл): фермеры обслуживают животных, управляющие — фермеров (людей). Ты сам = первый управляющий.
         function farmMgrCount(p){ return (p&&p.farm)?(Number(p.farm.managers)||0):0; }         // НАНЯТЫЕ управляющие
         function farmEffManagers(p){ return 1 + farmMgrCount(p); }                              // +ты сам
@@ -14232,18 +14235,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                       плюсе, а потом почему-то нет. Множителей эпохи он не видит никогда. */''}
                 ${(state.world && state.world.eraName) ? `<div class="era-line">Эпоха: <b>${state.world.eraName}</b></div>` : ''}
                 ${p.notify ? `<div style="background:linear-gradient(90deg,#10b981,#059669);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>${p.notify}</span><button onclick="clearNotify()" class="btn" style="background:#fff;color:#059669;flex:0 0 auto;">ОК</button></div>` : ''}
-                ${(Number(p.jail)||0)>0 ? `<div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fff;padding:16px 14px;border-radius:12px;margin-bottom:10px;text-align:center;border:2px solid #fca5a5;box-shadow:0 0 22px rgba(239,68,68,.45);">
-                    <div style="font-size:22px;font-weight:900;letter-spacing:1px;">🔒 ТЫ В ТЮРЬМЕ</div>
-                    <div style="font-size:13px;margin:6px 0 6px;">Сидишь ещё <b>${p.jail}</b> ход(ов). Клетки закрыты, но внутри есть дела: 🎰 казино, 📈 продажа акций, и ниже — работа, сделка, адвокат на досрочку.</div>
-                    <div style="font-size:12px;margin-bottom:8px;color:#fecaca;">🔢 За игру ты сидел <b>${Number(p.jailCount)||1}</b> раз(а). Срок уходит сам, когда ходы доходят до тебя — ничего нажимать не надо. Хочешь выйти сразу — откупись.</div>
-                    ${(()=>{ const up=(Number(p.otherExpPct)||0)+(Number(p.jailPress)||0), dn=Number(p.taxDiscPct)||0; if(!up&&!dn) return ''; const parts=[]; if(up) parts.push(`+${up}% к прочим расходам`); if(dn) parts.push(`−${dn}% к налогам`); return `<div style="font-size:11px;margin-bottom:10px;color:#fecaca;background:rgba(0,0,0,.22);border-radius:8px;padding:6px 8px;">🩸 Следы тюрьмы (навсегда): ${parts.join(' · ')}${(Number(p.jailPress)||0)?` <span style="color:#fca5a5;">· давление сидки +${Number(p.jailPress)||0}%</span>`:''}</div>`; })()}
-                    <button onclick="jailBuyout(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;">💸 Дать на лапу (10% котла −${fmtN(Math.round(tableCashSum()*0.10))}$)</button>
+                ${(Number(p.jail)||0)>0 ? `<div style="background:linear-gradient(135deg,#241a10,#181310);color:#efe3cf;padding:14px;border-radius:14px;margin-bottom:10px;text-align:center;border:1px solid var(--lx-gold-ln);box-shadow:0 10px 30px rgba(0,0,0,.5);">
+                    <img src="cat_imgs/jail_cell.webp" alt="" style="width:100%;max-width:280px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;margin-bottom:10px;background:#0a0806;" onerror="this.style.display='none'">
+                    <div style="font-size:21px;font-weight:900;letter-spacing:.5px;color:#efd8a3;">🔒 Ты в камере</div>
+                    <div style="font-size:13px;margin:6px 0;color:#d8c9ad;">Сидишь ещё <b style="color:#fbbf24;">${p.jail}</b> ход(ов). Клетки закрыты, но внутри есть дела: 🎰 казино, 📈 продажа акций, и ниже — работа, сделка, адвокат на досрочку.</div>
+                    <div style="font-size:12px;margin-bottom:8px;color:#b9ab8f;">🔢 За игру ты сидел <b>${Number(p.jailCount)||1}</b> раз(а). Срок уходит сам, когда ход доходит до тебя — нажимать ничего не надо. Хочешь выйти сразу — откупись.</div>
+                    ${(()=>{ const up=(Number(p.otherExpPct)||0)+(Number(p.jailPress)||0), dn=Number(p.taxDiscPct)||0; if(!up&&!dn) return ''; const parts=[]; if(up) parts.push(`+${up}% к прочим расходам`); if(dn) parts.push(`−${dn}% к налогам`); return `<div style="font-size:11px;margin-bottom:10px;color:#c9b48f;background:rgba(0,0,0,.28);border-radius:8px;padding:6px 8px;">🩸 Следы тюрьмы (навсегда): ${parts.join(' · ')}${(Number(p.jailPress)||0)?` <span style="color:#d8a06a;">· давление сидки +${Number(p.jailPress)||0}%</span>`:''}</div>`; })()}
+                    <button onclick="jailBuyout(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;">💸 Дать на лапу (20% кассы −${fmtN(jailBuyoutCost(p))}$)</button>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px;">
                         <button onclick="jailWork(${p.id})" class="btn" style="background:${p.jailWorkedTurn?'#374151':'#3a2f12'};color:#efd8a3;border:1px solid #6b551f;font-size:12px;padding:8px 12px;">🔨 Работа +300$</button>
                         <button onclick="jailCellmateDeal(${p.id})" class="btn" style="background:${p.jailDealTurn?'#374151':'#3a2f12'};color:#efd8a3;border:1px solid #6b551f;font-size:12px;padding:8px 12px;">🤝 Сделка с сокамерником</button>
                         <button onclick="jailLawyerAppeal(${p.id})" class="btn" style="background:${p.jailAppealTurn?'#374151':'#3a2f12'};color:#efd8a3;border:1px solid #6b551f;font-size:12px;padding:8px 12px;">⚖️ Адвокат — досрочка 2000$</button>
                     </div>
-                    <div style="font-size:10px;color:#fecaca;margin-top:6px;">Одно дело за ход. 🔨 подзаработать · 🤝 рискнуть ставкой (60% навар / 40% кинут) · ⚖️ шанс выйти раньше.</div>
+                    <div style="font-size:10px;color:#b9ab8f;margin-top:6px;">Одно дело за ход. 🔨 подзаработать · 🤝 рискнуть ставкой (60% навар / 40% кинут) · ⚖️ шанс выйти раньше.</div>
                 </div>` : ''}
                 <div id="turnPlate">${turnPlateHtml(p)}</div>
                 ${p.allow ? `<div style="background:linear-gradient(90deg,#065f46,#047857);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">✅ Ведущий ОТКРЫЛ клетку: ${ALLOW_LABEL[p.allow]||p.allow}. Жми её кнопку и тяни карту.</div>` : `<div style="background:#1f2937;color:#9ca3af;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-size:12px;text-align:center;">🔒 Клетки закрыты. Попал на клетку → жди, пока ведущий откроет её тебе.</div>`}
@@ -14252,7 +14256,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div>
                         <h2 style="font-size:21px; font-weight:800;"><span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${playerColor(p.id)};border:1px solid #0f172a;box-shadow:0 0 8px ${playerColor(p.id)};vertical-align:middle;margin-right:7px;"></span>${p.name} <span style="font-size:13px;color:${playerColor(p.id)};font-weight:800;">(${playerColorName(p.id)})</span></h2>
                         <p style="color:#10b981; font-weight:bold; font-size:13px; margin-top:3px;">${p.prof.name} · Зарплата ${f.salary}$${f.skillBonus>0?` <span style="color:#a5b4fc;">(база ${p.prof.salary}$ +${Math.round(f.skillBonus*100)}% навыки)</span>`:''}</p>
-                        ${(()=>{ const rk=careerRank(p), lv=careerLvl(p), nx=CAREER_LADDER[lv+1]; return `<p style="font-size:12px;color:#cdc8bd;margin-top:3px;">🪜 <b>${rk.name}</b>${lv>0?` · <span style="color:#a5b4fc;">${rk.bonus}</span>`:''}${nx?` <button onclick="careerPromote()" class="btn" style="background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;font-size:11px;padding:3px 9px;margin-left:4px;white-space:nowrap;">⬆️ ${nx.name.replace(/^[^ ]+ /,'')} · ${fmtN(nx.cost)}$ · ${nx.skills}🎓</button>`:` <span style="color:#efd8a3;">— вершина 👑</span>`}</p>`; })()}
+                        ${(()=>{ const rk=careerRank(p), lv=careerLvl(p), nx=CAREER_LADDER[lv+1]; return `<p style="font-size:12px;color:#cdc8bd;margin-top:3px;">🪜 <b>${rk.name}</b>${lv>0?` · <span style="color:#a5b4fc;">${rk.bonus}</span>`:''}${nx?` <button onclick="careerPromote()" class="btn" title="Повышение: ${nx.name.replace(/^[^ ]+ /,'')} за ${fmtN(nx.cost)}$ и ${nx.skills} навыка. Поднимает зарплату (и расходы по статусу)." style="background:rgba(217,184,119,.14);color:#efd8a3;border:1px solid var(--lx-gold-ln);font-weight:700;font-size:10px;padding:2px 8px;margin-left:4px;white-space:nowrap;">⬆️ ${fmtN(nx.cost)}$ · ${nx.skills}🎓</button>`:` <span style="color:#efd8a3;">— вершина 👑</span>`}</p>`; })()}
                     </div>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
                         <button onclick="openCharity()" class="btn" style="background:radial-gradient(120% 120% at 50% 0,rgba(217,184,119,.28),transparent 72%),#241a0c;color:#efd8a3;border:1px solid var(--lx-gold-ln);box-shadow:0 0 16px -7px var(--lx-gold);display:flex;align-items:center;gap:5px;font-weight:700;font-size:12px;padding:7px 11px;" title="Благотворительность — отдай, расти духом">🕯️ <span>Благотворительность</span>${(Number(p.donatedTotal)||0)>0?`<span style="font-size:10px;color:#b98a3e;font-weight:800;">${fmtN(Math.round(p.donatedTotal))}$</span>`:''}</button>
@@ -14308,7 +14312,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                      было крутить пол-экрана. Стало: сетка маленьких плиток, нажал — окно на весь
                      экран. Разметка разделов НЕ тронута, всё решает .sec-grid в CSS. */''}
                 <div class="card" style="border:2px solid #f59e0b; background:linear-gradient(135deg,rgba(180,120,40,0.20),rgba(90,60,25,0.08)); text-align:center; margin-bottom:10px;">
-                    <img src="cat_imgs/farm_market.webp" alt="Ферма" style="width:100%; max-height:180px; object-fit:cover; border-radius:12px; margin-bottom:10px;" loading="lazy">
+                    <img src="cat_imgs/farm_market.webp" alt="Ферма" style="width:100%; height:180px; object-fit:cover; border-radius:12px; margin-bottom:10px; background:#0a0806;">
                     <div class="block-title" style="color:#fcd34d; border:none; justify-content:center;">🐄 Рынок скота и ферма</div>
                     <p style="font-size:13px; color:#fde68a; margin-bottom:10px;">${p.farm ? 'Твоё хозяйство ждёт — зайди, вырасти и продай. Терпение кормит.' : 'Купи землю, выучись ремеслу и построй живое дело. Всё надо изучать.'}</p>
                     <button onclick="openFarm()" class="btn" style="background:linear-gradient(90deg,#f59e0b,#d97706); color:#111; font-weight:900; font-size:15px; padding:12px 22px;">${p.farm ? '🚜 Войти в ферму' : '🌱 Начать ферму'}</button>
@@ -14625,7 +14629,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const GAP=0.45;
             TRACK.forEach((c,i)=>{ const p=cellBox(i); const act=(i===turnCellIdx);
                 const img='cat_imgs/cell_'+(CELL_IMG_KEYS[i]||'salary')+'.webp'; const grp=CELL_GRP[i]||'gold';   // 🎨 новые клетки (тёмный кино-фотореализм) из cat_imgs
-                cellsHtml+=`<div class="dcell${p.corner?' corner':''}${act?' dactive':''}" style="left:${p.l+GAP}%;top:${p.t+GAP}%;width:${p.w-2*GAP}%;height:${p.h-2*GAP}%;--cc:var(--g-${grp})"><img loading="lazy" src="${img}" alt=""><div class="dnm">${c.n}</div>${p.corner?'<div class="dstar">★</div>':''}</div>`;
+                cellsHtml+=`<div class="dcell${p.corner?' corner':''}${act?' dactive':''}" style="left:${p.l+GAP}%;top:${p.t+GAP}%;width:${p.w-2*GAP}%;height:${p.h-2*GAP}%;--cc:var(--g-${grp})"><img src="${img}" alt=""><div class="dnm">${c.n}</div>${p.corner?'<div class="dstar">★</div>':''}</div>`;
             });
             // Год берём живой с биржи. Круг = 30 лет (1 год = 10 мин), но партия может идти
             // дольше (MAX_GAME_YEARS=300) — тогда стрелка идёт на второй круг, как настоящие часы,
@@ -15069,8 +15073,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
         // ═══════════════ 🐄 ФЕРМА / РЫНОК СКОТА (клиент) ═══════════════
         function farmMe(){ return state.players.find(x=>x.id==state.currentPlayerId); }
-        function farmImg(name, h){ return name ? `<img src="cat_imgs/${name}.webp" style="width:100%;${h?`max-height:${h}px;object-fit:cover;`:''}border-radius:12px;display:block;" loading="lazy">` : ''; }
-        function farmThumb(name){ return name ? `<img src="cat_imgs/${name}.webp" style="width:46px;height:46px;object-fit:cover;border-radius:9px;margin-right:9px;flex:0 0 auto;" loading="lazy" onerror="this.style.display='none'">` : ''; }
+        // 🩹 (Ринат 29июл «картинка складывается потом дёргается»): резервируем МЕСТО под картинку
+        // (фикс. высота или aspect-ratio + тёмный фон) — при перерисовке она не схлопывается в ноль, экран не прыгает.
+        function farmImg(name, h){ return name ? `<img src="cat_imgs/${name}.webp" style="width:100%;${h?`height:${h}px`:'aspect-ratio:1'};object-fit:cover;border-radius:12px;display:block;background:#0a0806;" onerror="this.style.opacity=0">` : ''; }
+        function farmThumb(name){ return name ? `<img src="cat_imgs/${name}.webp" style="width:46px;height:46px;object-fit:cover;border-radius:9px;margin-right:9px;flex:0 0 auto;background:#0a0806;" onerror="this.style.opacity=0">` : ''; }
         // 🖼️ Обложки окон теперь живут ФОНОМ на плитке (в summary style), поэтому внутри окна
         // картинку не дублируем — winCover возвращает пусто (оставлен как no-op в местах вставки).
         function winCover(n){ return ''; }
@@ -15306,7 +15312,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmDemolish(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!(p.farm.buildings||{})[bkey]) return; if(farmBuildingUsed(p,bkey)>0){ alert('🚧 В «'+B.name+'» ещё есть живность. Сначала продай или зарежь всех оттуда, потом сноси.'); return; } const back=Math.round(B.price*0.4); if(!confirm('Снести «'+B.name+'»? Вернётся '+fmtN(back)+'$ (40%), место освободится.')) return; delete p.farm.buildings[bkey]; farmSpend(p,-back); save(p.id); render(); alert('🧹 «'+B.name+'» снесено. +'+fmtN(back)+'$, место свободно.'); }
         function farmUpgradeStructure(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B||!B.up) return; const b=(p.farm.buildings||{})[bkey]; if(!b){ alert('Сначала построй строение.'); return; } if(b.lvl>=2){ alert('«'+B.name+'» уже улучшено до максимума.'); return; } if(p.savings<B.up.price){ alert('Не хватает кассы. Улучшение стоит '+B.up.price+'$.'); return; } farmSpend(p,B.up.price); b.lvl=2; save(p.id); render(); alert('⬆️ «'+B.name+'» улучшено — теперь вмещает '+B.up.cap+'.'); }
         function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ alert('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); alert('🏡 Амбар построен! Выучи «Фермерство» и заводи скот.'); }
-        function farmLearn(key){ const _sy=window.scrollY; const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); alert('🎓 Изучено: '+FARM_CFG.courseName[key]+'! Ход не потрачен.'); farmKeepScroll(_sy); }
+        function farmLearn(key){ const _sy=window.scrollY; const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); farmToast('🎓 Изучено: '+FARM_CFG.courseName[key]); }
         function farmBuyAnimal(kind){ const _sy=window.scrollY; const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const B=FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(!p.farm.buildings || !p.farm.buildings[bkey]){ alert('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).'); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.'); return; } farmAskQty({ title:'Купить «'+c.name+'»', note:'Цена '+fmtN(c.buy)+'$/'+(c.crop?'шт':'гол')+' · свободно '+_room+' в «'+B.name+'»', def:1, min:1, max:_room, okLabel:'Купить',
                 preview:(q)=>{ const cost=c.buy*q; const pp=farmMe(); return 'Итого <b>'+fmtN(cost)+'$</b>'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
                 onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=c.buy*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } const ex=(pp.farm.animals||[]).find(x=>x.kind===kind); farmSpend(pp,cost); if(ex){ ex.count=(ex.count||1)+qty; } else { pp.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,by:curYear(),count:qty}); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); const tot=((pp.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; farmToast('✅ Куплено '+qty+' «'+c.name+'» — всего '+tot); } }); }
@@ -15321,7 +15327,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm) return; const aa=(pp.farm.animals||[]).find(x=>x.aid===aid); if(!aa) return; const hv=aa.count||1; const n=Math.min(qty,hv); aa.count=hv-n; if(aa.count<=0){ pp.farm.animals=pp.farm.animals.filter(x=>x.aid!==aid); } pp.farm.stock=pp.farm.stock||{}; pp.farm.stock.meat=(Number(pp.farm.stock.meat)||0)+c.meat*n; pp.farm.meatFreshY=curYear(); pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); farmToast('🔪 Под нож '+n+' «'+c.name+'» → мясо на склад'); } }); }
         function farmBuyFridge(){ const p=farmMe(); if(!p||!p.farm) return; if(p.farm.fridge){ alert('🧊 Холодильник уже есть.'); return; } if(p.savings<FARM_CFG.fridge){ alert('Не хватает кассы. Холодильник стоит '+fmtN(FARM_CFG.fridge)+'$.'); return; } farmSpend(p,FARM_CFG.fridge); p.farm.fridge=true; save(p.id); render(); alert('🧊 Холодильник куплен! Теперь мясо на складе хранится долго и не тухнет.'); }
         function farmManager(on){ const p=farmMe(); if(!p||!p.farm) return; p.farm.manager=!!on; save(p.id); render(); }
-        function farmBuyMilker(){ const p=farmMe(); if(!p||!p.farm) return; if(p.savings<FARM_CFG.milker){ alert('Не хватает кассы. Доильный аппарат стоит '+fmtN(FARM_CFG.milker)+'$.'); return; } farmSpend(p,FARM_CFG.milker); p.farm.milkers=farmMilkers(p)+1; p.farm.milker=true; save(p.id); render(); alert('🥛 Куплен доильный аппарат! Нужен по одному на каждую корову — сейчас аппаратов: '+farmMilkers(p)+', коров: '+farmCowHeads(p)+'.'); }
+        function farmBuyMilker(){ const p=farmMe(); if(!p||!p.farm) return; const cows=farmCowHeads(p), have=farmMilkers(p);
+            farmAskQty({ title:'🥛 Доильный аппарат — купить', note:'Цена '+fmtN(FARM_CFG.milker)+'$/шт. Есть '+have+', коров '+cows+'. По одному на корову.', def:Math.max(1,cows-have), min:1, max:99, okLabel:'Купить',
+                preview:(q)=>{ const cost=FARM_CFG.milker*q; const pp=farmMe(); return 'Итого <b>'+fmtN(cost)+'$</b> за '+q+' шт'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
+                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=FARM_CFG.milker*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } farmSpend(pp,cost); pp.farm.milkers=farmMilkers(pp)+qty; pp.farm.milker=true; save(pp.id); render(); farmToast('🥛 Куплено аппаратов: +'+qty+' (всего '+farmMilkers(pp)+')'); } }); }
         // 🍷 ВЫДЕРЖКА: заложил → годами дорожает → продал. Цена = базовая × (1+rate)^годы (кап по виду).
         // выдержка в годах — лениво от года закладки (часы = год с сервера)
         function batchYears(b){ const cfg=FARM_CFG.aging[b.kind]; if(!cfg) return 0; const laid=(b.layY!=null)?b.layY:curYear(); return Math.min(cfg.cap, Math.max(0,(b.years||0)+(curYear()-laid))); }
@@ -17858,8 +17867,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const wasFree = (Number(p.jail)||0) === 0;
                 const nn = Math.max(0, Math.round(n));
                 const jc = (wasFree && nn>0) ? (Number(p.jailCount)||0)+1 : (Number(p.jailCount)||0);
-                // Новая посадка (был на свободе → сел) запускает выбор под давлением (2 окна).
-                return {...p, jail: nn, jailCount: jc, jailPending: (wasFree && nn>0) ? true : (p.jailPending||null)};
+                // Новая посадка (был на свободе → сел) запускает СУД (тюрьма 2.0): сначала суд, потом камера.
+                return {...p, jail: nn, jailCount: jc, jailPending: (wasFree && nn>0) ? 'court' : (p.jailPending||null)};
             });
             save(); render();
         }
@@ -17873,23 +17882,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(); render();
         }
         function toggleCasino(id) { state.players = state.players.map(p => p.id==id ? {...p, casinoOff: !p.casinoOff} : p); save(); render(); }
-        // Откуп «дать на лапу» (Ринат 19июл): 10% от СУММЫ КАСС ВСЕХ игроков за столом (общий котёл), фикс, не растёт.
-        // (Наказание за повторные посадки со временем → карцер, отдельная фича.)
+        // Откуп «дать на лапу» (Ринат 29июл): 20% от СВОЕЙ кассы. Раньше брали 10% общего котла,
+        // но взятка росла с числом игроков за столом — теперь цена зависит только от своих денег.
         function tableCashSum(){ return (state.players||[]).reduce((s,x)=>s+(Number(x.savings)||0),0); }
-        function jailBuyoutPct(p){ return 10; }   // 10% — но от КОТЛА стола, не от своей кассы (см. jailBuyout)
+        function jailBuyoutCost(p){ return Math.round((Number(p.savings)||0)*0.20); }   // 20% своей кассы
         async function jailBuyout(id) {
             const p = state.players.find(x => x.id == id); if (!p) return;
-            const pot = tableCashSum();
-            const cost = Math.round(pot * 0.10);
-            if(cost > (Number(p.savings)||0)){ alert('Дать на лапу стоит 10% от общего котла стола = '+fmtN(cost)+'$, а в кассе у тебя только '+fmtN(p.savings)+'$. Не хватает — отбывай ходы (тюрьма 2 хода).'); return; }
-            if (!confirm(`Дать на лапу и выйти сразу за 10% от общего котла стола (−${fmtN(cost)}$)? Котёл = сумма касс всех игроков (${fmtN(pot)}$).`)) return;
+            const cost = jailBuyoutCost(p);
+            if(cost <= 0){ farmToast('В кассе пусто — откупиться нечем. Отбывай ходы или заработай внутри.'); return; }
+            if (!confirm(`Дать на лапу и выйти сразу за 20% своей кассы (−${fmtN(cost)}$)? Останется ${fmtN(Math.round((Number(p.savings)||0)-cost))}$.`)) return;
             if(SERVER_MODE){
                 lastSaveT=Date.now();
                 try{
                     const r=await fetch('/jail/buyout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:id})});
                     const j=await r.json();
-                    if(j && j.ok===false && j.reason==='not_enough'){ alert('Не хватает: откуп '+fmtN(Math.round(j.cost))+'$ (10% котла).'); return; }
-                }catch(e){ console.warn('jail/buyout:',e); alert('Сеть подвела — попробуй ещё раз.'); return; }
+                    if(j && j.ok===false && j.reason==='not_enough'){ farmToast('Откупиться нечем — касса пуста.'); return; }
+                }catch(e){ console.warn('jail/buyout:',e); farmToast('Сеть подвела — попробуй ещё раз.'); return; }
                 return;   // сервер сам списал/освободил и разослал broadcast → ждём applyServerData
             }
             // офлайн: считаем и списываем локально
@@ -17898,76 +17906,91 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     shadow:(Number(x.shadow)||0)+1} : x);   // 🕯️ откупился = сделка с собой (копится на «Ложь»)
             save(id); render();
         }
-        // ─── 🔒 ТЮРЬМА 2.0: выбор под давлением (2 окна → «карта авторитета» 1 из 4) ───
-        // Попал в тюрьму → весь экран, других действий нет (напряжение). Два пути:
-        //   1) Послушаться тюремщиков → ТОЧНО +15% к прочим расходам навсегда.
-        //   2) Отмахнуться, стоять на своём → тянешь 1 из 4 карт: 3 ломают (+15% расходы),
-        //      1 = «продавил силой авторитета» (−5% к налогам навсегда). 3-к-1, риск.
-        // Давление сидки: за каждый пройденный ход в тюрьме +1% к прочим расходам (кап +10%),
-        // «здоровье падает» — считается на сервере в /turn/next. Все проценты — чистые множители.
-        const JAIL_SUBMIT_PENALTY = 15;   // «послушался» / «сломлен» → +% к прочим расходам навсегда
-        const JAIL_FIGHT_REWARD   = 5;    // «продавил силой» (1 из 4) → −% к налогам навсегда
-        const JAIL_FIGHT_CARDS    = 4;    // тянем 1 из 4: 3 ломают, 1 победная
-        function jailSubmit(id){
-            state.players = state.players.map(x => x.id==id ? {...x, otherExpPct:(Number(x.otherExpPct)||0)+JAIL_SUBMIT_PENALTY, jailPending:'submit', arrestStance:'broken'} : x);
-            save(id); render();
-        }
-        function jailFight(id){
-            state.players = state.players.map(x => x.id==id ? {...x, jailPending:'cards'} : x);
-            save(id); render();
-        }
-        function jailPickCard(id){
-            const won = (Math.floor(Math.random()*JAIL_FIGHT_CARDS) === 0);   // ровно 1 из 4 карт — победная
-            state.players = state.players.map(x => {
-                if(x.id!=id) return x;
-                return won
-                    ? {...x, taxDiscPct:(Number(x.taxDiscPct)||0)+JAIL_FIGHT_REWARD, jailPending:'won', arrestStance:'won'}
-                    : {...x, otherExpPct:(Number(x.otherExpPct)||0)+JAIL_SUBMIT_PENALTY, jailPending:'lost', arrestStance:'broken'};
-            });
-            save(id); render();
-        }
-        // экран результата закрывает сам игрок — карту надо разглядеть; дальше СУД (тюрьма 2.0)
-        function jailResultClose(id){
-            state.players = state.players.map(x => x.id==id ? {...x, jailPending:'trial', trialLuck:(Math.floor(Math.random()*3)-1), trialLawyer:null} : x);
-            save(id); render();
-        }
-        // ─── ⚖️ СУД (тюрьма 2.0): приговор от репутации + поведения на аресте + удачи + адвоката ───
+        // ═══ 🔒 ТЮРЬМА 2.0 (Ринат 29июл): СНАЧАЛА СУД → потом давление в камере ═══
+        // Порядок: клетка «Тюрьма» → ⚖️ СУД (можно нанять адвоката) → приговор:
+        //   ~2 из 10 ОПРАВДАН → на свободу сразу; ~8 из 10 ВИНОВЕН → штраф + в камеру.
+        // В камере момент под давлением: ДОГОВОРИЛСЯ → сидеть 1 ход; ЗАЖАЛИ → 3 хода.
+        // ⚠️ Оправдание (jail=0) и срок (1/3) ставятся АВТОРИТЕТНО через сервер (_jailWrite),
+        //    иначе серверный анти-откат воскресит плейсхолдер-срок (2).
+        // Давление сидки: за каждый пройденный ход +1% к прочим расходам (кап +10%) — сервер /turn/next.
+        const JAIL_SUBMIT_PENALTY = 15;   // «зажали» → +% к прочим расходам навсегда
+        const JAIL_FIGHT_REWARD   = 5;    // «договорился, продавил» → −% к налогам навсегда
+        const JAIL_TURNS_WON  = 1;        // договорился → 1 ход
+        const JAIL_TURNS_LOST = 3;        // зажали → 3 хода
+        const JAIL_ACQUIT_BASE = 0.20;    // база оправдания — 2 из 10
         const JAIL_LAWYER_TRIAL_MIN = 2000;   // адвокат на суде: max(2000, 8% кассы)
-        function jailSentence(p){
-            const rep = Number(p.repScore)||0;
-            let turns = rep>=40 ? 2 : (rep>=-20 ? 3 : (rep>=-60 ? 4 : 5));   // база по репутации
-            if(p.arrestStance==='won') turns -= 1;         // продавил — судья уважает
-            else if(p.arrestStance==='broken') turns -= 1; // сломлен — судья мягче сроком (клеймо уже висит)
-            turns += (Number(p.trialLuck)||0);             // карта удачи ±1
-            let fine = Math.round((Number(p.savings)||0)*0.06 * (1 + Math.max(0,-rep)/100));
-            fine = Math.max(500, fine);
-            if(p.trialLawyer==='win'){ turns -= 1; fine = Math.round(fine*0.5); }   // адвокат помог
-            turns = Math.max(1, Math.min(6, turns));
-            return { turns, fine };
-        }
-        function jailTrialLawyerFee(p){ return Math.max(JAIL_LAWYER_TRIAL_MIN, Math.round((Number(p.savings)||0)*0.08)); }
-        // после отправки авторитетного срока флаг снимаем локально — чтобы следующий save не перебивал серверный декремент
+        // после отправки авторитетного значения флаг снимаем — чтобы следующий save не перебивал серверный декремент
         function jailStripWrite(id){ state.players = state.players.map(x=> (x.id==id && x._jailWrite) ? (function(){var c={...x}; delete c._jailWrite; return c;})() : x); }
-        function jailTrialHireLawyer(id){
-            const p=state.players.find(x=>x.id==id); if(!p) return;
-            if(p.trialLawyer){ return; }
+        // ── ⚖️ СУД ──
+        function jailTrialLawyerFee(p){ return Math.max(JAIL_LAWYER_TRIAL_MIN, Math.round((Number(p.savings)||0)*0.08)); }
+        // шанс оправдания: база 20% + чистая репутация + адвокат (60% отрабатывает → +30%)
+        function jailAcquitChance(p){
+            const rep = Number(p.repScore)||0;
+            let ch = JAIL_ACQUIT_BASE + (rep>=40 ? 0.15 : (rep>=-20 ? 0 : (rep>=-60 ? -0.05 : -0.10)));
+            if(p.trialLawyer==='win') ch += 0.30;
+            return Math.max(0.05, Math.min(0.85, ch));
+        }
+        // штраф при обвинении: ~6% кассы, тем больнее чем хуже репутация; адвокат срезает вдвое
+        function jailFine(p){
+            const rep = Number(p.repScore)||0;
+            let fine = Math.max(500, Math.round((Number(p.savings)||0)*0.06 * (1 + Math.max(0,-rep)/100)));
+            if(p.trialLawyer==='win') fine = Math.round(fine*0.5);
+            return fine;
+        }
+        // нанять адвоката на суде (60% отработает: +30% к оправданию и −50% штрафа)
+        function jailHireLawyer(id){
+            const p=state.players.find(x=>x.id==id); if(!p || p.trialLawyer) return;
             const fee=jailTrialLawyerFee(p);
-            if((Number(p.savings)||0)<fee){ alert('Не хватает кассы на адвоката: нужно '+fmtN(fee)+'$.'); return; }
-            const win = Math.random()<0.6;   // 60% адвокат помогает
+            if((Number(p.savings)||0)<fee){ farmToast('Не хватает кассы на адвоката: нужно '+fmtN(fee)+'$.'); return; }
+            const win = Math.random()<0.6;
             state.players = state.players.map(x=> x.id==id ? {...x, savings:Math.round(((Number(x.savings)||0)-fee)*100)/100, trialLawyer:(win?'win':'fail')} : x);
             save(id); render();
         }
-        function jailTrialVerdict(id){
+        // приговор: оправдан → свободен (jail=0 авторитетно); виновен → штраф + давление в камере
+        function jailCourtVerdict(id){
             const p=state.players.find(x=>x.id==id); if(!p) return;
-            const s=jailSentence(p);
+            if(Math.random() < jailAcquitChance(p)){
+                state.players = state.players.map(x=> x.id==id ? {...x, jail:0, jailPending:'acquitted', _jailWrite:true, trialLawyer:null} : x);
+                save(id); jailStripWrite(id); render();
+                return;
+            }
+            const fine = Math.min(jailFine(p), Number(p.savings)||0);
+            state.players = state.players.map(x=> x.id==id ? {...x,
+                savings:Math.round(((Number(x.savings)||0)-fine)*100)/100,
+                repScore:(Number(x.repScore)||0)-5,
+                jailPending:'pressure', jailFinePaid:fine, trialLawyer:null } : x);
+            save(id); render();
+        }
+        function jailAcquittedClose(id){
+            state.players = state.players.map(x=> x.id==id ? {...x, jailPending:null, jailFinePaid:null} : x);
+            save(id); render();
+        }
+        // ── 🔒 ДАВЛЕНИЕ В КАМЕРЕ: договорился (1 ход) / зажали (3 хода) ──
+        // Два пути: «пойти на разговор» — шанс договориться выше при чистой репутации;
+        //   «молчать в отказ» — чистый риск 1 к 3 (но выигрыш даёт −5% к налогам).
+        function jailPressChanceTalk(p){
+            const rep = Number(p.repScore)||0;
+            return rep>=40 ? 0.70 : (rep>=-20 ? 0.55 : (rep>=-60 ? 0.42 : 0.32));
+        }
+        function jailPressResolve(id, won){
             state.players = state.players.map(x=>{
                 if(x.id!=id) return x;
-                const fine=Math.min(s.fine, Number(x.savings)||0);          // спишем сколько есть в кассе
-                return {...x, jail:s.turns, jailPending:null, _jailWrite:true,
-                        savings:Math.round(((Number(x.savings)||0)-fine)*100)/100,
-                        repScore:(Number(x.repScore)||0)-5,                 // отсидка бьёт репутацию
-                        trialLuck:null, trialLawyer:null, arrestStance:null,
-                        notify:'⚖️ Приговор: '+s.turns+' ход(ов), штраф '+fmtN(fine)+'$. Сиди и выбирай дела внутри.'};
+                return won
+                    ? {...x, jailPending:'won',  taxDiscPct:(Number(x.taxDiscPct)||0)+JAIL_FIGHT_REWARD,   jailTurns:JAIL_TURNS_WON}
+                    : {...x, jailPending:'lost', otherExpPct:(Number(x.otherExpPct)||0)+JAIL_SUBMIT_PENALTY, jailTurns:JAIL_TURNS_LOST};
+            });
+            save(id); render();
+        }
+        function jailTalk(id){ const p=state.players.find(x=>x.id==id); if(!p) return; jailPressResolve(id, Math.random()<jailPressChanceTalk(p)); }
+        function jailStand(id){ jailPressResolve(id, Math.random()<(1/3)); }
+        // итог давления закрывает игрок → срок (1 или 3) ставится авторитетно, дальше сидит
+        function jailPressClose(id){
+            state.players = state.players.map(x=>{
+                if(x.id!=id) return x;
+                const t = Number(x.jailTurns) || JAIL_TURNS_LOST;
+                const c = {...x, jail:t, jailPending:null, _jailWrite:true,
+                    notify:'🔒 Сидишь '+t+' ход(ов). Внутри есть дела — работай, рискуй ставкой, дави адвокатом на досрочку.'};
+                delete c.jailTurns; delete c.jailFinePaid; return c;
             });
             save(id); jailStripWrite(id); render();
         }
@@ -18005,76 +18028,81 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             alert(win ? '⚖️ Адвокат добился досрочки — минус ход!' : '⚖️ Суд отказал. Деньги ушли, срок прежний.');
         }
         function renderJailModal(p){
-            // ── ⚖️ СУД: судья назначает срок и штраф (тюрьма 2.0) ──
-            if(p.jailPending==='trial'){
-                const s=jailSentence(p); const fee=jailTrialLawyerFee(p);
+            // ═══ ⚖️ СУД (первый экран тюрьмы 2.0): виновен или оправдан ═══
+            if(p.jailPending==='court'){
+                const fee=jailTrialLawyerFee(p);
                 const rep=Number(p.repScore)||0;
-                const repTxt = rep>=40?'чистая — судья мягче':(rep>=-20?'обычная':(rep>=-60?'подмочена — жёстче':'на дне — по полной'));
-                const stanceTxt = p.arrestStance==='won'?'ты продавил на аресте — судья уважает (−1 ход)':(p.arrestStance==='broken'?'тебя сломали — судья добьёт мягче сроком':'');
+                const chance=Math.round(jailAcquitChance(p)*100);
+                const repTxt = rep>=40?'чистая — суд склонен поверить':(rep>=-20?'обычная':(rep>=-60?'подмочена — суд насторожён':'на дне — суд против тебя'));
                 const lawyerBlock = p.trialLawyer==='win'
-                    ? `<div style="color:#6ee7b7;font-size:13px;margin:6px 0;">🕴️ Адвокат отработал: −1 ход и −50% штрафа.</div>`
+                    ? `<div style="color:#6ee7b7;font-size:13px;margin:8px 0;">🕴️ Адвокат в деле: шанс на оправдание вырос, штраф вдвое меньше.</div>`
                     : (p.trialLawyer==='fail'
-                        ? `<div style="color:#fca5a5;font-size:13px;margin:6px 0;">🕴️ Адвокат не смог — деньги ушли впустую.</div>`
-                        : `<button onclick="jailTrialHireLawyer(${p.id})" class="btn" style="background:#1f2937;color:#e5e7eb;border:1px solid #b98a3e;font-weight:800;padding:10px 18px;margin:6px 0;">🕴️ Нанять адвоката · ${fmtN(fee)}$</button>`);
+                        ? `<div style="color:#fca5a5;font-size:13px;margin:8px 0;">🕴️ Адвокат оказался пустышкой — деньги ушли, толку ноль.</div>`
+                        : `<button onclick="jailHireLawyer(${p.id})" class="btn" style="background:#1f2937;color:#e5e7eb;border:1px solid #b98a3e;font-weight:800;padding:10px 18px;margin:8px 0;">🕴️ Нанять адвоката · ${fmtN(fee)}$</button>`);
                 return `<div style="position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 50% 28%,#14100a,#08080c);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;text-align:center;overflow:auto;">
-                    <img src="cat_imgs/jail_court.webp" alt="" style="width:min(64vw,240px);aspect-ratio:1;object-fit:cover;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.75),0 0 30px -6px rgba(217,184,119,.4);">
-                    <div style="font-family:Georgia,serif;font-size:26px;font-weight:800;letter-spacing:.06em;margin:12px 0 4px;color:#efd8a3;">⚖️ СУД</div>
-                    <p style="max-width:440px;color:#d8c39a;font-size:13px;line-height:1.5;margin:0 0 8px;">Репутация: <b>${repTxt}</b>.${stanceTxt?` ${stanceTxt}.`:''}</p>
-                    <div style="background:rgba(0,0,0,.3);border:1px solid var(--lx-gold-ln);border-radius:12px;padding:12px 16px;margin:6px 0;">
-                        <div style="font-size:15px;color:#f3efe6;">Приговор: <b style="color:#fbbf24;">${s.turns}</b> ход(ов) · штраф <b style="color:#fca5a5;">${fmtN(s.fine)}$</b></div>
+                    <img src="cat_imgs/jail_court.webp" alt="" style="width:min(70vw,260px);aspect-ratio:1;object-fit:cover;border-radius:14px;background:#0a0806;box-shadow:0 18px 50px rgba(0,0,0,.75),0 0 30px -6px rgba(217,184,119,.4);">
+                    <div style="font-family:Georgia,serif;font-size:27px;font-weight:800;letter-spacing:.06em;margin:12px 0 4px;color:#efd8a3;">⚖️ СУД</div>
+                    <p style="max-width:440px;color:#d8c39a;font-size:13.5px;line-height:1.55;margin:0 0 6px;">Тебя привели в зал. Судья листает дело. Репутация: <b style="color:#efd8a3;">${repTxt}</b>.</p>
+                    <div style="background:rgba(0,0,0,.3);border:1px solid var(--lx-gold-ln);border-radius:12px;padding:10px 16px;margin:6px 0;">
+                        <div style="font-size:14px;color:#f3efe6;">Шанс на <b style="color:#6ee7b7;">оправдание</b>: <b style="color:#fbbf24;">${chance}%</b></div>
+                        <div style="font-size:11.5px;color:#b9ab8f;margin-top:3px;">Оправдают — выходишь свободным. Признают виновным — штраф и в камеру.</div>
                     </div>
                     ${lawyerBlock}
-                    <button onclick="jailTrialVerdict(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;padding:12px 32px;font-size:15px;margin-top:8px;">Выслушать приговор</button>
-                    <p style="color:#8a7f7f;font-size:11px;margin-top:14px;">Штраф спишется сразу; не хватит — остаток в долг. Потом сидишь и выбираешь дела внутри.</p>
+                    <button onclick="jailCourtVerdict(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;padding:12px 32px;font-size:15px;margin-top:6px;">Выслушать приговор</button>
+                    <p style="color:#8a7f7f;font-size:11px;margin-top:14px;max-width:400px;">Адвокат берёт деньги вперёд и помогает не всегда (шанс 60%), зато поднимает оправдание и вдвое режет штраф.</p>
                 </div>`;
             }
-            // ── результат: карта переворачивается и показывает, что с тобой сделали ──
-            if(p.jailPending==='won' || p.jailPending==='lost' || p.jailPending==='submit'){
+            // ── 🕊️ ОПРАВДАН: свободен сразу ──
+            if(p.jailPending==='acquitted'){
+                return `<div style="position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 50% 30%,#0d2417,#08080c);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;text-align:center;overflow:auto;">
+                    <div style="font-size:56px;">🕊️</div>
+                    <div style="font-family:Georgia,serif;font-size:28px;font-weight:800;color:#6ee7b7;margin:6px 0;">ОПРАВДАН</div>
+                    <p style="max-width:440px;color:#c9e7d6;font-size:14.5px;line-height:1.55;margin:0 0 20px;">Суд не нашёл, за что тебя держать. Ты выходишь свободным — ни срока, ни камеры. Живи дальше.</p>
+                    <button onclick="jailAcquittedClose(${p.id})" class="btn" style="background:#10b981;color:#04120c;font-weight:800;padding:12px 34px;font-size:15px;">На свободу</button>
+                </div>`;
+            }
+            // ── 🔒 ДАВЛЕНИЕ В КАМЕРЕ: договориться (1 ход) или зажмут (3 хода) ──
+            if(p.jailPending==='pressure'){
+                const finePaid = Number(p.jailFinePaid)||0;
+                const talkPct = Math.round(jailPressChanceTalk(p)*100);
+                return `<div style="position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 50% 24%,#1a120b,#08080c);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;overflow:auto;">
+                    <img src="cat_imgs/jail_cell.webp" alt="" style="width:min(70vw,240px);aspect-ratio:16/10;object-fit:cover;border-radius:12px;background:#0a0806;box-shadow:0 16px 44px rgba(0,0,0,.7);" onerror="this.style.display='none'">
+                    <div style="font-family:Georgia,serif;font-size:25px;font-weight:800;color:#efd8a3;margin:12px 0 2px;">Признан виновным</div>
+                    ${finePaid?`<div style="font-size:12.5px;color:#fca5a5;margin-bottom:4px;">Штраф списан: −${fmtN(finePaid)}$.</div>`:''}
+                    <p style="max-width:460px;color:#d8c9ad;font-size:14px;line-height:1.55;margin:2px 0 18px;">Дверь камеры за спиной. Сколько ты просидишь — решается прямо сейчас. Как поведёшь себя?</p>
+                    <div style="display:flex;gap:14px;max-width:520px;width:100%;flex-wrap:wrap;">
+                        <button onclick="jailTalk(${p.id})" style="flex:1;min-width:180px;padding:18px 16px;border-radius:16px;border:2px solid #b98a3e;background:linear-gradient(160deg,#3a2a12,#241a0c);color:#efd8a3;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.5);">
+                            <div style="font-size:32px;">🤝</div>
+                            <div style="font-size:17px;font-weight:800;margin:6px 0;">Пойти на разговор</div>
+                            <div style="font-size:12.5px;color:#d8c39a;line-height:1.4;">Договоришься — сидишь <b style="color:#6ee7b7;">1 ход</b>. Шанс <b>${talkPct}%</b> (выше при чистой репутации). Не выйдет — зажмут на <b style="color:#fca5a5;">3 хода</b>.</div>
+                        </button>
+                        <button onclick="jailStand(${p.id})" style="flex:1;min-width:180px;padding:18px 16px;border-radius:16px;border:2px solid #6b7280;background:linear-gradient(160deg,#1f2937,#111827);color:#e5e7eb;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.5);">
+                            <div style="font-size:32px;">✊</div>
+                            <div style="font-size:17px;font-weight:800;margin:6px 0;">Молчать в отказ</div>
+                            <div style="font-size:12.5px;color:#9ca3af;line-height:1.4;">Чистый риск <b style="color:#6ee7b7;">1 к 3</b>: продавишь — <b>1 ход</b> и <b style="color:#6ee7b7;">−${JAIL_FIGHT_REWARD}% к налогам навсегда</b>. Иначе <b style="color:#fca5a5;">3 хода</b>.</div>
+                        </button>
+                    </div>
+                    <p style="color:#8a7f7f;font-size:11.5px;margin-top:18px;">Срок вступит в силу после того, как разглядишь исход.</p>
+                </div>`;
+            }
+            // ── результат давления: карта исхода (реальные картинки вместо эмодзи) ──
+            if(p.jailPending==='won' || p.jailPending==='lost'){
                 const won = p.jailPending==='won';
-                const img = won ? 'cat_imgs/jail_won.webp' : 'cat_imgs/jail_lost.webp';   // 🎨 новые карты исхода
+                const img = won ? 'cat_imgs/jail_won.webp' : 'cat_imgs/jail_lost.webp';
+                const turns = Number(p.jailTurns) || (won?JAIL_TURNS_WON:JAIL_TURNS_LOST);
                 const ttl = won ? 'ТЫ ДОГОВОРИЛСЯ' : 'ТЕБЯ ЗАЖАЛИ';
                 const txt = won
-                    ? 'Один шанс из четырёх — и он твой. Ты не дрогнул, не полез в драку и не стал просить. Тебя услышали и отступили: <b style="color:#6ee7b7;">−'+JAIL_FIGHT_REWARD+'% к налогам НАВСЕГДА</b>.'
-                    : (p.jailPending==='submit'
-                        ? 'Ты смирился. Срок отсидишь спокойно, но система запомнила, что тебя можно гнуть: <b style="color:#fca5a5;">+'+JAIL_SUBMIT_PENALTY+'% к прочим расходам НАВСЕГДА</b>.'
-                        : 'Их больше, и они это знают. Стена спин сомкнулась, разговор кончился, не начавшись. Сопротивление сломлено: <b style="color:#fca5a5;">+'+JAIL_SUBMIT_PENALTY+'% к прочим расходам НАВСЕГДА</b>.');
+                    ? 'Ты нашёл верные слова и держался ровно. Сидеть всего <b style="color:#6ee7b7;">'+turns+' ход</b> — и авторитет с тобой: <b style="color:#6ee7b7;">−'+JAIL_FIGHT_REWARD+'% к налогам НАВСЕГДА</b>.'
+                    : 'Их больше, и они это знают. Разговор кончился, не начавшись. Сидеть <b style="color:#fca5a5;">'+turns+' хода</b>, и система запомнила, что тебя можно гнуть: <b style="color:#fca5a5;">+'+JAIL_SUBMIT_PENALTY+'% к прочим расходам НАВСЕГДА</b>.';
                 return `<div style="position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 50% 32%,${won?'#241a06':'#2a0d0d'},#08080c);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;text-align:center;overflow:auto;">
-                    <img src="${img}" alt="" style="width:min(76vw,300px);aspect-ratio:1;object-fit:cover;border-radius:14px;animation:jailFlip .5s ease-out;box-shadow:0 18px 50px rgba(0,0,0,.75),0 0 34px -6px ${won?'rgba(230,200,119,.6)':'rgba(239,68,68,.45)'};">
+                    <img src="${img}" alt="" style="width:min(76vw,300px);aspect-ratio:1;object-fit:cover;border-radius:14px;background:#0a0806;animation:jailFlip .5s ease-out;box-shadow:0 18px 50px rgba(0,0,0,.75),0 0 34px -6px ${won?'rgba(230,200,119,.6)':'rgba(239,68,68,.45)'};">
                     <div style="font-family:Georgia,serif;font-size:24px;font-weight:800;letter-spacing:.06em;margin:14px 0 6px;color:${won?'#efd8a3':'#fca5a5'};">${ttl}</div>
-                    <p style="max-width:440px;color:#e7c9c9;font-size:14px;line-height:1.55;margin:0 0 18px;">${txt}</p>
-                    <button onclick="jailResultClose(${p.id})" class="btn" style="background:${won?'#fbbf24':'#6b7280'};color:${won?'#3a2a00':'#fff'};font-weight:800;padding:12px 32px;font-size:15px;">Дальше</button>
+                    <p style="max-width:440px;color:#e7d9c9;font-size:14px;line-height:1.55;margin:0 0 18px;">${txt}</p>
+                    <button onclick="jailPressClose(${p.id})" class="btn" style="background:${won?'#fbbf24':'#6b7280'};color:${won?'#3a2a00':'#fff'};font-weight:800;padding:12px 32px;font-size:15px;">В камеру</button>
                 </div>`;
             }
-            if(p.jailPending==='cards'){
-                const cardBtns = [0,1,2,3].map(i=>`
-                    <button onclick="jailPickCard(${p.id})" style="flex:1;min-width:60px;max-width:110px;aspect-ratio:2/3;border-radius:12px;border:2px solid #b98a3e;background:linear-gradient(160deg,#241a0c,#3a2a12);color:#efd8a3;font-size:34px;font-weight:900;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;transition:transform .12s;" onmouseover="this.style.transform='translateY(-6px)'" onmouseout="this.style.transform=''">?</button>
-                `).join('');
-                return `<div style="position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 50% 30%,#2a0d0d,#08080c);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;text-align:center;">
-                    <div style="font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:#fca5a5;font-weight:800;">Стоять на своём</div>
-                    <div style="font-family:Georgia,serif;font-size:26px;font-weight:800;color:#efd8a3;margin:6px 0 4px;">Тяни карту 🃏</div>
-                    <p style="max-width:440px;color:#e7c9c9;font-size:14px;line-height:1.5;margin-bottom:22px;">Четыре карты. <b>Три</b> тебя ломают (+${JAIL_SUBMIT_PENALTY}% к расходам). <b>Одна</b> — ты продавил силой авторитета (−${JAIL_FIGHT_REWARD}% к налогам). Выбирай.</p>
-                    <div style="display:flex;gap:12px;max-width:460px;width:100%;justify-content:center;">${cardBtns}</div>
-                    <p style="color:#8a7f7f;font-size:12px;margin-top:20px;">Один шанс из четырёх. Рискни.</p>
-                </div>`;
-            }
-            return `<div style="position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 50% 25%,#2a0d0d,#08080c);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;text-align:center;">
-                <div style="font-size:52px;">🔒</div>
-                <div style="font-family:Georgia,serif;font-size:28px;font-weight:800;color:#fff;margin:4px 0;">ТЫ ПОПАЛ В ТЮРЬМУ</div>
-                <p style="max-width:460px;color:#e7c9c9;font-size:14px;line-height:1.5;margin-bottom:26px;">Тебя зажали. Путей два — и оба стоят дорого. Выбирай, пока решётка не захлопнулась.</p>
-                <div style="display:flex;gap:14px;max-width:520px;width:100%;flex-wrap:wrap;">
-                    <button onclick="jailSubmit(${p.id})" style="flex:1;min-width:180px;padding:20px 16px;border-radius:16px;border:2px solid #6b7280;background:linear-gradient(160deg,#1f2937,#111827);color:#e5e7eb;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.5);">
-                        <div style="font-size:34px;">🙇</div>
-                        <div style="font-size:17px;font-weight:800;margin:6px 0;">Послушаться тюремщиков</div>
-                        <div style="font-size:12.5px;color:#9ca3af;line-height:1.4;">Смириться. Срок отсидишь спокойно, но <b style="color:#fca5a5;">+${JAIL_SUBMIT_PENALTY}% к прочим расходам НАВСЕГДА</b>. Точно.</div>
-                    </button>
-                    <button onclick="jailFight(${p.id})" style="flex:1;min-width:180px;padding:20px 16px;border-radius:16px;border:2px solid #b98a3e;background:linear-gradient(160deg,#3a2a12,#241a0c);color:#efd8a3;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.5);">
-                        <div style="font-size:34px;">✊</div>
-                        <div style="font-size:17px;font-weight:800;margin:6px 0;">Отмахнуться, стоять на своём</div>
-                        <div style="font-size:12.5px;color:#d8c39a;line-height:1.4;">Тянешь карту. <b style="color:#6ee7b7;">1 из 4</b> — продавишь силой (−${JAIL_FIGHT_REWARD}% налоги). <b style="color:#fca5a5;">3 из 4</b> — сломают (+${JAIL_SUBMIT_PENALTY}% расходы).</div>
-                    </button>
-                </div>
-                <p style="color:#8a7f7f;font-size:12px;margin-top:22px;">Других действий нет. Реши — и живи с этим.</p>
-            </div>`;
+            // страховка: незнакомое состояние → трактуем как суд
+            return renderJailModal({...p, jailPending:'court'});
         }
         // ─── РАЗРЕШЕНИЯ: кнопки клеток у игрока закрыты, пока ведущий не откроет КОНКРЕТНУЮ
         // клетку (p.allow = ключ). gate() проверяет+СЪЕДАЕТ разрешение (одноразовое). ───

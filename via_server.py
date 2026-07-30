@@ -66,7 +66,7 @@ def apply_market_shock(fx):
         hi = float(a.get('max') or (float(a['price']) * 10))
         new = float(a['price']) * (1 + pct)
         new = max(lo, min(hi, new))
-        a['price'] = round(new, 4 if new < 1 else 2)
+        a['price'] = via_market._pr(new) if via_market else round(new, 8 if new < 1 else 2)
         a.setdefault('history', []).append(a['price'])
         if len(a['history']) > 120:
             a['history'] = a['history'][-120:]
@@ -467,6 +467,9 @@ SELF_TRAININGS = {
     'standup':{'name': 'Стендап 🎤',                'cost': 3000},   # Ринат 28июл
     'bizproc':{'name': 'Бизнес-процессы 🏢',        'cost': 4000},   # Ринат 28июл: открывает Шоурум
 }
+# Ринат 28июл: доход созданного = процент от его ЦЕНЫ в месяц (было ~10% зашито в cf → мало «+500»).
+# 0.25 = 25% от цены/мес. Двигать сюда: 0.20 или 0.30. Считается при создании, cf в таблице ниже — просто ориентир.
+CREATE_YIELD = 0.30
 # req — нужны ВСЕ; reqAny — достаточно одного; boost — двигают колоду 7/3 в сторону успеха.
 CREATIONS = {
     'book':       {'name': 'Книга 📖',                 'cost': 10000, 'cf': 800,
@@ -522,8 +525,8 @@ CREATION_STEPS = {
 # с 5-го на 40%, с 9-го на 80%. Смысл: вход дёшев для бедного — лестница жива, — а собрать
 # всё подряд дорого, и человеку приходится ВЫБИРАТЬ, кем становиться.
 def train_mult(owned):
-    # каждый купленный навык +20% к цене следующего (растёт непрерывно, до ×5). Ринат 28июл
-    return min(5.0, 1.0 + max(0, owned) * 0.2)
+    # каждый купленный навык +30% к цене следующего (растёт непрерывно, до ×5). Ринат 28июл (было 0.2)
+    return min(5.0, 1.0 + max(0, owned) * 0.3)
 
 
 def train_price(key, owned):
@@ -531,8 +534,8 @@ def train_price(key, owned):
 
 
 def create_mult(made):
-    # каждое уже созданное дело +20% к цене следующего (растёт непрерывно, до ×5). Ринат 28июл
-    return min(5.0, 1.0 + max(0, made) * 0.2)
+    # каждое уже созданное дело +30% к цене следующего (растёт непрерывно, до ×5). Ринат 28июл (было 0.2)
+    return min(5.0, 1.0 + max(0, made) * 0.3)
 
 
 def create_price(key, made):
@@ -1027,10 +1030,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         pass  # тихий режим
 
     def end_headers(self):
-        # 2026-05-31: запрещаем кэш — иначе телефон показывает старую версию игры
-        # после правок (PIN/биржа не появлялись из-за кэша браузера).
-        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-        self.send_header('Pragma', 'no-cache')
+        # 🖼️ (Ринат 29июл «картинки постоянно обновляются, экран дёргается»): КАРТИНКИ статичны —
+        # кэшируем их надолго, чтобы браузер брал из памяти мгновенно и не перезагружал при каждой
+        # пересборке экрана. HTML/JS/данные — БЕЗ кэша (иначе телефон показывал старую версию игры).
+        _p = (self.path or '').split('?')[0].lower()
+        if _p.startswith('/cat_imgs/') or _p.endswith(('.webp', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.mp4', '.ico')):
+            self.send_header('Cache-Control', 'public, max-age=3600')   # картинки — час из кэша, не дёргают экран
+        else:
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            self.send_header('Pragma', 'no-cache')
         super().end_headers()
 
     def _cors(self):
@@ -1165,8 +1173,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                 # jail/jailPress меняет ТОЛЬКО сервер (посадка на __JAIL__, декремент в /turn/next,
                                 # откуп через /jail/buyout). Клиентский save НЕ должен воскрешать старый срок —
                                 # раньше `cur[me]=incoming[me]` затирал серверный декремент старым снимком.
-                                rec['jail'] = srv_prev.get('jail', rec.get('jail'))
-                                rec['jailPress'] = srv_prev.get('jailPress', rec.get('jailPress'))
+                                # ⚖️ ИСКЛЮЧЕНИЕ (тюрьма 2.0, Ринат 28июл): суд и адвокат-досрочка ставят срок
+                                # авторитетно с клиента через одноразовый флаг _jailWrite — принимаем и стираем флаг.
+                                if rec.get('_jailWrite'):
+                                    rec.pop('_jailWrite', None)
+                                else:
+                                    rec['jail'] = srv_prev.get('jail', rec.get('jail'))
+                                    rec['jailPress'] = srv_prev.get('jailPress', rec.get('jailPress'))
                                 # 🔒 СЕРВЕР-АВТОРИТЕТ по стартовым ДОЛГАМ (Ринат 19июл «долг воскресает, гасил 4 раза;
                                 # закладная не списывается»). Погашение ставит ведущий (одобрение заявки, авторитетная
                                 # запись). Игрок сам эти поля НЕ меняет — но его старый бланк затирал «оплачено» назад.
@@ -1325,8 +1338,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             if pl.get('id') == pid:
                                 if int(pl.get('jail') or 0) == 0:           # был на свободе → считаем посадку
                                     pl['jailCount'] = int(pl.get('jailCount') or 0) + 1
-                                    pl['jailPending'] = True               # запуск выбора под давлением (2 окна) у игрока
-                                pl['jail'] = 2                             # клетка Тюрьма — ровно 2 хода (Ринат 19июл), гарантированное освобождение через /turn/next
+                                    pl['jailPending'] = 'court'            # тюрьма 2.0 (Ринат 29июл): сначала СУД у игрока, срок ставит клиент через _jailWrite
+                                pl['jail'] = 2                             # плейсхолдер-срок; суд/давление перезапишут авторитетно (оправдан→0, договорился→1, зажали→3)
                                 pl['allow'] = None
                                 break
                     elif key == '__CHILD__':
@@ -1391,6 +1404,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                 pl['jail'] = int(pl['jail']) - 1
                                 # давление сидки: +1% к прочим расходам за каждый пройденный ход (кап +10%), «здоровье падает»
                                 pl['jailPress'] = min(10, int(pl.get('jailPress') or 0) + 1)
+                                # 🏭 тюрьма 2.0: дела (работа/сделка/адвокат) снова доступны на новый ход
+                                pl['jailWorkedTurn'] = False
+                                pl['jailDealTurn'] = False
+                                pl['jailAppealTurn'] = False
                                 break
                     if b['order']:
                         b['turnIdx'] = (b['turnIdx'] + 1) % len(b['order'])
@@ -1471,8 +1488,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({'error': str(e)}, 400)
             return
         if self.path == '/jail/buyout':
-            # ОТКУП «дать на лапу» (Ринат 19июл): выйти из тюрьмы сразу за 10% от СУММЫ КАСС ВСЕХ игроков
-            # (общий котёл). Серверно-авторитетно (не клиентом) — иначе гонка воскрешала бы срок.
+            # ОТКУП «дать на лапу» (Ринат 29июл): выйти из тюрьмы сразу за 20% от СВОЕЙ кассы.
+            # Раньше брали 10% общего котла — но взятка росла с числом игроков за столом (нечестно).
+            # Теперь цена зависит только от собственных денег. Серверно-авторитетно (не клиентом) —
+            # иначе гонка воскрешала бы срок.
             n = int(self.headers.get('Content-Length', 0) or 0)
             raw = self.rfile.read(n).decode('utf-8') if n else '{}'
             try:
@@ -1484,17 +1503,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         raise ValueError('player not found')
                     if int(pl.get('jail') or 0) <= 0:
                         raise ValueError('not in jail')
-                    pot = round(sum(float(p.get('savings') or 0) for p in DATA['players']), 2)
-                    cost = round(pot * 0.10, 2)
-                    if float(pl.get('savings') or 0) < cost:
-                        self._send_json({'ok': False, 'reason': 'not_enough', 'cost': cost, 'pot': pot}, 200)
+                    own = round(float(pl.get('savings') or 0), 2)
+                    cost = round(own * 0.20, 2)                      # 20% от СВОЕЙ кассы
+                    if own < cost or cost <= 0:
+                        self._send_json({'ok': False, 'reason': 'not_enough', 'cost': cost}, 200)
                         return
-                    pl['savings'] = round(float(pl.get('savings') or 0) - cost, 2)
+                    pl['savings'] = round(own - cost, 2)
                     pl['jail'] = 0
                     pl['shadow'] = int(pl.get('shadow') or 0) + 1   # сделка с собой → копится на «Ложь»
                     save_data(DATA)
                     broadcast()
-                self._send_json({'ok': True, 'cost': cost, 'pot': pot})
+                self._send_json({'ok': True, 'cost': cost})
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return
@@ -1572,6 +1591,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
                         pl['savings'] = round(float(pl.get('savings') or 0) - price, 2)
                         won = (drawn == 'win')
+                        _cf = int(round(cr['cost'] * CREATE_YIELD))   # доход = 25% от цены/мес (Ринат 28июл)
                         if won:
                             pl.setdefault('assets', []).append({
                                 'id': int(time.time() * 1000) % 10**9,
@@ -1581,16 +1601,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                 'title': cr['name'],
                                 't': cr['name'],
                                 'price': price,
-                                'cf': cr['cf'],
+                                'cf': _cf,
                                 'grow': cr.get('grow', 0),  # блог: +150 каждый круг
                             })
-                            pl['creations'].append({'key': key, 'cf': cr['cf'], 'level': 1})
+                            pl['creations'].append({'key': key, 'cf': _cf, 'level': 1})
                         else:
                             pl['failExp'] = int(pl['failExp']) + 1
                         save_data(DATA)
                         broadcast()
                         self._send_json({'ok': True, 'won': won, 'fails': fails, 'wins': wins,
-                                         'cost': cr['cost'], 'cf': cr['cf'] if won else 0,
+                                         'cost': cr['cost'], 'cf': _cf if won else 0,
                                          'name': cr['name'], 'key': key})
                         return
 
