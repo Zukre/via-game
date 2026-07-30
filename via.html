@@ -10611,14 +10611,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             animals: {
                 // yield = $/мес за голову (Ринат 27июл: пассив был раздут → урезал доходные ставки вдвое, ЧЕРНОВИК — тюним).
                 // Сырьё (milk/fruits) НЕ трогаем — оно задаёт КОЛИЧЕСТВО передела, а не деньги.
-                hen:    {buy:60,   need:['poultry'],      yield:1,   prod:'eggs',  breed:6,  meat:50,   img:'farm_hen',    name:'🐔 Курица',  meatImg:'farm_poultry'},
+                hen:    {buy:60,   need:['poultry'],      yield:1,   prod:'egg_hen',  breed:6,  meat:50,   img:'farm_hen',    name:'🐔 Курица',  meatImg:'farm_poultry'},
                 broiler:{buy:80,   need:['poultry'],      yield:0,   prod:null,    breed:0,  meat:220,  img:'farm_broiler',name:'🍗 Бройлер', meatImg:'farm_broilermeat', matureY:2},   // мясная птица: растёт 2 года → под нож (Ринат 27июл)
-                duck:   {buy:90,   need:['poultry'],      yield:1,   prod:'eggs',  breed:6,  meat:110,  img:'farm_duck',   name:'🦆 Утка',    meatImg:'farm_duckmeat'},
+                duck:   {buy:90,   need:['poultry'],      yield:1,   prod:'egg_duck', breed:6,  meat:110,  img:'farm_duck',   name:'🦆 Утка',    meatImg:'farm_duckmeat'},
                 sheep:  {buy:300,  need:['care'],         yield:2,   prod:'wool',  breed:12, meat:400,  img:'farm_sheep',  name:'🐑 Баран',   meatImg:'farm_lamb'},
                 cow:    {buy:1500, need:['care','dairy'], yield:180, prod:'milk',  breed:12, meat:1200, img:'farm_cow',    name:'🐄 Корова',  meatImg:'farm_beef'},
                 horse:  {buy:3000, need:['care'],         yield:0,   prod:null,    breed:18, meat:2500, img:'farm_horse',  name:'🐴 Лошадь',  meatImg:'farm_kazy'},
                 peacock:{buy:500,  need:['care'],         yield:2,   prod:'feath', breed:12, meat:0,    img:'farm_peacock',name:'🦚 Павлин',  meatImg:null},
-                trout:  {buy:200,  need:['fish'],         yield:3,   prod:'fish',  breed:6,  meat:0,    img:'farm_trout',  name:'🐟 Форель',  meatImg:'farm_fishmeat'},
+                trout:  {buy:200,  need:['fish'],         yield:3,   prod:'caviar', breed:6,  meat:0,    img:'farm_trout',  name:'🐟 Форель',  meatImg:'farm_fishmeat'},
                 hive:   {buy:250,  need:['bees'],         yield:3,   prod:'honey', breed:12, meat:0,    img:'farm_bees',   name:'🐝 Улей',    meatImg:null},
                 // 🌱 КУЛЬТУРЫ (растениеводство) — как скот, но без разведения и убоя: дают доход по живой цене
                 roses:  {buy:250,  need:['plants'],       yield:3,   prod:'flowers',breed:0,  meat:0,    img:'farm_roses',  name:'🌹 Розы',    meatImg:null, crop:true},
@@ -10636,6 +10636,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 stallion:{buy:5000, need:['care','breed'],    yield:0, prod:null, breed:0, meat:2000, img:'farm_stallion', name:'🐎 Жеребец',             male:'horse',   meatImg:'farm_kazy'},
                 ram_male:{buy:600,  need:['care','breed'],    yield:0, prod:null, breed:0, meat:350,  img:'farm_ram_male', name:'🐏 Баран-производитель', male:'sheep',   meatImg:'farm_lamb'},
                 peahen:  {buy:300,  need:['care','breed'],    yield:0, prod:null, breed:0, meat:200,  img:'farm_peahen',   name:'🦚 Пава (самка)',        male:'peacock', meatImg:'farm_peacockmeat'},
+                // ✨ ПРЕМИУМ-СКОТ (Ринат 30июл): дорогие виды под топ-продукт. Картинки Ринат догенерит (пока farmImg скрывает пустую).
+                angus:    {buy:4000, need:['care'],            yield:0, prod:null,         breed:12, meat:4000, img:'farm_angus',        name:'🥩 Ангус (мрамор)',      meatImg:'farm_angussteak',  matureY:2},   // мраморная говядина — самый дорогой стейк
+                camel:    {buy:4500, need:['care'],            yield:3, prod:'shubat',      breed:18, meat:1500, img:'farm_camel',        name:'🐫 Верблюд',             meatImg:'farm_camelmeat',   matureY:2},   // шубат — верблюжье молоко (наш премиум)
+                sturgeon: {buy:900,  need:['fish'],            yield:2, prod:'blackcaviar', breed:0,  meat:600,  img:'farm_sturgeon',     name:'🐟 Осётр',               meatImg:'farm_fishmeat',    matureY:3},   // чёрная икра — самый дорогой продукт фермы
+                ostrich:  {buy:800,  need:['poultry'],         yield:1, prod:'egg_ostrich', breed:12, meat:900,  img:'farm_ostrich',      name:'🦩 Страус',              meatImg:'farm_ostrichmeat', matureY:2},   // крупное страусиное яйцо + мясо
+                angus_bull:  {buy:6000, need:['care','breed'],    yield:0, prod:null, breed:0, meat:5000, img:'farm_angus_male',   name:'🐂 Ангус-бык',           male:'angus',   meatImg:'farm_angussteak'},
+                camel_male:  {buy:7000, need:['care','breed'],    yield:0, prod:null, breed:0, meat:2500, img:'farm_camel_male',   name:'🐫 Бура (самец)',        male:'camel',   meatImg:'farm_camelmeat'},
+                ostrich_male:{buy:1400, need:['poultry','breed'], yield:0, prod:null, breed:0, meat:1300, img:'farm_ostrich_male', name:'🦩 Страус-самец',        male:'ostrich', meatImg:'farm_ostrichmeat'},
             },
             // 🍷 ВЫДЕРЖКА: заложил → годами дорожает → продал. layCost=деньги на процесс, baseSell=цена в год 0, rate=прирост/год
             //   ЧЕСТНАЯ ЦЕПОЧКА (Ринат 26июл): нужно СЫРЬЁ. src=ресурс, srcQty=сколько на 1 партию.
@@ -10652,10 +10660,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 🏗️ СТРОЕНИЯ (Ринат 26июл): каждое вмещает КОНКРЕТНОЕ число — не тысячи. Хочешь больше → апгрейд (up).
         //   cap=база мест, up={price,cap}=улучшение до 2-го уровня. species=какие виды тут живут. Числа — черновик.
         const FARM_BUILDINGS = {
-            hangar:    {name:'🏚️ Ангар',   price:8000, cap:12, img:'farm_hangar',    up:{price:12000, cap:30},  species:['cow','bull','horse','stallion','sheep','ram_male','peacock','peahen'], note:'коровы, лошади, овцы, павлины'},
+            hangar:    {name:'🏚️ Ангар',   price:8000, cap:12, img:'farm_hangar',    up:{price:12000, cap:30},  species:['cow','bull','horse','stallion','sheep','ram_male','peacock','peahen','angus','angus_bull','camel','camel_male','ostrich','ostrich_male'], note:'коровы, лошади, овцы, павлины, ангус, верблюды, страусы'},
             aviary:    {name:'🐔 Вольер',  price:3000, cap:40, img:'farm_aviary',    up:{price:5000,  cap:100}, species:['hen','rooster','broiler'], note:'куры, бройлеры'},
             duckpond:  {name:'🦆 Озерцо',  price:3500, cap:40, img:'farm_duckpond',  up:{price:5500,  cap:100}, species:['duck','drake'], note:'утки'},
-            pond:      {name:'🐟 Озеро',   price:5000, cap:60, img:'farm_pond',      up:{price:8000,  cap:150}, species:['trout'], note:'рыба'},
+            pond:      {name:'🐟 Озеро',   price:5000, cap:60, img:'farm_pond',      up:{price:8000,  cap:150}, species:['trout','sturgeon'], note:'рыба, осётр'},
             apiary:    {name:'🐝 Пасека',  price:2500, cap:30, img:'farm_bees',      up:{price:4000,  cap:80},  species:['hive'], note:'ульи'},
             greenhouse:{name:'🌿 Теплица', price:6000, cap:24, img:'farm_greenhouse',up:{price:9000,  cap:60},  species:['roses','violets','lilac','grapes','fruits','micro','fert','flowers'], note:'цветы, микрозелень, виноград'},
         };
@@ -10663,8 +10671,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmHouseOf(kind){ for(const b in FARM_BUILDINGS){ if(FARM_BUILDINGS[b].species.indexOf(kind)>=0) return b; } return null; }
         // 🌾 КТО ЧТО ЕСТ (Ринат 27июл): скот — сено, птица — зерно, рыба — рыбий корм. Пчёлы/культуры — корм не нужен.
         const FARM_FEED_TYPE = { cow:'hay', horse:'hay', sheep:'hay', bull:'hay', stallion:'hay', ram_male:'hay',
+                                 angus:'hay', angus_bull:'hay', camel:'hay', camel_male:'hay',
                                  hen:'grain', duck:'grain', broiler:'grain', rooster:'grain', drake:'grain', peacock:'grain', peahen:'grain',
-                                 trout:'fishfeed' };
+                                 ostrich:'grain', ostrich_male:'grain',
+                                 trout:'fishfeed', sturgeon:'fishfeed' };
         function farmFeedType(kind){ return FARM_FEED_TYPE[kind] || null; }
         function farmBuildingCap(p,bkey){ const B=FARM_BUILDINGS[bkey]; if(!B||!p.farm||!p.farm.buildings||!p.farm.buildings[bkey]) return 0; return (p.farm.buildings[bkey].lvl>=2 && B.up)?B.up.cap:B.cap; }
         function farmBuildingUsed(p,bkey){ if(!p.farm) return 0; return (p.farm.animals||[]).reduce((s,a)=>s+(farmHouseOf(a.kind)===bkey?(Number(a.count)||1):0),0); }
@@ -10684,9 +10694,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // сырьё-ресурсы (молоко/виноград) НЕ капают деньгами — они идут в склад на переработку (честная цепочка)
         const FARM_RAW = ['milk','fruits'];
         // 📦 товары склада (что копится и продаётся). Порядок = порядок показа.
-        const FARM_STOCK_LABELS = { eggs:'🥚 Яйца', milk:'🥛 Молоко', meat:'🥩 Мясо', fish:'🐟 Рыба', honey:'🍯 Мёд', wool:'🧶 Шерсть', feath:'🪶 Перья', flowers:'🌹 Цветы', micro:'🌱 Микрозелень', fruits:'🍇 Виноград/фрукты', fert:'💩 Удобрения' };
+        // 🥚🍥 РАЗДЕЛЕНИЕ ПРОДУКТА ПО ВИДУ (Ринат 30июл): яйца теперь у каждой птицы СВОИ (курица/утка/страус —
+        // разный товар и разная цена), у рыбы — ИКРА, а не «яйцо». Старые ключи eggs/fish оставлены для уже
+        // накопленного товара (продастся). egg_ostrich/farm_ostrichegg/farm_duckeggs — картинки Ринат догенерит.
+        const FARM_STOCK_LABELS = { egg_hen:'🥚 Куриные яйца', egg_duck:'🥚 Утиные яйца', egg_ostrich:'🥚 Страусиные яйца', eggs:'🥚 Яйца', milk:'🥛 Молоко', shubat:'🥛 Шубат (верблюжье)', meat:'🥩 Мясо', caviar:'🍥 Икра', blackcaviar:'🖤 Чёрная икра', fish:'🐟 Рыба', honey:'🍯 Мёд', wool:'🧶 Шерсть', feath:'🪶 Перья', flowers:'🌹 Цветы', micro:'🌱 Микрозелень', fruits:'🍇 Виноград/фрукты', fert:'💩 Удобрения' };
         // 📦 картинка товара на складе (нет файла → farmThumb сам скроет, пока не сгенерим)
-        const FARM_PROD_IMG = { eggs:'farm_eggs', milk:'farm_milk', meat:'farm_beef', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer' };
+        const FARM_PROD_IMG = { egg_hen:'farm_eggs', egg_duck:'farm_duckeggs', egg_ostrich:'farm_ostrichegg', eggs:'farm_eggs', milk:'farm_milk', shubat:'farm_shubat', meat:'farm_beef', caviar:'farm_caviar', blackcaviar:'farm_blackcaviar', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer' };
         // 🏭 продукты БОЛЬШЕ НЕ капают деньгами сами — копятся на складе, продаёшь вручную (Ринат 28июл). Пассив фермы = 0, живёшь с продаж.
         function farmIncome(p){ return 0; }
         // 💰 сколько СЕЙЧАС стоит весь товар на складе по живой цене (для показа «продать всё»)
@@ -10806,7 +10819,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.farm.healthY=y;
         }
         function farmToggleVet(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.vaccinated=!p.farm.vaccinated; save(p.id); render(); }
-        function farmClock(p){ farmMature(p); farmUpkeepTick(p); farmHarvest(p); farmBreedTick(p); farmHealthTick(p); farmMeatSpoilTick(p); }   // прогнать часы разом (расход/голод ДО сбора — голодные дают мало)
+        // 🐞 ЗАВОД ЧАСОВ ФЕРМЫ (Ринат 30июл «склад вообще не копит»): раньше метки harvY/breedY/upkeepY/healthY
+        // залипали на null — код брал «последний сбор = текущий год», dy=0, урожай=0, И метку не проставлял
+        // (присвоение стояло ВНУТРИ if(dy>0), которое при null никогда не срабатывало). Вечный ноль: 290 голов,
+        // а склад пуст. Лечим тут: при первом заходе метки встают текущим годом и СОХРАНЯЮТСЯ (openFarm/farmGo
+        // делают save) — со следующего года dy>0 и продукт реально капает на склад.
+        function farmClockInit(p){ if(!p||!p.farm) return; const y=curYear(); for(const k of ['harvY','breedY','upkeepY','healthY']){ if(p.farm[k]==null) p.farm[k]=y; } }
+        function farmClock(p){ farmClockInit(p); farmMature(p); farmUpkeepTick(p); farmHarvest(p); farmBreedTick(p); farmHealthTick(p); farmMeatSpoilTick(p); }   // прогнать часы разом (расход/голод ДО сбора — голодные дают мало)
+        // 🔁 Переход по вкладкам фермы гоняет часы (Ринат 30июл): открыл «Склад» после того как годы шли —
+        // продукт пересчитывается и виден сразу, а не только при полном перезаходе на ферму.
+        function farmGo(k){ const p=farmMe(); if(p&&p.farm){ farmClock(p); save(p.id); } state.farmTab=k; render(); }
         // 🥩 порча мяса: без холодильника мясо на складе живёт 1 год, потом протухает
         function farmMeatSpoilTick(p){
             if(!p||!p.farm) return; p.farm.stock=p.farm.stock||{}; const meat=Number(p.farm.stock.meat)||0;
@@ -11229,6 +11251,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay + farmWage + farmFeedExp;
             const flow = income - totalExp;
             const target = totalExp * WIN_MULT;   // ПОБЕДА: пассив ≥ WIN_MULT × расходов (см. WIN_MULT выше)
+
+            // 💵 АВТО-ЗАРПЛАТА БЕЗ РАССИНХРОНА (Ринат 30июл): кладём ТОЧНЫЙ месячный поток прямо на игрока.
+            // Сервер при проходе клетки «Зарплата» начисляет ЭТУ цифру (via_server.calc_flow), а не свою
+            // упрощённую формулу — поэтому ферма-расходы/карьера/дно/дорожающая жизнь учтены один в один
+            // с тем, что человек видит на экране. save(me) шлёт p целиком, значение доезжает до сервера.
+            if (p) p._flow = flow;
 
             return { salary, baseSalary, skillBonus, passive, income, taxes, mortgagePay, eduPay, autoPay, ccPay, retailPay,
                      otherExp, childExp, bankPay, farmInc, farmWage, farmFeed: farmFeedExp, totalExp, flow, target,
@@ -14256,7 +14284,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div>
                         <h2 style="font-size:21px; font-weight:800;"><span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${playerColor(p.id)};border:1px solid #0f172a;box-shadow:0 0 8px ${playerColor(p.id)};vertical-align:middle;margin-right:7px;"></span>${p.name} <span style="font-size:13px;color:${playerColor(p.id)};font-weight:800;">(${playerColorName(p.id)})</span></h2>
                         <p style="color:#10b981; font-weight:bold; font-size:13px; margin-top:3px;">${p.prof.name} · Зарплата ${f.salary}$${f.skillBonus>0?` <span style="color:#a5b4fc;">(база ${p.prof.salary}$ +${Math.round(f.skillBonus*100)}% навыки)</span>`:''}</p>
-                        ${(()=>{ const rk=careerRank(p), lv=careerLvl(p), nx=CAREER_LADDER[lv+1]; return `<p style="font-size:12px;color:#cdc8bd;margin-top:3px;">🪜 <b>${rk.name}</b>${lv>0?` · <span style="color:#a5b4fc;">${rk.bonus}</span>`:''}${nx?` <button onclick="careerPromote()" class="btn" title="Повышение: ${nx.name.replace(/^[^ ]+ /,'')} за ${fmtN(nx.cost)}$ и ${nx.skills} навыка. Поднимает зарплату (и расходы по статусу)." style="background:rgba(217,184,119,.14);color:#efd8a3;border:1px solid var(--lx-gold-ln);font-weight:700;font-size:10px;padding:2px 8px;margin-left:4px;white-space:nowrap;">⬆️ ${fmtN(nx.cost)}$ · ${nx.skills}🎓</button>`:` <span style="color:#efd8a3;">— вершина 👑</span>`}</p>`; })()}
+                        ${(()=>{ const rk=careerRank(p), lv=careerLvl(p), nx=CAREER_LADDER[lv+1]; return `<p style="font-size:12px;color:#cdc8bd;margin-top:3px;">🪜 <b>${rk.name}</b>${lv>0?` · <span style="color:#a5b4fc;">${rk.bonus}</span>`:''}</p>${nx?`<button onclick="careerPromote()" class="btn" title="Повышение до «${nx.name.replace(/^[^ ]+ /,'')}» за ${fmtN(nx.cost)}$ и ${nx.skills} навыка. Поднимает зарплату (и расходы по статусу)." style="display:block;width:100%;background:radial-gradient(120% 120% at 50% 0,rgba(217,184,119,.30),transparent 72%),#241a0c;color:#efd8a3;border:1px solid var(--lx-gold-ln);box-shadow:0 0 16px -7px var(--lx-gold);font-weight:800;font-size:12px;padding:8px 10px;margin-top:6px;text-align:left;">⬆️ Повысить профессию → ${nx.name} <span style="color:#b98a3e;font-weight:700;">· ${fmtN(nx.cost)}$ · ${nx.skills}🎓</span></button><div style="font-size:10px;color:#9c8f6f;margin-top:3px;">🪜 Профессию можно растить по ступеням — выше ступень, выше зарплата.</div>`:`<div style="font-size:11px;color:#efd8a3;margin-top:3px;">🪜 Профессия на вершине 👑</div>`}`; })()}
                     </div>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
                         <button onclick="openCharity()" class="btn" style="background:radial-gradient(120% 120% at 50% 0,rgba(217,184,119,.28),transparent 72%),#241a0c;color:#efd8a3;border:1px solid var(--lx-gold-ln);box-shadow:0 0 16px -7px var(--lx-gold);display:flex;align-items:center;gap:5px;font-weight:700;font-size:12px;padding:7px 11px;" title="Благотворительность — отдай, расти духом">🕯️ <span>Благотворительность</span>${(Number(p.donatedTotal)||0)>0?`<span style="font-size:10px;color:#b98a3e;font-weight:800;">${fmtN(Math.round(p.donatedTotal))}$</span>`:''}</button>
@@ -15102,7 +15130,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p = farmMe();
             if(!p){ state.view='lobby'; render(); return; }
             const tab = state.farmTab || (p.farm ? 'mine' : 'buy');
-            const tabBtn = (key,label) => `<button onclick="state.farmTab='${key}';render();" class="btn" style="flex:1;background:${tab===key?'#f59e0b':'#374151'};color:${tab===key?'#111':'#e5e7eb'};font-weight:800;padding:10px 6px;">${label}</button>`;
+            const tabBtn = (key,label) => `<button onclick="farmGo('${key}')" class="btn" style="flex:1;background:${tab===key?'#f59e0b':'#374151'};color:${tab===key?'#111':'#e5e7eb'};font-weight:800;padding:10px 6px;">${label}</button>`;
             let body='';
             if(!p.farm)             body = renderFarmBuy(p);
             else if(tab==='mine')   body = renderFarmMine(p);
@@ -15244,7 +15272,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         ? (c.prod==='milk'
                             ? (farmMilkers(p)>=farmCowHeads(p) ? `<div style="font-size:11px;color:#fcd34d;">🥛 доится — молоко идёт в сыроварню</div>` : (farmMilkers(p)>0 ? `<div style="font-size:11px;color:#f59e0b;">🥛 аппаратов не хватает — часть коров не доится (1 аппарат = 1 корова)</div>` : `<div style="font-size:11px;color:#f59e0b;">🥛 нужен доильный аппарат — по одному на корову</div>`))
                             : `<div style="font-size:11px;color:#fcd34d;">🥛 даёт сырьё для переработки</div>`)
-                        : `<div style="font-size:11px;color:#10b981;">🥚 копит на склад ~${Math.round(c.yield*(a.count||1))}/год · продажа в 📦 Склад</div>`;
+                        : `<div style="font-size:11px;color:#10b981;">${(FARM_STOCK_LABELS[c.prod]||'🥚 товар').split(' ')[0]} копит на склад ~${Math.round(c.yield*(a.count||1))}/год · продажа в 📦 Склад</div>`;
                     if(c.breed>0){
                         if(!hasBreed) s += `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">🧬 развод — нужен курс «Разведение»</div>`;
                         else if(farmBreeds(p,a)) s += `<div style="font-size:10px;color:#a7f3d0;margin-top:3px;">🧬 плодится в стаде</div>`;
