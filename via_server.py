@@ -1418,6 +1418,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                 pl['jailWorkedTurn'] = False
                                 pl['jailDealTurn'] = False
                                 pl['jailAppealTurn'] = False
+                                # 🦁 тюрьма 3.0: новое давление в камере на новый ход + сброс «дела дня»
+                                pl['jailPressTurn'] = False
+                                pl['jailPressEvt'] = None
+                                pl['jailActTurn'] = False
                                 break
                     if b['order']:
                         b['turnIdx'] = (b['turnIdx'] + 1) % len(b['order'])
