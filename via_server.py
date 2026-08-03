@@ -286,6 +286,183 @@ def resolve_rumor(r, fx):
     r['resolved'] = True
 
 
+# ═══════════ 🚀 IPO МОНЕТ — ранний вход (Ринат 31июл) ═══════════
+# Ведущий по ходу игры ЗАПУСКАЕТ новую монету. Всему столу — окно раннего входа: успел влететь —
+# можешь поймать ×3..10 в «луну», а можешь словить скам в НОЛЬ. Честный проект РЕЖЕ скама (как в
+# жизни) и чаще стреляет; хайп и толпа ОРУТ FOMO и часто НЕ правы. Читаешь сигналы, не уверенность
+# (как аналитик на бирже). Судьба монеты ОДНА на весь стол — влетели вместе, взлетели/сгорели вместе
+# (нерв толпы). Механика доставки (broadcast/оверлей) — как у слуха; правда (legit) прячется до резолва.
+IPO_COINS = [
+    ('DMBR', 'Dombra Coin', '🪕', '«Национальная монета №1! Листинг на всех биржах уже завтра!»'),
+    ('KZX',  'KAZAX',       '🦅', '«Первый крипто-банк страны. Ранние инвесторы станут миллионерами.»'),
+    ('BLOY', 'BLOY',        '💎', '«Технология, которой нет аналогов. Кто успел — тот в дамках.»'),
+    ('SHMR', 'SHIMIR',      '🚀', '«Уже +300% за час! Не упусти ракету, потом локти кусать будешь!»'),
+    ('GRLS', 'KAZAX GERLS', '✨', '«Комьюнити 100 000 человек за сутки. Хайп бешеный!»'),
+]
+IPO_GOOD = ['У проекта есть реальная команда с именами и историей.',
+            'Деньги инвесторов заморожены в контракте — вывести нельзя.',
+            'Основатели вкладывают своё, не только собирают чужое.',
+            'Понятно, на чём монета будет зарабатывать.']
+IPO_BAD  = ['Создатели анонимны, ни одного реального имени.',
+            'Обещают «гарантированные ×100 без риска».',
+            'Основатели могут вывести все деньги в любой момент.',
+            'Кроме хайпа и картинок — ничего конкретного.',
+            'Агрессивно торопят: «покупай сейчас или всё».']
+IPO_NEU  = ['Красивый сайт и логотип.', 'Много рекламы у блогеров.', 'Название на слуху.']
+IPO_CROWD = ['Все в чате скупают — «поезд уходит»!',
+             'Толпа в панике FOMO: «залетаем всей улицей»!',
+             'Блогеры кричат: «это иксы, не думай, бери»!',
+             'Соседи по столу уже вложились — не отставай!']
+IPO_LEGIT_P    = 0.40   # честный проект РЕЖЕ, чем скам (как в жизни)
+IPO_MOON_LEGIT = 0.62   # честный чаще стреляет
+IPO_MOON_SCAM  = 0.18   # скам иногда случайно пампят
+IPO_WINDOW     = 90     # сек окна раннего входа всему столу
+
+
+def _sample(seq, n):
+    seq = list(seq)
+    random.shuffle(seq)
+    return seq[:max(0, n)]
+
+
+def launch_ipo():
+    """Ведущий запускает монету. legit прячется до резолва (в broadcast всё же уедет — как rumor['true'],
+    это принятый в проекте компромисс). Возвращает карту. Вызывать ПОД LOCK."""
+    tk, nm, emoji, story = random.choice(IPO_COINS)
+    legit = random.random() < IPO_LEGIT_P
+    hype = 55 + random.randint(0, 44)
+    goods = _sample(IPO_GOOD, (2 + random.randint(0, 1)) if legit else (1 if random.random() < 0.35 else 0))
+    bads  = _sample(IPO_BAD,  (1 if random.random() < 0.35 else 0) if legit else (2 + random.randint(0, 1)))
+    neus  = _sample(IPO_NEU,  1 + random.randint(0, 1))
+    tells = goods + bads + neus
+    random.shuffle(tells)
+    DATA['ipo'] = {'id': int(time.time() * 1000), 'tk': tk, 'nm': nm, 'emoji': emoji,
+                   'story': story, 'hype': hype, 'crowd': random.choice(IPO_CROWD),
+                   'legit': legit, 'tells': tells, 'choices': {},
+                   'endsAt': time.time() + IPO_WINDOW, 'resolved': False, 'moon': None}
+    return DATA['ipo']
+
+
+def resolve_ipo(ipo):
+    """Окно закрылось — монета решает судьбу ОДИН раз на весь стол (влетели вместе, сгорели вместе).
+    Влетел: луна ×3..10 или скам в ноль (создатели вывели). Переждал: увернулся/упустил. Ставка была
+    списана при выборе — на луне возвращаем back (со ставкой), на скаме возвращаем left (0 или 5%).
+    Игроку пишем ipoResult (клиент покажет один раз). Вызывать ПОД LOCK."""
+    if not isinstance(ipo, dict) or ipo.get('resolved'):
+        return
+    moon = random.random() < (IPO_MOON_LEGIT if ipo.get('legit') else IPO_MOON_SCAM)
+    mult = round(3 + random.random() * 7, 1) if moon else 0
+    ipo['moon'] = moon
+    ipo['mult'] = mult
+    for p in DATA.get('players', []):
+        ch = (ipo.get('choices') or {}).get(str(p.get('id')))
+        if not ch:
+            continue
+        if ch.get('a') == 'invest':
+            stake = round(float(ch.get('stake') or 0), 2)
+            if moon:
+                back = round(stake * mult, 2)
+                p['savings'] = round(float(p.get('savings') or 0) + back, 2)
+                p['ipoResult'] = {'entered': True, 'moon': True, 'mult': mult, 'stake': stake,
+                                  'back': back, 'profit': round(back - stake, 2),
+                                  'nm': ipo.get('nm'), 'legit': ipo.get('legit')}
+            else:
+                left = round(stake * (0.05 if random.random() < 0.5 else 0), 2)
+                p['savings'] = round(float(p.get('savings') or 0) + left, 2)
+                p['ipoResult'] = {'entered': True, 'moon': False, 'stake': stake, 'back': left,
+                                  'profit': round(left - stake, 2), 'nm': ipo.get('nm'),
+                                  'legit': ipo.get('legit')}
+        else:  # переждал
+            p['ipoResult'] = {'entered': False, 'moon': moon, 'nm': ipo.get('nm'),
+                              'legit': ipo.get('legit')}
+    ipo['resolved'] = True
+
+
+# ═══════════ 🌍 СТОЙКА ПЕРЕД ЭПОХОЙ — «дирижёр» (Ринат 31июл, превью, одобрено 2авг) ═══════════
+# ПОВЕРХ события: эпоха НАДВИГАЕТСЯ, сигналы намекают заранее (правда + шум, как слух), стол выбирает
+# СТОЙКУ (защита/риск/здоровье/ничего). Эпоха приходит → угадал стойку = +куш, встал не туда = минус,
+# проспал = тоже минус (мягче). Удар ЛИЧНЫЙ по кассе. Судьба эпохи ОДНА на стол; эпоха прячется до
+# резолва (как ipo.legit). НЕ трогает рыночный шок мира (тот отдельно — «Событие круга» + слухи, они
+# двигают реальную биржу/бизнесы). Это драматический слой личной подготовки — как встречаешь эпоху жизнью.
+BRACE_EPOCHS = {
+    'crisis':   {'emoji': '📉', 'nm': 'Кризис', 'win': 'defend',
+                 'sectors': {'birzha': -30, 'rabota': -20, 'ferma': -10, 'zdorovie': 0},
+                 'desc': 'Биржа рухнула, пошли увольнения. Кто в кэше и золоте — тот на коне.',
+                 'sig': ['Банки шепчут о плохих долгах.', 'Крупные инвесторы тихо выходят в кэш.', 'Заводы объявляют сокращения.']},
+    'boom':     {'emoji': '🚀', 'nm': 'Экономический бум', 'win': 'risk',
+                 'sectors': {'birzha': 30, 'rabota': 10, 'ferma': 20, 'zdorovie': 0},
+                 'desc': 'Всё растёт: акции, бизнес, ферма. Кто вложился заранее — сорвал куш.',
+                 'sig': ['Стартапы поднимают рекордные раунды.', 'Люди массово скупают акции.', 'Спрос на всё зашкаливает.']},
+    'war':      {'emoji': '⚔️', 'nm': 'Война/нестабильность', 'win': 'defend',
+                 'sectors': {'birzha': -25, 'rabota': -5, 'ferma': 5, 'zdorovie': -10},
+                 'desc': 'Хаос: биржа падает, дорожают золото и сырьё, тревога кругом.',
+                 'sig': ['Растут цены на золото и нефть.', 'Границы лихорадит, новости тревожны.', 'Люди скупают припасы.']},
+    'pandemic': {'emoji': '🦠', 'nm': 'Пандемия', 'win': 'health',
+                 'sectors': {'birzha': -15, 'rabota': -20, 'ferma': 0, 'zdorovie': -35},
+                 'desc': 'Болезнь косит: здоровье и работа страдают, кто готовился — устоял.',
+                 'sig': ['Врачи говорят о новой инфекции.', 'Аптеки сметают, растёт тревога.', 'Компании переходят на удалёнку.']},
+    'tech':     {'emoji': '💡', 'nm': 'Технологический скачок', 'win': 'risk',
+                 'sectors': {'birzha': 25, 'rabota': 5, 'ferma': 5, 'zdorovie': 5},
+                 'desc': 'Прорыв: тех-активы взлетают, старое отстаёт. Смелые инвесторы в плюсе.',
+                 'sig': ['Все говорят о новой технологии.', 'Тех-компании бьют рекорды.', 'Инвесторы гонятся за инновациями.']},
+}
+# Цепочка: после эпохи пул следующей смещён (как в превью) — мир не случаен, одно тянет другое.
+BRACE_NEXT = {
+    'crisis':   ['boom', 'boom', 'tech', 'war'],
+    'war':      ['crisis', 'crisis', 'pandemic', 'boom'],
+    'boom':     ['crisis', 'tech', 'boom', 'war'],
+    'pandemic': ['boom', 'crisis', 'tech'],
+    'tech':     ['boom', 'crisis', 'war'],
+}
+BRACE_WINDOW    = 90      # сек окна подготовки всему столу
+BRACE_WIN_PCT   = 0.28    # угадал стойку — куш
+BRACE_NONE_PCT  = -0.14   # проспал (ничего не делал)
+BRACE_WRONG_PCT = -0.20   # готовился не к тому — тоже больно
+
+
+def launch_brace():
+    """Ведущий: эпоха надвигается. Пул следующей смещён цепочкой. Сигналы — правда от грядущей эпохи +
+    шум от чужой (намекают, но не гарантируют). Эпоха (epoch) прячется до резолва. Вызывать ПОД LOCK."""
+    prev = (DATA.get('brace') or {}).get('epoch') if isinstance(DATA.get('brace'), dict) else None
+    pool = BRACE_NEXT.get(prev) or list(BRACE_EPOCHS.keys())
+    epoch = random.choice(pool)
+    ep = BRACE_EPOCHS[epoch]
+    true_sig = _sample(ep['sig'], 2)
+    noise_ep = BRACE_EPOCHS[random.choice([k for k in BRACE_EPOCHS if k != epoch])]
+    noise = _sample(noise_ep['sig'], 1)
+    signals = [{'t': t, 'true': True} for t in true_sig] + [{'t': t, 'true': False} for t in noise]
+    random.shuffle(signals)
+    DATA['brace'] = {'id': int(time.time() * 1000), 'epoch': epoch, 'signals': signals,
+                     'choices': {}, 'endsAt': time.time() + BRACE_WINDOW, 'resolved': False, 'prev': prev}
+    return DATA['brace']
+
+
+def resolve_brace(br):
+    """Окно закрылось — эпоха настала ОДНА на весь стол. Угадал стойку → +куш; проспал/встал не туда →
+    минус. Удар личный по кассе (%). Пишем игроку braceResult (клиент покажет карту-разбор). Под LOCK."""
+    if not isinstance(br, dict) or br.get('resolved'):
+        return
+    ep = BRACE_EPOCHS.get(br.get('epoch')) or {}
+    win = ep.get('win')
+    for p in DATA.get('players', []):
+        st = (br.get('choices') or {}).get(str(p.get('id')))
+        if not st:
+            continue
+        cash = max(0.0, float(p.get('savings') or 0))
+        if st == win:
+            pct, good = BRACE_WIN_PCT, True
+        elif st == 'none':
+            pct, good = BRACE_NONE_PCT, False
+        else:
+            pct, good = BRACE_WRONG_PCT, False
+        delta = round(cash * pct, 2)
+        p['savings'] = round(float(p.get('savings') or 0) + delta, 2)
+        p['braceResult'] = {'epoch': br.get('epoch'), 'emoji': ep.get('emoji'), 'nm': ep.get('nm'),
+                            'desc': ep.get('desc'), 'sectors': ep.get('sectors'), 'win': win,
+                            'stance': st, 'good': good, 'delta': delta, 'none': st == 'none'}
+    br['resolved'] = True
+
+
 def era_now():
     e = DATA.get('era')
     if not isinstance(e, dict) or e.get('k') not in ERAS:
@@ -984,6 +1161,24 @@ def auction_ticker():
                     except Exception as _e:
                         print('world auto error:', _e)
                         DATA['worldLastAt'] = now   # не долбим каждые 2с
+                # 🚀 IPO: окно раннего входа закрылось само — монета решает судьбу всего стола
+                _ipo = DATA.get('ipo')
+                if isinstance(_ipo, dict) and not _ipo.get('resolved') and now >= float(_ipo.get('endsAt') or 0):
+                    try:
+                        resolve_ipo(_ipo)
+                        changed = True
+                    except Exception as _e:
+                        print('ipo resolve error:', _e)
+                        _ipo['resolved'] = True
+                # 🌍 СТОЙКА: окно подготовки закрылось — эпоха настала, разбираем стойки стола
+                _br = DATA.get('brace')
+                if isinstance(_br, dict) and not _br.get('resolved') and now >= float(_br.get('endsAt') or 0):
+                    try:
+                        resolve_brace(_br)
+                        changed = True
+                    except Exception as _e:
+                        print('brace resolve error:', _e)
+                        _br['resolved'] = True
                 if changed:
                     save_data(DATA)
                     broadcast()
@@ -1129,6 +1324,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 DATA['deals'] = []
                 DATA['market'] = via_market.init_market() if via_market else None
                 DATA['world'] = None
+                DATA['ipo'] = None
+                DATA['brace'] = None
                 # 💎 коллекция: новая партия — новые легендарки, свежие цены, пустой молоток
                 DATA['auction'] = None
                 DATA['colPrices'] = {}
@@ -1498,6 +1695,106 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     save_data(DATA)
                     broadcast()
                 self._send_json({'ok': True, 'world': we})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path == '/ipo/launch':
+            # Ведущий запускает IPO новой монеты — окно раннего входа всему столу (см. launch_ipo).
+            try:
+                with LOCK:
+                    cur = DATA.get('ipo')
+                    if (isinstance(cur, dict) and not cur.get('resolved')
+                            and time.time() < float(cur.get('endsAt') or 0)):
+                        self._send_json({'ok': False, 'reason': 'active'}, 200)
+                        return
+                    ipo = launch_ipo()
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True, 'ipo': {k: v for k, v in ipo.items() if k != 'legit'}})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path == '/ipo/choice':
+            # Игрок решает по IPO: invest (со ставкой) | wait. Тихо — чужие не видят. Ставка списывается
+            # сразу (как покупка); резолв вернёт back/left. Судьбу монеты решает окно (resolve_ipo).
+            try:
+                req = json.loads(self.rfile.read(int(self.headers.get('Content-Length') or 0)) or b'{}')
+                pid = str(req.get('pid') or '')
+                action = str(req.get('action') or '')
+                amount = float(req.get('amount') or 0)
+                if action not in ('invest', 'wait'):
+                    raise ValueError('неизвестный выбор')
+                with LOCK:
+                    ipo = DATA.get('ipo')
+                    if (not isinstance(ipo, dict) or ipo.get('resolved')
+                            or time.time() >= float(ipo.get('endsAt') or 0)):
+                        self._send_json({'ok': False, 'reason': 'closed'}, 200)
+                        return
+                    if pid in (ipo.get('choices') or {}):
+                        self._send_json({'ok': False, 'reason': 'already'}, 200)
+                        return
+                    p = next((x for x in DATA.get('players', []) if str(x.get('id')) == pid), None)
+                    if p is None:
+                        self._send_json({'ok': False, 'reason': 'no_player'}, 200)
+                        return
+                    stake = 0.0
+                    if action == 'invest':
+                        stake = round(max(0.0, amount), 2)
+                        if stake < 1:
+                            self._send_json({'ok': False, 'reason': 'no_amount'}, 200)
+                            return
+                        if stake > float(p.get('savings') or 0):
+                            self._send_json({'ok': False, 'reason': 'not_enough'}, 200)
+                            return
+                        p['savings'] = round(float(p.get('savings') or 0) - stake, 2)
+                    ipo.setdefault('choices', {})[pid] = {'a': action, 'stake': stake}
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True, 'action': action, 'stake': stake})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path == '/brace/launch':
+            # Ведущий: эпоха надвигается — окно подготовки всему столу (см. launch_brace).
+            try:
+                with LOCK:
+                    cur = DATA.get('brace')
+                    if (isinstance(cur, dict) and not cur.get('resolved')
+                            and time.time() < float(cur.get('endsAt') or 0)):
+                        self._send_json({'ok': False, 'reason': 'active'}, 200)
+                        return
+                    br = launch_brace()
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True, 'brace': {k: v for k, v in br.items() if k != 'epoch'}})
+            except Exception as e:
+                self._send_json({'error': str(e)}, 400)
+            return
+        if self.path == '/brace/choice':
+            # Игрок выбирает СТОЙКУ: defend | risk | health | none. Тихо — чужие не видят до резолва.
+            try:
+                req = json.loads(self.rfile.read(int(self.headers.get('Content-Length') or 0)) or b'{}')
+                pid = str(req.get('pid') or '')
+                stance = str(req.get('stance') or '')
+                if stance not in ('defend', 'risk', 'health', 'none'):
+                    raise ValueError('неизвестная стойка')
+                with LOCK:
+                    br = DATA.get('brace')
+                    if (not isinstance(br, dict) or br.get('resolved')
+                            or time.time() >= float(br.get('endsAt') or 0)):
+                        self._send_json({'ok': False, 'reason': 'closed'}, 200)
+                        return
+                    if pid in (br.get('choices') or {}):
+                        self._send_json({'ok': False, 'reason': 'already'}, 200)
+                        return
+                    p = next((x for x in DATA.get('players', []) if str(x.get('id')) == pid), None)
+                    if p is None:
+                        self._send_json({'ok': False, 'reason': 'no_player'}, 200)
+                        return
+                    br.setdefault('choices', {})[pid] = stance
+                    save_data(DATA)
+                    broadcast()
+                self._send_json({'ok': True, 'stance': stance})
             except Exception as e:
                 self._send_json({'error': str(e)}, 400)
             return

@@ -11085,6 +11085,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const b = state.board || {};
                 const base = state.view + '|' + b.turnIdx + '|' + (b.lastRoll||'') + '|' + buyWindowOpen()
                            + '|' + ((state.world||{}).id||'') + '|' + ((state.rumor||{}).id||'')
+                           + '|' + ((state.ipo||{}).id||'') + '|' + ((state.ipo||{}).resolved?1:0)
+                           + '|' + ((state.brace||{}).id||'') + '|' + ((state.brace||{}).resolved?1:0)
                            + '|' + (state.deals||[]).length + '|' + (state.p2p||[]).length;
                 if (state.view === 'player') {
                     const me = (state.players||[]).find(x => x.id == state.currentPlayerId);
@@ -11179,6 +11181,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (j.market) state.market = j.market;   // живые цены рынка
             state.world = j.world || null;           // мировое событие (broadcast)
             state.rumor = j.rumor || null;           // 🗞️ слух о следующем звене цепочки мира
+            state.ipo = j.ipo || null;               // 🚀 IPO монеты (broadcast всему столу)
+            state.brace = j.brace || null;           // 🌍 стойка перед эпохой (broadcast всему столу)
             state.board = j.board || null;           // поле (движок хода) — всегда свежее
             state.p2p = j.p2p || [];                 // сделки игрок↔игрок (#23/#24) — реестр целиком серверный
             state.auction = j.auction || null;       // 🔨 живые торги — вся судьба лотов на сервере
@@ -11419,7 +11423,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // на любом экране, остальные окна — по-прежнему только в бланке.
             if (state.view !== 'player') return renderWorldShow();
             const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return renderWorldShow();
-            return renderWorldShow() + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup();
+            return renderWorldShow() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup();
         }
         // 🎲 Личный попап «Твой ход» — показывается тому, чей ход настал, закрывается крестиком/кнопкой.
         function renderMyTurnPopup(){
@@ -12446,6 +12450,151 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                             </span>
                         </button>`).join('')}
                     <div style="font-size:10.5px;color:#6d6a62;text-align:center;line-height:1.45;margin-top:3px;">Решение тихое — остальные не видят, что ты выбрал.</div>
+                </div></div>`;
+        }
+        // ═══════ 🚀 IPO МОНЕТ — ранний вход (Ринат 31июл) ═══════
+        // Ведущий запустил новую монету → всему столу окно раннего входа. Влетел — ×3..10 в луну ИЛИ
+        // скам в ноль. Хайп и толпа орут FOMO и часто НЕ правы. Читаешь сигналы, не уверенность (как
+        // аналитик на бирже). Судьба монеты ОДНА на стол — решает сервер (resolve_ipo) по закрытии окна.
+        async function ipoChoose(pid, action){
+            const io = state.ipo; if(!io || io.resolved) return;
+            let amount = 0;
+            if(action==='invest'){
+                const el = document.getElementById('ipoAmt');
+                amount = Math.max(0, Math.floor(Number(el && el.value)||0));
+                if(amount < 1){ alert('Впиши сумму раннего входа.'); return; }
+                if(!confirm('🚀 Влететь в IPO «'+io.nm+'» на '+fmtN(amount)+'$?\n\nМожет быть ×3..10 в луну, а может — скам в ноль. Переиграть нельзя.')) return;
+            } else {
+                if(!confirm('🧊 Переждать «'+io.nm+'»?\n\nНичего не вложишь. Если монета стрельнёт — упустишь; если скам — сбережёшь деньги.')) return;
+            }
+            let j=null;
+            try{
+                const res = await fetch('/ipo/choice',{method:'POST',headers:{'Content-Type':'application/json'},
+                                                       body:JSON.stringify({pid:pid, action:action, amount:amount})});
+                j = await res.json();
+            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
+            if(!j || j.ok===false){
+                alert(j && j.reason==='already'     ? 'Ты уже решил по этому IPO.'
+                    : j && j.reason==='closed'      ? 'Поздно — окно раннего входа закрылось.'
+                    : j && j.reason==='not_enough'  ? 'Столько нет в кассе.'
+                    : j && j.reason==='no_amount'   ? 'Впиши сумму.'
+                    : 'Не получилось, попробуй ещё раз.');
+                return;
+            }
+            await pollServer(true); render();
+        }
+        // Сервер положил игроку итог по IPO (resolve_ipo) — показываем ОДИН раз через notify и стираем.
+        function ipoResultCheck(p){
+            const r = p && p.ipoResult; if(!r) return;
+            p.ipoResult = null;
+            if(!r.entered){
+                p.notify = r.moon
+                    ? '🚀 IPO «'+r.nm+'» УЛЕТЕЛО, а ты переждал. Осторожность стоила куша — иногда смелость вознаграждается.'
+                    : '🛡️ IPO «'+r.nm+'» оказалось скамом и обнулилось. Ты переждал и сберёг деньги — читать важнее, чем вестись.';
+            } else if(r.moon){
+                p.notify = '🌙 В ЛУНУ! IPO «'+r.nm+'» ×'+r.mult+': вложил '+fmtN(r.stake)+'$ → вернулось '+fmtN(r.back)+'$ (прибыль +'+fmtN(r.profit)+'$). Прочитал верно и рискнул рано.';
+            } else {
+                p.notify = '💀 СКАМ. IPO «'+r.nm+'» обнулилось — создатели вывели деньги. Потерял '+fmtN(-r.profit)+'$. Хайп кричал «ракета», а сигналы шептали правду.';
+            }
+            save(p.id);
+        }
+        function renderIpoModal(p){
+            const io = state.ipo;
+            if(!io || io.resolved || !p) return '';
+            if((io.choices||{})[String(p.id)]) return '';   // уже решил — окно не держим (ждёт резолва)
+            const cash = Math.round(Number(p.savings)||0);
+            const def  = Math.min(2000, cash);
+            const tells = (io.tells||[]).map(t=>`<div style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45;padding:7px 10px;border-radius:8px;border:1px solid var(--lx-line);background:var(--lx-ink);margin:5px 0;color:#cdc8bd;">• ${t}</div>`).join('');
+            return `<div style="position:fixed;inset:0;z-index:5292;background:rgba(3,5,8,.95);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;">
+                <div style="width:440px;max-width:100%;max-height:94vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:18px 16px;">
+                    <div style="text-align:center;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;margin-bottom:8px;">🚀 IPO · ранний вход</div>
+                    <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;">
+                        <div style="width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:27px;flex:0 0 auto;border:2px solid var(--lx-gold);background:#1a1608;">${io.emoji||'🪙'}</div>
+                        <div><div style="font-family:Georgia,serif;font-size:19px;font-weight:800;color:#f3efe6;line-height:1.1;">${io.nm||''}</div><div style="font-family:ui-monospace,monospace;font-size:11px;color:#6d6a62;">$${io.tk||''} · IPO · ведущий запустил</div></div>
+                    </div>
+                    <div style="font-size:13px;line-height:1.55;color:#e3ecf3;background:var(--lx-ink);border:1px solid var(--lx-line);border-left:3px solid #ffb454;border-radius:8px;padding:11px;margin:8px 0;">${io.story||''}</div>
+                    <div style="display:flex;align-items:center;gap:8px;margin:8px 0;font-size:12px;color:#ffd08a;">🔥 Хайп <span style="flex:1;height:8px;border-radius:6px;background:var(--lx-ink);border:1px solid var(--lx-line);overflow:hidden;"><i style="display:block;height:100%;width:${io.hype||60}%;background:linear-gradient(90deg,#ffb454,#ff5d5d);"></i></span> ${io.hype||60}%</div>
+                    <div style="font-size:12px;color:#9fb0bd;font-style:italic;margin:8px 0;">💬 ${io.crowd||''}</div>
+                    <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9c988e;font-weight:700;margin:12px 0 4px;">👁 Что видно за хайпом</div>
+                    ${tells}
+                    <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9c988e;font-weight:700;margin:12px 0 4px;">Сколько вложить в ранний вход · касса ${fmtN(cash)}$</div>
+                    <input id="ipoAmt" type="number" min="1" value="${def>0?def:''}" placeholder="напр. 2000" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;margin-bottom:10px;">
+                    <div style="display:flex;gap:8px;">
+                        <button onclick="ipoChoose(${p.id},'invest')" class="btn" style="flex:1;background:linear-gradient(180deg,#12251b,#0e1a13);color:#8ff0b6;border:1px solid #1f6b45;font-weight:800;padding:12px;">🚀 Влететь в IPO</button>
+                        <button onclick="ipoChoose(${p.id},'wait')" class="btn" style="flex:1;background:var(--lx-ink);color:#e8c987;border:1px solid #5a4a2a;font-weight:800;padding:12px;">🧊 Переждать</button>
+                    </div>
+                    <div style="font-size:10.5px;color:#6d6a62;text-align:center;line-height:1.45;margin-top:8px;">Ранний вход = максимальный риск и максимальный куш. Честный проект чаще стреляет, скам — обнуляется. Хайп и толпа врут — читай сигналы. Судьба монеты одна на весь стол.</div>
+                </div></div>`;
+        }
+        // ═══════ 🌍 СТОЙКА ПЕРЕД ЭПОХОЙ — «дирижёр» (Ринат 31июл, превью, одобрено 2авг) ═══════
+        // Поверх события: эпоха надвигается, сигналы намекают заранее (правда+шум), стол выбирает стойку
+        // (защита/риск/здоровье/ничего). Эпоха настала → угадал = +куш, встал не туда/проспал = минус.
+        // Судьба эпохи одна на стол, решает сервер (resolve_brace) по закрытии окна. Слух живёт отдельно.
+        const STANCES = {
+            defend: {emoji:'🛡️', nm:'Уйти в защиту',       c:'Кэш и золото. Спасает в кризис и войну.'},
+            risk:   {emoji:'📈', nm:'Рискнуть и вложиться', c:'Закупиться активами. Стреляет в бум и технологии.'},
+            health: {emoji:'🏥', nm:'Готовиться к худшему',  c:'Здоровье и запасы. Спасает в пандемию.'},
+            none:   {emoji:'😴', nm:'Ничего не делать',      c:'Плыть по течению. Почти всегда хуже.'},
+        };
+        const SECMETA = {birzha:['📈','Биржа'], rabota:['💼','Работа'], ferma:['🐄','Ферма'], zdorovie:['⚕️','Здоровье']};
+        async function braceChoose(pid, stance){
+            const br = state.brace; if(!br || br.resolved) return;
+            const st = STANCES[stance]; if(!st) return;
+            if(!confirm('🌍 Эпоха надвигается.\n\nТвоя стойка — «'+st.nm+'».\n'+st.c+'\n\nУгадаешь эпоху — заработаешь; встанешь не туда — потеряешь. Переиграть нельзя.')) return;
+            let j=null;
+            try{
+                const res = await fetch('/brace/choice',{method:'POST',headers:{'Content-Type':'application/json'},
+                                                         body:JSON.stringify({pid:pid, stance:stance})});
+                j = await res.json();
+            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
+            if(!j || j.ok===false){
+                alert(j && j.reason==='already' ? 'Ты уже выбрал стойку.'
+                    : j && j.reason==='closed'  ? 'Поздно — эпоха уже настала.'
+                    : 'Не получилось, попробуй ещё раз.');
+                return;
+            }
+            await pollServer(true); render();
+        }
+        function renderBraceModal(p){
+            const br = state.brace;
+            if(!br || br.resolved || !p) return '';
+            if((br.choices||{})[String(p.id)]) return '';   // уже выбрал — окно не держим (ждёт эпохи)
+            const sigs = (br.signals||[]).map(s=>`<div style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45;padding:7px 10px;border-radius:8px;border:1px solid var(--lx-line);background:var(--lx-ink);margin:5px 0;color:#cbd5e1;">📻 ${s.t}</div>`).join('');
+            const opts = Object.keys(STANCES).map(k=>`<button onclick="braceChoose(${p.id},'${k}')" class="btn" style="display:block;width:100%;text-align:left;margin:7px 0;padding:12px;border-radius:10px;border:1px solid var(--lx-line);background:var(--lx-ink);color:var(--lx-text);"><b style="display:block;font-size:13.5px;color:#f3efe6;margin-bottom:2px;">${STANCES[k].emoji} ${STANCES[k].nm}</b><span style="display:block;font-size:11.5px;color:#9c988e;line-height:1.42;white-space:normal;">${STANCES[k].c}</span></button>`).join('');
+            return `<div style="position:fixed;inset:0;z-index:5291;background:rgba(3,5,8,.95);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;">
+                <div style="width:440px;max-width:100%;max-height:94vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:18px 16px;">
+                    <div style="text-align:center;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;margin-bottom:6px;">🌍 Эпоха надвигается</div>
+                    <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:12px;">Мир живёт эпохами, и каждая меняет ВСЁ поле — биржу, работу, ферму, здоровье. Сигналы намекают, что грядёт. Среди них есть шум, и толпа паникует зря — читай, не поддавайся.</div>
+                    <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9c988e;font-weight:700;margin:4px 0 4px;">📡 Сигналы — что-то надвигается</div>
+                    ${sigs}
+                    <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9c988e;font-weight:700;margin:14px 0 4px;">Как подготовишься?</div>
+                    ${opts}
+                    <div style="font-size:10.5px;color:#6d6a62;text-align:center;line-height:1.45;margin-top:6px;">Угадаешь эпоху и встанешь верно — заработаешь. Не туда — потеряешь. Решение тихое — остальные не видят.</div>
+                </div></div>`;
+        }
+        function dismissBraceResult(pid){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            p.braceResult=null; save(pid); paintOverlays();
+        }
+        function renderBraceResult(p){
+            const r = p && p.braceResult; if(!r) return '';
+            const st = STANCES[r.stance]||{}, wn = STANCES[r.win]||{};
+            const secs = Object.keys(r.sectors||{}).map(k=>{const v=r.sectors[k];const col=v>0?'#5cb08b':v<0?'#cf9a9a':'#9aa7b3';const m=SECMETA[k]||['•',k];return `<div style="flex:1;min-width:64px;text-align:center;background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:9px;padding:8px 4px;"><div style="font-size:18px;">${m[0]}</div><div style="font-size:9.5px;color:#9c988e;margin-top:2px;">${m[1]}</div><div style="font-family:ui-monospace,monospace;font-weight:800;font-size:12px;margin-top:2px;color:${col};">${v>0?'+':''}${v}%</div></div>`;}).join('');
+            const good=r.good, d=Number(r.delta)||0;
+            const vcol=good?'#10b981':'#f43f5e', vbg=good?'rgba(16,185,129,.14)':'rgba(244,63,94,.14)';
+            const verdict = good ? '✅ Ты подготовился верно! '+(d>=0?'+':'')+fmtN(Math.round(d))+'$'
+                                 : (r.none ? '😴 Проспал — накрыло: '+fmtN(Math.round(d))+'$'
+                                           : '😵 Готовился не к тому: '+fmtN(Math.round(d))+'$');
+            return `<div style="position:fixed;inset:0;z-index:5293;background:rgba(3,5,8,.92);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto;">
+                <div style="width:430px;max-width:100%;max-height:94vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 16px;text-align:center;">
+                    <div style="font-size:44px;line-height:1;">${r.emoji||'🌍'}</div>
+                    <div style="font-family:Georgia,serif;font-size:20px;font-weight:800;color:${good?'#5cb08b':'#ffb454'};margin:4px 0;">Настала эпоха: ${r.nm||''}</div>
+                    <div style="font-size:13px;line-height:1.6;color:#d3dde6;margin:6px 0 10px;">${r.desc||''}</div>
+                    <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9c988e;font-weight:700;margin-bottom:6px;">Как тряхнуло поле</div>
+                    <div style="display:flex;gap:6px;margin:6px 0;flex-wrap:wrap;">${secs}</div>
+                    <div style="font-weight:800;padding:12px;border-radius:9px;margin:10px 0 4px;font-size:15px;color:${vcol};background:${vbg};border:1px solid ${vcol};">${verdict}</div>
+                    <div style="font-size:11.5px;color:#9c988e;line-height:1.5;margin-bottom:12px;">${good?'Ты услышал сигналы и встал правильно — эпоха сыграла на тебя.':'Выигрышная стойка была «'+(wn.nm||r.win)+'». Сигналы были — но ты встал не туда. В следующий раз читай внимательнее и не всегда верь толпе.'}</div>
+                    <button onclick="dismissBraceResult(${p.id})" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понял</button>
                 </div></div>`;
         }
         function renderPartnerModal(){
@@ -14453,6 +14602,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (p.cheatPick) { app.innerHTML = renderCheatPick(p);return; }      // 😈 выбор жертвы
             if (p.doorOpen)  { app.innerHTML = renderDoorModal(p);return; }      // 🚪 карты выбора
             rumorResultCheck(p);                                                 // 🗞️ слух сбылся или нет — сказать один раз
+            ipoResultCheck(p);                                                   // 🚀 IPO: луна/скам/увернулся — сказать один раз
             soulCheck(p);                                                        // 🕯️ карта духа приходит сама
             if (p.soulCard) { app.innerHTML = renderSoulModal(p); return; }      // 🕯️ весь экран: голос внутри
             const f = calc(p);
@@ -14950,6 +15100,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <button onclick="boardNudge(1)" class="btn btn-gray" title="Поправка: фишка выбранного игрока на клетку ВПЕРЁД. Чистый сдвиг — без зарплат, тюрьмы и уровней.">Фишку ➡</button>
                     <button onclick="boardNext()" class="btn btn-gray">Ход дальше ▶</button>
                     <button onclick="hostDrawWorld()" class="btn" style="background:linear-gradient(90deg,#0891b2,#22d3ee);color:#fff;font-weight:800;" title="Раз в круг: тянет мировое событие, применяет ко ВСЕМ и показывает на всех экранах">🌍 Событие круга</button>
+                    <button onclick="hostLaunchIpo()" class="btn" style="background:linear-gradient(90deg,#7a5a12,#efd8a3);color:#20180a;font-weight:800;" title="Запустить IPO новой монеты — всему столу окно раннего входа на 90с (×10 в луну или скам в ноль)">🚀 Запустить IPO</button>
+                    <button onclick="hostLaunchBrace()" class="btn" style="background:linear-gradient(90deg,#334155,#64748b);color:#fff;font-weight:800;" title="Эпоха надвигается — всему столу окно подготовки на 90с: сигналы + выбор стойки (защита/риск/здоровье). Угадал = куш, не туда = минус.">⏳ Эпоха грядёт</button>
                 </div>
                 <div style="display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:8px;border-top:1px solid var(--lx-gold-ln);padding-top:8px;">
                     <span style="font-size:11px;color:var(--lx-muted);font-weight:700;text-transform:uppercase;letter-spacing:.12em;">⏱ Таймер хода:</span>
@@ -16416,6 +16568,24 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             state.world = { id: Date.now(), emoji:ev.emoji, title:ev.title, text:ev.text };
             // seen НЕ отмечаем — ведущий тоже увидит оверлей вместе со всеми
             save(); render();
+        }
+        // ВЕДУЩИЙ: запускает IPO новой монеты — сервер рассылает окно раннего входа всему столу (оверлей
+        // через SSE), по закрытии окна сам резолвит судьбу монеты (resolve_ipo). Клиент только просит запуск.
+        function hostLaunchIpo(){
+            if(!SERVER_MODE){ alert('🚀 IPO работает только на сервере (общий стол).'); return; }
+            fetch('/ipo/launch',{method:'POST',headers:{'Content-Type':'application/json'}})
+              .then(r=>r.json())
+              .then(j=>{ if(j && j.ok===false && j.reason==='active') alert('🚀 IPO уже идёт — дождись, пока закроется окно раннего входа.'); })
+              .catch(e=>console.warn('ipo:',e));
+        }
+        // ВЕДУЩИЙ: объявляет надвигающуюся эпоху — сервер рассылает окно подготовки всему столу (оверлей
+        // через SSE), по закрытии окна сам резолвит стойки (resolve_brace). Клиент только просит запуск.
+        function hostLaunchBrace(){
+            if(!SERVER_MODE){ alert('🌍 Стойка перед эпохой работает только на сервере (общий стол).'); return; }
+            fetch('/brace/launch',{method:'POST',headers:{'Content-Type':'application/json'}})
+              .then(r=>r.json())
+              .then(j=>{ if(j && j.ok===false && j.reason==='active') alert('⏳ Эпоха уже надвигается — дождись, пока закроется окно подготовки.'); })
+              .catch(e=>console.warn('brace:',e));
         }
         function maybeShowWorld(){
             if (!state.world || !state.world.id) return;
