@@ -10955,7 +10955,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function farmBuyFeedType(ft){ const p=farmMe(); if(!p||!p.farm) return; const T=(FARM_CFG.feedTypes||{})[ft]; if(!T) return; const b=T.bundle; if(p.savings<b.cost){ alert('Не хватает кассы. '+T.name+': '+b.qty+' за '+fmtN(b.cost)+'$.'); return; } farmSpend(p,b.cost); p.farm.feedStores=p.farm.feedStores||{}; p.farm.feedStores[ft]=(Number(p.farm.feedStores[ft])||0)+b.qty; save(p.id); render(); }
         function farmTractors(p){ return (p&&p.farm)?(Number(p.farm.tractors)|| (p.farm.tractor?1:0)):0; }   // 🚜 сколько тракторов (совместимость со старым boolean)
-        function farmBuyTractor(){ const p=farmMe(); if(!p||!p.farm) return; if(p.savings<FARM_CFG.tractor){ alert('Не хватает кассы. Трактор: '+fmtN(FARM_CFG.tractor)+'$.'); return; } farmSpend(p,FARM_CFG.tractor); p.farm.tractors=farmTractors(p)+1; p.farm.tractor=true; save(p.id); render(); alert('🚜 Ещё трактор куплен! Всего '+farmTractors(p)+'. Каждый тянет +'+FARM_CFG.tractorSelfBoost+' голов — работников нужно меньше.'); }
+        function farmBuyTractor(){ const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.tractor; const boost=FARM_CFG.tractorSelfBoost||0; const heads=farmHeads(p); const covered=farmSelfCap(p); const deficit=Math.max(0,heads-covered); const suggest=boost>0?Math.max(1,Math.ceil(deficit/boost)):1;
+            farmAskQty({ title:'🚜 Трактор — купить', note:'Цена '+fmtN(price)+'$/шт. Каждый тянет +'+boost+' голов сам — меньше нужно фермеров. Есть '+farmTractors(p)+' · голов на ферме '+heads+' · сам тянешь '+covered+(deficit>0?(' → не хватает на '+deficit):' → хватает на всех'), def:suggest, min:1, max:99, okLabel:'Купить',
+                preview:(q)=>{ const cost=price*q; const pp=farmMe(); const newCap=covered+q*boost; return 'Итого <b>'+fmtN(cost)+'$</b> за '+q+' шт · сам будешь тянуть <b>'+newCap+'</b> голов'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
+                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=price*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } farmSpend(pp,cost); pp.farm.tractors=farmTractors(pp)+qty; pp.farm.tractor=true; save(pp.id); render(); farmToast('🚜 Куплено тракторов: +'+qty+' (всего '+farmTractors(pp)+')'); } }); }
         // 🧊 ХОЛОДИЛЬНИК тирами (ёмкость + расширение до огромных)
         function farmFridgeTier(p){ return (p&&p.farm)?(Number(p.farm.fridgeTier)|| (p.farm.fridge?1:0)):0; }
         function farmFridgeCap(p){ const t=farmFridgeTier(p); return t>0?FRIDGE_TIERS[Math.min(t,FRIDGE_TIERS.length)-1].cap:0; }
@@ -10975,7 +10978,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmPastureTier(p){ return (p&&p.farm)?(Number(p.farm.pasture)||0):0; }
         function farmPastureCap(p){ const t=farmPastureTier(p); return t>0?PASTURE_SIZES[Math.min(t,PASTURE_SIZES.length)-1].cap:0; }
         function farmBuyPasture(){ const p=farmMe(); if(!p||!p.farm) return; const t=farmPastureTier(p); if(t>=PASTURE_SIZES.length){ alert('🐄 Уже огромное ранчо — расширять некуда.'); return; } const nx=PASTURE_SIZES[t]; if(p.savings<nx.price){ alert('Не хватает кассы. «'+nx.name+'» стоит '+fmtN(nx.price)+'$.'); return; } farmSpend(p,nx.price); p.farm.pasture=t+1; save(p.id); render(); alert('🐄 '+(t===0?'Куплено':'Расширено до «'+nx.name+'»')+' — вмещает '+fmtN(nx.cap)+' ангусов на выгуле. Строить тут нельзя, только выгул.'); }
-        function farmBuyWater(){ const p=farmMe(); if(!p||!p.farm) return; const b=FARM_CFG.waterBundle; if(p.savings<b.cost){ alert('Не хватает кассы. Вода: '+b.qty+' за '+fmtN(b.cost)+'$.'); return; } farmSpend(p,b.cost); p.farm.waterStock=(Number(p.farm.waterStock)||0)+b.qty; save(p.id); render(); }
+        function farmBuyWater(){ const p=farmMe(); if(!p||!p.farm) return; const b=FARM_CFG.waterBundle; const use=(FARM_CFG.usePerHeadYr||12); const heads=farmHeads(p); const need=heads*use; const have=Math.floor(Number(p.farm.waterStock)||0); const unit=b.cost/b.qty; const deficit=Math.max(0,need-have); const def=Math.max(b.qty, Math.ceil((deficit||b.qty)/b.qty)*b.qty);
+            farmAskQty({ title:'💧 Вода — купить запас', note:'Цена '+unit.toFixed(2)+'$/ед (пачка '+b.qty+' за '+fmtN(b.cost)+'$). Запас '+fmtN(have)+' · пьют ~'+Math.round(need)+'/год. Это разовая покупка из кассы — НЕ ежемесячный платёж (ежемесячно тянет только 🚰 водопровод).', def:def, min:1, max:999999, okLabel:'Купить',
+                preview:(q)=>{ const cost=Math.round(q*unit); const pp=farmMe(); const lasts=need>0?((have+q)/need):null; return 'Стоит <b>'+fmtN(cost)+'$</b>'+(lasts!=null?' · хватит на ~'+lasts.toFixed(1)+' лет':' · пока некого поить')+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
+                onOk:(q)=>{ const pp=farmMe(); if(!pp||!pp.farm||q<1) return; const cost=Math.round(q*unit); if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } farmSpend(pp,cost); pp.farm.waterStock=(Number(pp.farm.waterStock)||0)+q; save(pp.id); render(); farmToast('💧 Куплено воды: +'+fmtN(q)+' ед. (запас '+fmtN(Math.floor(Number(pp.farm.waterStock)||0))+')'); } }); }
         function farmInstallWater(){ const p=farmMe(); if(!p||!p.farm) return; if(p.farm.waterMain){ alert('Водопровод уже проведён.'); return; } const cost=(FARM_CFG.waterMainByLand||{})[p.farm.land]||5000; if(p.savings<cost){ alert('Не хватает кассы. Провести воду на «'+FARM_CFG.land[p.farm.land].name+'»: '+fmtN(cost)+'$ (чем больше земля — тем дороже).'); return; } farmSpend(p,cost); p.farm.waterMain=true; save(p.id); render(); alert('🚰 Вода проведена! Скот поится сам — но содержание тянет пассив '+FARM_CFG.waterPerHeadMo+'$/гол/мес.'); }
         function farmToggleAutoFeed(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.autoFeed=!p.farm.autoFeed; save(p.id); render(); }
         function farmHireWorker(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.workers=(Number(p.farm.workers)||0)+1; save(p.id); render(); }
@@ -12403,6 +12409,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div class="block-title" style="margin:0;">🔨 Торги идут</div>
                     <span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#f87171;background:rgba(185,28,28,.14);border:1px solid #7f1d1d;border-radius:999px;padding:4px 10px;">● live</span>
                 </div>
+                ${aucRarityBar()}
+                ${(function(){ const rk=state.aucRarity; if(!rk||!cur) return ''; const it=COL_ITEMS[cur.item]||{}; const lr=(it.rar)||'gray'; if(lr===rk) return `<div style="font-size:11px;color:${COL_RAR[rk].c};text-align:center;margin-bottom:8px;font-weight:700;">✦ Этот лот — твоя редкость «${COL_RAR[rk].t}». Лови!</div>`; return `<div style="font-size:11px;color:#8a8378;text-align:center;margin-bottom:8px;">Сейчас на молотке «${COL_RAR[lr]?COL_RAR[lr].t:lr}», а ты ждёшь «${COL_RAR[rk].t}» — следующие лоты в очереди.</div>`; })()}
                 ${lotHtml}
                 ${qn?`<div style="font-size:11px;color:#9c988e;text-align:center;margin-top:8px;">⏳ ждут молотка: ещё ${qn} лот${qn==1?'':qn<5?'а':'ов'}</div>`:''}
                 ${darkLeft>0?`<div style="display:flex;gap:10px;align-items:center;background:linear-gradient(180deg,#12151c,#0c0f14);border:1px solid #2b2f3a;border-radius:13px;padding:10px;margin-top:11px;">
@@ -15791,9 +15799,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 out += `<div class="row-item" style="border-color:${low?'#b45309':'#3a6ea5'};">${farmThumb(T.img)}<div style="flex:1;"><b>${T.name}</b><div style="font-size:11px;color:#9ca3af;">${p.farm.autoFeed?'авто-корм подаёт сам':`запас <b style="color:${low?'#f87171':'#10b981'};">${have}</b> · нужно ~${Math.round(_needBy[ft])}/год · хватит на ~${lasts.toFixed(1)} лет${low?' <b style="color:#f87171;">⚠️ мало — голод!</b>':''}`}</div></div>${p.farm.autoFeed?'':`<button onclick="farmFeedBuyWindow('${ft}')" class="btn btn-amber" style="white-space:nowrap;">Купить…</button>`}</div>`;
             }
             const _wheads=farmHeads(p), _wneed=_wheads*_use, _wat=Math.floor(Number(p.farm.waterStock)||0), _wlow=_wheads>0 && !p.farm.waterMain && _wat<_wneed;
-            out += `<div class="row-item" style="border-color:${_wlow?'#b45309':'#3a6ea5'};">${farmThumb(p.farm.waterMain?'farm_waterpipe':'farm_water')}<div style="flex:1;"><b>💧 Вода</b><div style="font-size:11px;color:#9ca3af;">${p.farm.waterMain?'водопровод поит сам':`запас <b style="color:${_wlow?'#f87171':'#10b981'};">${_wat}</b> · нужно ~${Math.round(_wneed)}/год${_wlow?' <b style="color:#f87171;">⚠️ мало — падёж!</b>':''}`}</div></div>${p.farm.waterMain?'<b style="color:#10b981;font-size:12px;">✅ есть</b>':`<button onclick="farmBuyWater()" class="btn btn-blue" style="white-space:nowrap;">+${FARM_CFG.waterBundle.qty} · ${FARM_CFG.waterBundle.cost}$</button>`}</div>`;
+            out += `<div class="row-item" style="border-color:${_wlow?'#b45309':'#3a6ea5'};">${farmThumb(p.farm.waterMain?'farm_waterpipe':'farm_water')}<div style="flex:1;"><b>💧 Вода</b><div style="font-size:11px;color:#9ca3af;">${p.farm.waterMain?'водопровод поит сам':`запас <b style="color:${_wlow?'#f87171':'#10b981'};">${_wat}</b> · нужно ~${Math.round(_wneed)}/год${_wlow?' <b style="color:#f87171;">⚠️ мало — падёж!</b>':''}`}</div></div>${p.farm.waterMain?'<b style="color:#10b981;font-size:12px;">✅ есть</b>':`<button onclick="farmBuyWater()" class="btn btn-blue" style="white-space:nowrap;">Купить…</button>`}</div>`;
             const _tr=farmTractors(p);
-            out += `<div class="row-item" style="border-color:#6366f1;">${farmThumb('farm_tractor')}<div style="flex:1;"><b>🚜 Тракторы</b><div style="font-size:11px;color:#9ca3af;">${_tr>0?`есть ${_tr} · сам тянешь +${_tr*FARM_CFG.tractorSelfBoost} голов`:'механизация — меньше нужно фермеров'}</div></div><button onclick="farmBuyTractor()" class="btn btn-amber" style="white-space:nowrap;">Купить +1 · ${fmtN(FARM_CFG.tractor)}$</button></div>`;
+            out += `<div class="row-item" style="border-color:#6366f1;">${farmThumb('farm_tractor')}<div style="flex:1;"><b>🚜 Тракторы</b><div style="font-size:11px;color:#9ca3af;">${_tr>0?`есть ${_tr} · сам тянешь +${_tr*FARM_CFG.tractorSelfBoost} голов`:'механизация — меньше нужно фермеров'}</div></div><button onclick="farmBuyTractor()" class="btn btn-amber" style="white-space:nowrap;">Купить…</button></div>`;
             out += `<div class="row-item" style="border-color:#3a6ea5;">${farmThumb('farm_waterpipe')}<div style="flex:1;"><b>🚰 Водопровод</b><div style="font-size:11px;color:#9ca3af;">${p.farm.waterMain?`проведён · авто-вода −${farmWaterCost(p)}$/мес · падежа по воде нет`:`провести на «${FARM_CFG.land[p.farm.land].name}» — чем больше земля, тем дороже`}</div></div>${p.farm.waterMain?`<b style="color:#10b981;font-size:12px;">✅ есть</b>`:`<button onclick="farmInstallWater()" class="btn btn-amber" style="white-space:nowrap;">Провести ${fmtN((FARM_CFG.waterMainByLand||{})[p.farm.land]||5000)}$</button>`}</div>`;
             out += `<div class="row-item" style="border-color:#3a6ea5;">${farmThumb('farm_grain')}<div style="flex:1;"><b>🌾 Авто-корм</b><div style="font-size:11px;color:#9ca3af;">${p.farm.autoFeed?`включён · −${farmAutoFeedCost(p)}$/мес · падежа по корму нет`:'без него корм покупаешь вручную — кончился, будет падёж'}</div></div><button onclick="farmToggleAutoFeed()" class="btn ${p.farm.autoFeed?'btn-gray':'btn-amber'}">${p.farm.autoFeed?'Выключить':'Включить'}</button></div>`;
             const _need=farmWorkersNeeded(p), _have=Number(p.farm.workers)||0, _eff=farmEffWorkers(p), _staff=Math.round(farmStaffedFrac(p)*100);
@@ -16020,19 +16028,33 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     rows+=`<div class="row-item">${farmThumb(cf.img)}<div style="flex:1;"><b>${cf.name}</b> <span style="font-size:10px;color:#6b7280;">· ${cf.tier}</span><div style="font-size:12px;">${status}</div><div style="font-size:11px;color:#9ca3af;">${sustain}</div></div><button onclick="farmCancelContract('${c.id}')" class="btn btn-gray" style="white-space:nowrap;">Расторгнуть</button></div>`; }
                 out+=`<div class="card"><div class="block-title">📜 Мои контракты · пассив +${fmtN(totalMo)}$/мес</div>${rows}</div>`;
             }
-            // доступные
+            // доступные — КАРТОЧКАМИ (Ринат 4авг): фото сбоку · что даёт в описании · «Подписать» снизу
             let av='';
             for(const id in FARM_CONTRACTS){ if(signedIds.indexOf(id)>=0) continue; const cf=FARM_CONTRACTS[id];
                 const locked=rep<cf.rep; const have=Math.floor(Number((p.farm.stock||{})[cf.prod])||0); const rate=farmProdRate(p,cf.prod);
                 const canSupply = cf.prod==='meat' ? (have>=cf.qtyYr) : (rate>=cf.qtyYr || have>=cf.qtyYr);
                 const need = cf.prod==='meat'
-                    ? `нужно ${fmtN(cf.qtyYr)} мяса/год (склад ${fmtN(have)})`
-                    : `нужно ${fmtN(cf.qtyYr)}/год · ты производишь ~${fmtN(rate)}/год`;
-                const btn = locked
-                    ? `<span style="font-size:11px;color:#e0a3a3;white-space:nowrap;">🔒 репутация ≥${cf.rep}</span>`
-                    : `<button onclick="farmSignContract('${id}')" class="btn btn-green" style="white-space:nowrap;">Подписать</button>`;
-                av+=`<div class="row-item" style="opacity:${locked?0.6:1};">${farmThumb(cf.img)}<div style="flex:1;"><b>${cf.name}</b> <span style="font-size:10px;color:#6b7280;">· ${cf.tier}</span><div style="font-size:12px;color:#10b981;">+${fmtN(cf.payMo)}$/мес пассив · ${FARM_STOCK_LABELS[cf.prod]||cf.prod}</div><div style="font-size:11px;color:${canSupply?'#9ca3af':'#e0a3a3'};">${need}${canSupply?'':' — маловато, расширяй ферму'}</div></div>${btn}</div>`; }
-            out+=`<div class="card"><div class="block-title">🤝 Доступные заказчики</div><p style="font-size:11.5px;color:#9ca3af;margin-bottom:8px;">Репутация растёт от добрых дел за столом (её видит ведущий). Подписывай, когда ферма реально тянет объём — иначе разрыв и минус к репутации.</p>${av}</div>`;
+                    ? `нужно ${fmtN(cf.qtyYr)} мяса/год · склад ${fmtN(have)}`
+                    : `нужно ${fmtN(cf.qtyYr)}/год · производишь ~${fmtN(rate)}/год`;
+                const supplyLine = canSupply
+                    ? `<span style="color:#10b981;">${need} · ферма тянет ✓</span>`
+                    : `<span style="color:#e0a3a3;">${need} — маловато, расширяй ферму</span>`;
+                const foot = locked
+                    ? `<div style="padding:10px;text-align:center;font-size:11.5px;color:#e0a3a3;background:#1a1410;border-top:1px solid #242833;">🔒 откроется при репутации ≥${cf.rep}</div>`
+                    : `<button onclick="farmSignContract('${id}')" class="btn btn-green" style="border-radius:0;width:100%;padding:11px;font-weight:800;font-size:13px;">✍️ Подписать контракт</button>`;
+                av+=`<div style="opacity:${locked?0.55:1};background:#12151c;border:1px solid ${locked?'#242833':'#2f6b4a'};border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
+                    <div style="display:flex;gap:11px;padding:11px;">
+                        <div style="flex:0 0 84px;">${farmImg(cf.img,84)||'<div style=\"width:100%;height:84px;border-radius:12px;background:#0a0806;\"></div>'}</div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:800;font-size:14px;line-height:1.2;">${cf.name}</div>
+                            <div style="font-size:9.5px;color:#7c8698;text-transform:uppercase;letter-spacing:.4px;margin:2px 0 6px;">${cf.tier}</div>
+                            <div style="font-size:16px;font-weight:800;color:#10b981;line-height:1;">+${fmtN(cf.payMo)}$<span style="font-size:11px;color:#9ca3af;font-weight:600;">/мес пассив</span></div>
+                            <div style="font-size:11px;color:#c9c2b4;margin-top:5px;">📦 поставляешь: <b>${FARM_STOCK_LABELS[cf.prod]||cf.prod}</b></div>
+                            <div style="font-size:10.5px;margin-top:3px;line-height:1.35;">${supplyLine}</div>
+                        </div>
+                    </div>${foot}
+                </div>`; }
+            out+=`<div class="card"><div class="block-title">🤝 Доступные заказчики</div><p style="font-size:11.5px;color:#9ca3af;margin-bottom:10px;">Репутация растёт от добрых дел за столом (её видит ведущий). Подписывай, когда ферма реально тянет объём — иначе разрыв и минус к репутации.</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">${av}</div></div>`;
             return out;
         }
         function renderFarmWarehouse(p){
