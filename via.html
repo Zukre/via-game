@@ -10750,7 +10750,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // накопленного товара (продастся). egg_ostrich/farm_ostrichegg/farm_duckeggs — картинки Ринат догенерит.
         const FARM_STOCK_LABELS = { egg_hen:'🥚 Куриные яйца', egg_duck:'🥚 Утиные яйца', egg_ostrich:'🥚 Страусиные яйца', eggs:'🥚 Яйца', milk:'🥛 Молоко', shubat:'🥛 Шубат (верблюжье)', meat:'🥩 Мясо', hooves:'🦴 Копыта', horns:'🦬 Рога', caviar:'🍥 Икра', blackcaviar:'🖤 Чёрная икра', fish:'🐟 Рыба', honey:'🍯 Мёд', wool:'🧶 Шерсть', feath:'🪶 Перья', flowers:'🌹 Цветы', micro:'🌱 Микрозелень', fruits:'🍇 Виноград/фрукты', fert:'💩 Удобрения', crocleather:'🐊 Кожа крокодила', bag:'👜 Сумка из кожи' };
         // 📦 картинка товара на складе (нет файла → farmThumb сам скроет, пока не сгенерим)
-        const FARM_PROD_IMG = { egg_hen:'farm_eggs', egg_duck:'farm_duckeggs', egg_ostrich:'farm_ostrichegg', eggs:'farm_eggs', milk:'farm_milk', shubat:'farm_shubat', meat:'farm_beef', hooves:'farm_hooves', horns:'farm_horns', caviar:'farm_caviar', blackcaviar:'farm_blackcaviar', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer', crocleather:'farm_crocleather', bag:'farm_crocbag' };
+        const FARM_PROD_IMG = { egg_hen:'farm_eggs', egg_duck:'farm_duckeggs', egg_ostrich:'farm_ostrichegg', eggs:'farm_eggs', milk:'farm_milk', shubat:'farm_camel', meat:'farm_beef', hooves:'farm_hooves', horns:'farm_horns', caviar:'farm_caviar', blackcaviar:'farm_blackcaviar', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer', crocleather:'farm_crocleather', bag:'farm_crocbag' };
         // 🐊👜 КОЖА → СУМКИ и 🦴🦬 КОПЫТА/РОГА (Ринат 4авг): кожу крокодила шьёшь в дорогие сумки (мастерская в ⚗️ Производство);
         //   копыта и рога капают побочкой с убоя копытного скота и продаются на складе. Числа — черновик под тюнинг.
         const FARM_LEATHER = { perBag:150, bagValue:650 };                 // 150 ед. кожи → сумка ценой ~650 (наценка ×4)
@@ -10770,7 +10770,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             grill:      {name:'🍖 Кафе-гриль «Уголёк»',       prod:'meat',       qtyYr:2400,  payMo:400,  rep:10, img:'farm_beef',       tier:'ремесло'},
             sushi:      {name:'🍥 Суши-бар «Волна»',          prod:'caviar',     qtyYr:60,    payMo:350,  rep:15, img:'farm_caviar',     tier:'ремесло'},
             flowers:    {name:'🌹 Цветочная сеть «Астра»',    prod:'flowers',    qtyYr:200,   payMo:350,  rep:20, img:'farm_flowers',    tier:'сеть'},
-            ethno:      {name:'🐫 Этно-ресторан «Дала»',      prod:'shubat',     qtyYr:60,    payMo:500,  rep:25, img:'farm_shubat',     tier:'сеть'},
+            ethno:      {name:'🐫 Этно-ресторан «Дала»',      prod:'shubat',     qtyYr:60,    payMo:500,  rep:25, img:'farm_camel',      tier:'сеть'},
             bigmilk:    {name:'🥛 Молочный завод (сеть)',      prod:'milk',       qtyYr:3000,  payMo:1400, rep:30, img:'farm_milk',       tier:'сеть'},
             steak:      {name:'🥩 Стейк-хаус «Ангус Prime»',  prod:'meat',       qtyYr:8000,  payMo:1200, rep:40, img:'farm_angussteak', tier:'премиум'},
             caviarhouse:{name:'🖤 Икорный дом «Каспий»',      prod:'blackcaviar',qtyYr:30,    payMo:900,  rep:40, img:'farm_blackcaviar',tier:'премиум'},
@@ -10961,7 +10961,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmBuyFeedType(ft){ const p=farmMe(); if(!p||!p.farm) return; const T=(FARM_CFG.feedTypes||{})[ft]; if(!T) return; const b=T.bundle; if(p.savings<b.cost){ alert('Не хватает кассы. '+T.name+': '+b.qty+' за '+fmtN(b.cost)+'$.'); return; } farmSpend(p,b.cost); p.farm.feedStores=p.farm.feedStores||{}; p.farm.feedStores[ft]=(Number(p.farm.feedStores[ft])||0)+b.qty; save(p.id); render(); }
         function farmTractors(p){ return (p&&p.farm)?(Number(p.farm.tractors)|| (p.farm.tractor?1:0)):0; }   // 🚜 сколько тракторов (совместимость со старым boolean)
         function farmBuyTractor(){ const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.tractor; const boost=FARM_CFG.tractorSelfBoost||0; const heads=farmHeads(p); const covered=farmSelfCap(p); const deficit=Math.max(0,heads-covered); const suggest=boost>0?Math.max(1,Math.ceil(deficit/boost)):1;
-            farmAskQty({ title:'🚜 Трактор — купить', note:'Цена '+fmtN(price)+'$/шт. Каждый тянет +'+boost+' голов сам — меньше нужно фермеров. Есть '+farmTractors(p)+' · голов на ферме '+heads+' · сам тянешь '+covered+(deficit>0?(' → не хватает на '+deficit):' → хватает на всех'), def:suggest, min:1, max:99, okLabel:'Купить',
+            farmAskQty({ title:'🚜 Трактор — купить', note:'Цена '+fmtN(price)+'$/шт. Каждый тянет +'+boost+' голов сам — меньше нужно фермеров. Есть '+farmTractors(p)+' · голов на ферме '+heads+' · сам тянешь '+covered+(deficit>0?(' → не хватает на '+deficit):' → хватает на всех'), def:suggest, min:1, max:999, okLabel:'Купить',
                 preview:(q)=>{ const cost=price*q; const pp=farmMe(); const newCap=covered+q*boost; return 'Итого <b>'+fmtN(cost)+'$</b> за '+q+' шт · сам будешь тянуть <b>'+newCap+'</b> голов'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
                 onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=price*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } farmSpend(pp,cost); pp.farm.tractors=farmTractors(pp)+qty; pp.farm.tractor=true; save(pp.id); render(); farmToast('🚜 Куплено тракторов: +'+qty+' (всего '+farmTractors(pp)+')'); } }); }
         // 🧊 ХОЛОДИЛЬНИК тирами (ёмкость + расширение до огромных)
@@ -12287,13 +12287,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function renderColPanel(p){
             const col = p.collection || [];
             const worth = col.reduce((s,c)=>s+colPrice(c.key),0);
+            const colW = colRepWeight(p), setsFull = colSetsFull(p);   // 💎 вес имени за столом
             const themeChips = ['time','art','word','power'].map(t=>{
                 const have = new Set(col.filter(c=>(COL_ITEMS[c.key]||{}).theme===t).map(c=>c.key)).size;
                 const total = Object.values(COL_ITEMS).filter(i=>i.theme===t).length;
                 const full = have>=3;
                 return `<div style="background:${full?'radial-gradient(120% 120% at 50% 0,rgba(217,184,119,.22),transparent 70%),#12151c':'#0d1016'};border:1px solid ${full?'var(--lx-gold-ln)':'#242833'};border-radius:10px;padding:8px 10px;text-align:center;">
                     <div style="font-size:11px;font-weight:700;color:${full?'#efd8a3':'#9c988e'};">${COL_THEME_LBL[t]}</div>
-                    <div style="font-family:ui-monospace,monospace;font-size:13px;font-weight:700;margin-top:2px;color:${full?'#efd8a3':'#6d6a62'};">${have} / 3${full?' ✓':''}</div></div>`;
+                    <div style="font-family:ui-monospace,monospace;font-size:13px;font-weight:700;margin-top:2px;color:${full?'#efd8a3':'#6d6a62'};">${have} / 3${full?` ✓ <span style="font-size:10px;color:#d9b877;">+${COL_SET_REP}</span>`:''}</div></div>`;
             }).join('');
             const cards = col.map((c,i)=>{
                 const it = COL_ITEMS[c.key]; if(!it) return '';
@@ -12314,6 +12315,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${col.length?`<div style="display:flex;justify-content:space-between;align-items:baseline;background:#0d1016;border:1px solid #242833;border-radius:11px;padding:9px 12px;margin-bottom:10px;">
                     <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6d6a62;font-weight:700;">Красная цена коллекции</span>
                     <b style="font-family:ui-monospace,monospace;font-size:17px;color:#efd8a3;">${fmtN(worth)}$</b></div>`:''}
+                ${colW>0?`<div style="background:radial-gradient(120% 120% at 50% 0,rgba(217,184,119,.18),transparent 70%),#12151c;border:1px solid var(--lx-gold-ln);border-radius:11px;padding:10px 12px;margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-size:11px;font-weight:800;color:#efd8a3;">💎 Вес имени за столом</span><b style="font-family:ui-monospace,monospace;font-size:16px;color:#efd8a3;">+${colW} к репутации</b></div>
+                    <div style="font-size:10.5px;color:#9c988e;line-height:1.5;margin-top:4px;">${setsFull?`собрано сетов: <b style="color:#efd8a3;">${setsFull}</b> · `:''}редкости и полные сеты поднимают твоё имя. Это видит государство (льготы, гранты) и заказчики фермы — козырь и на двери 2-го круга.</div></div>`:''}
                 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:11px;">${themeChips}</div>
                 ${col.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;">${cards}</div>`
                              : '<p style="font-size:12px;color:#6d6a62;line-height:1.55;margin:0;">Коллекция пуста. Вещи приходят только с торгов: живой молоток и запечатанные ящики. Аукцион открывает ведущий — не пропусти.</p>'}
@@ -14460,6 +14464,27 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Считается из поступков заново каждый раз, поэтому её не затрёт ни один пуш сервера.
         // Утонула ниже REP_CURSE_AT — значит человек СИСТЕМАТИЧЕСКИ играл против живых → колода сгорает.
         const REP_CURSE_AT = -60;
+        // 💎 ВЕС КОЛЛЕКЦИИ (Ринат 23июл замысел, вживлено 4авг): собранный сет темы + редчайшие вещи =
+        // «вес твоего имени за столом». Собранное входит в репутацию → чистому коллекционеру потом
+        // льготы государства, жирные контракты фермы, козырь на двери 2-го круга. Числа — ЧЕРНОВИК.
+        const COL_SET_REP = 10;     // полный сет одной темы (≥3 вещей) = +10 веса
+        const COL_MYTHIC_REP = 10;  // мифик в коллекции = +10
+        const COL_LEGEND_REP = 15;  // легендарка = +15
+        const COL_REP_CAP = 45;     // потолок вклада коллекции в репутацию
+        function colSetsFull(p){
+            const col=(p&&p.collection)||[]; let n=0;
+            for(const t of ['time','art','word','power']){
+                const have=new Set(col.filter(c=>(COL_ITEMS[c.key]||{}).theme===t).map(c=>c.key)).size;
+                if(have>=3) n++;
+            }
+            return n;   // сколько тем собрано полностью
+        }
+        function colRepWeight(p){
+            const col=(p&&p.collection)||[]; if(!col.length) return 0;
+            let w=colSetsFull(p)*COL_SET_REP;
+            for(const c of col){ const it=COL_ITEMS[c.key]||{}; if(it.rar==='legend') w+=COL_LEGEND_REP; else if(it.rar==='mythic') w+=COL_MYTHIC_REP; }
+            return Math.min(COL_REP_CAP, w);
+        }
         function repScore(p){
             if(!p) return {rep:0, good:[], bad:[]};
             const st = pstat(p);
@@ -14473,6 +14498,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const cy = Number(p.cleanYears)||0;
             g(cy, cy*3, '🌿 чистый год');
             if(s5has(p,'service')) G.push({v:12, t:'🕊️ служение людям (от ведущего)'});
+            const colw = colRepWeight(p);   // 💎 собранные сеты/легендарки = вес имени за столом
+            if(colw>0) G.push({v:colw, t:'💎 вес коллекции (сеты/редкости)'});
             const sh = Number(p.shadow)||0;
             b(sh, sh*8, '🌑 теневой ход (чёрный рынок / на лапу)');
             const sp = Number(p.soulPoison)||0;
