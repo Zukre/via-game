@@ -316,7 +316,8 @@ IPO_CROWD = ['Все в чате скупают — «поезд уходит»!
 IPO_LEGIT_P    = 0.40   # честный проект РЕЖЕ, чем скам (как в жизни)
 IPO_MOON_LEGIT = 0.62   # честный чаще стреляет
 IPO_MOON_SCAM  = 0.18   # скам иногда случайно пампят
-IPO_WINDOW     = 90     # сек окна раннего входа всему столу
+IPO_WINDOW     = 60     # сек ОКНА РЕШЕНИЯ всему столу (Ринат 3авг: ровно 1 минута)
+IPO_LOCKUP     = 90     # сек ЗАКРЫТОГО ДОСТУПА после окна: позиция видна, но продать нельзя, потом разблокировка+результат
 
 
 def _sample(seq, n):
@@ -339,7 +340,9 @@ def launch_ipo():
     DATA['ipo'] = {'id': int(time.time() * 1000), 'tk': tk, 'nm': nm, 'emoji': emoji,
                    'story': story, 'hype': hype, 'crowd': random.choice(IPO_CROWD),
                    'legit': legit, 'tells': tells, 'choices': {},
-                   'endsAt': time.time() + IPO_WINDOW, 'resolved': False, 'moon': None}
+                   'endsAt': time.time() + IPO_WINDOW,
+                   'lockUntil': time.time() + IPO_WINDOW + IPO_LOCKUP,   # 🔒 закрытый доступ до разблокировки
+                   'resolved': False, 'moon': None}
     return DATA['ipo']
 
 
@@ -1161,9 +1164,10 @@ def auction_ticker():
                     except Exception as _e:
                         print('world auto error:', _e)
                         DATA['worldLastAt'] = now   # не долбим каждые 2с
-                # 🚀 IPO: окно раннего входа закрылось само — монета решает судьбу всего стола
+                # 🚀 IPO: ЗАКРЫТЫЙ ДОСТУП кончился (lockUntil) — монета выходит на биржу, решается судьба стола.
+                #   Окно решения (endsAt) уже закрыто раньше — выборы приняты; тут наступает разблокировка+результат.
                 _ipo = DATA.get('ipo')
-                if isinstance(_ipo, dict) and not _ipo.get('resolved') and now >= float(_ipo.get('endsAt') or 0):
+                if isinstance(_ipo, dict) and not _ipo.get('resolved') and now >= float(_ipo.get('lockUntil') or _ipo.get('endsAt') or 0):
                     try:
                         resolve_ipo(_ipo)
                         changed = True
@@ -1703,8 +1707,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             try:
                 with LOCK:
                     cur = DATA.get('ipo')
+                    # активна, пока не РЕЗОЛВНУТА (включая закрытый доступ) — иначе новый запуск затрёт позиции стола
                     if (isinstance(cur, dict) and not cur.get('resolved')
-                            and time.time() < float(cur.get('endsAt') or 0)):
+                            and time.time() < float(cur.get('lockUntil') or cur.get('endsAt') or 0)):
                         self._send_json({'ok': False, 'reason': 'active'}, 200)
                         return
                     ipo = launch_ipo()

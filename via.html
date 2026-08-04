@@ -313,6 +313,10 @@
             animation:reelglow 1.8s ease-in-out infinite;}
         .reel:nth-child(2){animation-delay:.3s} .reel:nth-child(3){animation-delay:.6s}
         @keyframes reelglow{0%,100%{filter:brightness(.92)}50%{filter:brightness(1.28) drop-shadow(0 0 7px rgba(217,184,119,.55))}}
+        /* 🧠 (Ринат 3авг): аналитик «совет за деньги» СВЕТИТСЯ, пока его не наняли — зовёт нажать. */
+        @keyframes analystGlow{0%,100%{box-shadow:0 0 0 0 rgba(217,184,119,0);border-color:var(--lx-gold-ln)}50%{box-shadow:0 0 18px 2px rgba(217,184,119,.6);border-color:var(--lx-gold)}}
+        details.analyst-glow>summary{animation:analystGlow 1.7s ease-in-out infinite;border:1px solid var(--lx-gold-ln);border-radius:12px;}
+        @media (prefers-reduced-motion:reduce){details.analyst-glow>summary{animation:none;box-shadow:0 0 12px 1px rgba(217,184,119,.4);border-color:var(--lx-gold);}}
         .casino-spin{border:1px solid var(--lx-gold) !important; color:#f7e6c8 !important; font-weight:900 !important;
             background:linear-gradient(180deg,#b6433f,#8c2c2a) !important;
             box-shadow:0 8px 22px rgba(140,44,42,.45), inset 0 1px 0 rgba(255,255,255,.18), 0 0 16px -4px rgba(217,184,119,.5) !important;
@@ -350,6 +354,27 @@
            Разметку разделов не меняли: всё держится на этих правилах. */
         .sec-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; align-items:start;}
         @media(max-width:640px){ .sec-grid{grid-template-columns:repeat(2,1fr); gap:7px;} }
+        /* 🐄 (Ринат 3авг «ферма красивее, не в один столб»): содержание фермы — сетка 2 колонки, ровные карточки */
+        .farm-grid2{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:8px; align-items:stretch;}
+        @media(max-width:560px){ .farm-grid2{grid-template-columns:1fr;} }
+        .farm-grid2 .row-item{margin:0; height:100%; align-items:center; border-radius:12px;}
+        .farm-grid2 .row-item .btn{white-space:nowrap;}
+        /* 🐄 (Ринат 3авг «аккуратные кнопки красиво все в Ферме»): единый стиль кнопок под чёрно-золото.
+           Кнопки фермы напиханы инлайновыми стилями → перебиваем через .farm-view + !important, аккуратно. */
+        .farm-view .btn{ border-radius:10px !important; font-weight:700 !important; letter-spacing:.01em; transition:filter .12s ease, transform .05s ease; }
+        .farm-view .btn:active{ transform:translateY(1px); }
+        .farm-view .btn:hover{ filter:brightness(1.06); }
+        /* кислотный оранжевый → тёплое золото Via */
+        .farm-view .btn-amber{ background:linear-gradient(180deg,#efd8a3,#d9b877) !important; color:#20180a !important; border:1px solid var(--lx-gold-ln) !important; }
+        .farm-view .btn-blue{ background:linear-gradient(180deg,#2a3648,#1c2634) !important; color:#cfe0ff !important; border:1px solid #35506f !important; }
+        .farm-view .btn-gray{ background:var(--lx-ink) !important; color:#cdc8bd !important; border:1px solid var(--lx-line) !important; }
+        .farm-view .btn-orange{ background:linear-gradient(180deg,#c98a4a,#a86a2e) !important; color:#1a1206 !important; border:1px solid #7a5320 !important; }
+        /* кнопки в строках управления — ровные, одинаковой высоты, справа единой шириной */
+        .farm-view .row-item .btn{ padding:9px 13px !important; font-size:12.5px !important; min-width:104px; white-space:nowrap; }
+        .farm-view .row-item .btn.btn-gray{ min-width:40px; padding:9px 12px !important; }   /* маленькие −/± */
+        .farm-view .row-item > div:last-child{ display:flex; gap:5px; align-items:center; flex:0 0 auto; }
+        /* карточки животных/строений: CTA во всю ширину, аккуратные */
+        .farm-view .card .btn{ font-size:12px !important; padding:9px 10px !important; }
         .sec-grid>details.sec{margin:0; min-height:74px;}
         .sec-grid>details.sec>summary{padding:12px 10px; flex-direction:column; align-items:flex-start;
             justify-content:center; gap:3px; font-size:13px; line-height:1.25; min-height:74px;}
@@ -10644,6 +10669,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 angus_bull:  {buy:6000, need:['care','breed'],    yield:0, prod:null, breed:0, meat:5000, img:'farm_angus_male',   name:'🐂 Ангус-бык',           male:'angus',   meatImg:'farm_angussteak'},
                 camel_male:  {buy:7000, need:['care','breed'],    yield:0, prod:null, breed:0, meat:2500, img:'farm_camel_male',   name:'🐫 Бура (самец)',        male:'camel',   meatImg:'farm_camelmeat'},
                 ostrich_male:{buy:1400, need:['poultry','breed'], yield:0, prod:null, breed:0, meat:1300, img:'farm_ostrich_male', name:'🦩 Страус-самец',        male:'ostrich', meatImg:'farm_ostrichmeat'},
+                // 🐊 КРОКОДИЛ (Ринат 3авг): ест мясо/рыбу СО СКЛАДА фермы (farmCrocTick, не покупной корм) → даёт КОЖУ на склад.
+                //   Живёт в озере (croclake), плодится через самца. Продукт=crocleather (премиум). Продукт/корм считает farmCrocTick.
+                crocodile:{buy:3500, need:['fish'], yield:0, prod:null, breed:12, meat:0, img:'farm_crocodile', name:'🐊 Крокодил', meatImg:null, matureY:3, crocEater:true},
+                croc_male:{buy:5500, need:['fish','breed'], yield:0, prod:null, breed:0, meat:0, img:'farm_croc_male', name:'🐊 Крокодил-самец', male:'crocodile', meatImg:null, crocEater:true},
             },
             // 🍷 ВЫДЕРЖКА: заложил → годами дорожает → продал. layCost=деньги на процесс, baseSell=цена в год 0, rate=прирост/год
             //   ЧЕСТНАЯ ЦЕПОЧКА (Ринат 26июл): нужно СЫРЬЁ. src=ресурс, srcQty=сколько на 1 партию.
@@ -10660,15 +10689,36 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 🏗️ СТРОЕНИЯ (Ринат 26июл): каждое вмещает КОНКРЕТНОЕ число — не тысячи. Хочешь больше → апгрейд (up).
         //   cap=база мест, up={price,cap}=улучшение до 2-го уровня. species=какие виды тут живут. Числа — черновик.
         const FARM_BUILDINGS = {
-            hangar:    {name:'🏚️ Ангар',   price:8000, cap:12, img:'farm_hangar',    up:{price:12000, cap:30},  species:['cow','bull','horse','stallion','sheep','ram_male','peacock','peahen','angus','angus_bull','camel','camel_male','ostrich','ostrich_male'], note:'коровы, лошади, овцы, павлины, ангус, верблюды, страусы'},
+            hangar:    {name:'🏚️ Ангар',   price:8000, cap:12, img:'farm_hangar',    up:{price:12000, cap:30},  species:['cow','bull','horse','stallion','sheep','ram_male','peacock','peahen','camel','camel_male','ostrich','ostrich_male'], note:'коровы, лошади, овцы, павлины, верблюды, страусы'},
             aviary:    {name:'🐔 Вольер',  price:3000, cap:40, img:'farm_aviary',    up:{price:5000,  cap:100}, species:['hen','rooster','broiler'], note:'куры, бройлеры'},
             duckpond:  {name:'🦆 Озерцо',  price:3500, cap:40, img:'farm_duckpond',  up:{price:5500,  cap:100}, species:['duck','drake'], note:'утки'},
             pond:      {name:'🐟 Озеро',   price:5000, cap:60, img:'farm_pond',      up:{price:8000,  cap:150}, species:['trout','sturgeon'], note:'рыба, осётр'},
             apiary:    {name:'🐝 Пасека',  price:2500, cap:30, img:'farm_bees',      up:{price:4000,  cap:80},  species:['hive'], note:'ульи'},
             greenhouse:{name:'🌿 Теплица', price:6000, cap:24, img:'farm_greenhouse',up:{price:9000,  cap:60},  species:['roses','violets','lilac','grapes','fruits','micro','fert','flowers'], note:'цветы, микрозелень, виноград'},
+            croclake:  {name:'🐊 Озеро крокодилов', price:9000, cap:20, img:'farm_croclake', up:{price:16000, cap:60}, species:['crocodile','croc_male'], note:'крокодилы (кожа) — едят мясо/рыбу со склада'},
         };
         const FARM_CELLAR_CAP = 12;   // 🍷 сколько партий выдержки помещается в погреб (апгрейд позже)
-        function farmHouseOf(kind){ for(const b in FARM_BUILDINGS){ if(FARM_BUILDINGS[b].species.indexOf(kind)>=0) return b; } return null; }
+        // 🧊 ХОЛОДИЛЬНИК С ЁМКОСТЬЮ (Ринат 3авг «не бесконечный, расширять до огромных за доплату»): тиры.
+        //   Мясо сверх ёмкости не влезает. Каждый тир — платный апгрейд до огромных размеров.
+        const FRIDGE_TIERS = [
+            {name:'Малый',          cap:2000,   cost:5000},
+            {name:'Средний',        cap:8000,   cost:15000},
+            {name:'Большой',        cap:30000,  cost:40000},
+            {name:'Промышленный',   cap:120000, cost:120000},
+            {name:'Гигантский',     cap:500000, cost:350000},
+        ];
+        // 🤠🔪 ТРУД МЯСА (Ринат 3авг): ковбой пасёт/гонит стадо; бойню КУПИТЬ + нанять УБОЙЩИКОВ — иначе мяса нет.
+        const FARM_LABOR = { cowboyWage:500, headsPerCowboy:40, slaughterhouse:15000, butcherWage:600, headsPerButcher:30 };
+        // 🐄🌾 ПАСТБИЩЕ ДЛЯ АНГУСОВ (Ринат 3авг): отдельная ЗЕМЛЯ под выгул, разная площадь = лимит голов.
+        //   ТОЛЬКО выгул ангусов — строить на ней нельзя. Покупаешь отдельно, расширяешь площадь.
+        const PASTURE_SIZES = [
+            {name:'Малое пастбище',    cap:40,   price:12000},
+            {name:'Среднее пастбище',  cap:120,  price:30000},
+            {name:'Большое ранчо',     cap:400,  price:80000},
+            {name:'Огромное ранчо',    cap:1200, price:200000},
+        ];
+        function farmHouseOf(kind){ if(kind==='angus'||kind==='angus_bull') return 'pasture';   // 🐄 ангусы живут на пастбище-выгуле, не в строении
+            for(const b in FARM_BUILDINGS){ if(FARM_BUILDINGS[b].species.indexOf(kind)>=0) return b; } return null; }
         // 🌾 КТО ЧТО ЕСТ (Ринат 27июл): скот — сено, птица — зерно, рыба — рыбий корм. Пчёлы/культуры — корм не нужен.
         const FARM_FEED_TYPE = { cow:'hay', horse:'hay', sheep:'hay', bull:'hay', stallion:'hay', ram_male:'hay',
                                  angus:'hay', angus_bull:'hay', camel:'hay', camel_male:'hay',
@@ -10676,7 +10726,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                  ostrich:'grain', ostrich_male:'grain',
                                  trout:'fishfeed', sturgeon:'fishfeed' };
         function farmFeedType(kind){ return FARM_FEED_TYPE[kind] || null; }
-        function farmBuildingCap(p,bkey){ const B=FARM_BUILDINGS[bkey]; if(!B||!p.farm||!p.farm.buildings||!p.farm.buildings[bkey]) return 0; return (p.farm.buildings[bkey].lvl>=2 && B.up)?B.up.cap:B.cap; }
+        function farmBuildingCap(p,bkey){ if(bkey==='pasture') return farmPastureCap(p);   // 🐄 вместимость выгула = площадь пастбища
+            const B=FARM_BUILDINGS[bkey]; if(!B||!p.farm||!p.farm.buildings||!p.farm.buildings[bkey]) return 0; return (p.farm.buildings[bkey].lvl>=2 && B.up)?B.up.cap:B.cap; }
         function farmBuildingUsed(p,bkey){ if(!p.farm) return 0; return (p.farm.animals||[]).reduce((s,a)=>s+(farmHouseOf(a.kind)===bkey?(Number(a.count)||1):0),0); }
         // индекс живой цены продукта (Task 7 наполнит state.market.farm; пока безопасно =1)
         // Живой рынок фермы: если сервер даёт цены — берём их; иначе ДЕТЕРМИНИРОВАННЫЙ годовой индекс
@@ -10697,9 +10748,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 🥚🍥 РАЗДЕЛЕНИЕ ПРОДУКТА ПО ВИДУ (Ринат 30июл): яйца теперь у каждой птицы СВОИ (курица/утка/страус —
         // разный товар и разная цена), у рыбы — ИКРА, а не «яйцо». Старые ключи eggs/fish оставлены для уже
         // накопленного товара (продастся). egg_ostrich/farm_ostrichegg/farm_duckeggs — картинки Ринат догенерит.
-        const FARM_STOCK_LABELS = { egg_hen:'🥚 Куриные яйца', egg_duck:'🥚 Утиные яйца', egg_ostrich:'🥚 Страусиные яйца', eggs:'🥚 Яйца', milk:'🥛 Молоко', shubat:'🥛 Шубат (верблюжье)', meat:'🥩 Мясо', caviar:'🍥 Икра', blackcaviar:'🖤 Чёрная икра', fish:'🐟 Рыба', honey:'🍯 Мёд', wool:'🧶 Шерсть', feath:'🪶 Перья', flowers:'🌹 Цветы', micro:'🌱 Микрозелень', fruits:'🍇 Виноград/фрукты', fert:'💩 Удобрения' };
+        const FARM_STOCK_LABELS = { egg_hen:'🥚 Куриные яйца', egg_duck:'🥚 Утиные яйца', egg_ostrich:'🥚 Страусиные яйца', eggs:'🥚 Яйца', milk:'🥛 Молоко', shubat:'🥛 Шубат (верблюжье)', meat:'🥩 Мясо', caviar:'🍥 Икра', blackcaviar:'🖤 Чёрная икра', fish:'🐟 Рыба', honey:'🍯 Мёд', wool:'🧶 Шерсть', feath:'🪶 Перья', flowers:'🌹 Цветы', micro:'🌱 Микрозелень', fruits:'🍇 Виноград/фрукты', fert:'💩 Удобрения', crocleather:'🐊 Кожа крокодила' };
         // 📦 картинка товара на складе (нет файла → farmThumb сам скроет, пока не сгенерим)
-        const FARM_PROD_IMG = { egg_hen:'farm_eggs', egg_duck:'farm_duckeggs', egg_ostrich:'farm_ostrichegg', eggs:'farm_eggs', milk:'farm_milk', shubat:'farm_shubat', meat:'farm_beef', caviar:'farm_caviar', blackcaviar:'farm_blackcaviar', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer' };
+        const FARM_PROD_IMG = { egg_hen:'farm_eggs', egg_duck:'farm_duckeggs', egg_ostrich:'farm_ostrichegg', eggs:'farm_eggs', milk:'farm_milk', shubat:'farm_shubat', meat:'farm_beef', caviar:'farm_caviar', blackcaviar:'farm_blackcaviar', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer', crocleather:'farm_crocleather' };
         // 🏭 продукты сами деньгами НЕ капают — копятся на складе (Ринат 28июл). Единственный ЧЕСТНЫЙ пассив фермы = КОНТРАКТЫ (см. ниже).
         // 🍽️ КОНТРАКТЫ С ЗАКАЗЧИКАМИ (Ринат 26июл, дословный замысел): ферма перестаёт быть кнопкой-на-миллион.
         //   Подписал контракт → продукт УХОДИТ заказчику (списывается со склада каждый год), а взамен капает РОВНЫЙ ПАССИВ payMo/мес в поток.
@@ -10769,7 +10820,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     if(!cfg || !cfg.prod || !a.mature) continue;   // 🏭 ВСЁ (яйца/молоко/мёд/шерсть/рыба…) копится на складе, не капает деньгами
                     let heads = (a.count||1);
                     if(cfg.prod==='milk'){ heads = Math.min(heads, milkFree); milkFree -= heads; if(heads<=0) continue; }   // без аппарата на эту корову — молока нет
-                    const hungry = a.hungry ? 0.4 : 1;   // 🌾 голодный скот даёт мало продукта
+                    const hungry = a.hungry ? 0.1 : 1;   // 🌾 голодный скот почти НЕ даёт продукта (Ринат 3авг: нет сена → нет молока)
                     const got = cfg.yield*heads*dy*staff*hungry;
                     if(got>0) p.farm.stock[cfg.prod] = (p.farm.stock[cfg.prod]||0) + got;
                 }
@@ -10811,7 +10862,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.farm.waterStock=Math.max(0,Number(p.farm.waterStock)||0);
             // потребность по ТИПАМ корма (сено/зерно/рыбий) + вода (пьют все)
             const needByType={}; let waterNeed=0;
-            for(const a of p.farm.animals){ const cnt=Number(a.count)||1; waterNeed+=cnt*use; const ft=farmFeedType(a.kind); if(ft) needByType[ft]=(needByType[ft]||0)+cnt*use; }
+            for(const a of p.farm.animals){ const _cc=FARM_CFG.animals[a.kind]; if(_cc&&_cc.crocEater) continue; const cnt=Number(a.count)||1; waterNeed+=cnt*use; const ft=farmFeedType(a.kind); if(ft) needByType[ft]=(needByType[ft]||0)+cnt*use; }
             const fedFracByType={};
             for(const ft in needByType){
                 const have=autoF?Infinity:(Number(p.farm.feedStores[ft])||0);
@@ -10824,12 +10875,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // болезнь/падёж приходят позже и растут, чем дольше голодает. Наелся — оживает.
             let died=0, lackFeed=false, lackWater=false, hungrySome=false;
             for(const a of p.farm.animals){
+                const _cc=FARM_CFG.animals[a.kind]; if(_cc&&_cc.crocEater) continue;   // 🐊 крокодилов кормит farmCrocTick (мясо/рыба со склада), не корм/вода
                 const ft=farmFeedType(a.kind); const ff=ft?(fedFracByType[ft]!=null?fedFracByType[ft]:1):1;
                 const surv=Math.min(ff,wetFrac);
                 if(surv>=1){ a.hungry=false; a.hungryYrs=0; continue; }
                 a.hungry=true; a.hungryYrs=(Number(a.hungryYrs)||0)+dy; hungrySome=true;   // даёт мало продукта (см. farmHarvest)
-                if(a.hungryYrs>=2){   // затяжной голод → болезнь и падёж, доля растёт с годами
-                    const killFrac=Math.min(0.6,(1-surv)*0.3*(a.hungryYrs-1));
+                if(a.hungryYrs>=1){   // голод → падёж уже с 1-го года, доля растёт с годами (Ринат 3авг: строже)
+                    const killFrac=Math.min(0.7,(1-surv)*0.35*a.hungryYrs);
                     const d=Math.floor((Number(a.count)||1)*killFrac);
                     if(d>0){ a.count-=d; died+=d; if(ff<=wetFrac) lackFeed=true; else lackWater=true; }
                 }
@@ -10837,6 +10889,34 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(died>0){ p.farm.animals=p.farm.animals.filter(a=>(Number(a.count)||0)>0); p.farm.capUsed=farmHeads(p); p.notify='💀 От затяжного голода пало '+died+' голов — не хватило '+(lackFeed&&!lackWater?'корма':(lackWater&&!lackFeed?'воды':'корма и воды'))+'. Скот сперва даёт мало продукта, потом болеет и дохнет — держи запас!'; }
             else if(hungrySome){ p.notify='🌾 Скот голодает — продукта мало, скоро начнёт болеть. Докупи корм во вкладке 📦 Склад!'; }
             p.farm.upkeepY=y;
+        }
+        // 🐊 КРОКОДИЛЫ (Ринат 3авг): едят МЯСО/РЫБУ СО СКЛАДА фермы (не покупной корм) → дают КОЖУ на склад.
+        //   Нет мяса/рыбы → голодают и дохнут. Изолировано от обычного корма/воды (крокодил живёт в озере).
+        function farmCrocTick(p){
+            if(!p||!p.farm||!Array.isArray(p.farm.animals)) return;
+            const crocs=p.farm.animals.filter(a=>{const c=FARM_CFG.animals[a.kind]; return c&&c.crocEater&&a.mature;});
+            const cnt=crocs.reduce((s,a)=>s+(Number(a.count)||1),0);
+            const y=curYear(); const last=(p.farm.crocY==null)?y:p.farm.crocY; const dy=Math.max(0,y-last);
+            if(cnt<=0){ p.farm.crocY=y; return; }
+            if(dy<=0) return;
+            p.farm.stock=p.farm.stock||{}; const st=p.farm.stock;
+            let need=cnt*8*dy, eaten=0;                              // ~8 мясных единиц на крокодила в год
+            for(const src of ['meat','fishmeat','fish','caviar']){   // ест мясо, потом рыбу со склада
+                const have=Math.floor(Number(st[src])||0); if(have<=0) continue;
+                const take=Math.min(have, need-eaten); st[src]=have-take; eaten+=take;
+                if(eaten>=need) break;
+            }
+            const fed = need>0 ? eaten/need : 1;
+            const leather=Math.round(cnt*8*dy*fed);                  // сытый крокодил даёт кожу (Ринат тюнит)
+            if(leather>0) st.crocleather=(Number(st.crocleather)||0)+leather;
+            if(fed<1){
+                let died=0;
+                for(const a of crocs){ a.hungry=true; a.hungryYrs=(Number(a.hungryYrs)||0)+dy;
+                    if(a.hungryYrs>=2){ const d=Math.floor((Number(a.count)||1)*Math.min(0.5,(1-fed)*0.4*(a.hungryYrs-1))); if(d>0){ a.count-=d; died+=d; } } }
+                if(died>0){ p.farm.animals=p.farm.animals.filter(a=>(Number(a.count)||0)>0); p.farm.capUsed=farmHeads(p); }
+                p.notify='🐊 Крокодилам не хватает мяса/рыбы на складе — они голодают'+(died>0?' и дохнут':'')+'. Держи мясо/рыбу на складе им на корм.';
+            } else { for(const a of crocs){ a.hungry=false; a.hungryYrs=0; } }
+            p.farm.crocY=y;
         }
         // 🦠 ЗДОРОВЬЕ (Ринат 27июл): без прививок скот может заболеть и часть падёт. Привит → защищён.
         function farmHealthTick(p){
@@ -10862,7 +10942,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // а склад пуст. Лечим тут: при первом заходе метки встают текущим годом и СОХРАНЯЮТСЯ (openFarm/farmGo
         // делают save) — со следующего года dy>0 и продукт реально капает на склад.
         function farmClockInit(p){ if(!p||!p.farm) return; const y=curYear(); for(const k of ['harvY','breedY','upkeepY','healthY','contractY']){ if(p.farm[k]==null) p.farm[k]=y; } }
-        function farmClock(p){ farmClockInit(p); farmMature(p); farmUpkeepTick(p); farmHarvest(p); farmContractTick(p); farmBreedTick(p); farmHealthTick(p); farmMeatSpoilTick(p); }   // прогнать часы разом (сбор ДО контрактов — заказчик ест свежий склад)
+        function farmClock(p){ farmClockInit(p); farmMature(p); farmUpkeepTick(p); farmHarvest(p); farmContractTick(p); farmBreedTick(p); farmHealthTick(p); farmMeatSpoilTick(p); farmCrocTick(p); }   // прогнать часы разом (сбор ДО контрактов — заказчик ест свежий склад; крокодилы едят склад ПОСЛЕДними)
         // 🔁 Переход по вкладкам фермы гоняет часы (Ринат 30июл): открыл «Склад» после того как годы шли —
         // продукт пересчитывается и виден сразу, а не только при полном перезаходе на ферму.
         function farmGo(k){ const p=farmMe(); if(p&&p.farm){ farmClock(p); save(p.id); } state.farmTab=k; render(); }
@@ -10874,7 +10954,27 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(y>fresh){ p.farm.stock.meat=0; p.notify='🥩 Мясо протухло на складе — без 🧊 холодильника оно живёт 1 год. Продавай в тот же год или купи холодильник.'; }
         }
         function farmBuyFeedType(ft){ const p=farmMe(); if(!p||!p.farm) return; const T=(FARM_CFG.feedTypes||{})[ft]; if(!T) return; const b=T.bundle; if(p.savings<b.cost){ alert('Не хватает кассы. '+T.name+': '+b.qty+' за '+fmtN(b.cost)+'$.'); return; } farmSpend(p,b.cost); p.farm.feedStores=p.farm.feedStores||{}; p.farm.feedStores[ft]=(Number(p.farm.feedStores[ft])||0)+b.qty; save(p.id); render(); }
-        function farmBuyTractor(){ const p=farmMe(); if(!p||!p.farm) return; if(p.farm.tractor){ alert('Трактор уже есть.'); return; } if(p.savings<FARM_CFG.tractor){ alert('Не хватает кассы. Трактор: '+fmtN(FARM_CFG.tractor)+'$.'); return; } farmSpend(p,FARM_CFG.tractor); p.farm.tractor=true; save(p.id); render(); alert('🚜 Трактор куплен! Сам тянешь на '+FARM_CFG.tractorSelfBoost+' голов больше — работников нужно меньше.'); }
+        function farmTractors(p){ return (p&&p.farm)?(Number(p.farm.tractors)|| (p.farm.tractor?1:0)):0; }   // 🚜 сколько тракторов (совместимость со старым boolean)
+        function farmBuyTractor(){ const p=farmMe(); if(!p||!p.farm) return; if(p.savings<FARM_CFG.tractor){ alert('Не хватает кассы. Трактор: '+fmtN(FARM_CFG.tractor)+'$.'); return; } farmSpend(p,FARM_CFG.tractor); p.farm.tractors=farmTractors(p)+1; p.farm.tractor=true; save(p.id); render(); alert('🚜 Ещё трактор куплен! Всего '+farmTractors(p)+'. Каждый тянет +'+FARM_CFG.tractorSelfBoost+' голов — работников нужно меньше.'); }
+        // 🧊 ХОЛОДИЛЬНИК тирами (ёмкость + расширение до огромных)
+        function farmFridgeTier(p){ return (p&&p.farm)?(Number(p.farm.fridgeTier)|| (p.farm.fridge?1:0)):0; }
+        function farmFridgeCap(p){ const t=farmFridgeTier(p); return t>0?FRIDGE_TIERS[Math.min(t,FRIDGE_TIERS.length)-1].cap:0; }
+        // 🤠🔪🏭 ТРУД МЯСА: ковбои (пасут стадо), убойщики + бойня (делают мясо)
+        function farmCowboys(p){ return (p&&p.farm)?(Number(p.farm.cowboys)||0):0; }
+        function farmButchers(p){ return (p&&p.farm)?(Number(p.farm.butchers)||0):0; }
+        function farmHasSlaughter(p){ return !!(p&&p.farm&&p.farm.slaughterhouse); }
+        function farmCattleHeads(p){ if(!p||!p.farm) return 0; return (p.farm.animals||[]).reduce((s,a)=>s+(FARM_FEED_TYPE[a.kind]==='hay'?(Number(a.count)||1):0),0); }   // скот на выпасе = ест сено
+        function farmCowboysNeeded(p){ return Math.ceil(farmCattleHeads(p)/(FARM_LABOR.headsPerCowboy||40)); }
+        function farmCanMakeMeat(p){ return farmHasSlaughter(p) && farmButchers(p)>0; }   // ГЕЙТ: без бойни И убойщиков мясо не сделать
+        function farmHireCowboy(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.cowboys=farmCowboys(p)+1; save(p.id); render(); }
+        function farmFireCowboy(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.cowboys=Math.max(0,farmCowboys(p)-1); save(p.id); render(); }
+        function farmHireButcher(){ const p=farmMe(); if(!p||!p.farm) return; if(!farmHasSlaughter(p)){ alert('🏭 Сначала купи Бойню — убойщикам негде работать.'); return; } p.farm.butchers=farmButchers(p)+1; save(p.id); render(); }
+        function farmFireButcher(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.butchers=Math.max(0,farmButchers(p)-1); save(p.id); render(); }
+        function farmBuySlaughter(){ const p=farmMe(); if(!p||!p.farm) return; if(farmHasSlaughter(p)){ alert('🏭 Бойня уже есть.'); return; } if(p.savings<FARM_LABOR.slaughterhouse){ alert('Не хватает кассы. Бойня стоит '+fmtN(FARM_LABOR.slaughterhouse)+'$.'); return; } farmSpend(p,FARM_LABOR.slaughterhouse); p.farm.slaughterhouse=true; save(p.id); render(); alert('🏭 Бойня построена! Теперь найми убойщиков — и сможешь пускать скот на мясо.'); }
+        // 🐄 ПАСТБИЩЕ ДЛЯ АНГУСОВ (отдельная земля-выгул, разная площадь; строить нельзя — только выгул)
+        function farmPastureTier(p){ return (p&&p.farm)?(Number(p.farm.pasture)||0):0; }
+        function farmPastureCap(p){ const t=farmPastureTier(p); return t>0?PASTURE_SIZES[Math.min(t,PASTURE_SIZES.length)-1].cap:0; }
+        function farmBuyPasture(){ const p=farmMe(); if(!p||!p.farm) return; const t=farmPastureTier(p); if(t>=PASTURE_SIZES.length){ alert('🐄 Уже огромное ранчо — расширять некуда.'); return; } const nx=PASTURE_SIZES[t]; if(p.savings<nx.price){ alert('Не хватает кассы. «'+nx.name+'» стоит '+fmtN(nx.price)+'$.'); return; } farmSpend(p,nx.price); p.farm.pasture=t+1; save(p.id); render(); alert('🐄 '+(t===0?'Куплено':'Расширено до «'+nx.name+'»')+' — вмещает '+fmtN(nx.cap)+' ангусов на выгуле. Строить тут нельзя, только выгул.'); }
         function farmBuyWater(){ const p=farmMe(); if(!p||!p.farm) return; const b=FARM_CFG.waterBundle; if(p.savings<b.cost){ alert('Не хватает кассы. Вода: '+b.qty+' за '+fmtN(b.cost)+'$.'); return; } farmSpend(p,b.cost); p.farm.waterStock=(Number(p.farm.waterStock)||0)+b.qty; save(p.id); render(); }
         function farmInstallWater(){ const p=farmMe(); if(!p||!p.farm) return; if(p.farm.waterMain){ alert('Водопровод уже проведён.'); return; } const cost=(FARM_CFG.waterMainByLand||{})[p.farm.land]||5000; if(p.savings<cost){ alert('Не хватает кассы. Провести воду на «'+FARM_CFG.land[p.farm.land].name+'»: '+fmtN(cost)+'$ (чем больше земля — тем дороже).'); return; } farmSpend(p,cost); p.farm.waterMain=true; save(p.id); render(); alert('🚰 Вода проведена! Скот поится сам — но содержание тянет пассив '+FARM_CFG.waterPerHeadMo+'$/гол/мес.'); }
         function farmToggleAutoFeed(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.autoFeed=!p.farm.autoFeed; save(p.id); render(); }
@@ -10887,7 +10987,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 🏗️ Содержание большой фермы — всё тянет пассив (Ринат 27июл)
         function farmWaterCost(p){ return (p && p.farm && p.farm.waterMain) ? (FARM_CFG.waterMainBaseMo||0)+farmHeads(p)*(FARM_CFG.waterPerHeadMo||0) : 0; }   // база + за голову
         function farmAutoFeedCost(p){ return (p && p.farm && p.farm.autoFeed) ? (FARM_CFG.autoFeedBaseMo||0)+farmHeads(p)*(FARM_CFG.autoFeedPerHeadMo||0) : 0; }
-        function farmSelfCap(p){ return (FARM_CFG.selfHeads||50) + ((p&&p.farm&&p.farm.tractor)?(FARM_CFG.tractorSelfBoost||0):0); }   // 🚜 трактор поднимает «сам тянешь»
+        function farmSelfCap(p){ return (FARM_CFG.selfHeads||50) + farmTractors(p)*(FARM_CFG.tractorSelfBoost||0) + farmCowboys(p)*(FARM_LABOR.headsPerCowboy||40); }   // 🚜 трактор + 🤠 ковбои поднимают «сам тянешь»
         function farmVetCost(p){ return (p && p.farm && p.farm.vaccinated) ? (FARM_CFG.vetBaseMo||0)+farmHeads(p)*(FARM_CFG.vetPerHeadMo||0) : 0; }
         // 👔👷 ИЕРАРХИЯ ТРУДА (Ринат 27июл): фермеры обслуживают животных, управляющие — фермеров (людей). Ты сам = первый управляющий.
         function farmMgrCount(p){ return (p&&p.farm)?(Number(p.farm.managers)||0):0; }         // НАНЯТЫЕ управляющие
@@ -10895,7 +10995,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmEffWorkers(p){ if(!p||!p.farm) return 0; const w=Number(p.farm.workers)||0; const cap=farmEffManagers(p)*(FARM_CFG.farmersPerManager||5); return Math.min(w, cap); }  // фермеры работают только под управлением
         function farmWorkersNeeded(p){ if(!p||!p.farm) return 0; const excess=Math.max(0, farmHeads(p)-farmSelfCap(p)); return Math.ceil(excess/(FARM_CFG.headsPerWorker||50)); }
         function farmManagersNeeded(p){ const w=(p&&p.farm)?(Number(p.farm.workers)||0):0; return Math.max(0, Math.ceil(w/(FARM_CFG.farmersPerManager||5)) - 1); }   // ты покрываешь первую пачку фермеров
-        function farmWorkerCost(p){ if(!p||!p.farm) return 0; return (Number(p.farm.workers)||0)*(FARM_CFG.workerWage||0) + farmMgrCount(p)*((FARM_CFG.manager&&FARM_CFG.manager.wage)||600); }
+        function farmWorkerCost(p){ if(!p||!p.farm) return 0; return (Number(p.farm.workers)||0)*(FARM_CFG.workerWage||0) + farmMgrCount(p)*((FARM_CFG.manager&&FARM_CFG.manager.wage)||600) + farmCowboys(p)*(FARM_LABOR.cowboyWage||0) + farmButchers(p)*(FARM_LABOR.butcherWage||0); }   // + 🤠 ковбои + 🔪 убойщики
         // capacity = сам + РАБОТАЮЩИЕ (управляемые) фермеры × headsPerWorker; недобор фермеров ИЛИ управляющих → доход падает плавно
         function farmStaffedFrac(p){ if(!p||!p.farm) return 1; const heads=farmHeads(p); if(heads<=0) return 1; const capacity=farmSelfCap(p)+farmEffWorkers(p)*(FARM_CFG.headsPerWorker||50); return Math.min(1, capacity/heads); }
         function farmUpkeepPassive(p){ return farmFeed(p)+farmWaterCost(p)+farmAutoFeedCost(p)+farmWorkerCost(p)+farmVetCost(p); }
@@ -11027,7 +11127,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             taxModal: null,
             svyazModal: null,
             sdelkaModal: null,
-            medModal: null
+            medModal: null,
+            childModal: null
         };
 
         // Глобально уникальный id заявки: время + счётчик + случайное.
@@ -11222,7 +11323,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // 🛡️ (Ринат 19июл: «тик цен обновляет страницу, окна сбиваются») — НЕ дёргаем полную
             // перерисовку от тика рынка, когда открыто окно или крутится слот: картинка бы моргала,
             // барабаны слота сбивались, прокрутка прыгала. Живые цены догонят при закрытии окна / действии.
-            const _winOpen = !!(state.catPopup||state.soulsInfo||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.bankModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.marginModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.showHistory||state.doorOpen||state.soulCard);
+            const _winOpen = !!(state.catPopup||state.soulsInfo||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.bankModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.marginModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.childModal||state.showHistory||state.doorOpen||state.soulCard);
             if (!_slotSpinning && (_nmChanged || (state.view === 'player' && !_winOpen))) safeRerender();
             _lastNonMarket = _nonMarket;
             // окно сделки перерисовалось (тик рынка/чужой ход) → блок проскальзывания сбросился,
@@ -11346,7 +11447,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // 🧱 Плитки: открытая плитка занимает весь экран, поэтому открытой может быть
             // только ОДНА — иначе два окна лягут друг на друга. Остальные закрываем.
             if(d.open && d.parentElement && d.parentElement.classList.contains('sec-grid')){
-                d.parentElement.querySelectorAll('details.sec[open]').forEach(o => {
+                // 🩹 (Ринат 3авг «страница складывается при покупке аналитика»): закрываем только СОСЕДНИЕ
+                // плитки-ПРЯМЫЕ дети sec-grid, НЕ вложенные details.sec (аналитик/секции ВНУТРИ плитки Биржи).
+                // Раньше querySelectorAll ловил и вложенные — и каждый рендер (покупка/наём) складывал аналитика.
+                d.parentElement.querySelectorAll(':scope > details.sec[open]').forEach(o => {
                     if(o === d) return;
                     o.open = false;
                     const ok = secKey(o); if(ok) _openSecs.delete(ok);
@@ -11616,7 +11720,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="padding:20px;">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
                             <div><div style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Покупка на бирже</div>
-                            <div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#f3efe6;line-height:1.1;">${a.name}</div>
+                            <div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:800;letter-spacing:.02em;color:#f3efe6;line-height:1.1;">${assetTicker(a.name)}</div>
                             <div style="font-size:12px;color:${chg>=0?'#10b981':'#f43f5e'};font-weight:700;margin-top:2px;">${fmtPrice(price)}$ · ${chg>=0?'▲':'▼'} ${fmtPct(chg)}</div></div>
                             <button onclick="closeBuyModal()" class="btn btn-gray" style="flex:0 0 auto;">✕</button>
                         </div>
@@ -11782,6 +11886,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Вкладки биржи (Ринат): разбить по категориям, не всё подряд.
         const MARKET_TABS = [['stock','📈 Акции'],['crypto','🪙 Крипта'],['meme','🚀 МЕМ'],['metal','🥇 Металлы'],['comm','🌾 Сырьё']];
         function assetCat(a){ const t=a.type; if(t==='metal')return'metal'; if(t==='commodity')return'comm'; if(t==='crypto')return (Number(a.vol)||0)>=40?'meme':'crypto'; return 'stock'; }
+        // 🏷️ ТИКЕР вместо полного названия (Ринат 3авг: «оставляешь только тикеты, не надо полное название»).
+        // Имя в CSV = «Bitcoin (BTC)» → берём BTC. Без скобок («BNB», «XRP») — оставляем как есть.
+        function assetTicker(nm){ nm=String(nm||''); const m=/\(([^)]+)\)\s*$/.exec(nm); return (m?m[1]:nm).trim(); }
+        function assetTickerById(id){ const a=assetById(id); return a?assetTicker(a.name):''; }
         // 🖼️ ОКНА АКТИВОВ (Ринат 19июл): при ПЕРВОМ заходе в категорию — всплывает окно с картинкой и текстом.
         const CAT_POPUP={
             stock:{img:'cat_imgs/0.webp', t:'📈 Акции', c:'#5cb08b', txt:'Доли компаний. Растут ~5–10% в год, стабильно. Большие деньги, тихо. Выигрывает терпеливый, кто держит и не дёргается.'},
@@ -12215,6 +12323,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             await pollServer(true); render();
         }
         // ── 🔨 Зал торгов: лот, живая ставка, антиснайпер, тёмные ящики ──
+        // 🔨 ВЫБОР РЕДКОСТИ на аукционе (Ринат 4авг: «сюда засунуть рарность» — верхняя полоса).
+        //   Игрок выбирает ветку редкости, за которой охотится. Пока фильтр-подсветка; сегментные потоки — серверный шаг.
+        function setAucRarity(k){ state.aucRarity=(k==='all'?null:k); render(); }
+        function aucRarityBar(){
+            const cur = state.aucRarity || 'all';
+            const tiers = [['all','Все','#cdc8bd','var(--lx-line)']].concat(Object.keys(COL_RAR).map(k=>[k,COL_RAR[k].t,COL_RAR[k].c,COL_RAR[k].ring]));
+            return `<div style="margin-bottom:10px;">
+                <div style="font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#6d6a62;font-weight:700;text-align:center;margin-bottom:6px;">🎯 Редкость, за которой охотишься</div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;">${tiers.map(t=>`<button onclick="setAucRarity('${t[0]}')" style="cursor:pointer;font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:5px 11px;border-radius:999px;border:1px solid ${cur===t[0]?t[2]:t[3]};background:${cur===t[0]?'rgba(217,184,119,.12)':'var(--lx-ink)'};color:${cur===t[0]?t[2]:'#8a8378'};">${t[1]}</button>`).join('')}</div>
+            </div>`;
+        }
         function renderAucPanel(p){
             const a = state.auction;
             const live = a && a.status==='live';
@@ -12501,6 +12620,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function renderIpoModal(p){
             const io = state.ipo;
             if(!io || io.resolved || !p) return '';
+            if(Date.now() >= (Number(io.endsAt)||0)*1000) return '';   // 🔒 окно решения (60с) закрылось — дальше закрытый доступ, окно не держим
             if((io.choices||{})[String(p.id)]) return '';   // уже решил — окно не держим (ждёт резолва)
             const cash = Math.round(Number(p.savings)||0);
             const def  = Math.min(2000, cash);
@@ -12525,6 +12645,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     </div>
                     <div style="font-size:10.5px;color:#6d6a62;text-align:center;line-height:1.45;margin-top:8px;">Ранний вход = максимальный риск и максимальный куш. Честный проект чаще стреляет, скам — обнуляется. Хайп и толпа врут — читай сигналы. Судьба монеты одна на весь стол.</div>
                 </div></div>`;
+        }
+        // 🚀 ВЕТКА IPO в бирже (Ринат 3авг): после окна решения твоя позиция ВИДНА — закрытый доступ (лок-ап),
+        //   продать нельзя, тикает таймер разблокировки. Так «не пойму куда падает» → всё на виду.
+        function renderIpoPosition(p){
+            const io=state.ipo; if(!io || io.resolved || !p) return '';
+            const ch=(io.choices||{})[String(p.id)]; if(!ch) return '';                 // не участвовал — ветки нет
+            const decideOpen = Date.now() < (Number(io.endsAt)||0)*1000;
+            const leftLock = Math.max(0,Math.ceil(((Number(io.lockUntil)||0)*1000 - Date.now())/1000));
+            const head='<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#9c988e;font-weight:700;margin-bottom:6px;">🚀 IPO · '+(io.emoji||'🪙')+' '+(io.nm||'')+' · $'+(io.tk||'')+'</div>';
+            let body;
+            if(ch.a==='wait'){
+                body='<div style="font-size:12.5px;color:#9c988e;line-height:1.5;">🧊 Ты переждал эту монету. '+(decideOpen?'Окно решения ещё открыто.':'Ждём, чем всё кончится через ~'+leftLock+'с.')+'</div>';
+            } else {
+                const stake=Math.round(Number(ch.stake)||0);
+                body='<div style="font-size:12.5px;color:#cdc8bd;line-height:1.6;">Влетел в ранний вход: <b style="color:#8ff0b6;">'+fmtN(stake)+'$</b> в «'+(io.nm||'')+'».</div>'
+                    +'<div style="margin-top:6px;font-weight:800;text-align:center;padding:9px;border-radius:9px;color:#e8c987;background:rgba(255,180,84,.12);border:1px solid #5a4a2a;">🔒 ЗАКРЫТЫЙ ДОСТУП · продать нельзя ещё '+leftLock+'с</div>'
+                    +'<div style="font-size:10.5px;color:#6d6a62;margin-top:6px;text-align:center;line-height:1.45;">Монета на размещении. Когда лок-ап кончится — выйдет на биржу, и станет ясно: луна или скам.</div>';
+            }
+            return '<div style="border:1px solid var(--lx-gold-ln);border-radius:12px;padding:11px 13px;margin:8px 0;background:radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.06),transparent 70%),var(--lx-panel2);">'+head+body+'</div>';
         }
         // ═══════ 🌍 СТОЙКА ПЕРЕД ЭПОХОЙ — «дирижёр» (Ринат 31июл, превью, одобрено 2авг) ═══════
         // Поверх события: эпоха надвигается, сигналы намекают заранее (правда+шум), стол выбирает стойку
@@ -13291,7 +13430,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function renderAnalystCard(p){
             const rec=p.analystRec||{};
-            const box=(inner)=>'<details class="sec" style="margin:8px 0;"><summary style="min-height:auto;padding:11px 13px;font-size:13px;">🧠 Аналитик — совет за деньги <span class="sec-hint">— платный, и часто врёт</span></summary><div class="sec-in" style="padding:11px 13px;">'+inner+'</div></details>';
+            const box=(inner,glow)=>'<details class="sec'+(glow?' analyst-glow':'')+'" style="margin:8px 0;"><summary style="min-height:auto;padding:11px 13px;font-size:13px;">🧠 Аналитик — совет за деньги <span class="sec-hint">— платный, и часто врёт</span></summary><div class="sec-in" style="padding:11px 13px;">'+inner+'</div></details>';
             const c=p.analyst;
             if(!c){
                 let btns=ANALYSTS.map(A=>{
@@ -13300,7 +13439,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     return '<button onclick="hireAnalyst(\''+A.key+'\')" style="display:block;width:100%;text-align:left;margin:6px 0;padding:11px 12px;border-radius:10px;border:1px solid var(--lx-line);background:var(--lx-ink);color:#cdc8bd;cursor:pointer;font-family:inherit;">'
                       +'<b style="color:#f3efe6;">'+A.name+'</b> · <b style="color:var(--lx-gold-br);">'+fmtN(A.fee)+'$</b><span style="color:#7dd3fc;font-size:11px;">'+tr+'</span><br><small style="color:#8a8378;">'+sub+'</small></button>';
                 }).join('');
-                return box('<div style="font-size:12px;color:#8a8378;line-height:1.55;margin-bottom:4px;">Платишь — получаешь мнение, куда двинется актив. Дороже = звучит увереннее и чаще прав. Но даже звезда ошибается — и звучит она при этом так же уверенно. Читай не уверенность, а послужной список.</div>'+btns);
+                return box('<div style="font-size:12px;color:#8a8378;line-height:1.55;margin-bottom:4px;">Платишь — получаешь мнение, куда двинется актив. Дороже = звучит увереннее и чаще прав. Но даже звезда ошибается — и звучит она при этом так же уверенно. Читай не уверенность, а послужной список.</div>'+btns, true);
             }
             const A=analystBy(c.tier);
             let body='<div style="font-size:12px;color:#9c988e;margin-bottom:4px;">'+A.name+' про <b style="color:#f3efe6;">'+c.name+'</b> говорит:</div>'
@@ -13327,6 +13466,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function openMarginModal(){
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
             const m=state.market; if(!m||!m.assets){ alert('Рынок ещё грузится — попробуй через пару секунд.'); return; }
+            // 🔒 (Ринат 3авг «лонг/шорт ставится даже когда рынок закрыт»): плечо гейтим окном покупки, как акции.
+            if(!buyWindowOpen()){ const bb=state.board; if(bb && Array.isArray(bb.order) && bb.order.length){ alert('🔒 Биржа закрыта. Плечо и шорт доступны только когда ведущий откроет окно покупки (кнопка ▶ на пульте).'); return; } }
             if(p.mpos){ alert('Сначала закрой открытую позицию с плечом (кнопка «Закрыть позицию»).'); return; }
             let def=(p.analyst&&p.analyst.assetId)?p.analyst.assetId:null;
             if(!def){ const cr=m.assets.find(x=>assetCat(x)==='crypto'); def=cr?cr.id:m.assets[0].id; }
@@ -13350,6 +13491,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const mm=state.marginModal; if(!mm) return;
             const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(mm.assetId);
             if(!p||!a){ alert('Выбери актив.'); return; }
+            if(!buyWindowOpen()){ const bb=state.board; if(bb && Array.isArray(bb.order) && bb.order.length){ alert('🔒 Биржа закрыта — плечо/шорт нельзя открыть, пока ведущий не откроет окно покупки.'); state.marginModal=null; paintOverlays(); return; } }
             if(p.mpos){ alert('Сначала закрой открытую позицию с плечом.'); return; }
             const amt=Math.floor(Number(mm.amt)||0);
             if(amt<1){ alert('Впиши сумму ставки.'); return; }
@@ -13422,7 +13564,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const ownIds=Object.keys(p.holdings);
             let holdHtml = ownIds.length ? ownIds.map(id=>{
                 const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, plPct=h.avg?((pr/h.avg-1)*100):0, plAbs=Math.round((pr-h.avg)*h.qty), c=plPct>=0?'#10b981':'#f43f5e';
-                return `<div class="row-item"><div style="flex:1;"><b>${h.name}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellFrac('${id}',0.5)" class="btn btn-sell" style="margin-top:4px;" title="Продать половину позиции">½&nbsp;50%</button> <button onclick="sellWhole('${id}')" class="btn btn-sell" style="margin-top:4px;">Продать</button></div></div>`;
+                return `<div class="row-item"><div style="flex:1;"><b style="font-family:ui-monospace,monospace;letter-spacing:.02em;">${assetTicker(h.name)}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellFrac('${id}',0.5)" class="btn btn-sell" style="margin-top:4px;" title="Продать половину позиции">½&nbsp;50%</button> <button onclick="sellWhole('${id}')" class="btn btn-sell" style="margin-top:4px;">Продать</button></div></div>`;
             }).join('') : '<div style="color:#9ca3af;font-size:13px;">пока нет активов — открой биржу ниже и купи</div>';
             const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
             const alertHtml = ev.length ? ev.map(e=>{const bad=(e.kind==='КРАХ'||e.kind==='ОБВАЛ');return `<div style="background:${bad?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${bad?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`;}).join('') : '';
@@ -13440,17 +13582,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const rows=sorted.length?sorted.map(({a,chg,invested})=>{
                     const c=chg>=0?'#5cb08b':'#cf9a9a', arrow=chg>=0?'▲':'▼';
                     const cap=invested>0?`<span style="color:var(--lx-gold-br);font-size:10.5px;font-weight:700;white-space:nowrap;">💰 ${fmtN(invested)}$</span>`:'';
-                    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--lx-line);border-radius:12px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));margin-bottom:6px;">
-                      <div style="flex:0 0 auto;min-width:76px;">
-                        <div style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:#f3efe6;line-height:1.1;">${a.name}</div>
-                        ${cap||`<div style="font-size:10.5px;color:#6d6a62;">—</div>`}
+                    return `<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--lx-line);border-radius:12px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));margin-bottom:6px;">
+                      <div style="flex:0 0 82px;min-width:0;overflow:hidden;">
+                        <div style="font-family:ui-monospace,monospace;font-size:15px;font-weight:800;letter-spacing:.02em;color:#f3efe6;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${assetTicker(a.name)}</div>
+                        ${cap||`<div style="font-size:10px;color:#6d6a62;">—</div>`}
                       </div>
                       ${sparkline(a.history, chg>=0)}
-                      <div style="flex:0 0 auto;text-align:right;min-width:88px;">
-                        <div style="font-family:ui-monospace,monospace;font-size:14px;font-weight:700;color:#efd8a3;line-height:1.15;">${fmtPrice(a.price)}$</div>
-                        <div style="font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:${c};">${arrow} ${fmtPct(chg)}</div>
+                      <div style="flex:0 0 88px;text-align:right;overflow:hidden;">
+                        <div style="font-family:ui-monospace,monospace;font-size:14px;font-weight:700;color:#efd8a3;line-height:1.15;white-space:nowrap;">${fmtPrice(a.price)}$</div>
+                        <div style="font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:${c};white-space:nowrap;">${arrow} ${fmtPct(chg)}</div>
                       </div>
-                      <button onclick="openBuyModal('${a.id}')" style="flex:0 0 auto;background:rgba(217,184,119,.10);border:1px solid var(--lx-gold-ln);border-radius:9px;color:var(--lx-gold-br);font-size:11.5px;font-weight:800;padding:7px 12px;cursor:pointer;">Купить</button>
+                      <button onclick="openBuyModal('${a.id}')" style="flex:0 0 62px;background:rgba(217,184,119,.10);border:1px solid var(--lx-gold-ln);border-radius:9px;color:var(--lx-gold-br);font-size:11.5px;font-weight:800;padding:7px 0;cursor:pointer;">Купить</button>
                     </div>`;
                 }).join(''):'<div style="color:#9ca3af;font-size:13px;padding:10px;text-align:center;">В этой категории пока нет активов.</div>';
                 // ℹ️ Прогноз доходности по вкладке (Ринат 19июл): «сколько даёт в год как в жизни»
@@ -13471,6 +13613,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <div id="buyTimer" style="position:fixed;left:12px;bottom:78px;z-index:900;pointer-events:none;visibility:${buyWindowOpen()?'visible':'hidden'};text-align:center;background:rgba(6,78,59,.94);color:#d1fae5;padding:5px 11px;border-radius:999px;font-weight:800;font-size:12px;border:1px solid #10b981;box-shadow:0 6px 16px -8px rgba(16,185,129,.7);">${buyWindowOpen()&&state.board?'🟢 Покупка '+fmtLeft(state.board.buyWindowEndsAt):''}</div>
                 ${alertHtml}
                 ${renderAnalystCard(p)}
+                ${renderIpoPosition(p)}
                 ${renderMarginCard(p)}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
                   <div style="border:1px solid var(--lx-line);border-radius:11px;padding:9px 11px;background:var(--lx-ink);">
@@ -14574,7 +14717,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="padding:20px;">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
                             <div><div style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Продажа на бирже</div>
-                            <div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#f3efe6;line-height:1.1;">${a.name}</div>
+                            <div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:800;letter-spacing:.02em;color:#f3efe6;line-height:1.1;">${assetTicker(a.name)}</div>
                             <div style="font-size:12px;color:#9c988e;margin-top:2px;">Витрина <b style="color:#e9eefb;">${fmtPrice(a.price)}$</b> · у тебя <b style="color:#efd8a3;">${fmtN(have)} шт</b>${avg?` · твоя средняя ${fmtPrice(avg)}$ <b style="color:${pnl>=0?'#34d399':'#f87171'};">${pnl>=0?'+':''}${pnl.toFixed(1)}%</b>`:''}</div></div>
                             <button onclick="closeSellModal()" class="btn btn-gray" style="flex:0 0 auto;">✕</button>
                         </div>
@@ -14931,6 +15074,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderSdelkaModal()}
                 ${renderMarketModal()}
                 ${renderMedModal()}
+                ${renderChildModal()}
                 ${renderRumorModal(p)}
                 ${renderCatPopup()}
                 ${renderSoulsInfo()}
@@ -15533,6 +15677,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else if(tab==='market') body = renderFarmMarket(p);
             const L = p.farm ? FARM_CFG.land[p.farm.land] : null;
             app.innerHTML = `
+                <div class="farm-view">
                 <div class="card flex-between" style="background:#1f2937;">
                     <div><h2 style="font-size:20px;font-weight:800;">🐄 Рынок скота и ферма</h2>
                     <p style="color:#fcd34d;font-size:12px;margin-top:2px;">💰 Касса: <b>${Math.round(p.savings)} $</b>${L?` · 🌾 ${L.name} (${Object.keys(p.farm.buildings||{}).length}/${L.slots} строений · ${farmHeads(p)} гол · корм −${farmFeed(p)}$/мес)`:''}</p>
@@ -15541,6 +15686,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
                 ${p.farm ? `<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">${tabBtn('mine','🌾 Ферма')}${tabBtn('buy','🛒 Купить')}${tabBtn('learn','🎓 Учёба')}${tabBtn('prod','⚗️ Производство')}${tabBtn('deals','🍽️ Контракты')}${tabBtn('sklad','📦 Склад')}${tabBtn('market','📈 Рынок')}</div>` : ''}
                 ${body}
+                </div>
             `;
         }
 
@@ -15569,6 +15715,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         out += `<div style="font-size:11px;color:#9ca3af;margin-top:3px;">вмещает до ${B.cap}</div><button onclick="farmBuildStructure('${_bk}')" ${noSlot?'disabled':''} class="btn ${noSlot?'btn-gray':'btn-green'}" style="width:100%;margin-top:6px;font-size:11px;">${noSlot?'нет места на земле':'Построить · '+fmtN(B.price)+'$'}</button>`;
                     }
                     out += `</div>`;
+                }
+                // 🐄 ПАСТБИЩЕ для ангусов — отдельная земля-выгул (не занимает слот строений; только выгул, строить нельзя)
+                { const _pt=farmPastureTier(p), _pcap=farmPastureCap(p), _pused=farmBuildingUsed(p,'pasture'), _pnx=_pt<PASTURE_SIZES.length?PASTURE_SIZES[_pt]:null;
+                  out += `<div class="card" style="padding:8px;margin:0;border-color:#4a7c3a;">${farmImg('farm_angus_graze')}<div style="font-weight:800;margin-top:6px;">🐄 Пастбище (выгул ангусов)</div><div style="font-size:11px;color:#9ca3af;">отдельная земля только под выгул ангусов — строить нельзя, площадь = сколько голов влезет</div>`;
+                  if(_pt>0){ out += `<div style="font-size:11px;color:#fcd34d;margin-top:3px;">${PASTURE_SIZES[_pt-1].name} · ${_pused}/${_pcap} голов</div>` + (_pnx?`<button onclick="farmBuyPasture()" class="btn btn-blue" style="width:100%;margin-top:6px;font-size:11px;">⬆️ Расширить до ${_pnx.cap} · ${fmtN(_pnx.price)}$</button>`:`<div style="font-size:10px;color:#10b981;margin-top:4px;">✅ макс площадь</div>`);
+                  } else { out += `<div style="font-size:11px;color:#9ca3af;margin-top:3px;">вмещает до ${PASTURE_SIZES[0].cap} голов</div><button onclick="farmBuyPasture()" class="btn btn-green" style="width:100%;margin-top:6px;font-size:11px;">Купить · ${fmtN(PASTURE_SIZES[0].price)}$</button>`; }
+                  out += `</div>`;
                 }
                 out += `</div></div>`;
                 // ⬆️ Улучшить землю (доплата разницы) — если есть куда расти
@@ -15625,7 +15778,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const all = p.farm.animals||[];
             const livestock = all.filter(a=>{const c=FARM_CFG.animals[a.kind]; return c && !c.crop;});
             const crops     = all.filter(a=>{const c=FARM_CFG.animals[a.kind]; return c && c.crop;});
-            let out = `<div class="card"><div class="block-title">🌾 Моё хозяйство</div><p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Здесь всё, что держит ферму: люди (управляющие/фермеры), корм и вода, техника, авто-подача. Корм жми «Купить…» и впиши количество. Продукт и продажа — во вкладке 📦 Склад.</p>`;
+            let out = `<div class="card"><div class="block-title">🌾 Моё хозяйство</div><p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Здесь всё, что держит ферму: люди (управляющие/фермеры), корм и вода, техника, авто-подача. Корм жми «Купить…» и впиши количество. Продукт и продажа — во вкладке 📦 Склад.</p><div class="farm-grid2">`;
             const _mgr=Number(p.farm.managers)||0, _mgrNeed=farmManagersNeeded(p), _mgrWage=((FARM_CFG.manager&&FARM_CFG.manager.wage)||600);
             out += `<div class="row-item" style="border-color:${_mgr<_mgrNeed?'#b45309':'#6366f1'};">${farmThumb('farm_worker')}<div style="flex:1;"><b>👔 Управляющие</b><div style="font-size:11px;color:#9ca3af;">нанято ${_mgr}${_mgrNeed>0?`/${_mgrNeed} нужно`:''} (+ты сам) · каждый ведёт ${FARM_CFG.farmersPerManager} фермеров · −${_mgr*_mgrWage}$/мес${_mgr<_mgrNeed?' <b style="color:#f87171;">⚠️ фермеры без управления не работают</b>':''}</div></div><div style="display:flex;gap:4px;"><button onclick="farmFireManager()" class="btn btn-gray" style="padding:4px 10px;">−</button><button onclick="farmHireManager()" class="btn btn-amber" style="padding:4px 10px;">Нанять</button></div></div>`;
             const _mk=farmMilkers(p), _cows=farmCowHeads(p);
@@ -15639,15 +15792,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             const _wheads=farmHeads(p), _wneed=_wheads*_use, _wat=Math.floor(Number(p.farm.waterStock)||0), _wlow=_wheads>0 && !p.farm.waterMain && _wat<_wneed;
             out += `<div class="row-item" style="border-color:${_wlow?'#b45309':'#3a6ea5'};">${farmThumb(p.farm.waterMain?'farm_waterpipe':'farm_water')}<div style="flex:1;"><b>💧 Вода</b><div style="font-size:11px;color:#9ca3af;">${p.farm.waterMain?'водопровод поит сам':`запас <b style="color:${_wlow?'#f87171':'#10b981'};">${_wat}</b> · нужно ~${Math.round(_wneed)}/год${_wlow?' <b style="color:#f87171;">⚠️ мало — падёж!</b>':''}`}</div></div>${p.farm.waterMain?'<b style="color:#10b981;font-size:12px;">✅ есть</b>':`<button onclick="farmBuyWater()" class="btn btn-blue" style="white-space:nowrap;">+${FARM_CFG.waterBundle.qty} · ${FARM_CFG.waterBundle.cost}$</button>`}</div>`;
-            out += `<div class="row-item" style="border-color:#6366f1;">${farmThumb('farm_tractor')}<div style="flex:1;"><b>🚜 Трактор</b><div style="font-size:11px;color:#9ca3af;">${p.farm.tractor?`есть · сам тянешь +${FARM_CFG.tractorSelfBoost} голов`:'механизация — меньше нужно фермеров'}</div></div>${p.farm.tractor?'<b style="color:#10b981;font-size:12px;">✅ есть</b>':`<button onclick="farmBuyTractor()" class="btn btn-amber">Купить ${fmtN(FARM_CFG.tractor)}$</button>`}</div>`;
+            const _tr=farmTractors(p);
+            out += `<div class="row-item" style="border-color:#6366f1;">${farmThumb('farm_tractor')}<div style="flex:1;"><b>🚜 Тракторы</b><div style="font-size:11px;color:#9ca3af;">${_tr>0?`есть ${_tr} · сам тянешь +${_tr*FARM_CFG.tractorSelfBoost} голов`:'механизация — меньше нужно фермеров'}</div></div><button onclick="farmBuyTractor()" class="btn btn-amber" style="white-space:nowrap;">Купить +1 · ${fmtN(FARM_CFG.tractor)}$</button></div>`;
             out += `<div class="row-item" style="border-color:#3a6ea5;">${farmThumb('farm_waterpipe')}<div style="flex:1;"><b>🚰 Водопровод</b><div style="font-size:11px;color:#9ca3af;">${p.farm.waterMain?`проведён · авто-вода −${farmWaterCost(p)}$/мес · падежа по воде нет`:`провести на «${FARM_CFG.land[p.farm.land].name}» — чем больше земля, тем дороже`}</div></div>${p.farm.waterMain?`<b style="color:#10b981;font-size:12px;">✅ есть</b>`:`<button onclick="farmInstallWater()" class="btn btn-amber" style="white-space:nowrap;">Провести ${fmtN((FARM_CFG.waterMainByLand||{})[p.farm.land]||5000)}$</button>`}</div>`;
             out += `<div class="row-item" style="border-color:#3a6ea5;">${farmThumb('farm_grain')}<div style="flex:1;"><b>🌾 Авто-корм</b><div style="font-size:11px;color:#9ca3af;">${p.farm.autoFeed?`включён · −${farmAutoFeedCost(p)}$/мес · падежа по корму нет`:'без него корм покупаешь вручную — кончился, будет падёж'}</div></div><button onclick="farmToggleAutoFeed()" class="btn ${p.farm.autoFeed?'btn-gray':'btn-amber'}">${p.farm.autoFeed?'Выключить':'Включить'}</button></div>`;
             const _need=farmWorkersNeeded(p), _have=Number(p.farm.workers)||0, _eff=farmEffWorkers(p), _staff=Math.round(farmStaffedFrac(p)*100);
             out += `<div class="row-item" style="border-color:${_staff<100?'#b45309':'#3a6ea5'};">${farmThumb('farm_worker')}<div style="flex:1;"><b>👷 Фермеры</b><div style="font-size:11px;color:#9ca3af;">нанято ${_have}${_need>0?`/${_need} нужно`:''} · работают ${_eff} (под управлением) · −${_have*(FARM_CFG.workerWage||0)}$/мес · укомплектовано ${_staff}%${_staff<100?' <b style="color:#f87171;">⚠️ доход падает</b>':''}</div></div><div style="display:flex;gap:4px;"><button onclick="farmFireWorker()" class="btn btn-gray" style="padding:4px 10px;">−</button><button onclick="farmHireWorker()" class="btn btn-amber" style="padding:4px 10px;">Нанять</button></div></div>`;
             out += `<div class="row-item" style="border-color:${p.farm.vaccinated?'#3a6ea5':'#7f1d1d'};">${farmThumb('farm_vet')}<div style="flex:1;"><b>💉 Прививки / ветеринар</b><div style="font-size:11px;color:#9ca3af;">${p.farm.vaccinated?`включены · −${farmVetCost(p)}$/мес · стадо защищено от болезней`:'выключены — риск вспышки болезни и падежа'}</div></div><button onclick="farmToggleVet()" class="btn ${p.farm.vaccinated?'btn-gray':'btn-amber'}">${p.farm.vaccinated?'Выключить':'Включить'}</button></div>`;
+            const _cb=farmCowboys(p), _cbN=farmCowboysNeeded(p);
+            out += `<div class="row-item" style="border-color:${_cb<_cbN?'#b45309':'#6366f1'};">${farmThumb('farm_cowboy')}<div style="flex:1;"><b>🤠 Ковбои</b><div style="font-size:11px;color:#9ca3af;">нанято ${_cb}${_cbN>0?`/${_cbN} на стадо`:''} · пасут/гонят скот (+${FARM_LABOR.headsPerCowboy} голов каждый) · −${_cb*FARM_LABOR.cowboyWage}$/мес${_cb<_cbN?' <b style="color:#f87171;">⚠️ мало — стадо без присмотра</b>':''}</div></div><div style="display:flex;gap:4px;"><button onclick="farmFireCowboy()" class="btn btn-gray" style="padding:4px 10px;">−</button><button onclick="farmHireCowboy()" class="btn btn-amber" style="padding:4px 10px;">Нанять</button></div></div>`;
+            out += `<div class="row-item" style="border-color:${farmHasSlaughter(p)?'#3a6ea5':'#7f1d1d'};">${farmThumb('farm_slaughterhouse')}<div style="flex:1;"><b>🏭 Бойня</b><div style="font-size:11px;color:#9ca3af;">${farmHasSlaughter(p)?'построена · тут режут скот на мясо (нужны убойщики)':'без неё мясо НЕ сделать — купи, потом найми убойщиков'}</div></div>${farmHasSlaughter(p)?'<b style="color:#10b981;font-size:12px;">✅ есть</b>':`<button onclick="farmBuySlaughter()" class="btn btn-amber" style="white-space:nowrap;">Купить ${fmtN(FARM_LABOR.slaughterhouse)}$</button>`}</div>`;
+            const _bt=farmButchers(p);
+            out += `<div class="row-item" style="border-color:${farmHasSlaughter(p)&&_bt<1&&farmCattleHeads(p)>0?'#b45309':'#3a6ea5'};">${farmThumb('farm_butcher')}<div style="flex:1;"><b>🔪 Убойщики</b><div style="font-size:11px;color:#9ca3af;">нанято ${_bt} · делают мясо на бойне · −${_bt*FARM_LABOR.butcherWage}$/мес${farmHasSlaughter(p)?(_bt<1?' <b style="color:#f87171;">⚠️ найми — иначе мяса нет</b>':''):' <span style="color:#9ca3af;">(сначала Бойня)</span>'}</div></div><div style="display:flex;gap:4px;"><button onclick="farmFireButcher()" class="btn btn-gray" style="padding:4px 10px;">−</button><button onclick="farmHireButcher()" class="btn btn-amber" style="padding:4px 10px;">Нанять</button></div></div>`;
+            out += `</div>`;   // ← конец .farm-grid2 (сетка содержания фермы 2 колонки)
             const cardOf = (a)=>{
                 const c=FARM_CFG.animals[a.kind];
-                const canButcher=(p.farm.courses||[]).includes('butcher') && c.meat>0;
+                const canButcher=farmCanMakeMeat(p) && c.meat>0;
                 let s = `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}${(a.count||1)>1?` ×${a.count}`:''}</div>`;
                 if(!a.mature){ const left=Math.max(0,(a.by!=null?a.by:1)+((c.matureY||FARM_CFG.matureY||1))-curYear()); s += `<div style="font-size:11px;color:#f59e0b;">🌱 растёт — созреет ${left<=0?'в этом году':'через '+left+' г.'}</div>`; }
                 else if(c.crop){ s += FARM_RAW.indexOf(c.prod)>=0
@@ -15656,10 +15816,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 else if(c.male){ s += `<div style="font-size:11px;color:#a5b4fc;margin-top:2px;">🧬 Производитель — плодит стадо. Зарежешь → приплод этого вида остановится.</div>`;
                     if(c.meat>0) s += canButcher
                         ? `<button onclick="farmSlaughter('${a.aid}')" class="btn btn-orange" style="width:100%;padding:4px;font-size:11px;margin-top:4px;">🔪 На убой → 🥩 склад (~${Math.round(c.meat*priceIdx('meat'))}$)</button>`
-                        : `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">🔪 убой — нужен курс «Мясник»</div>`;
+                        : `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">🔪 убой — нужна 🏭 Бойня + 🔪 убойщики</div>`;
                 }
                 else {
                     const hasBreed = (p.farm.courses||[]).includes('breed');
+                    if(c.crocEater){ s += `<div style="font-size:11px;color:#a3e635;">🐊 ест 🥩 мясо / 🐟 рыбу со склада → 🐊 кожа копится в 📦 Склад</div>`; }
                     if(c.prod) s += FARM_RAW.indexOf(c.prod)>=0
                         ? (c.prod==='milk'
                             ? (farmMilkers(p)>=farmCowHeads(p) ? `<div style="font-size:11px;color:#fcd34d;">🥛 доится — молоко идёт в сыроварню</div>` : (farmMilkers(p)>0 ? `<div style="font-size:11px;color:#f59e0b;">🥛 аппаратов не хватает — часть коров не доится (1 аппарат = 1 корова)</div>` : `<div style="font-size:11px;color:#f59e0b;">🥛 нужен доильный аппарат — по одному на корову</div>`))
@@ -15672,7 +15833,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     }
                     if(c.meat>0) s += canButcher
                         ? `<button onclick="farmSlaughter('${a.aid}')" class="btn btn-orange" style="width:100%;padding:4px;font-size:11px;margin-top:4px;">🔪 На убой → 🥩 склад (~${Math.round(c.meat*priceIdx('meat'))}$)</button>`
-                        : `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">🔪 убой — нужен курс «Мясник»</div>`;
+                        : `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">🔪 убой — нужна 🏭 Бойня + 🔪 убойщики</div>`;
                 }
                 // 🧹 УБРАТЬ: культуры (выкосить) и живность без убоя (павлин/рыба/пчёлы) — освободить место
                 if(a.mature && (c.crop || (!c.male && !(c.meat>0)))) s += `<button onclick="farmCull('${a.aid}')" class="btn btn-gray" style="width:100%;padding:4px;font-size:10px;margin-top:4px;">🧹 ${c.crop?'Выкосить / убрать':'Убрать'}</button>`;
@@ -15733,7 +15894,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmUpgradeStructure(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B||!B.up) return; const b=(p.farm.buildings||{})[bkey]; if(!b){ alert('Сначала построй строение.'); return; } if(b.lvl>=2){ alert('«'+B.name+'» уже улучшено до максимума.'); return; } if(p.savings<B.up.price){ alert('Не хватает кассы. Улучшение стоит '+B.up.price+'$.'); return; } farmSpend(p,B.up.price); b.lvl=2; save(p.id); render(); alert('⬆️ «'+B.name+'» улучшено — теперь вмещает '+B.up.cap+'.'); }
         function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ alert('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); alert('🏡 Амбар построен! Выучи «Фермерство» и заводи скот.'); }
         function farmLearn(key){ const _sy=window.scrollY; const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); farmToast('🎓 Изучено: '+FARM_CFG.courseName[key]); }
-        function farmBuyAnimal(kind){ const _sy=window.scrollY; const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const B=FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(!p.farm.buildings || !p.farm.buildings[bkey]){ alert('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).'); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.'); return; } farmAskQty({ title:'Купить «'+c.name+'»', note:'Цена '+fmtN(c.buy)+'$/'+(c.crop?'шт':'гол')+' · свободно '+_room+' в «'+B.name+'»', def:1, min:1, max:_room, okLabel:'Купить',
+        function farmBuyAnimal(kind){ const _sy=window.scrollY; const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const isPast=(bkey==='pasture'); const B=isPast?{name:'🐄 Пастбище (выгул)'}:FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(isPast ? farmPastureTier(p)<=0 : (!p.farm.buildings || !p.farm.buildings[bkey])){ alert(isPast?'🐄 Сначала купи ПАСТБИЩЕ для ангусов — отдельная земля-выгул (раздел «Строения» на вкладке 🛒 Купить). На нём только выгул, строить нельзя.':('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).')); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert(isPast?('🐄 Пастбище заполнено: '+_used+'/'+_cap+'. Расширь площадь или продай/зарежь часть.'):('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.')); return; } farmAskQty({ title:'Купить «'+c.name+'»', note:'Цена '+fmtN(c.buy)+'$/'+(c.crop?'шт':'гол')+' · свободно '+_room+' в «'+B.name+'»', def:1, min:1, max:_room, okLabel:'Купить',
                 preview:(q)=>{ const cost=c.buy*q; const pp=farmMe(); return 'Итого <b>'+fmtN(cost)+'$</b>'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
                 onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=c.buy*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } const ex=(pp.farm.animals||[]).find(x=>x.kind===kind); farmSpend(pp,cost); if(ex){ ex.count=(ex.count||1)+qty; } else { pp.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,by:curYear(),count:qty}); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); const tot=((pp.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; farmToast('✅ Куплено '+qty+' «'+c.name+'» — всего '+tot); } }); }
         // 🧹 УБРАТЬ / УТИЛИЗИРОВАТЬ (Ринат 27июл): культуры и живность без убоя — выкосить/убрать, освободить место. Возврат 30% цены.
@@ -15741,11 +15902,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             farmAskQty({ title:word+' «'+c.name+'»', note:'Есть '+have+'. Вернётся ~'+fmtN(per)+'$/шт (30% цены).', def:have, min:1, max:have, okLabel:'Убрать',
                 preview:(q)=>'Вернётся <b>'+fmtN(per*q)+'$</b>',
                 onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm) return; const aa=(pp.farm.animals||[]).find(x=>x.aid===aid); if(!aa) return; const hv=aa.count||1; const n=Math.min(qty,hv); const pay=per*n; farmSpend(pp,-pay); aa.count=hv-n; if(aa.count<=0){ pp.farm.animals=pp.farm.animals.filter(x=>x.aid!==aid); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); farmToast('🧹 Убрано '+n+' «'+c.name+'»: +'+fmtN(pay)+'$'); } }); }
-        function farmSlaughter(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c.meat||!a.mature) return; if(!p.farm.courses.includes('butcher')){ farmToast('Нужен курс «Убой (мясник)»'); return; } const have=a.count||1; const per=Math.round(c.meat*priceIdx('meat'));
-            farmAskQty({ title:'На убой «'+c.name+'»', note:'Есть '+have+'. Мясо ~'+fmtN(per)+'$/гол → на склад'+(p.farm.fridge?'':' (без 🧊 протухнет за год)'), def:have, min:1, max:have, okLabel:'На убой',
+        function farmSlaughter(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c.meat||!a.mature) return;
+            if(!farmCanMakeMeat(p)){ farmToast(!farmHasSlaughter(p)?'🏭 Нужна Бойня — построй её в «Моё хозяйство».':'🔪 Найми убойщиков в Бойню — без них мясо не сделать.'); return; }
+            const have=a.count||1; const per=Math.round(c.meat*priceIdx('meat')); const _fcap=farmFridgeCap(p);
+            farmAskQty({ title:'На убой «'+c.name+'»', note:'Есть '+have+'. Мясо ~'+fmtN(per)+'$/гол → на склад'+(farmFridgeTier(p)>0?(' · холодильник вмещает '+fmtN(_fcap)+'$ мяса'):' (без 🧊 протухнет за год)'), def:have, min:1, max:have, okLabel:'На убой',
                 preview:(q)=>'Мяса на склад ~<b>'+fmtN(per*q)+'$</b>',
-                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm) return; const aa=(pp.farm.animals||[]).find(x=>x.aid===aid); if(!aa) return; const hv=aa.count||1; const n=Math.min(qty,hv); aa.count=hv-n; if(aa.count<=0){ pp.farm.animals=pp.farm.animals.filter(x=>x.aid!==aid); } pp.farm.stock=pp.farm.stock||{}; pp.farm.stock.meat=(Number(pp.farm.stock.meat)||0)+c.meat*n; pp.farm.meatFreshY=curYear(); pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); farmToast('🔪 Под нож '+n+' «'+c.name+'» → мясо на склад'); } }); }
-        function farmBuyFridge(){ const p=farmMe(); if(!p||!p.farm) return; if(p.farm.fridge){ alert('🧊 Холодильник уже есть.'); return; } if(p.savings<FARM_CFG.fridge){ alert('Не хватает кассы. Холодильник стоит '+fmtN(FARM_CFG.fridge)+'$.'); return; } farmSpend(p,FARM_CFG.fridge); p.farm.fridge=true; save(p.id); render(); alert('🧊 Холодильник куплен! Теперь мясо на складе хранится долго и не тухнет.'); }
+                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm) return; const aa=(pp.farm.animals||[]).find(x=>x.aid===aid); if(!aa) return; const hv=aa.count||1; const n=Math.min(qty,hv); pp.farm.stock=pp.farm.stock||{}; const add=c.meat*n; let cur=Number(pp.farm.stock.meat)||0; const cap=farmFridgeCap(pp); let lost=0; let nv=cur+add; if(cap>0 && nv>cap){ lost=nv-cap; nv=cap; } aa.count=hv-n; if(aa.count<=0){ pp.farm.animals=pp.farm.animals.filter(x=>x.aid!==aid); } pp.farm.stock.meat=nv; pp.farm.meatFreshY=curYear(); pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); farmToast(lost>0?('🔪 Под нож '+n+' → склад полон, холодильник вместил не всё (потеряно ~'+fmtN(lost)+'$ мяса). Расширь холодильник!'):('🔪 Под нож '+n+' «'+c.name+'» → мясо на склад')); } }); }
+        function farmBuyFridge(){ const p=farmMe(); if(!p||!p.farm) return; const t=farmFridgeTier(p); if(t>=FRIDGE_TIERS.length){ alert('🧊 Уже максимальный холодильник — расширять некуда.'); return; } const nx=FRIDGE_TIERS[t]; if(p.savings<nx.cost){ alert('Не хватает кассы. «'+nx.name+'» холодильник стоит '+fmtN(nx.cost)+'$.'); return; } farmSpend(p,nx.cost); p.farm.fridgeTier=t+1; p.farm.fridge=true; save(p.id); render(); alert('🧊 '+(t===0?'Куплен':'Расширен до «'+nx.name+'»')+' холодильник — вмещает '+fmtN(nx.cap)+' мяса, хранится долго и не тухнет.'); }
         function farmManager(on){ const p=farmMe(); if(!p||!p.farm) return; p.farm.manager=!!on; save(p.id); render(); }
         function farmBuyMilker(){ const p=farmMe(); if(!p||!p.farm) return; const cows=farmCowHeads(p), have=farmMilkers(p);
             farmAskQty({ title:'🥛 Доильный аппарат — купить', note:'Цена '+fmtN(FARM_CFG.milker)+'$/шт. Есть '+have+', коров '+cows+'. По одному на корову.', def:Math.max(1,cows-have), min:1, max:99, okLabel:'Купить',
@@ -15881,7 +16044,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(rows){ out += rows + `<button onclick="farmSellAllStock()" class="btn btn-amber" style="width:100%;margin-top:8px;font-weight:800;">💰 Продать ВЕСЬ склад · ${fmtN(totalVal)}$</button>`; }
             else out += `<p style="font-size:12px;color:#6b7280;">Пока пусто. Заведи скот, птицу или рыбу — продукт начнёт копиться сам.</p>`;
             out += `</div>`;
-            out += `<div class="card"><div class="block-title">🧊 Холодильник для мяса</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Мясо без холодильника портится за год. Купил — хранится долго, продавай когда цена выше.</p><div class="row-item">${farmThumb('farm_fridge')}<div style="flex:1;"><b>🧊 Холодильник</b><div style="font-size:11px;color:#9ca3af;">${p.farm.fridge?'куплен · мясо хранится долго':'нет · мясо тухнет за год'}</div></div>${p.farm.fridge?'<b style="color:#10b981;font-size:12px;">✅ есть</b>':`<button onclick="farmBuyFridge()" class="btn btn-amber">Купить ${fmtN(FARM_CFG.fridge)}$</button>`}</div></div>`;
+            const _ft=farmFridgeTier(p), _fcap=farmFridgeCap(p), _meat=Math.floor(Number((p.farm.stock||{}).meat)||0), _fnx=_ft<FRIDGE_TIERS.length?FRIDGE_TIERS[_ft]:null;
+            out += `<div class="card"><div class="block-title">🧊 Холодильник для мяса</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Мясо без холодильника портится за год. Холодильник хранит долго, но ёмкость КОНЕЧНАЯ — расширяй до огромных за доплату.</p><div class="row-item">${farmThumb('farm_fridge')}<div style="flex:1;"><b>🧊 ${_ft>0?FRIDGE_TIERS[_ft-1].name+' холодильник':'Нет холодильника'}</b><div style="font-size:11px;color:#9ca3af;">${_ft>0?`вмещает <b style="color:#10b981;">${fmtN(_fcap)}</b> мяса · сейчас ${fmtN(_meat)}${_meat>=_fcap?' <b style="color:#f87171;">⚠️ ПОЛОН</b>':''}`:'мясо тухнет за год — купи холодильник'}</div></div>${_fnx?`<button onclick="farmBuyFridge()" class="btn btn-amber" style="white-space:nowrap;">${_ft>0?'Расширить':'Купить'} · ${fmtN(_fnx.cost)}$</button>`:'<b style="color:#10b981;font-size:12px;">✅ макс</b>'}</div>${_fnx?`<div style="font-size:10.5px;color:#6d6a62;margin-top:6px;">${_ft>0?'След.':'Первый'} уровень «${_fnx.name}»: вмещает ${fmtN(_fnx.cap)} мяса за ${fmtN(_fnx.cost)}$.</div>`:''}</div>`;
             const _needBy={}; for(const a of (p.farm.animals||[])){ const ft=farmFeedType(a.kind); if(ft) _needBy[ft]=(_needBy[ft]||0)+(Number(a.count)||1)*(FARM_CFG.usePerHeadYr||12); }
             let feedRows='';
             for(const ft in FARM_CFG.feedTypes){ const T=FARM_CFG.feedTypes[ft]; const have=Math.floor(Number((p.farm.feedStores||{})[ft])||0); const need=_needBy[ft]||0; const lasts=need>0?(have/need):null; const low=need>0 && !p.farm.autoFeed && have<need; feedRows += `<div class="row-item" style="border-color:${low?'#b45309':'#242833'};">${farmThumb(T.img)}<div style="flex:1;"><b>${T.name}</b><div style="font-size:11px;color:#9ca3af;">запас <b style="color:${low?'#f87171':'#10b981'};">${fmtN(have)}</b>${need>0?` · нужно ~${Math.round(need)}/год · хватит на ~${lasts.toFixed(1)} лет`+(low?' <b style="color:#f87171;">⚠️ голод!</b>':''):' · этому корму пока некого кормить'}</div></div><button onclick="farmFeedBuyWindow('${ft}')" class="btn btn-amber" style="white-space:nowrap;">Купить…</button></div>`; }
@@ -16350,85 +16514,61 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         let GAME_T0 = +(localStorage.getItem('via_t0') || 0);
         if (!GAME_T0) { GAME_T0 = Date.now(); try { localStorage.setItem('via_t0', GAME_T0); } catch(e){} }
         function govYears() { return Math.floor((Date.now() - GAME_T0) / (10*60*1000)); }
-        function openGovModal(id) { if(!gate(id,'gov')) return; state.govModal = { pId:id, drawn:null }; render(); }
+        // 🏛️ ГОСУДАРСТВО 2.0 (Ринат: ЗЕРКАЛО ПОВЕДЕНИЯ). Досье = репутация + тень + долги → standing.
+        //   Чистому — субсидии/льготы/гос-контракт. Теневику — проверка: штраф честно / взятка (тень++) / суд.
+        function govStanding(p){ const rep=Number(p.repScore)||0, sh=Number(p.shadow)||0; if(sh>=3||rep<=-20) return 'shady'; if(rep>=15&&sh<=0) return 'clean'; return 'mid'; }
+        function govPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0)p.bankLoan=(Number(p.bankLoan)||0)+rest; return amt; }
+        function openGovModal(id) { if(!gate(id,'gov')) return; state.govModal = { pId:id, phase:'intro', done:false }; render(); }
         function closeGovModal() { state.govModal = null; render(); }
-        function drawGovCard() {
-            const m = state.govModal; if (!m || m.drawn) return;
-            const p = state.players.find(x => x.id === m.pId); if (!p) return;
-            const yrReal = govYears();
-            const yr = Math.min(yrReal, 15);
-            const baseTax = p.prof.taxes;
-            const TAXMOD_CAP = baseTax * 2;               // налоги не выше 3× базы (защита от краха)
-            const pay = (amount) => {                     // касса не в минус: недостача → долг банку
-                amount = Math.max(0, Math.round(amount));
-                const fc = Math.min(amount, Math.max(0, Number(p.savings)||0));
-                p.savings = (Number(p.savings)||0) - fc;
-                const rest = amount - fc;
-                if (rest > 0) p.bankLoan = (Number(p.bankLoan)||0) + rest;
-                return rest;
-            };
-            const sal = p.prof.salary;
-            const addTax = (delta) => { p.taxMod = Math.max(-baseTax, Math.min(TAXMOD_CAP, (Number(p.taxMod)||0) + Math.round(delta))); };
-            const hasBiz = (p.assets||[]).some(a => a.type === 'BUSINESS');
-            const note = (amt, rest) => `${amt}$${rest>0?` (кассы не хватило, ${rest}$ в долг банку)`:''}`;
-            // КОЛОДА ГОСУДАРСТВА (14 событий). w = вес (частота). Все капы → игра не рушится.
-            const E = [
-                // 🟢 аккуратно (часто)
-                { w:16, run:()=>{ const h=Math.max(10,Math.round(baseTax*(0.03+0.012*yr))); addTax(h); return {emoji:'🏛️',title:'Индексация налогов',text:`Инфляция: налоги +${h}$/мес (год ${yrReal}). Терпимо.`}; }},
-                { w:15, run:()=>{ const fee=Math.max(30,Math.round(sal*0.04)); const r=pay(fee); return {emoji:'🧾',title:'Новый сбор',text:`Эко/утиль-сбор ${note(fee,r)} списан.`}; }},
-                { w:14, run:()=>{ const up=Math.random()<0.5; const dlt=Math.max(10,Math.round(baseTax*0.04))*(up?1:-1); addTax(dlt); return {emoji:'⚖️',title:'Перерасчёт ставки',text:`Ставку ${up?'подняли':'снизили'}: налоги ${dlt>=0?'+':''}${dlt}$/мес.`}; }},
-                // 🟡 заметно (разовое)
-                { w:10, run:()=>{ const fee=Math.max(50,Math.round(sal*0.10)); const r=pay(fee); return {emoji:'📜',title:'Госпошлина/лицензия',text:`Оформление документов: ${note(fee,r)}.`}; }},
-                { w:9,  run:()=>{ const fee=Math.max(40,Math.round(sal*(0.06+0.04*Math.random()))); const r=pay(fee); return {emoji:'🚓',title:'Штраф',text:`Админ-штраф ${note(fee,r)}.`}; }},
-                { w:8,  run:()=>{ const fee=Math.max(60,Math.round(sal*(0.12+0.04*yr/15))); const r=pay(fee); return {emoji:'🔍',title:'Налоговая проверка',text:`Проверка по доходу: штраф ${note(fee,r)}.`}; }},
-                { w:6,  run:()=>{ const fee=hasBiz?Math.max(150,Math.round(sal*0.25)):Math.max(40,Math.round(sal*0.05)); const r=pay(fee); return {emoji:'🏢',title:'Лицензия дороже',text:hasBiz?`Перелицензирование бизнеса: ${note(fee,r)}.`:`Сбор за разрешение ${note(fee,r)}.`}; }},
-                // 🔴 резкий бум (редко, выживаемо)
-                { w:5,  run:()=>{ const h=Math.max(50,Math.round(baseTax*(0.18+0.03*yr))); const before=Number(p.taxMod)||0; addTax(h); const got=(Number(p.taxMod)||0)-before; return {emoji:'💥',title:'Налоговая реформа',text:`Крупный рост: налоги +${got}$/мес. Держись.`}; }},
-                { w:4,  run:()=>{ const h=Math.max(40,Math.round(baseTax*0.12)); addTax(h); const cap=Math.round(Math.max(0,Number(p.savings)||0)*0.5+sal*0.5); const f=Math.min(Math.round(sal*(0.25+0.05*yr)),Math.max(sal,cap)); const r=pay(f); return {emoji:'📉',title:'Кризис/девальвация',text:`Налоги +${h}$/мес и сбор ${note(f,r)}. Выкарабкивайся.`}; }},
-                { w:3,  run:()=>{ const cap=Math.round(Math.max(0,Number(p.savings)||0)*0.5+sal*0.6); const f=Math.min(Math.round(sal*(0.30+0.05*yr)),Math.max(sal,cap)); const r=pay(f); return {emoji:'🧮',title:'Доначисление налога',text:`🔻 Налоговая доначислила — с вас СПИСАЛИ ${note(f,r)}.`}; }},
-                // ✨ повезло (редко)
-                { w:3,  run:()=>{ const back=Math.max(15,Math.round(baseTax*0.18)); addTax(-back); return {emoji:'✨',title:'Налоговая льгота',text:`Вычет: налоги −${back}$/мес. Повезло!`}; }},
-                { w:3,  run:()=>{ const b=Math.max(80,Math.round(sal*0.15)); p.savings=(Number(p.savings)||0)+b; return {emoji:'💸',title:'Субсидия/пособие',text:`Господдержка +${b}$ в кассу.`}; }},
-                { w:2,  run:()=>{ const cut=Math.min(Number(p.bankLoan)||0,Math.max(100,Math.round(sal*0.5))); p.bankLoan=(Number(p.bankLoan)||0)-cut; return {emoji:'🕊️',title:'Налоговая амнистия',text:cut>0?`Списали ${cut}$ долга банку!`:`Амнистия — но долгов нет, повезло без выгоды.`}; }},
-                { w:2,  run:()=>{ const kids=Number(p.children)||0; if(kids>0){ const b=kids*Math.max(100,Math.round(sal*0.12)); p.savings=(Number(p.savings)||0)+b; return {emoji:'👶',title:'Маткапитал',text:`За детей (${kids}) +${b}$ в кассу.`}; } const b=Math.max(50,Math.round(sal*0.08)); p.savings=(Number(p.savings)||0)+b; return {emoji:'🎁',title:'Соцвыплата',text:`Детей нет — но дали ${b}$.`}; }}
-            ];
-            const total = E.reduce((s,e)=>s+e.w,0);
-            let rr = Math.random()*total, ev = E[0];
-            for (const e of E) { if ((rr -= e.w) < 0) { ev = e; break; } }
-            const res = ev.run();
-            m.drawn = res;
-            p.notify = `🏛️ Государство: ${res.title} — ${res.text}`;
-            save(); render();
+        function govAct(kind){
+            const m=state.govModal; if(!m||m.done) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
+            const sal=p.prof.salary||3000, rep=Number(p.repScore)||0, baseTax=p.prof.taxes||0;
+            const addTax=(d)=>{ p.taxMod=Math.max(-baseTax,Math.min(baseTax*2,(Number(p.taxMod)||0)+Math.round(d))); };
+            let text, tone='ok';
+            if(kind==='subsidy'){ const ch=Math.max(0.12,Math.min(0.92,0.45+rep/120)); if(Math.random()<ch){ const b=Math.round(sal*(0.4+Math.random()*0.4)); p.savings=(Number(p.savings)||0)+b; p.repScore=rep+2; text='🎁 Субсидию одобрили — +'+fmtN(b)+'$ в кассу. Чистое досье открывает двери.'; } else { text='Отказали в субсидии — досье недостаточно чистое. Копи репутацию честными ходами.'; tone='warn'; } }
+            else if(kind==='benefit'){ const ch=Math.max(0.15,Math.min(0.9,0.4+rep/120)); if(Math.random()<ch){ const cut=Math.max(20,Math.round(baseTax*0.2)); addTax(-cut); p.repScore=rep+1; text='📉 Оформил льготу — налоги −'+fmtN(cut)+'$/мес. Законно и приятно.'; } else { text='В льготе отказали — не проходишь по критериям.'; tone='warn'; } }
+            else if(kind==='contract'){ const up=Math.round(sal*0.5); govPay(p,up); const ch=Math.max(0.2,Math.min(0.85,0.4+rep/130)); if(Math.random()<ch){ const cf=Math.round(sal*(0.25+Math.random()*0.25)); p.assets=p.assets||[]; p.assets.push({id:Date.now()+Math.floor(Math.random()*1000),type:'OTHER',title:'Гос-контракт 🏗️',cf:cf,now:0,price:0}); p.repScore=rep+3; text='🏗️ Гос-контракт ТВОЙ! Оформление −'+fmtN(up)+'$, зато пассив +'+fmtN(cf)+'$/мес. Жирно.'; } else { text='🏗️ Тендер продул — оформление −'+fmtN(up)+'$ сгорело в бюрократии. Бывает.'; tone='bad'; } }
+            else if(kind==='fine'){ const f=Math.round(sal*(0.4+Math.random()*0.3)); govPay(p,f); p.shadow=Math.max(0,(Number(p.shadow)||0)-1); p.repScore=rep+1; text='💰 Заплатил штраф честно −'+fmtN(f)+'$. Тень чуть спала, к тебе меньше вопросов.'; tone='warn'; }
+            else if(kind==='bribe'){ const f=Math.round(sal*0.2); govPay(p,f); p.shadow=(Number(p.shadow)||0)+1; p.repScore=rep-3; if(Math.random()<0.25){ const big=Math.round(sal*0.8); govPay(p,big); p.repScore=(Number(p.repScore)||0)-4; text='🤝 Дал на лапу −'+fmtN(f)+'$… а на тебя завели дело — доплатил −'+fmtN(big)+'$ и репутация рухнула. Тень гуще.'; tone='bad'; } else { text='🤝 Сунул −'+fmtN(f)+'$ — замяли по-тихому. Дёшево сейчас, но тень растёт и досье грязнее.'; tone='warn'; } }
+            else if(kind==='court'){ const ch=Math.max(0.1,Math.min(0.7,0.35+rep/120)); if(Math.random()<ch){ p.repScore=rep+5; p.shadow=Math.max(0,(Number(p.shadow)||0)-1); text='⚖️ Суд ВЫИГРАН — оправдали! Репутация выросла, тень спала. Иногда правда на твоей стороне.'; } else { const f=Math.round(sal*1.0); govPay(p,f); p.repScore=(Number(p.repScore)||0)-5; text='⚖️ Суд ПРОИГРАН — штраф −'+fmtN(f)+'$ и репутация вниз. Чуть не сел; в другой раз не доводи.'; tone='bad'; } }
+            m.result={text,tone}; m.done=true; m.phase='result'; p.notify='🏛️ Государство: '+text; save(); render();
         }
         function renderGovModal() {
             const m = state.govModal; if (!m) return '';
-            if (!m.drawn) {
-                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:2000;display:flex;align-items:center;justify-content:center;">
-                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
-                        <div style="font-size:16px;font-weight:800;color:#fcd34d;margin-bottom:14px;">🏛️ ГОСУДАРСТВО — вытяни карту</div>
-                        <div onclick="drawGovCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#92400e,#b45309);border:2px solid #f59e0b;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">🏛️</div>
-                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Нажми на карту, чтобы вытянуть. Событие касается ТОЛЬКО тебя.</p>
+            const p = state.players.find(x => x.id === m.pId); if(!p) return '';
+            const wrap=(inner)=>`<div style="position:fixed;inset:0;background:rgba(3,5,8,.9);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px;"><div style="background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:22px;max-width:440px;width:100%;text-align:center;">${inner}</div></div>`;
+            if(m.phase==='intro'){
+                const st=govStanding(p), rep=Number(p.repScore)||0, sh=Number(p.shadow)||0, debt=Math.round(Number(p.bankLoan)||0);
+                const repW=rep>=15?['безупречная','#34d399']:rep<=-20?['подмоченная','#f87171']:['обычная','#fbbf24'];
+                const shW=sh<=0?['чистая','#34d399']:sh<=2?['сероватая','#fbbf24']:['тёмная','#f87171'];
+                const stMeta=st==='clean'?['Государство на твоей стороне','#34d399']:st==='shady'?['К тебе есть вопросы','#f87171']:['Ты на нейтральной ноге','#fbbf24'];
+                const opt=(k,label,sub,col)=>`<button onclick="govAct('${k}')" class="btn" style="display:block;width:100%;margin:6px 0;padding:11px;text-align:left;background:var(--lx-ink);border:1px solid ${col};color:#f3efe6;font-weight:700;">${label}<br><span style="font-size:11px;color:#9c988e;font-weight:400;">${sub}</span></button>`;
+                let opts = st==='shady'
+                    ? opt('fine','💰 Заплатить штраф честно','Дорого, но обеляет — тень спадает.','#5a4a2a')+opt('bribe','🤝 Дать на лапу','Дёшево сейчас — но тень и грязь в досье, риск дела.','#7a2f36')+opt('court','⚖️ Идти в суд','Оправдают — репутация вверх; проиграешь — крупный штраф.','#3a4a6a')
+                    : opt('subsidy','🎁 Заявить на субсидию','Дадут по репутации — чистому чаще «да».','#1f6b45')+opt('benefit','📉 Оформить льготу','Снизить налоги законно, если досье позволяет.','#5a4a2a')+opt('contract','🏗️ Побороться за гос-контракт','Оформление стоит, но выиграешь — жирный пассив.','#3a4a6a');
+                return wrap(`<div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">🏛️ Государство</div>
+                    <div style="font-size:15px;font-weight:800;color:${stMeta[1]};margin:8px 0 10px;">${stMeta[0]}</div>
+                    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;font-size:11.5px;margin-bottom:12px;">
+                        <span style="background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:8px;padding:6px 9px;">📋 Репутация: <b style="color:${repW[1]}">${repW[0]}</b></span>
+                        <span style="background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:8px;padding:6px 9px;">🌑 Досье: <b style="color:${shW[1]}">${shW[0]}</b></span>
+                        <span style="background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:8px;padding:6px 9px;">💳 Долги: <b style="color:${debt>0?'#f87171':'#34d399'}">${fmtN(debt)}$</b></span>
                     </div>
-                </div>`;
+                    <div style="font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:6px;">${st==='shady'?'Косяки в досье не спрячешь — государство пришло с вопросами. Как выкрутишься?':'Чистое досье — государство помогает. Чем воспользуешься?'}</div>
+                    ${opts}
+                    <div style="font-size:10.5px;color:#6d6a62;margin-top:8px;line-height:1.45;">Каким ты был — таким оно и будет. Плати честно, помогай, держи тень в нуле — и оно на твоей стороне.</div>`);
             }
-            const dr = m.drawn;
-            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
-                <div style="background:#0f172a;border:1px solid #f59e0b;border-radius:14px;padding:24px;max-width:400px;text-align:center;">
-                    <div style="font-size:48px;">${dr.emoji}</div>
-                    <div style="font-size:17px;font-weight:800;color:#fcd34d;margin:6px 0;">${dr.title}</div>
-                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
-                    <button onclick="closeGovModal()" class="btn" style="background:#d97706;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
-                </div>
-            </div>`;
+            const r=m.result||{text:'',tone:'ok'};
+            return wrap(`<div style="font-size:44px;">${r.tone==='bad'?'⚠️':r.tone==='warn'?'📎':'✅'}</div>
+                <div style="font-size:14px;color:#e5e7eb;line-height:1.55;margin:8px 0 16px;">${r.text}</div>
+                <button onclick="closeGovModal()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понял</button>`);
         }
         function renderGovPanel(p) {
-            const f = calc(p); const yr = govYears(); const mod = Number(p.taxMod)||0;
+            const st=govStanding(p); const stW=st==='clean'?['на твоей стороне','#34d399']:st==='shady'?['имеет вопросы','#f87171']:['нейтрально','#fbbf24'];
             return `
                 <div class="card" style="border-color:#f59e0b;">
-                    <div class="block-title" style="color:#fcd34d;">🏛️ ГОСУДАРСТВО (налоги и сборы)</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на клетку → вытяни карту, она зачитает что случилось (только тебе). Налоги растут со временем. Год игры: <b style="color:#fcd34d;">${yr}</b>. Игра не рушится: капы + долг вместо вайпа.</p>
-                    <div style="margin-bottom:10px;">Налоги: база ${p.prof.taxes}$ ${mod>=0?'+':''}${mod}$ = <b style="color:${mod>0?'#ef4444':(mod<0?'#10b981':'#e5e7eb')};">${f.taxes}$/мес</b></div>
-                    <button onclick="openGovModal(${p.id})" class="btn" style="width:100%;background:#d97706;color:#fff;font-weight:800;font-size:14px;">🏛️ ВЫТЯНУТЬ КАРТУ ГОСУДАРСТВА</button>
+                    <div class="block-title" style="color:#fcd34d;">🏛️ ГОСУДАРСТВО (зеркало поведения)</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Государство смотрит на твоё досье — репутацию, тень, долги — и ведёт себя соответственно. Сейчас оно <b style="color:${stW[1]}">${stW[0]}</b>. Чистому — субсидии и контракты, теневику — проверки и суд. Попал на клетку → зайди.</p>
+                    <button onclick="openGovModal(${p.id})" class="btn" style="width:100%;background:#d97706;color:#fff;font-weight:800;font-size:14px;">🏛️ ОБРАТИТЬСЯ В ГОСУДАРСТВО</button>
                 </div>
             `;
         }
@@ -16748,48 +16888,57 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             {e:'⚡',t:'Сгорела проводка',m:0.20}, {e:'🚲',t:'Украли велосипед',m:0.10},
             {e:'🛂',t:'Срочные документы/виза',m:0.15}, {e:'🍽️',t:'Внезапные гости',m:0.07}
         ];
-        function openExpenseModal(id){ if(!gate(id,'expense')) return; state.expenseModal = { pId:id, drawn:null }; render(); }
+        // 💸 РАСХОДЫ 2.0 (Ринат: не тихий минус, а ДИЛЕММА). Дёшево-рискнуть / дорого-надёжно / забить.
+        //   Дорого = закрыл вопрос (иногда окупается). Дёшево = 42% вылезет снова (доплата). Забить = 55% аукнется
+        //   (деньгами или ЗДОРОВЬЕМ — связка с Медициной), 45% пронесёт. Клиент-сайд, без сервера.
+        function openExpenseModal(id){ if(!gate(id,'expense')) return; const c=EXPENSE_CARDS[Math.floor(Math.random()*EXPENSE_CARDS.length)]; state.expenseModal = { pId:id, card:c, phase:'choose', done:false }; render(); }
         function closeExpenseModal(){ state.expenseModal = null; render(); }
-        function drawExpenseCard(){
-            const m = state.expenseModal; if (!m || m.drawn) return;
-            const p = state.players.find(x => x.id === m.pId); if (!p) return;
-            const c = EXPENSE_CARDS[Math.floor(Math.random()*EXPENSE_CARDS.length)];
-            const cost = Math.max(30, Math.round(p.prof.salary * c.m));
-            const fc = Math.min(cost, Math.max(0, Number(p.savings)||0));
-            p.savings = (Number(p.savings)||0) - fc;
-            const rest = cost - fc;
-            if (rest > 0) p.bankLoan = (Number(p.bankLoan)||0) + rest;
-            m.drawn = { emoji:c.e, title:c.t, text:`Неожиданный расход: −${cost}$${rest>0?` (кассы не хватило, ${rest}$ в долг банку)`:' с кассы'}.` };
-            p.notify = `💸 Расход: ${c.t} −${cost}$.`;
-            save(); render();
+        function expPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0)p.bankLoan=(Number(p.bankLoan)||0)+rest; return amt; }
+        function expenseChoose(kind){
+            const m=state.expenseModal; if(!m||m.done) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
+            const c=m.card, base=Math.max(30,Math.round((p.prof.salary||3000)*c.m)); let text, tone='ok';
+            if(kind==='safe'){
+                const spent=expPay(p,base);
+                if(Math.random()<0.22){ const back=Math.round(base*0.4); p.savings=(Number(p.savings)||0)+back; text='Сделал дорого и на совесть −'+fmtN(spent)+'$ — и окупилось: вышло даже в плюс +'+fmtN(back)+'$. Иногда «дорого» = выгодно.'; }
+                else text='Сделал дорого и надёжно −'+fmtN(spent)+'$. Вопрос закрыт, аукаться нечему — спишь спокойно.';
+            } else if(kind==='cheap'){
+                const spent=expPay(p,Math.round(base*0.5));
+                if(Math.random()<0.42){ const extra=expPay(p,Math.round(base*0.9)); text='Починил по-быстрому −'+fmtN(spent)+'$… а скоро вылезло снова — доплатил −'+fmtN(extra)+'$. Дёшево дважды выходит дороже.'; tone='bad'; }
+                else text='Сделал дёшево −'+fmtN(spent)+'$ и повезло — обошлось. Бывает, экономия срабатывает.';
+            } else {
+                if(Math.random()<0.55){
+                    if(c.m>=0.16 && p.health!=null && Math.random()<0.5){ p.health=Math.max(0,pHealth(p)-8); text='Забил — и аукнулось ЗДОРОВЬЕМ: запустил, теперь хуже себя чувствуешь. «Потом» ударило больнее денег.'; }
+                    else { const worse=expPay(p,Math.round(base*1.3)); text='Забил — а оно вернулось хуже: пришлось решать за −'+fmtN(worse)+'$. Откладывать вышло дороже.'; }
+                    tone='bad';
+                } else text='Забил — и пронесло, ничего не случилось. Рискнул и выиграл (в этот раз).';
+            }
+            m.result={text,tone}; m.done=true; m.phase='result'; p.notify='💸 Расход: '+c.t; save(); render();
         }
         function renderExpenseModal(){
             const m = state.expenseModal; if (!m) return '';
-            if (!m.drawn) {
-                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
-                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
-                        <div style="font-size:16px;font-weight:800;color:#fdba74;margin-bottom:14px;">💸 РАСХОДЫ — вытяни карту</div>
-                        <div onclick="drawExpenseCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#9a3412,#c2410c);border:2px solid #fb923c;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">💸</div>
-                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Жизнь подкинула трату. Касается только тебя.</p>
-                    </div>
-                </div>`;
+            const p = state.players.find(x => x.id === m.pId); if(!p) return '';
+            const c=m.card, base=Math.max(30,Math.round((p.prof.salary||3000)*c.m));
+            const wrap=(inner)=>`<div style="position:fixed;inset:0;background:rgba(3,5,8,.9);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px;"><div style="background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:22px;max-width:430px;width:100%;text-align:center;">${inner}</div></div>`;
+            if(m.phase==='choose'){
+                const opt=(k,label,sub,col)=>`<button onclick="expenseChoose('${k}')" class="btn" style="display:block;width:100%;margin:6px 0;padding:11px;text-align:left;background:var(--lx-ink);border:1px solid ${col};color:#f3efe6;font-weight:700;">${label}<br><span style="font-size:11px;color:#9c988e;font-weight:400;">${sub}</span></button>`;
+                return wrap(`<div style="font-size:44px;">${c.e}</div>
+                    <div style="font-size:18px;font-weight:800;color:#fdba74;margin:4px 0;">${c.t}</div>
+                    <div style="font-size:12.5px;color:#cdc8bd;line-height:1.5;margin-bottom:14px;">Жизнь подкинула. Как решаешь?</div>
+                    ${opt('safe','💳 Дорого и надёжно · −'+fmtN(base)+'$','Закроешь вопрос наверняка, иногда окупается.','#1f6b45')}
+                    ${opt('cheap','🔧 Дёшево, по-быстрому · −'+fmtN(Math.round(base*0.5))+'$','Дешевле сейчас, но может вылезти снова.','#5a4a2a')}
+                    ${opt('ignore','😤 Забить / отложить · 0$','Даром сейчас — но «потом» может ударить больнее.','#7a2f36')}`);
             }
-            const dr = m.drawn;
-            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
-                <div style="background:#0f172a;border:1px solid #fb923c;border-radius:14px;padding:24px;max-width:420px;text-align:center;">
-                    <div style="font-size:48px;">${dr.emoji}</div>
-                    <div style="font-size:18px;font-weight:800;color:#fdba74;margin:6px 0;">${dr.title}</div>
-                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
-                    <button onclick="closeExpenseModal()" class="btn" style="background:#c2410c;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
-                </div>
-            </div>`;
+            const r=m.result||{text:'',tone:'ok'};
+            return wrap(`<div style="font-size:44px;">${r.tone==='bad'?'⚠️':'✅'}</div>
+                <div style="font-size:14px;color:#e5e7eb;line-height:1.55;margin:8px 0 16px;">${r.text}</div>
+                <button onclick="closeExpenseModal()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понял</button>`);
         }
         function renderExpensePanel(p){
             return `
                 <div class="card" style="border-color:#fb923c;">
                     <div class="block-title" style="color:#fdba74;">💸 РАСХОДЫ (неожиданные)</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Жизнь подкидывает траты: мама попросила, сломалось, заболел... Попал на клетку → вытяни карту, спишется с кассы (нехватка — в долг).</p>
-                    <button onclick="openExpenseModal(${p.id})" class="btn" style="width:100%;background:#c2410c;color:#fff;font-weight:800;font-size:14px;">💸 ВЫТЯНУТЬ КАРТУ РАСХОДА</button>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Жизнь подкидывает траты — но это не тихий минус, а ВЫБОР: дёшево-рискнуть / дорого-надёжно / забить. Каждый путь аукается по-своему. Попал на клетку → зайди и реши.</p>
+                    <button onclick="openExpenseModal(${p.id})" class="btn" style="width:100%;background:#c2410c;color:#fff;font-weight:800;font-size:14px;">💸 ОТКРЫТЬ РАСХОД</button>
                 </div>
             `;
         }
@@ -16952,63 +17101,78 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             {e:'📞',t:'Полезный номер',k:'none'}, {e:'🌐',t:'Расширил круг общения',k:'none'},
             {e:'🫱',t:'Доверие растёт',k:'none'}, {e:'🗣️',t:'Завёл знакомство',k:'none'}
         ];
-        function openSvyazModal(id){ if(!gate(id,'svyaz')) return; state.svyazModal = { pId:id, drawn:null }; render(); }
+        // 🌐 СВЯЗИ 2.0 (Ринат: ЗАПИСНАЯ КНИЖКА контактов). Знакомишься → читаешь стоящий/пиявка → вкладываешь
+        //   (время/деньги/услуга) → хороший в книжке и выручает; пиявка вытянет деньги. Учит заводить связи.
+        const SVYAZ_GOOD=[
+            {type:'mentor',   e:'🧑‍🏫', label:'Ментор'},
+            {type:'investor', e:'💼',   label:'Инвестор'},
+            {type:'useful',   e:'🤝',   label:'Полезный человек'},
+            {type:'patron',   e:'🕯️',  label:'Наставник'},
+        ];
+        const SVYAZ_GTELLS=['За плечами реальные дела и имена — легко проверить.','Не просит вперёд, сам предлагает помощь.','Общие знакомые о нём тепло отзываются.','Спокоен, конкретен, без пустого пафоса.'];
+        const SVYAZ_LTELLS=['Торопит: «вложись прямо сейчас, потом поздно».','Обещает золотые горы почти за так.','Про себя темнит — проверить нечего.','Слишком гладко стелет, аж скользко.'];
+        const SVYAZ_NTELLS=['Модно одет, уверенный вид.','Много контактов в телефоне.','Красиво говорит.'];
+        const SVYAZ_NM_M=['Арман','Данияр','Ерлан','Нурлан','Тимур','Асхат','Бекзат','Мади','Олжас'];
+        const SVYAZ_NM_F=['Айгуль','Динара','Жанна','Камила','Сауле','Аружан','Мадина','Асель'];
+        function svShuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+        function svPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0)p.bankLoan=(Number(p.bankLoan)||0)+rest; return amt; }
+        function openSvyazModal(id){ if(!gate(id,'svyaz')) return;
+            const p=state.players.find(x=>x.id===id);
+            const good=Math.random() < (0.45 + Math.min(0.2,(Number(p&&p.repScore)||0)/200));   // репутация притягивает хороших
+            const male=Math.random()<0.5; const list=male?SVYAZ_NM_M:SVYAZ_NM_F;
+            const name=list[Math.floor(Math.random()*list.length)];
+            const gtype=good?SVYAZ_GOOD[Math.floor(Math.random()*SVYAZ_GOOD.length)]:null;
+            const tells=svShuffle([...svShuffle(good?SVYAZ_GTELLS:SVYAZ_LTELLS).slice(0,2), ...svShuffle(SVYAZ_NTELLS).slice(0,1)]);
+            state.svyazModal={pId:id, phase:'meet', good, gtype, name, male, tells, done:false};
+            render();
+        }
         function closeSvyazModal(){ state.svyazModal = null; render(); }
-        function drawSvyazCard(){
-            const m = state.svyazModal; if (!m || m.drawn) return;
-            const p = state.players.find(x => x.id === m.pId); if (!p) return;
-            const c = SVYAZI_CARDS[Math.floor(Math.random()*SVYAZI_CARDS.length)];
-            let text, color;
-            if (c.k === 'partner') {
-                const cf = Math.max(20, Math.round(p.prof.salary * c.m));
-                p.assets = p.assets || [];
-                p.assets.push({ id: Date.now()+Math.floor(Math.random()*1000), type:'BUSINESS', title:'Партнёр: '+c.t, cf, price:0, down:0 });
-                text = `Классное партнёрство! Приносит +${cf}$/мес пассивного дохода.`; color='#34d399';
-            } else if (c.k === 'cash') {
-                const b = Math.max(30, Math.round(p.prof.salary * c.m));
-                p.savings = (Number(p.savings)||0) + b;
-                text = `Связи помогли: +${b}$ в кассу.`; color='#34d399';
-            } else if (c.k === 'scam') {
-                const cost = Math.max(30, Math.round(p.prof.salary * c.m));
-                const fc = Math.min(cost, Math.max(0, Number(p.savings)||0));
-                p.savings = (Number(p.savings)||0) - fc;
-                const rest = cost - fc;
-                if (rest > 0) p.bankLoan = (Number(p.bankLoan)||0) + rest;
-                text = `Тебя кинули: −${cost}$${rest>0?` (кассы не хватило, ${rest}$ в долг банку)`:''}.`; color='#f87171';
-            } else {
-                text = `Пока без результата — строишь доверие, связь может сыграть позже.`; color='#9ca3af';
+        function svyazAct(kind){
+            const m=state.svyazModal; if(!m||m.done) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return; const sal=p.prof.salary||3000; let text,tone;
+            if(kind==='pass'){ if(m.good){ text='Прошёл мимо — а '+m.name+' оказался стоящим. Иногда упускаешь хорошего человека. Ни потерял, ни приобрёл.'; tone='warn'; } else { text='Прошёл мимо — и верно: '+m.name+' был пиявкой. Сберёг и деньги, и нервы.'; tone='ok'; } }
+            else {
+                const cost=Math.round(sal*0.12); svPay(p,cost);
+                if(m.good){ const g=m.gtype; p.contacts=p.contacts||[]; p.contacts.push({type:g.type,e:g.e,name:m.name});
+                    if(g.type==='mentor'){ const b=Math.round(sal*0.45); p.savings=(Number(p.savings)||0)+b; text='🤝 '+m.name+' теперь в книжке! Ментор подкинул +'+fmtN(b)+'$ и дельный совет. Вложил '+fmtN(cost)+'$ — окупилось.'; }
+                    else if(g.type==='investor'){ const cf=Math.round(sal*0.25); p.assets=p.assets||[]; p.assets.push({id:Date.now()+Math.floor(Math.random()*1000),type:'BUSINESS',title:'Дело с '+m.name,cf,price:0,down:0}); text='🤝 '+m.name+' в книжке! Инвестор зашёл в долю — пассив +'+fmtN(cf)+'$/мес. Вложил '+fmtN(cost)+'$.'; }
+                    else if(g.type==='useful'){ p.repScore=(Number(p.repScore)||0)+4; text='🤝 '+m.name+' в книжке! Полезный человек поднял твою репутацию — двери открываются. Вложил '+fmtN(cost)+'$.'; }
+                    else { p.repScore=(Number(p.repScore)||0)+2; text='🤝 '+m.name+' в книжке! Наставник укрепил твоё имя и совесть. Вложил '+fmtN(cost)+'$.'; }
+                    tone='ok';
+                } else { const bleed=Math.round(sal*0.35); svPay(p,bleed); p.repScore=(Number(p.repScore)||0)-2; text='🐍 '+m.name+' оказался пиявкой — вытянул вложение и ещё −'+fmtN(bleed)+'$ сверху, и пропал. Читай сигналы внимательнее.'; tone='bad'; }
             }
-            m.drawn = { emoji:c.e, title:c.t, text, color };
-            p.notify = `🌐 Связи: ${c.t} — ${text}`;
-            save(); render();
+            m.result={text,tone}; m.done=true; m.phase='result'; p.notify='🌐 Связи: '+text; save(); render();
         }
         function renderSvyazModal(){
             const m = state.svyazModal; if (!m) return '';
-            if (!m.drawn) {
-                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
-                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
-                        <div style="font-size:16px;font-weight:800;color:#6ee7b7;margin-bottom:14px;">🌐 СВЯЗИ — вытяни карту</div>
-                        <div onclick="drawSvyazCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#065f46,#047857);border:2px solid #34d399;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">🌐</div>
-                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Партнёрство, доверие — или мошенник. Только на тебя.</p>
+            const p = state.players.find(x => x.id === m.pId); if(!p) return '';
+            const wrap=(inner)=>`<div style="position:fixed;inset:0;background:rgba(3,5,8,.9);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px;"><div style="background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:22px;max-width:430px;width:100%;text-align:center;">${inner}</div></div>`;
+            if(m.phase==='meet'){
+                const sal=p.prof.salary||3000, cost=Math.round(sal*0.12);
+                return wrap(`<div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#6ee7b7;font-weight:800;">🌐 Знакомство</div>
+                    <div style="font-size:44px;margin:8px 0 2px;">${m.male?'🧑':'👩'}</div>
+                    <div style="font-size:18px;font-weight:800;color:#f3efe6;">${m.name}</div>
+                    <div style="font-size:12px;color:#9c988e;margin-bottom:10px;">Подошёл познакомиться. Кто это — стоящий человек или пиявка? Читай по деталям.</div>
+                    <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9c988e;font-weight:700;margin-bottom:4px;">👁 Что заметно</div>
+                    ${m.tells.map(t=>`<div style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45;padding:7px 10px;border-radius:8px;border:1px solid var(--lx-line);background:var(--lx-ink);margin:5px 0;color:#cbd5e1;">• ${t}</div>`).join('')}
+                    <div style="display:flex;gap:8px;margin-top:14px;">
+                        <button onclick="svyazAct('invest')" class="btn" style="flex:1;background:linear-gradient(180deg,#12251b,#0e1a13);color:#8ff0b6;border:1px solid #1f6b45;font-weight:800;padding:11px;">🤝 Завести знакомство<br><span style="font-size:10.5px;color:#9c988e;font-weight:400;">вложить ~${fmtN(cost)}$ времени/услуг</span></button>
+                        <button onclick="svyazAct('pass')" class="btn" style="flex:1;background:var(--lx-ink);color:#cdc8bd;border:1px solid var(--lx-line);font-weight:700;padding:11px;">🚶 Пройти мимо</button>
                     </div>
-                </div>`;
+                    <div style="font-size:10.5px;color:#6d6a62;margin-top:8px;line-height:1.45;">Хороший контакт садится в книжку и выручает (деньги, дело, репутация). Пиявка вытянет и пропадёт. Репутация притягивает лучших людей.</div>`);
             }
-            const dr = m.drawn;
-            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
-                <div style="background:#0f172a;border:1px solid ${dr.color};border-radius:14px;padding:24px;max-width:420px;text-align:center;">
-                    <div style="font-size:48px;">${dr.emoji}</div>
-                    <div style="font-size:18px;font-weight:800;color:${dr.color};margin:6px 0;">${dr.title}</div>
-                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
-                    <button onclick="closeSvyazModal()" class="btn" style="background:#047857;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
-                </div>
-            </div>`;
+            const r=m.result||{text:'',tone:'ok'};
+            return wrap(`<div style="font-size:44px;">${r.tone==='bad'?'🐍':r.tone==='warn'?'🤷':'🤝'}</div>
+                <div style="font-size:14px;color:#e5e7eb;line-height:1.55;margin:8px 0 16px;">${r.text}</div>
+                <button onclick="closeSvyazModal()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понял</button>`);
         }
         function renderSvyazPanel(p){
+            const cn=((p.contacts||[]).length);
+            const book = cn? (p.contacts||[]).slice(-6).map(c=>`${c.e||'🤝'} ${c.name}`).join(' · ') : 'пока пусто';
             return `
                 <div class="card" style="border-color:#34d399;">
-                    <div class="block-title" style="color:#6ee7b7;">🌐 СВЯЗИ (партнёрства)</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Строй сеть: классный партнёр даст пассивный доход или кэш, мошенник — кинет, а иногда просто растёт доверие. Попал на клетку → вытяни карту.</p>
-                    <button onclick="openSvyazModal(${p.id})" class="btn" style="width:100%;background:#047857;color:#fff;font-weight:800;font-size:14px;">🌐 ВЫТЯНУТЬ КАРТУ СВЯЗЕЙ</button>
+                    <div class="block-title" style="color:#6ee7b7;">🌐 СВЯЗИ (записная книжка)</div>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Знакомишься, читаешь человека (стоящий или пиявка) и вкладываешься — хороший садится в книжку и выручает деньгами, делом или репутацией. Пиявка вытянет. В книжке: <b style="color:#6ee7b7;">${cn}</b> — ${book}</p>
+                    <button onclick="openSvyazModal(${p.id})" class="btn" style="width:100%;background:#047857;color:#fff;font-weight:800;font-size:14px;">🌐 ПОЗНАКОМИТЬСЯ</button>
                 </div>
             `;
         }
@@ -17292,68 +17456,72 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             {e:'😴',t:'Хорошо отдохнул — продуктивность',k:'cash',m:0.10}, {e:'🧖',t:'Санаторий по страховке',k:'heal'},
             {e:'❤️‍🩹',t:'Выздоровел полностью',k:'heal'}, {e:'🩹',t:'Лёгкое выздоровление + выплата',k:'cash',m:0.12}
         ];
-        function openMedModal(id){ if(!gate(id,'med')) return; state.medModal = { pId:id, drawn:null }; render(); }
+        function openMedModal(id){ if(!gate(id,'med')) return; state.medModal = { pId:id, phase:'intro', checked:false }; render(); }
         function closeMedModal(){ state.medModal = null; render(); }
-        function drawMedCard(){
-            const m = state.medModal; if (!m || m.drawn) return;
-            const p = state.players.find(x => x.id === m.pId); if (!p) return;
-            const sal = p.prof.salary;
-            const c = MED_CARDS[Math.floor(Math.random()*MED_CARDS.length)];
-            let text, color='#f87171';
-            const pay = (amount) => { amount=Math.max(0,Math.round(amount)); const fc=Math.min(amount,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amount-fc; if(rest>0)p.bankLoan=(Number(p.bankLoan)||0)+rest; return rest; };
-            if (c.k === 'cost') {
-                const cost=Math.max(20,Math.round(sal*c.m)); const rest=pay(cost);
-                text=`Лечение: −${cost}$${rest>0?` (кассы не хватило, ${rest}$ в долг)`:''}.`;
-            } else if (c.k === 'sick') {
-                const loss=Math.max(30,Math.round(sal*c.m)); const rest=pay(loss);
-                text=`Болел и не работал — потерял зарплату −${loss}$${rest>0?` (${rest}$ в долг)`:''}.`;
-            } else if (c.k === 'chronic') {
-                const cf=Math.max(15,Math.round(sal*c.m)); p.assets=p.assets||[];
-                p.assets.push({ id:Date.now()+Math.floor(Math.random()*1000), type:'OTHER', title:'Здоровье: '+c.t, cf:-cf, now:0, price:0, health:true });
-                text=`Хроническое: −${cf}$/мес из дохода (пока не вылечишь). Следи за здоровьем!`;
-            } else if (c.k === 'tax') {
-                const add=Math.max(10,Math.round(sal*0.02)); const cap=p.prof.taxes*2;
-                p.taxMod=Math.min(cap,(Number(p.taxMod)||0)+add);
-                text=`Медрасходы/страховка выросли: налоги-сборы +${add}$/мес.`;
-            } else if (c.k === 'cash') {
-                const b=Math.max(20,Math.round(sal*c.m)); p.savings=(Number(p.savings)||0)+b; color='#34d399';
-                text=`Здоровье в плюс: +${b}$ в кассу.`;
-            } else { // heal — снять одно хроническое
-                p.assets=p.assets||[]; const idx=p.assets.findIndex(a=>a.health);
-                if (idx>=0){ const rem=p.assets[idx]; p.assets.splice(idx,1); color='#34d399'; text=`Выздоровел! Убрал «${rem.title}» (вернул +${Math.abs(rem.cf)}$/мес дохода).`; }
-                else { const b=Math.max(20,Math.round(sal*0.08)); p.savings=(Number(p.savings)||0)+b; color='#34d399'; text=`Здоров как бык — бонус +${b}$ в кассу.`; }
+        // ⚕️ МЕДИЦИНА 2.0 (Ринат: СКРЫТАЯ шкала здоровья, как Дух). Не проверяешься → рискуешь слечь.
+        //   Здоровье p.health (0..100, скрыто) тает по годам/визитам; чек-ап показывает и лечит; болезнь бьёт
+        //   чаще при низком здоровье; лечить дорого(наверняка)/дёшево(55%)/забить(−здоровье, дальше дороже).
+        function pHealth(p){ if(p.health==null) p.health=80+Math.floor(Math.random()*12); return Math.max(0,Math.min(100,Number(p.health)||0)); }
+        function healthBand(h){ return h>=75?{t:'бодр и здоров',c:'#34d399',e:'💪'}:h>=50?{t:'потрёпан, но держишься',c:'#fbbf24',e:'🙂'}:h>=25?{t:'часто недомогаешь',c:'#fb923c',e:'😪'}:{t:'совсем плохо, на грани',c:'#f87171',e:'🤒'}; }
+        const MED_DISEASES=[{t:'Простуда 🤧',sev:1},{t:'Скачки давления 🩸',sev:1},{t:'Спина и суставы 🦴',sev:2},{t:'Сердце 🫀',sev:2},{t:'Серьёзная болезнь 🏥',sev:3},{t:'Опасная болезнь ☠️',sev:4}];
+        function medDiseaseChance(p,checked){ const h=pHealth(p); let base=Math.max(0.06,(100-h)/140); if(checked) base*=0.4; return Math.min(0.9,base); }
+        function medPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0)p.bankLoan=(Number(p.bankLoan)||0)+rest; return amt; }
+        function medCheckup(){ const m=state.medModal; if(!m||m.checked) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return; const cost=500; if((Number(p.savings)||0)<cost){ alert('Чек-ап стоит '+cost+'$ — не хватает кассы.'); return; } p.savings=(Number(p.savings)||0)-cost; p.health=Math.min(100,pHealth(p)+6); m.checked=true; save(); render(); }
+        function medFace(){ const m=state.medModal; if(!m||m.done) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
+            if(Math.random() < medDiseaseChance(p,m.checked)){
+                const pool=MED_DISEASES.filter(d=> pHealth(p)>=30 ? d.sev<=3 : true);
+                m.disease=pool[Math.floor(Math.random()*pool.length)]; m.phase='disease';
+            } else {
+                const drop=2+Math.floor(Math.random()*3); p.health=Math.max(0,pHealth(p)-drop); m.phase='result'; m.done=true;
+                m.result={ok:true,text:'В этот раз обошлось. '+(m.checked?'Чек-ап помог — риск был ниже.':'Но здоровье потихоньку тает — не забывай проверяться.')};
+                p.notify='⚕️ Медицина: в этот раз обошлось.'; save();
             }
-            m.drawn = { emoji:c.e, title:c.t, text, color };
-            p.notify = `⚕️ Медицина: ${c.t} — ${text}`;
-            save(); render();
+            render();
+        }
+        function medTreat(kind){ const m=state.medModal; if(!m||!m.disease||m.done) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return; const sal=p.prof.salary||3000; const d=m.disease; let text,ok=true;
+            if(kind==='dear'){ const c=medPay(p,sal*0.4*d.sev); p.health=Math.min(100,pHealth(p)+8); text='Лечился дорого −'+fmtN(c)+'$ — вылечился наверняка, здоровье подросло.'; }
+            else if(kind==='cheap'){ const c=medPay(p,sal*0.15*d.sev); if(Math.random()<0.55){ p.health=Math.min(100,pHealth(p)+4); text='Лечился дёшево −'+fmtN(c)+'$ — повезло, помогло.'; } else { p.health=Math.max(0,pHealth(p)-6*d.sev); ok=false; text='Лечился дёшево −'+fmtN(c)+'$ — не помогло, стало хуже.'; } }
+            else { p.health=Math.max(0,pHealth(p)-9*d.sev); ok=false; text='Забил на «'+d.t+'» — 0$ сейчас, но здоровье просело сильно'+(d.sev>=3?', еле на ногах':'')+'. Дальше лечить дороже.'; }
+            if(pHealth(p)<=0){ const c=medPay(p,sal*0.8); p.health=15; text+=' Здоровье рухнуло в ноль — экстренно спасли за −'+fmtN(c)+'$.'; }
+            m.result={ok,text}; m.phase='result'; m.done=true; p.notify='⚕️ Медицина: '+text; save(); render();
         }
         function renderMedModal(){
             const m = state.medModal; if (!m) return '';
-            if (!m.drawn) {
-                return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;">
-                    <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:24px;max-width:380px;text-align:center;">
-                        <div style="font-size:16px;font-weight:800;color:#fca5a5;margin-bottom:14px;">⚕️ МЕДИЦИНА — вытяни карту</div>
-                        <div onclick="drawMedCard()" style="cursor:pointer;width:120px;height:170px;margin:0 auto;background:linear-gradient(135deg,#991b1b,#b91c1c);border:2px solid #f87171;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:54px;">⚕️</div>
-                        <p style="color:#94a3b8;font-size:12px;margin-top:12px;">Здоровье важно! Запустишь — ударит по игре. Только на тебя.</p>
+            const p = state.players.find(x => x.id === m.pId); if(!p) return '';
+            const h=pHealth(p), band=healthBand(h);
+            const wrap=(inner)=>`<div style="position:fixed;inset:0;background:rgba(3,5,8,.9);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px;"><div style="background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:22px;max-width:420px;width:100%;text-align:center;">${inner}</div></div>`;
+            if(m.phase==='intro'){
+                return wrap(`<div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">⚕️ Медицина</div>
+                    <div style="font-size:44px;margin:8px 0;">${band.e}</div>
+                    <div style="font-size:15px;color:${band.c};font-weight:700;">Самочувствие: ${band.t}</div>
+                    ${m.checked?`<div style="font-family:ui-monospace,monospace;font-size:13px;color:#cbd5e1;margin-top:6px;">🩺 Чек-ап: здоровье <b style="color:${band.c}">${h}/100</b></div>`:`<div style="font-size:12px;color:#9c988e;margin-top:6px;line-height:1.5;">Точную цифру видно только на чек-апе. Не проверишься — выше риск слечь.</div>`}
+                    <div style="display:flex;gap:8px;margin-top:16px;">
+                        ${m.checked?'':`<button onclick="medCheckup()" class="btn" style="flex:1;background:var(--lx-ink);color:var(--lx-gold-br);border:1px solid var(--lx-gold-ln);font-weight:700;padding:11px;">🩺 Чек-ап · 500$</button>`}
+                        <button onclick="medFace()" class="btn" style="flex:1;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:11px;">Прожить дальше →</button>
                     </div>
-                </div>`;
+                    <div style="font-size:10.5px;color:#6d6a62;margin-top:8px;line-height:1.45;">Чек-ап дешевле, чем потом лечить запущенное. Здоровье тает от возраста, переработок, тюрьмы.</div>`);
             }
-            const dr = m.drawn;
-            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;">
-                <div style="background:#0f172a;border:1px solid ${dr.color};border-radius:14px;padding:24px;max-width:420px;text-align:center;">
-                    <div style="font-size:48px;">${dr.emoji}</div>
-                    <div style="font-size:18px;font-weight:800;color:${dr.color};margin:6px 0;">${dr.title}</div>
-                    <p style="color:#e5e7eb;font-size:14px;line-height:1.45;margin-bottom:16px;">${dr.text}</p>
-                    <button onclick="closeMedModal()" class="btn" style="background:#b91c1c;color:#fff;font-weight:800;padding:8px 24px;">Закрыть</button>
-                </div>
-            </div>`;
+            if(m.phase==='disease'){
+                const d=m.disease, sal=p.prof.salary||3000;
+                return wrap(`<div style="font-size:44px;">🤒</div>
+                    <div style="font-size:18px;font-weight:800;color:#f87171;margin:4px 0;">${d.t}</div>
+                    <div style="font-size:12.5px;color:#cdc8bd;line-height:1.5;margin-bottom:14px;">Прихватило. Как лечишь?</div>
+                    <button onclick="medTreat('dear')" class="btn" style="display:block;width:100%;margin:6px 0;padding:11px;text-align:left;background:var(--lx-ink);border:1px solid #1f6b45;color:#8ff0b6;font-weight:700;">💊 Дорого и наверняка · −${fmtN(Math.round(sal*0.4*d.sev))}$<br><span style="font-size:11px;color:#9c988e;font-weight:400;">Вылечишься точно, здоровье вырастет.</span></button>
+                    <button onclick="medTreat('cheap')" class="btn" style="display:block;width:100%;margin:6px 0;padding:11px;text-align:left;background:var(--lx-ink);border:1px solid #5a4a2a;color:#e8c987;font-weight:700;">🌿 Дёшево, как повезёт · −${fmtN(Math.round(sal*0.15*d.sev))}$<br><span style="font-size:11px;color:#9c988e;font-weight:400;">55% поможет, иначе станет хуже.</span></button>
+                    <button onclick="medTreat('ignore')" class="btn" style="display:block;width:100%;margin:6px 0;padding:11px;text-align:left;background:var(--lx-ink);border:1px solid #7a2f36;color:#ffb0b0;font-weight:700;">😤 Забить · 0$<br><span style="font-size:11px;color:#9c988e;font-weight:400;">Сейчас даром, но здоровье просядет — дальше дороже.</span></button>`);
+            }
+            const r=m.result||{ok:true,text:''};
+            return wrap(`<div style="font-size:44px;">${r.ok?'✅':'⚠️'}</div>
+                <div style="font-size:14px;color:#e5e7eb;line-height:1.55;margin:8px 0 16px;">${r.text}</div>
+                <button onclick="closeMedModal()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понял</button>`);
         }
         function renderMedPanel(p){
+            const band=healthBand(pHealth(p));
             return `
                 <div class="card" style="border-color:#f87171;">
                     <div class="block-title" style="color:#fca5a5;">⚕️ МЕДИЦИНА (здоровье)</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Жизненные ситуации со здоровьем: чаще негатив (лечение, болезнь без работы, хроническое), реже плюс (страховка, ЗОЖ, выздоровление). Попал на клетку → вытяни карту.</p>
-                    <button onclick="openMedModal(${p.id})" class="btn" style="width:100%;background:#b91c1c;color:#fff;font-weight:800;font-size:14px;">⚕️ ВЫТЯНУТЬ КАРТУ МЕДИЦИНЫ</button>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">У тебя скрытая шкала здоровья — судишь по самочувствию (${band.e} ${band.t}). Проверяйся на чек-апе или рискуешь слечь: болезнь бьёт чаще, когда здоровье низкое. Попал на клетку → зайди.</p>
+                    <button onclick="openMedModal(${p.id})" class="btn" style="width:100%;background:#b91c1c;color:#fff;font-weight:800;font-size:14px;">⚕️ ЗАЙТИ К ВРАЧУ</button>
                 </div>
             `;
         }
@@ -17841,16 +18009,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         // ─── 📷 QR-КАРТЫ: скан открывает и АВТО-применяет карту залогиненному игроку (ничего вводить не надо) ───
         const QR_CARD = {
-            expense: ['expense', 'openExpenseModal', 'drawExpenseCard'],
+            expense: ['expense', 'openExpenseModal', ''],
             sdelka:       ['sdelka', 'openSdelkaSmall', 'drawSdelkaCard'],
             sdelka_small: ['sdelka', 'openSdelkaSmall', 'drawSdelkaCard'],
             sdelka_big:   ['sdelka', 'openSdelkaBig',   'drawSdelkaCard'],
-            gov:     ['gov',     'openGovModal',     'drawGovCard'],
+            gov:     ['gov',     'openGovModal',     ''],
             world:   ['world',   'openWorldModal',   'drawWorldCard'],
             work:    ['work',    'openWorkModal',    'drawWorkCard'],
             tax:     ['tax',     'openTaxModal',     'drawTaxCard'],
-            svyaz:   ['svyaz',   'openSvyazModal',   'drawSvyazCard'],
-            med:     ['med',     'openMedModal',     'drawMedCard'],
+            svyaz:   ['svyaz',   'openSvyazModal',   ''],
+            med:     ['med',     'openMedModal',     ''],
         };
         // ЗОЛОТОЙ БИЛЕТ — счастливая клетка: бросок кубика → растущая награда (6 = ДЖЕКПОТ)
         function resolveGoldenTicket(pid){
@@ -17865,13 +18033,47 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(); render();
         }
         // ДЕТИ — +1 ребёнок → растут ежемесячные расходы (childCost из профессии)
-        function resolveChild(pid){
-            const p=state.players.find(x=>x.id==pid); if(!p) return;
-            p.children=(Number(p.children)||0)+1;
+        function resolveChild(pid){ openChildModal(pid); }   // 👶 старый вызов → новое окно «Наследие»
+        // 👶 ДЕТИ 2.0 — НАСЛЕДИЕ (Ринат: растёт до 18 по годам, во что вложишь — тем и силён, в 18 → помощник).
+        //   Ветки: 💹 дело (пассив), 🛠️ труд (доход), 🕯️ дух (репутация). Часы = год с сервера (как ферма).
+        const CHILD_BRANCHES = { biz:{e:'💹',label:'Дело / учёба'}, work:{e:'🛠️',label:'Труд / спорт'}, soul:{e:'🕯️',label:'Дух / совесть'} };
+        function childAge(k){ return Math.max(0, Math.min(18, curYear() - (Number(k.bornY)|| curYear()))); }
+        function openChildModal(id){ const p=state.players.find(x=>x.id==id); if(!p) return; p.kids=p.kids||[]; childHelperCheck(p); state.childModal={pId:id}; save(id); render(); }
+        function closeChildModal(){ state.childModal=null; render(); }
+        function childHelperCheck(p){   // дети 18+ становятся помощниками — разовая активация пассива по ветке
+            if(!p||!Array.isArray(p.kids)) return; const sal=p.prof&&p.prof.salary||3000; let any=false;
+            for(const k of p.kids){ if(k.helper) continue; if(childAge(k)>=18){ k.helper=true; any=true; p.assets=p.assets||[];
+                const br=k.branch||'work'; const cf = br==='biz'?Math.round(sal*0.35): br==='work'?Math.round(sal*0.22):Math.round(sal*0.10);
+                if(br==='soul') p.repScore=(Number(p.repScore)||0)+6;
+                p.assets.push({id:Date.now()+Math.floor(Math.random()*1000),type:'BUSINESS',title:'🧑 Наследник ('+(CHILD_BRANCHES[br].label)+')',cf,price:0,down:0});
+                p.notify='🧑 Твой ребёнок вырос (18 лет) и стал помощником по ветке «'+CHILD_BRANCHES[br].label+'» — '+(br==='soul'?'поднял репутацию':'пассив +'+fmtN(cf)+'$/мес')+'!';
+            } }
+            if(any) save(p.id);
+        }
+        function childBirth(branch){ const m=state.childModal; if(!m) return; const p=state.players.find(x=>x.id==m.pId); if(!p) return;
+            p.kids=p.kids||[]; p.kids.push({bornY:curYear(), branch, helper:false}); p.children=(Number(p.children)||0)+1;
             const cc=Number(p.prof&&p.prof.childCost)||0;
-            p.notify=`👶 Пополнение в семье! Теперь детей: ${p.children}. Расходы +${cc}$/мес.`;
-            state.sdelkaModal={pId:pid, drawn:{emoji:'👶', title:'Пополнение в семье!', text:`Теперь у тебя ${p.children} ребёнок(а). Расходы на детей растут: +${cc}$/мес каждый круг.`, color:'#b98bff'}};
-            save(); render();
+            p.notify='👶 Пополнение! Растишь по ветке «'+CHILD_BRANCHES[branch].label+'». Расходы +'+fmtN(cc)+'$/мес, но в 18 станет помощником.';
+            save(p.id); render();
+        }
+        function renderChildModal(){
+            const m=state.childModal; if(!m) return '';
+            const p=state.players.find(x=>x.id==m.pId); if(!p) return '';
+            const kids=p.kids||[], cc=Number(p.prof&&p.prof.childCost)||0;
+            const wrap=(inner)=>`<div style="position:fixed;inset:0;background:rgba(3,5,8,.9);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px;"><div style="background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:22px;max-width:440px;width:100%;text-align:center;">${inner}</div></div>`;
+            const kidsList = kids.length ? kids.map(k=>{ const a=childAge(k), br=CHILD_BRANCHES[k.branch||'work']; const done=k.helper||a>=18;
+                return `<div style="display:flex;gap:8px;align-items:center;font-size:12.5px;padding:8px 10px;border-radius:8px;border:1px solid ${done?'#1f6b45':'var(--lx-line)'};background:var(--lx-ink);margin:5px 0;color:#cbd5e1;text-align:left;">
+                    <span style="font-size:20px;">${done?'🧑':'👶'}</span><span style="flex:1;">${br.e} ветка «${br.label}»<br><span style="font-size:11px;color:#9c988e;">${done?'вырос — помощник (18+)':a+' лет · растёт до 18'}</span></span></div>`; }).join('')
+                : '<div style="font-size:12px;color:#9c988e;margin:8px 0;">Детей пока нет. Ребёнок растёт до 18 лет и станет помощником по той ветке, в какую вложишь.</div>';
+            const opt=(k,e,label,sub)=>`<button onclick="childBirth('${k}')" class="btn" style="display:block;width:100%;margin:6px 0;padding:11px;text-align:left;background:var(--lx-ink);border:1px solid var(--lx-line);color:#f3efe6;font-weight:700;">${e} ${label}<br><span style="font-size:11px;color:#9c988e;font-weight:400;">${sub}</span></button>`;
+            return wrap(`<div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#c4b5fd;font-weight:800;">👶 Дети · наследие</div>
+                <div style="font-size:12px;color:#9c988e;line-height:1.5;margin:8px 0 10px;">Ребёнок растёт по годам, тянет расходы (+${fmtN(cc)}$/мес каждый), а в 18 становится живым помощником по ветке, в которую ты его растил. Как вырастишь — тем и силён.</div>
+                ${kidsList}
+                <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9c988e;font-weight:700;margin:14px 0 4px;">Завести ребёнка — во что вкладываешь</div>
+                ${opt('biz','💹','Дело / учёба','Наследник → жирный пассив по бизнесу.')}
+                ${opt('work','🛠️','Труд / спорт','Крепкий помощник → стабильный доход.')}
+                ${opt('soul','🕯️','Дух / совесть','Поднимет твою репутацию и имя.')}
+                <button onclick="closeChildModal()" class="btn btn-gray" style="width:100%;margin-top:8px;padding:10px;">Закрыть</button>`);
         }
         // ── ПРЕДПРОСМОТР КАРТЫ при скане: карточка со всеми данными → «Применить» ──
         function closeCardPreview(){ state.cardPreview=null; paintOverlays(); }
@@ -18004,7 +18206,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(pid);   // сохраняем «allow» на сервер, чтобы синхра не стёрла его до открытия/покупки → не «жди ведущего»
             state.view='player'; render();
             window[openName](pid);   // пройдёт gate (allow=key), откроет модалку
-            window[drawName]();      // авто-тянет и применяет эффект
+            if(drawName && typeof window[drawName]==='function') window[drawName]();   // авто-тянет (у клеток с фазовым окном, напр. Медицина, шага «тянуть» нет)
         }
         // ─── 📷 ВСТРОЕННЫЙ СКАНЕР QR (камера прямо в игре, не выходя в отдельное приложение) ───
         let _scanStream=null, _scanRAF=null, _scanOverlay=null;
