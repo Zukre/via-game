@@ -919,10 +919,11 @@ def _col_out_count(key):
         n += sum(1 for c in (p.get('collection') or []) if c.get('key') == key)
     n += sum(1 for s in DATA.get('colSellQueue', []) if s.get('key') == key)
     a = DATA.get('auction') or {}
-    cur = a.get('cur') or {}
-    if cur.get('item') == key and not cur.get('seller'):
-        n += 1
-    n += sum(1 for l in (a.get('queue') or []) if l.get('item') == key and not l.get('seller'))
+    for lane in (a.get('lanes') or {}).values():
+        cur = lane.get('cur') or {}
+        if cur.get('item') == key and not cur.get('seller'):
+            n += 1
+        n += sum(1 for l in (lane.get('queue') or []) if l.get('item') == key and not l.get('seller'))
     return n
 
 
@@ -972,14 +973,18 @@ def _npc_ceiling(key):
     return round(worth * random.uniform(lo, hi))
 
 
-def auction_settle_lot(a):
-    """Закрыть текущий лот: вещь победителю, деньги продавцу или в банк. Вызывать под LOCK."""
-    cur = a.get('cur')
+def auction_settle_lot(lane):
+    """Закрыть текущий лот ПОЛОСЫ: вещь победителю, деньги продавцу или в банк. Под LOCK."""
+    cur = lane.get('cur')
     if not cur:
         return
     key, price, bidder = cur.get('item'), float(cur.get('price') or 0), cur.get('bidder')
     it = COLLECTION_ITEMS.get(key) or {}
-    log = a.setdefault('log', [])
+    log = lane.setdefault('log', [])
+
+    def _rec(entry):
+        entry['ts'] = time.time()          # метка времени → клиент сливает логи полос по порядку
+        log.append(entry)
     # 🕴️ Незнакомец выиграл: вещь уходит из мира, продавцу-игроку — живые деньги
     if bidder == 'npc':
         if it.get('rar') in ('mythic', 'legend'):
@@ -990,15 +995,15 @@ def auction_settle_lot(a):
                 seller['savings'] = round(float(seller.get('savings') or 0) + price, 2)
                 seller['p2pSeq'] = int(seller.get('p2pSeq') or 0) + 1
                 seller['notify'] = '🔨 «%s» забрал %s за %s$. Деньги в кассе.' % (it.get('name', key), NPC_NAME, int(price))
-        log.append({'item': key, 'price': price, 'name': NPC_NAME, 'sold': True, 'npc': True})
-        a['cur'] = None
+        _rec({'item': key, 'price': price, 'name': NPC_NAME, 'sold': True, 'npc': True})
+        lane['cur'] = None
         return
     winner = next((p for p in DATA['players'] if p.get('id') == bidder), None) if bidder is not None else None
     # 🤫 Скрытый резерв лота игры: дешевле 75% красной цены мир вещь не отдаёт
     if winner is not None and cur.get('res') and cur.get('seller') is None and price < float(cur['res']):
         winner['notify'] = '🔨 «%s» снята с торгов — резерв не взят. Вещь вернулась в мир.' % it.get('name', key)
-        log.append({'item': key, 'price': price, 'name': None, 'sold': False, 'res': True})
-        a['cur'] = None
+        _rec({'item': key, 'price': price, 'name': None, 'sold': False, 'res': True})
+        lane['cur'] = None
         return
     if winner is not None and float(winner.get('savings') or 0) >= price:
         winner['savings'] = round(float(winner.get('savings') or 0) - price, 2)
@@ -1016,7 +1021,7 @@ def auction_settle_lot(a):
             seller['p2pSeq'] = int(seller.get('p2pSeq') or 0) + 1
             seller['notify'] = '🔨 «%s» продана с молотка за %s$.' % (it.get('name', key), int(price))
         # лот от игры → деньги сгорают в банк: стол не заливаем
-        log.append({'item': key, 'price': price, 'name': winner.get('name'), 'sold': True})
+        _rec({'item': key, 'price': price, 'name': winner.get('name'), 'sold': True})
     else:
         # никто не взял (или у победителя к закрытию не хватило) — вещь возвращается
         if cur.get('seller') is not None:
@@ -1025,35 +1030,46 @@ def auction_settle_lot(a):
                 owner.setdefault('collection', []).append(
                     {'key': key, 'paid': float(cur.get('min') or 0), 'at': int(time.time())})
                 owner['notify'] = '🔨 «%s» не нашла покупателя — вернулась в коллекцию.' % it.get('name', key)
-        log.append({'item': key, 'price': 0, 'name': None, 'sold': False})
-    a['cur'] = None
+        _rec({'item': key, 'price': 0, 'name': None, 'sold': False})
+    lane['cur'] = None
 
 
-def auction_next_lot(a):
-    """Поставить следующий лот на молоток. Вызывать под LOCK."""
-    q = a.setdefault('queue', [])
+def auction_next_lot(lane):
+    """Поставить следующий лот ПОЛОСЫ на молоток. Вызывать под LOCK."""
+    q = lane.setdefault('queue', [])
     if not q:
-        a['status'] = 'done'
-        a['doneAt'] = time.time()
+        lane['cur'] = None
         return
     lot = q.pop(0)
     key = lot['item']
     worth = col_prices().get(key, COLLECTION_ITEMS[key]['base'])
     start = lot.get('min') or max(1, round(worth * AUC_START_PCT))
-    a['cur'] = {'item': key, 'price': start, 'start': start, 'bidder': None, 'bidderName': None,
-                'seller': lot.get('seller'), 'min': lot.get('min'),
-                # резерв только у лотов игры; у лота игрока его минималка и есть старт
-                'res': (round(worth * AUC_RESERVE_PCT) if lot.get('seller') is None else None),
-                'npcMax': _npc_ceiling(key),   # 🕴️ до скольки сегодня торгуется Незнакомец
-                'endsAt': time.time() + AUC_LOT_SECONDS}
+    lane['cur'] = {'item': key, 'price': start, 'start': start, 'bidder': None, 'bidderName': None,
+                   'seller': lot.get('seller'), 'min': lot.get('min'),
+                   # резерв только у лотов игры; у лота игрока его минималка и есть старт
+                   'res': (round(worth * AUC_RESERVE_PCT) if lot.get('seller') is None else None),
+                   'npcMax': _npc_ceiling(key),   # 🕴️ до скольки сегодня торгуется Незнакомец
+                   'endsAt': time.time() + AUC_LOT_SECONDS}
 
 
+def auction_all_done(a):
+    """Все полосы отторговали (ни текущего лота, ни очереди) — молоток замолк."""
+    for lane in (a.get('lanes') or {}).values():
+        if lane.get('cur') or lane.get('queue'):
+            return False
+    return True
+
+
+# 🎯 СЕГМЕНТНЫЕ ПОТОКИ ПО РЕДКОСТИ (Ринат, «добить аукцион»): вместо одной очереди —
+# параллельные ПОЛОСЫ (gray/blue/gold/mythic/legend). Каждая тикает сама, у каждой СВОЙ
+# Незнакомец и свой молоток. Игрок выбирает ветку редкости в баре и бьётся именно в ней.
 def auction_open(by):
-    """Собрать лоты и открыть торги. Вызывать под LOCK. Возвращает (ok, reason|лотов)."""
+    """Собрать лоты, разложить по полосам редкости и открыть торги. Под LOCK.
+    Возвращает (ok, reason|число лотов)."""
     a = DATA.get('auction')
     if a and a.get('status') == 'live':
         return False, 'busy'
-    queue = []
+    all_lots = []
     allow_legend = True
     for _ in range(AUC_LOTS):
         k = col_pick_lot(allow_legend)
@@ -1061,21 +1077,26 @@ def auction_open(by):
             break
         if COLLECTION_ITEMS[k]['rar'] in ('mythic', 'legend'):
             allow_legend = False   # мифик/легендарка — не больше одной за аукцион
-        queue.append({'item': k, 'seller': None})
-    # вещи игроков, выставленные на продажу, идут после лотов игры
+        all_lots.append({'item': k, 'seller': None})
+    # вещи игроков, выставленные на продажу, добавляются в свои полосы
     sq = DATA.get('colSellQueue', [])
-    queue.extend({'item': s['key'], 'seller': s['pid'], 'min': s.get('min')} for s in sq)
+    all_lots.extend({'item': s['key'], 'seller': s['pid'], 'min': s.get('min')} for s in sq)
     DATA['colSellQueue'] = []
-    if not queue:
+    if not all_lots:
         return False, 'empty'
+    lanes = {}
+    for lot in all_lots:
+        rar = COLLECTION_ITEMS[lot['item']]['rar']
+        lanes.setdefault(rar, {'queue': [], 'cur': None, 'log': []})['queue'].append(lot)
     DATA['auction'] = {'status': 'live', 'openedBy': str(by or 'ведущий'),
-                       'queue': queue, 'cur': None, 'log': [],
+                       'lanes': lanes, 'log': [],   # top-level log = только тёмные ящики
                        'darkLeft': AUC_DARK_LOTS, 'startedAt': time.time()}
-    auction_next_lot(DATA['auction'])
+    for rar in lanes:
+        auction_next_lot(lanes[rar])                 # у каждой полосы сразу свой первый лот на молотке
     # расписание праздника: следующий сам через AUC_PERIOD, объявление ещё не делали
     DATA['aucNextAt'] = time.time() + AUC_PERIOD
     DATA['aucWarned'] = False
-    return True, len(queue) + 1
+    return True, len(all_lots)
 
 
 def _notify_all(msg):
@@ -1107,28 +1128,34 @@ def auction_ticker():
                     changed = True
                 a = DATA.get('auction')
                 if a and a.get('status') == 'live':
-                    cur = a.get('cur')
-                    if cur and now >= float(cur.get('endsAt') or 0):
-                        auction_settle_lot(a)
-                        auction_next_lot(a)
-                        changed = True
-                    elif not cur:
-                        auction_next_lot(a)
-                        changed = True
-                    elif cur:
-                        # 🕴️ НЕЗНАКОМЕЦ: вяло на мусор, бешено на легендарки, любит флажок
-                        left = float(cur.get('endsAt') or 0) - now
-                        price = float(cur.get('price') or 0)
-                        need = price if cur.get('bidder') is None else round(price * (1 + AUC_MIN_STEP))
-                        if (cur.get('npcMax') and cur.get('bidder') != 'npc'
-                                and need <= float(cur['npcMax'])
-                                and (random.random() < NPC_BID_CHANCE or left < 8)):
-                            cur['price'] = need
-                            cur['bidder'] = 'npc'
-                            cur['bidderName'] = NPC_NAME
-                            if left < AUC_ANTISNIPE:
-                                cur['endsAt'] = now + AUC_ANTISNIPE
+                    # 🎯 каждая ПОЛОСА редкости тикает сама, у каждой свой Незнакомец
+                    for _rar, lane in (a.get('lanes') or {}).items():
+                        cur = lane.get('cur')
+                        if cur and now >= float(cur.get('endsAt') or 0):
+                            auction_settle_lot(lane)
+                            auction_next_lot(lane)
                             changed = True
+                        elif not cur and lane.get('queue'):
+                            auction_next_lot(lane)
+                            changed = True
+                        elif cur:
+                            # 🕴️ НЕЗНАКОМЕЦ полосы: вяло на мусор, бешено на легендарки, любит флажок
+                            left = float(cur.get('endsAt') or 0) - now
+                            price = float(cur.get('price') or 0)
+                            need = price if cur.get('bidder') is None else round(price * (1 + AUC_MIN_STEP))
+                            if (cur.get('npcMax') and cur.get('bidder') != 'npc'
+                                    and need <= float(cur['npcMax'])
+                                    and (random.random() < NPC_BID_CHANCE or left < 8)):
+                                cur['price'] = need
+                                cur['bidder'] = 'npc'
+                                cur['bidderName'] = NPC_NAME
+                                if left < AUC_ANTISNIPE:
+                                    cur['endsAt'] = now + AUC_ANTISNIPE
+                                changed = True
+                    if auction_all_done(a):
+                        a['status'] = 'done'
+                        a['doneAt'] = time.time()
+                        changed = True
                 else:
                     # 🎪 ПРАЗДНИК ПО РАСПИСАНИЮ (Ринат: «забываю про аукцион — пусть автоматом»)
                     nxt = float(DATA.get('aucNextAt') or 0)
@@ -2012,10 +2039,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         pl = find(req.get('pid'))
                         if pl is None:
                             raise ValueError('player not found')
-                        if not a or a.get('status') != 'live' or not a.get('cur'):
+                        # 🎯 ставка идёт в ПОЛОСУ выбранной редкости
+                        lane = ((a or {}).get('lanes') or {}).get(req.get('rar'))
+                        if not a or a.get('status') != 'live' or not lane or not lane.get('cur'):
                             self._send_json({'ok': False, 'reason': 'no_lot'}, 200)
                             return
-                        cur = a['cur']
+                        cur = lane['cur']
                         if time.time() >= float(cur.get('endsAt') or 0):
                             self._send_json({'ok': False, 'reason': 'closed'}, 200)
                             return
@@ -2079,7 +2108,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         a['darkLeft'] = int(a.get('darkLeft') or 0) - 1
                         worth = ps.get(key, COLLECTION_ITEMS[key]['base'])
                         a.setdefault('log', []).append({'item': key, 'price': DARK_PRICE,
-                                                        'name': pl.get('name'), 'sold': True, 'dark': True})
+                                                        'name': pl.get('name'), 'sold': True, 'dark': True,
+                                                        'ts': time.time()})
                         save_data(DATA)
                         broadcast()
                         self._send_json({'ok': True, 'item': key, 'name': COLLECTION_ITEMS[key]['name'],

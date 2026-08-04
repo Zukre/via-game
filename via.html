@@ -10748,9 +10748,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 🥚🍥 РАЗДЕЛЕНИЕ ПРОДУКТА ПО ВИДУ (Ринат 30июл): яйца теперь у каждой птицы СВОИ (курица/утка/страус —
         // разный товар и разная цена), у рыбы — ИКРА, а не «яйцо». Старые ключи eggs/fish оставлены для уже
         // накопленного товара (продастся). egg_ostrich/farm_ostrichegg/farm_duckeggs — картинки Ринат догенерит.
-        const FARM_STOCK_LABELS = { egg_hen:'🥚 Куриные яйца', egg_duck:'🥚 Утиные яйца', egg_ostrich:'🥚 Страусиные яйца', eggs:'🥚 Яйца', milk:'🥛 Молоко', shubat:'🥛 Шубат (верблюжье)', meat:'🥩 Мясо', caviar:'🍥 Икра', blackcaviar:'🖤 Чёрная икра', fish:'🐟 Рыба', honey:'🍯 Мёд', wool:'🧶 Шерсть', feath:'🪶 Перья', flowers:'🌹 Цветы', micro:'🌱 Микрозелень', fruits:'🍇 Виноград/фрукты', fert:'💩 Удобрения', crocleather:'🐊 Кожа крокодила' };
+        const FARM_STOCK_LABELS = { egg_hen:'🥚 Куриные яйца', egg_duck:'🥚 Утиные яйца', egg_ostrich:'🥚 Страусиные яйца', eggs:'🥚 Яйца', milk:'🥛 Молоко', shubat:'🥛 Шубат (верблюжье)', meat:'🥩 Мясо', hooves:'🦴 Копыта', horns:'🦬 Рога', caviar:'🍥 Икра', blackcaviar:'🖤 Чёрная икра', fish:'🐟 Рыба', honey:'🍯 Мёд', wool:'🧶 Шерсть', feath:'🪶 Перья', flowers:'🌹 Цветы', micro:'🌱 Микрозелень', fruits:'🍇 Виноград/фрукты', fert:'💩 Удобрения', crocleather:'🐊 Кожа крокодила', bag:'👜 Сумка из кожи' };
         // 📦 картинка товара на складе (нет файла → farmThumb сам скроет, пока не сгенерим)
-        const FARM_PROD_IMG = { egg_hen:'farm_eggs', egg_duck:'farm_duckeggs', egg_ostrich:'farm_ostrichegg', eggs:'farm_eggs', milk:'farm_milk', shubat:'farm_shubat', meat:'farm_beef', caviar:'farm_caviar', blackcaviar:'farm_blackcaviar', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer', crocleather:'farm_crocleather' };
+        const FARM_PROD_IMG = { egg_hen:'farm_eggs', egg_duck:'farm_duckeggs', egg_ostrich:'farm_ostrichegg', eggs:'farm_eggs', milk:'farm_milk', shubat:'farm_shubat', meat:'farm_beef', hooves:'farm_hooves', horns:'farm_horns', caviar:'farm_caviar', blackcaviar:'farm_blackcaviar', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer', crocleather:'farm_crocleather', bag:'farm_crocbag' };
+        // 🐊👜 КОЖА → СУМКИ и 🦴🦬 КОПЫТА/РОГА (Ринат 4авг): кожу крокодила шьёшь в дорогие сумки (мастерская в ⚗️ Производство);
+        //   копыта и рога капают побочкой с убоя копытного скота и продаются на складе. Числа — черновик под тюнинг.
+        const FARM_LEATHER = { perBag:150, bagValue:650 };                 // 150 ед. кожи → сумка ценой ~650 (наценка ×4)
+        const FARM_BYPRODUCT = { hoovesFrac:0.04, hornsFrac:0.06 };        // доля от мяса головы → копыта/рога
+        const FARM_HORNED = { cow:1, bull:1, angus:1, angus_bull:1, sheep:1, ram_male:1, camel:1, camel_male:1 };  // у кого есть рога
         // 🏭 продукты сами деньгами НЕ капают — копятся на складе (Ринат 28июл). Единственный ЧЕСТНЫЙ пассив фермы = КОНТРАКТЫ (см. ниже).
         // 🍽️ КОНТРАКТЫ С ЗАКАЗЧИКАМИ (Ринат 26июл, дословный замысел): ферма перестаёт быть кнопкой-на-миллион.
         //   Подписал контракт → продукт УХОДИТ заказчику (списывается со склада каждый год), а взамен капает РОВНЫЙ ПАССИВ payMo/мес в поток.
@@ -12332,20 +12337,35 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 🔨 ВЫБОР РЕДКОСТИ на аукционе (Ринат 4авг: «сюда засунуть рарность» — верхняя полоса).
         //   Игрок выбирает ветку редкости, за которой охотится. Пока фильтр-подсветка; сегментные потоки — серверный шаг.
         function setAucRarity(k){ state.aucRarity=(k==='all'?null:k); render(); }
-        function aucRarityBar(){
-            const cur = state.aucRarity || 'all';
-            const tiers = [['all','Все','#cdc8bd','var(--lx-line)']].concat(Object.keys(COL_RAR).map(k=>[k,COL_RAR[k].t,COL_RAR[k].c,COL_RAR[k].ring]));
+        // 🎯 бар-переключатель ПОЛОС редкости: у каждой свой поток лотов и свой скрытый покупатель.
+        // ● = в ветке прямо сейчас идёт молоток; число = сколько лотов в ветке (текущий + очередь).
+        function aucRarityBar(lanes){
+            lanes = lanes || {};
+            const sel = state.aucRarity || 'all';
+            const order = ['gray','blue','gold','mythic','legend'];
+            const tiers = [['all','Все','#cdc8bd','var(--lx-line)']].concat(order.filter(k=>COL_RAR[k]).map(k=>[k,COL_RAR[k].t,COL_RAR[k].c,COL_RAR[k].ring]));
             return `<div style="margin-bottom:10px;">
-                <div style="font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#6d6a62;font-weight:700;text-align:center;margin-bottom:6px;">🎯 Редкость, за которой охотишься</div>
-                <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;">${tiers.map(t=>`<button onclick="setAucRarity('${t[0]}')" style="cursor:pointer;font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:5px 11px;border-radius:999px;border:1px solid ${cur===t[0]?t[2]:t[3]};background:${cur===t[0]?'rgba(217,184,119,.12)':'var(--lx-ink)'};color:${cur===t[0]?t[2]:'#8a8378'};">${t[1]}</button>`).join('')}</div>
+                <div style="font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#6d6a62;font-weight:700;text-align:center;margin-bottom:6px;">🎯 Ветка редкости — свой поток, свой покупатель</div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;">${tiers.map(t=>{
+                    const k=t[0], on=(sel===k);
+                    const lane = k==='all'?null:lanes[k];
+                    const hasLane = k==='all' ? Object.keys(lanes).length>0 : !!lane;
+                    const liveDot = k==='all' ? Object.keys(lanes).some(r=>lanes[r]&&lanes[r].cur) : !!(lane&&lane.cur);
+                    const waiting = lane ? ((lane.queue||[]).length + (lane.cur?1:0)) : 0;
+                    const dim = !hasLane;
+                    return `<button onclick="${dim?'':`setAucRarity('${k}')`}" ${dim?'disabled':''} style="cursor:${dim?'default':'pointer'};opacity:${dim?0.35:1};font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:5px 11px;border-radius:999px;border:1px solid ${on?t[2]:t[3]};background:${on?'rgba(217,184,119,.12)':'var(--lx-ink)'};color:${on?t[2]:'#8a8378'};">${liveDot?'<span style="color:#f87171;">●</span> ':''}${t[1]}${(k!=='all'&&waiting)?` <span style="opacity:.6;">${waiting}</span>`:''}</button>`;
+                }).join('')}</div>
             </div>`;
         }
         function renderAucPanel(p){
             const a = state.auction;
             const live = a && a.status==='live';
-            const logHtml = (a && (a.log||[]).length) ? `<div style="margin-top:11px;">
+            const lanes = (a && a.lanes) || {};
+            // 🎯 объединённый лог всех полос + тёмные ящики, по метке времени
+            const mergedLog = [].concat((a&&a.log)||[], ...Object.keys(lanes).map(k=>lanes[k].log||[])).sort((x,y)=>(x.ts||0)-(y.ts||0));
+            const logHtml = mergedLog.length ? `<div style="margin-top:11px;">
                 <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6d6a62;font-weight:700;margin-bottom:6px;">Молоток уже стукнул</div>
-                ${(a.log||[]).slice(-8).reverse().map(l=>{
+                ${mergedLog.slice(-8).reverse().map(l=>{
                     const it=COL_ITEMS[l.item]||{}; const r=COL_RAR[(it.rar)||'gray']||COL_RAR.gray;
                     return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:5px 2px;border-bottom:1px solid #1a1e26;">
                         <span style="color:${r.c};">${l.dark?'📦 ':''}${it.name||l.item}</span>
@@ -12364,9 +12384,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${logHtml}
                 </div>`;
             }
-            const cur = a.cur;
-            let lotHtml = '<p style="font-size:12px;color:#9c988e;text-align:center;margin:10px 0;">Следующий лот выходит на подиум…</p>';
-            if(cur){
+            // 🎯 какую ПОЛОСУ показываем: выбранную в баре; «Все» → самую горячую (скорее молоток)
+            const order=['gray','blue','gold','mythic','legend'];
+            const activeRars=order.filter(r=>lanes[r]&&lanes[r].cur);
+            let showRar=state.aucRarity;
+            if(!showRar || !lanes[showRar]){
+                showRar = activeRars.slice().sort((x,y)=>((lanes[x].cur.endsAt||0)-(lanes[y].cur.endsAt||0)))[0] || order.find(r=>lanes[r]) || null;
+            }
+            const lane = showRar?lanes[showRar]:null;
+            const cur = lane && lane.cur;
+            const laneR = COL_RAR[showRar]||COL_RAR.gray;
+            let lotHtml;
+            if(!lane){ lotHtml = '<p style="font-size:12px;color:#9c988e;text-align:center;margin:12px 0;">В этой ветке лотов нет — выбери другую редкость в баре.</p>'; }
+            else if(!cur){ lotHtml = `<p style="font-size:12px;color:#9c988e;text-align:center;margin:12px 0;">Ветка «${laneR.t}» отторговала — все её лоты ушли. Загляни в другую редкость.</p>`; }
+            else {
                 const it = COL_ITEMS[cur.item]||{name:cur.item};
                 const r = COL_RAR[(it.rar)||'gray']||COL_RAR.gray;
                 const myLot = cur.seller!=null && cur.seller==p.id;
@@ -12393,26 +12424,27 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${myLot ? '' : iHold
                         ? `<div style="font-size:12px;color:#5cb08b;font-weight:700;text-align:center;margin-top:9px;">Твоя ставка держит лот. Молчи и смотри на молоток.</div>`
                         : `<div style="display:grid;grid-template-columns:1fr;gap:7px;margin-top:9px;">
-                            <button onclick="aucBid(${p.id},${need})" class="btn" style="padding:12px;font-weight:800;font-size:14px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">${cur.bidder==null?'ВЗЯТЬ СО СТАРТА':'ПЕРЕБИТЬ'} — ${fmtN(need)}$</button>
+                            <button onclick="aucBid(${p.id},${need},'${showRar}')" class="btn" style="padding:12px;font-weight:800;font-size:14px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">${cur.bidder==null?'ВЗЯТЬ СО СТАРТА':'ПЕРЕБИТЬ'} — ${fmtN(need)}$</button>
                             <div style="display:grid;grid-template-columns:1fr auto;gap:7px;">
                                 <input id="aucAmt" type="number" min="${need}" placeholder="Своя ставка, от ${fmtN(need)}$" class="inp" style="padding:8px 11px;font-family:ui-monospace,monospace;font-weight:700;">
-                                <button onclick="aucBid(${p.id},0)" class="btn" style="padding:8px 14px;font-weight:700;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;">Ставлю</button>
+                                <button onclick="aucBid(${p.id},0,'${showRar}')" class="btn" style="padding:8px 14px;font-weight:700;background:#241a0c;color:#efd8a3;border:1px solid #b98a3e;">Ставлю</button>
                             </div>
                             <div style="font-size:10.5px;color:#6d6a62;text-align:center;">ставка в последние 10 секунд продлевает торг — перебивание на флажке живёт</div>
                         </div>`}
                 </div>`;
             }
-            const qn = (a.queue||[]).length;
+            const qn = lane ? (lane.queue||[]).length : 0;
             const darkLeft = Number(a.darkLeft)||0;
+            const myHunt = state.aucRarity && state.aucRarity===showRar;
             return `<div class="card">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;">
                     <div class="block-title" style="margin:0;">🔨 Торги идут</div>
                     <span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#f87171;background:rgba(185,28,28,.14);border:1px solid #7f1d1d;border-radius:999px;padding:4px 10px;">● live</span>
                 </div>
-                ${aucRarityBar()}
-                ${(function(){ const rk=state.aucRarity; if(!rk||!cur) return ''; const it=COL_ITEMS[cur.item]||{}; const lr=(it.rar)||'gray'; if(lr===rk) return `<div style="font-size:11px;color:${COL_RAR[rk].c};text-align:center;margin-bottom:8px;font-weight:700;">✦ Этот лот — твоя редкость «${COL_RAR[rk].t}». Лови!</div>`; return `<div style="font-size:11px;color:#8a8378;text-align:center;margin-bottom:8px;">Сейчас на молотке «${COL_RAR[lr]?COL_RAR[lr].t:lr}», а ты ждёшь «${COL_RAR[rk].t}» — следующие лоты в очереди.</div>`; })()}
+                ${aucRarityBar(lanes)}
+                ${cur?`<div style="font-size:11px;text-align:center;margin-bottom:8px;color:${laneR.c};font-weight:700;">${myHunt?'✦ ':''}Молоток ветки «${laneR.t}»${!state.aucRarity?' <span style="color:#8a8378;font-weight:400;">— самая горячая; жми ветку в баре, чтоб перейти в другой поток</span>':''}</div>`:''}
                 ${lotHtml}
-                ${qn?`<div style="font-size:11px;color:#9c988e;text-align:center;margin-top:8px;">⏳ ждут молотка: ещё ${qn} лот${qn==1?'':qn<5?'а':'ов'}</div>`:''}
+                ${qn?`<div style="font-size:11px;color:#9c988e;text-align:center;margin-top:8px;">⏳ в ветке «${laneR.t}» ждут ещё ${qn} лот${qn==1?'':qn<5?'а':'ов'}</div>`:''}
                 ${darkLeft>0?`<div style="display:flex;gap:10px;align-items:center;background:linear-gradient(180deg,#12151c,#0c0f14);border:1px solid #2b2f3a;border-radius:13px;padding:10px;margin-top:11px;">
                     <div style="flex:0 0 74px;">${colImg('darklot',64)}</div>
                     <div style="flex:1;">
@@ -12424,7 +12456,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${logHtml}
             </div>`;
         }
-        async function aucBid(pid, amount){
+        async function aucBid(pid, amount, rar){
             if(!amount){
                 amount = Math.floor(Number((document.getElementById('aucAmt')||{}).value)||0);
                 if(amount<1){ alert('Впиши свою ставку числом.'); return; }
@@ -12432,7 +12464,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             let j=null;
             try{
                 const r = await fetch('/auction/bid',{method:'POST',headers:{'Content-Type':'application/json'},
-                                                      body:JSON.stringify({pid:pid, amount:amount})});
+                                                      body:JSON.stringify({pid:pid, amount:amount, rar:rar})});
                 j = await r.json();
             }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
             if(j && j.ok===false){
@@ -15879,6 +15911,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 out += `</div>`;
             }
             out += `</div>`;
+            // 🐊👜 КОЖЕВЕННАЯ МАСТЕРСКАЯ (Ринат 4авг): кожа крокодила → дорогие сумки
+            const _leather=Math.floor(Number((p.farm.stock||{}).crocleather)||0);
+            const _canBag=Math.floor(_leather/FARM_LEATHER.perBag);
+            const _bagVal=Math.round(FARM_LEATHER.bagValue*priceIdx('bag'));
+            const _bags=Math.floor(Number((p.farm.stock||{}).bag)||0);
+            out += `<div class="card"><div class="block-title">👜 Кожевенная мастерская</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Кожа крокодила — сырьё. Сшей из неё сумку: <b>${FARM_LEATHER.perBag}</b> ед. кожи → одна сумка ценой <b>~${fmtN(_bagVal)}$</b> (в разы дороже сырья). Готовые сумки копятся на 📦 Склад и продаются там.</p>`;
+            out += `<div class="row-item">${farmThumb('farm_crocleather')||farmThumb('farm_crocodile')}<div style="flex:1;"><b>🐊 Кожа на складе</b><div style="font-size:11px;color:#9ca3af;">${fmtN(_leather)} ед. · хватит на <b style="color:${_canBag>0?'#10b981':'#f59e0b'};">${_canBag}</b> сумок (${FARM_LEATHER.perBag} ед./сумка)</div></div><button onclick="farmMakeBag()" ${_canBag>0?'':'disabled'} class="btn ${_canBag>0?'btn-amber':'btn-gray'}" style="white-space:nowrap;">🧵 Сшить сумку</button></div>`;
+            if(_bags>0) out += `<div class="row-item">${farmThumb('farm_crocbag')||farmThumb('farm_crocleather')}<div style="flex:1;"><b>👜 Готовые сумки</b><div style="font-size:11px;color:#10b981;">на складе ~${fmtN(_bags)}$ товара · продать в 📦 Склад</div></div></div>`;
+            else if(_leather<FARM_LEATHER.perBag) out += `<p style="font-size:11px;color:#6b7280;margin-top:6px;">Заведи 🐊 крокодилов (озеро крокодилов) — они едят мясо/рыбу со склада и дают кожу. Накопится ${FARM_LEATHER.perBag} ед. — сошьёшь первую сумку.</p>`;
+            out += `</div>`;
             return out;
         }
 
@@ -15915,8 +15957,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const have=a.count||1; const per=Math.round(c.meat*priceIdx('meat')); const _fcap=farmFridgeCap(p);
             farmAskQty({ title:'На убой «'+c.name+'»', note:'Есть '+have+'. Мясо ~'+fmtN(per)+'$/гол → на склад'+(farmFridgeTier(p)>0?(' · холодильник вмещает '+fmtN(_fcap)+'$ мяса'):' (без 🧊 протухнет за год)'), def:have, min:1, max:have, okLabel:'На убой',
                 preview:(q)=>'Мяса на склад ~<b>'+fmtN(per*q)+'$</b>',
-                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm) return; const aa=(pp.farm.animals||[]).find(x=>x.aid===aid); if(!aa) return; const hv=aa.count||1; const n=Math.min(qty,hv); pp.farm.stock=pp.farm.stock||{}; const add=c.meat*n; let cur=Number(pp.farm.stock.meat)||0; const cap=farmFridgeCap(pp); let lost=0; let nv=cur+add; if(cap>0 && nv>cap){ lost=nv-cap; nv=cap; } aa.count=hv-n; if(aa.count<=0){ pp.farm.animals=pp.farm.animals.filter(x=>x.aid!==aid); } pp.farm.stock.meat=nv; pp.farm.meatFreshY=curYear(); pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); farmToast(lost>0?('🔪 Под нож '+n+' → склад полон, холодильник вместил не всё (потеряно ~'+fmtN(lost)+'$ мяса). Расширь холодильник!'):('🔪 Под нож '+n+' «'+c.name+'» → мясо на склад')); } }); }
+                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm) return; const aa=(pp.farm.animals||[]).find(x=>x.aid===aid); if(!aa) return; const hv=aa.count||1; const n=Math.min(qty,hv); pp.farm.stock=pp.farm.stock||{}; const add=c.meat*n; let cur=Number(pp.farm.stock.meat)||0; const cap=farmFridgeCap(pp); let lost=0; let nv=cur+add; if(cap>0 && nv>cap){ lost=nv-cap; nv=cap; } aa.count=hv-n; if(aa.count<=0){ pp.farm.animals=pp.farm.animals.filter(x=>x.aid!==aid); } pp.farm.stock.meat=nv; pp.farm.meatFreshY=curYear();
+                    // 🦴🦬 побочка убоя (Ринат 4авг): у копытного скота — копыта, у рогатого — ещё и рога → на склад
+                    let bpMsg=''; if(farmFeedType(aa.kind)==='hay'){ const hoov=Math.round(c.meat*FARM_BYPRODUCT.hoovesFrac)*n; if(hoov>0){ pp.farm.stock.hooves=(Number(pp.farm.stock.hooves)||0)+hoov; bpMsg+=' · 🦴 копыта +'+fmtN(hoov); } if(FARM_HORNED[aa.kind]){ const hrn=Math.round(c.meat*FARM_BYPRODUCT.hornsFrac)*n; if(hrn>0){ pp.farm.stock.horns=(Number(pp.farm.stock.horns)||0)+hrn; bpMsg+=' · 🦬 рога +'+fmtN(hrn); } } }
+                    pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); farmToast(lost>0?('🔪 Под нож '+n+' → склад полон, холодильник вместил не всё (потеряно ~'+fmtN(lost)+'$ мяса). Расширь холодильник!'+bpMsg):('🔪 Под нож '+n+' «'+c.name+'» → мясо на склад'+bpMsg)); } }); }
         function farmBuyFridge(){ const p=farmMe(); if(!p||!p.farm) return; const t=farmFridgeTier(p); if(t>=FRIDGE_TIERS.length){ alert('🧊 Уже максимальный холодильник — расширять некуда.'); return; } const nx=FRIDGE_TIERS[t]; if(p.savings<nx.cost){ alert('Не хватает кассы. «'+nx.name+'» холодильник стоит '+fmtN(nx.cost)+'$.'); return; } farmSpend(p,nx.cost); p.farm.fridgeTier=t+1; p.farm.fridge=true; save(p.id); render(); alert('🧊 '+(t===0?'Куплен':'Расширен до «'+nx.name+'»')+' холодильник — вмещает '+fmtN(nx.cap)+' мяса, хранится долго и не тухнет.'); }
+        // 🐊👜 сшить сумку из кожи крокодила: списывает кожу со склада, кладёт дорогой товар «сумка» на склад
+        function farmMakeBag(){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock=p.farm.stock||{}; const leather=Math.floor(Number(st.crocleather)||0); if(leather<FARM_LEATHER.perBag){ farmToast('Мало кожи: нужно '+FARM_LEATHER.perBag+' ед. на сумку (есть '+fmtN(leather)+').'); return; } st.crocleather=leather-FARM_LEATHER.perBag; st.bag=(Number(st.bag)||0)+FARM_LEATHER.bagValue; save(p.id); render(); farmToast('👜 Сшита сумка из крокодила! На склад +'+fmtN(FARM_LEATHER.bagValue)+'$ товара — продать в 📦 Склад.'); }
         function farmManager(on){ const p=farmMe(); if(!p||!p.farm) return; p.farm.manager=!!on; save(p.id); render(); }
         function farmBuyMilker(){ const p=farmMe(); if(!p||!p.farm) return; const cows=farmCowHeads(p), have=farmMilkers(p);
             farmAskQty({ title:'🥛 Доильный аппарат — купить', note:'Цена '+fmtN(FARM_CFG.milker)+'$/шт. Есть '+have+', коров '+cows+'. По одному на корову.', def:Math.max(1,cows-have), min:1, max:99, okLabel:'Купить',
