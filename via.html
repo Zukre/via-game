@@ -10750,7 +10750,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // накопленного товара (продастся). egg_ostrich/farm_ostrichegg/farm_duckeggs — картинки Ринат догенерит.
         const FARM_STOCK_LABELS = { egg_hen:'🥚 Куриные яйца', egg_duck:'🥚 Утиные яйца', egg_ostrich:'🥚 Страусиные яйца', eggs:'🥚 Яйца', milk:'🥛 Молоко', shubat:'🥛 Шубат (верблюжье)', meat:'🥩 Мясо', hooves:'🦴 Копыта', horns:'🦬 Рога', caviar:'🍥 Икра', blackcaviar:'🖤 Чёрная икра', fish:'🐟 Рыба', honey:'🍯 Мёд', wool:'🧶 Шерсть', feath:'🪶 Перья', flowers:'🌹 Цветы', micro:'🌱 Микрозелень', fruits:'🍇 Виноград/фрукты', fert:'💩 Удобрения', crocleather:'🐊 Кожа крокодила', bag:'👜 Сумка из кожи' };
         // 📦 картинка товара на складе (нет файла → farmThumb сам скроет, пока не сгенерим)
-        const FARM_PROD_IMG = { egg_hen:'farm_eggs', egg_duck:'farm_duckeggs', egg_ostrich:'farm_ostrichegg', eggs:'farm_eggs', milk:'farm_milk', shubat:'farm_camel', meat:'farm_beef', hooves:'farm_hooves', horns:'farm_horns', caviar:'farm_caviar', blackcaviar:'farm_blackcaviar', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer', crocleather:'farm_crocleather', bag:'farm_crocbag' };
+        const FARM_PROD_IMG = { egg_hen:'farm_eggs', egg_duck:'farm_duckeggs', egg_ostrich:'farm_ostrichegg', eggs:'farm_eggs', milk:'farm_milk', shubat:'farm_shubat', meat:'farm_beef', hooves:'farm_hooves', horns:'farm_horns', caviar:'farm_caviar', blackcaviar:'farm_blackcaviar', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer', crocleather:'farm_crocleather', bag:'farm_crocbag' };
         // 🐊👜 КОЖА → СУМКИ и 🦴🦬 КОПЫТА/РОГА (Ринат 4авг): кожу крокодила шьёшь в дорогие сумки (мастерская в ⚗️ Производство);
         //   копыта и рога капают побочкой с убоя копытного скота и продаются на складе. Числа — черновик под тюнинг.
         const FARM_LEATHER = { perBag:150, bagValue:650 };                 // 150 ед. кожи → сумка ценой ~650 (наценка ×4)
@@ -10770,7 +10770,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             grill:      {name:'🍖 Кафе-гриль «Уголёк»',       prod:'meat',       qtyYr:2400,  payMo:400,  rep:10, img:'farm_beef',       tier:'ремесло'},
             sushi:      {name:'🍥 Суши-бар «Волна»',          prod:'caviar',     qtyYr:60,    payMo:350,  rep:15, img:'farm_caviar',     tier:'ремесло'},
             flowers:    {name:'🌹 Цветочная сеть «Астра»',    prod:'flowers',    qtyYr:200,   payMo:350,  rep:20, img:'farm_flowers',    tier:'сеть'},
-            ethno:      {name:'🐫 Этно-ресторан «Дала»',      prod:'shubat',     qtyYr:60,    payMo:500,  rep:25, img:'farm_camel',      tier:'сеть'},
+            ethno:      {name:'🐫 Этно-ресторан «Дала»',      prod:'shubat',     qtyYr:60,    payMo:500,  rep:25, img:'farm_shubat',     tier:'сеть'},
             bigmilk:    {name:'🥛 Молочный завод (сеть)',      prod:'milk',       qtyYr:3000,  payMo:1400, rep:30, img:'farm_milk',       tier:'сеть'},
             steak:      {name:'🥩 Стейк-хаус «Ангус Prime»',  prod:'meat',       qtyYr:8000,  payMo:1200, rep:40, img:'farm_angussteak', tier:'премиум'},
             caviarhouse:{name:'🖤 Икорный дом «Каспий»',      prod:'blackcaviar',qtyYr:30,    payMo:900,  rep:40, img:'farm_blackcaviar',tier:'премиум'},
@@ -11334,7 +11334,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // 🛡️ (Ринат 19июл: «тик цен обновляет страницу, окна сбиваются») — НЕ дёргаем полную
             // перерисовку от тика рынка, когда открыто окно или крутится слот: картинка бы моргала,
             // барабаны слота сбивались, прокрутка прыгала. Живые цены догонят при закрытии окна / действии.
-            const _winOpen = !!(state.catPopup||state.soulsInfo||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.bankModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.marginModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.childModal||state.showHistory||state.doorOpen||state.soulCard);
+            const _winOpen = !!(state.catPopup||state.soulsInfo||state.farmInfo||state.cellInfo||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.bankModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.marginModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.childModal||state.showHistory||state.doorOpen||state.soulCard);
             if (!_slotSpinning && (_nmChanged || (state.view === 'player' && !_winOpen))) safeRerender();
             _lastNonMarket = _nonMarket;
             // окно сделки перерисовалось (тик рынка/чужой ход) → блок проскальзывания сбросился,
@@ -12310,7 +12310,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>`;
             }).join('');
             return `<div class="card">
-                <div class="block-title">💎 Моя коллекция</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="margin:0;">💎 Моя коллекция</div>${infoBtn('collection')}</div>
                 <div style="font-size:11.5px;color:#9c988e;line-height:1.55;margin-bottom:10px;">Вещь не капает в поток — она <b style="color:#efd8a3;">дорожает на бархате</b>, +2–4% в год, молча. Сет из 3 вещей одной темы и легендарки — вес твоего имени за столом: козырь на двери 2-го круга.</div>
                 ${col.length?`<div style="display:flex;justify-content:space-between;align-items:baseline;background:#0d1016;border:1px solid #242833;border-radius:11px;padding:9px 12px;margin-bottom:10px;">
                     <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6d6a62;font-weight:700;">Красная цена коллекции</span>
@@ -12377,6 +12377,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 }).join('')}</div>` : '';
             if(!live){
                 return `<div class="card">
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">${infoBtn('auction')}</div>
                     <div style="border-radius:13px;overflow:hidden;position:relative;height:130px;margin-bottom:11px;">
                         <img src="cat_imgs/col_auction.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.75) brightness(.8);" onerror="this.style.display='none'">
                         <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,.2),rgba(11,14,20,.92));"></div>
@@ -12441,8 +12442,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const darkLeft = Number(a.darkLeft)||0;
             const myHunt = state.aucRarity && state.aucRarity===showRar;
             return `<div class="card">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;">
-                    <div class="block-title" style="margin:0;">🔨 Торги идут</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;gap:8px;">
+                    <div style="display:flex;align-items:center;gap:8px;"><div class="block-title" style="margin:0;">🔨 Торги идут</div>${infoBtn('auction')}</div>
                     <span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#f87171;background:rgba(185,28,28,.14);border:1px solid #7f1d1d;border-radius:999px;padding:4px 10px;">● live</span>
                 </div>
                 ${aucRarityBar(lanes)}
@@ -13213,6 +13214,95 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
             </div>`;
         }
+        // ─── 🐄 ИНСТРУКЦИЯ ПО ФЕРМЕ (Ринат 4авг: «кнопка i как везде + описание как этим заниматься и что там есть») ───
+        const FARM_HOWTO = [
+            ['🌍','Земля и амбар','Начни с земли (кнопка «Начать ферму»), потом построй амбар. Чем больше земля — тем больше мест под строения; землю можно расширять с доплатой.'],
+            ['🎓','Ремесло','Сначала выучи «Фермерство», затем курсы под нужное дело — уход за скотом, рыба, разведение, растениеводство. Без курса вид не заведёшь.'],
+            ['🏗️','Строения','У каждого вида своё жильё: ангар, вольер, озерцо, озеро, пасека, теплица, озеро крокодилов. Вмещает конкретное число голов — улучшай или строй ещё.'],
+            ['🐮','Скот и культуры','Покупай по живой цене. Молодняк растёт годами до взрослости, потом даёт продукт, плодится (нужен самец) или идёт на убой.'],
+            ['🌾💧','Корм и вода','Скот ест (сено/зерно/рыбий корм) и пьёт. Кончится — голод и падёж. Купи запас окном «Купить…» или включи авто-корм и водопровод — они тянут ровный пассив помесячно.'],
+            ['👷','Люди','Фермеры работают только под управляющими; ковбои пасут стадо; убойщики режут на бойне. Все зарплаты списываются с месячного потока.'],
+            ['📦','Склад','Всё, что даёт ферма — молоко, яйца, мясо, мёд, шерсть, икра, кожа, копыта, рога — копится на Складе. Продавай по живой цене: по одному или «Продать ВЕСЬ склад».'],
+            ['⚗️','Производство','Сырьё в передел: 🥛 молоко→🧀 сыр, 🍇 виноград→🍷 вино/🥃 виски — годами дорожает в погребе. 🐊 Кожа крокодила→👜 дорогие сумки в кожевенной мастерской.'],
+            ['🔪','Мясо и побочка','Построй Бойню и найми убойщиков — тогда скот идёт под нож в мясо. Мясо без 🧊 холодильника тухнет за год; с убоя копытных капают 🦴 копыта и 🦬 рога на продажу.'],
+            ['🍽️','Контракты','Договорись с рестораном, сыроварней, икорным домом — это постоянный покупатель: платит ровный ПАССИВ каждый месяц, пока склад покрывает годовой объём. Главный честный доход фермы.'],
+            ['📈','Рынок','Цены продуктов качаются по годам циклами — у каждого свой пик. 🔥 дорого — продавай/режь, 🧊 дёшево — придержи. Кто ловит момент, тот и зарабатывает.'],
+        ];
+        function showFarmInfo(){ state.farmInfo=true; render(); }
+        function closeFarmInfo(){ state.farmInfo=false; render(); }
+        function renderFarmInfo(){
+            if(!state.farmInfo) return '';
+            return `<div style="position:fixed;inset:0;z-index:5100;background:rgba(4,6,9,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:460px;max-width:100%;max-height:90vh;overflow:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid #f59e0b;border-radius:18px;padding:22px 20px;box-shadow:0 30px 70px rgba(0,0,0,.7);">
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:22px;font-weight:700;color:#fcd34d;">🐄 Как вести ферму</div>
+                    <p style="text-align:center;font-size:12.5px;color:#9c988e;line-height:1.55;margin:8px 0 16px;">Ферма — живое дело: заводишь скот, кормишь, растишь, продаёшь и переделываешь. Терпение кормит. Вот весь путь по шагам.</p>
+                    ${FARM_HOWTO.map(([ic,nm,tx])=>`<div style="display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--lx-line);"><span style="font-size:22px;flex:0 0 auto;">${ic}</span><div><div style="font-weight:700;color:#f3efe6;font-size:14px;">${nm}</div><div style="font-size:12px;color:#9c988e;line-height:1.5;margin-top:2px;">${tx}</div></div></div>`).join('')}
+                    <div style="margin-top:14px;padding:12px;border-radius:11px;background:radial-gradient(120% 80% at 50% 0,rgba(245,158,11,.10),transparent 70%),var(--lx-ink);border:1px solid #f59e0b;text-align:center;">
+                        <div style="font-size:12.5px;color:#fde68a;line-height:1.6;">Коротко: <b>земля → амбар → курс → скот → корм/вода → продукт на склад → продажа или контракты</b>. Контракты дают ровный пассив — к нему и стремись.</div>
+                    </div>
+                    <button onclick="closeFarmInfo()" class="btn" style="width:100%;margin-top:14px;background:linear-gradient(180deg,#f59e0b,#d97706);color:#20180a;font-weight:800;padding:12px;">Понятно, погнали</button>
+                </div>
+            </div>`;
+        }
+        // ─── ℹ️ ЕДИНЫЙ ДВИЖОК ИНСТРУКЦИЙ ПО КЛЕТКАМ (Ринат 4авг «кнопка i как везде + описание») ───
+        // Одна кнопка infoBtn('ключ') + одно окно renderCellInfo — вешаем на все тяжёлые системы,
+        // чтобы игра сама себя объясняла и новичок не терялся.
+        const CELL_HOWTO = {
+            exchange: { t:'📈 Как торговать на бирже', c:'#7dd3fc',
+                intro:'Живой рынок: акции, крипта, металлы, мем-монеты. Цены ходят каждую секунду. Суть проста — купил дешевле, продал дороже.',
+                steps:[
+                    ['💵','Как купить','Жми актив → откроется окно: впиши сумму или долю кассы (25/50/МАКС). Купил — это твои доли, они лежат в «Мои активы».'],
+                    ['💰','Как продать','Там же в «Мои активы» продаёшь — целиком или частью. Разница с ценой покупки и есть твоя прибыль или убыток.'],
+                    ['🧠','Аналитик','Совет аналитика (3 уровня, дороже = увереннее) подсказывает направление — но даже самый дорогой врёт примерно в трети случаев. Это подсказка, а не гарантия.'],
+                    ['⚡','Плечо и шорт','Плечо ×2/3/5 множит и прибыль, и убыток; шорт — заработок на падении. Маржин-колл вынесет позицию, но потеряешь только свою ставку.'],
+                    ['⏳','Терпение','Рынок — не казино. Кто дёргается на каждой свече, тот и теряет. Ищи тренд, входи с головой.'],
+                ], foot:'Главное: риск = твой выбор. Совет слушай, но решай сам.' },
+            auction: { t:'🔨 Как идут торги', c:'#efd8a3',
+                intro:'Живой молоток: редкие вещи уходят тому, кто перебил ставку. Аукцион открывает ведущий — раз в пару кругов это целый праздник.',
+                steps:[
+                    ['🎯','Ветки редкости','Лоты идут потоками по редкости (Серый → Легенда). Выбери свою ветку в баре наверху — у каждой свой поток вещей и свой скрытый покупатель.'],
+                    ['💰','Ставка','Возьми со старта или перебей на +5%. Можно вписать свою сумму. Ставка в последние 10 секунд продлевает торг — перебивание на флажке живёт.'],
+                    ['🕴️','Незнакомец','Таинственный коллекционер торгуется сам: за мусор вяло, за легендарку — насмерть. Перебьёт тебя — вещь уйдёт из мира навсегда.'],
+                    ['📦','Запечатанный ящик','Фикс-цена, вещь внутри всегда: шесть из десяти дороже цены ящика, четыре — дешевле. Это рынок, а не казино.'],
+                ], foot:'Вещи копятся в «Коллекции» и там тихо дорожают.' },
+            collection: { t:'💎 Про коллекцию', c:'#efd8a3',
+                intro:'Вещи с аукциона не капают доход — они тихо дорожают на бархате, +2–4% в год. Но ценность их не только в деньгах.',
+                steps:[
+                    ['🎨','Сеты по темам','Собери 3 вещи одной темы (⌛ Время, 🎻 Искусство, 📜 Слово, ⚔️ Сила) — полный сет добавляет вес твоему имени за столом.'],
+                    ['👑','Редкости','Мифики и легендарки — единственные в мире: вышли раз и всё. Держишь такую — имя весит ещё больше.'],
+                    ['⚖️','Вес имени','Собранное входит в репутацию: чистому коллекционеру потом льготы государства, гранты и жирные контракты фермы. Козырь и на двери 2-го круга.'],
+                    ['🔨','Продать','Любую вещь можно выставить на следующие торги кнопкой «На торги» — назовёшь стартовую цену.'],
+                ], foot:'Коллекция — это не только деньги, это твой вес за столом.' },
+            develop: { t:'🎓 Вложение в себя', c:'#a7f3d0',
+                intro:'Ветка «вложи в себя»: сначала учишься, потом создаёшь своё — и оно кормит тебя всю игру. Порядок именно такой.',
+                steps:[
+                    ['🎓','Тренинги','Учись. Сам по себе тренинг денег не даёт и молчит — но открывает тебе право СОЗДАВАТЬ своё дело или продукт.'],
+                    ['🎨','Создание','Создай своё — вот это уже кормит: даёт пассивный доход в поток. Чем больше создал, тем дороже каждое следующее.'],
+                    ['🪜','Развитие','Созданное растёт ступенями — каждая удваивает поток. Чем позже вложишься в развитие, тем дороже ступень.'],
+                ], foot:'Сначала вкладываешь (учёба), потом снимаешь всю жизнь (созданное работает на тебя).' },
+            svyaz: { t:'🌐 Про связи', c:'#6ee7b7',
+                intro:'Записная книжка связей: полезные люди, партнёры, менторы — и мошенники среди них. Каждая карта — риск или награда.',
+                steps:[
+                    ['🤝','Партнёр','Хорошая связь даёт пассив или кэш — надёжный человек работает на тебя. Плохая кинет на деньги.'],
+                    ['👁','Читай человека','Не всё, что блестит — партнёр. Смотри на сигналы, а не на обещания: мошенник торопит и сулит золотые горы.'],
+                    ['🔗','Круг растёт','Связи копятся: чем шире круг, тем больше и возможностей, и рисков. Доверие — валюта.'],
+                ], foot:'Люди — тоже актив. Но живой: могут и поднять, и подставить.' },
+        };
+        function showCellInfo(k){ state.cellInfo=k; render(); }
+        function closeCellInfo(){ state.cellInfo=null; render(); }
+        function infoBtn(k){ return `<button onclick="showCellInfo('${k}')" style="background:rgba(217,184,119,.1);border:1px solid var(--lx-gold-ln);border-radius:8px;color:var(--lx-gold-br);font-size:11px;padding:4px 9px;cursor:pointer;font-weight:700;white-space:nowrap;">ℹ️ Как это работает</button>`; }
+        function renderCellInfo(){
+            const k=state.cellInfo; if(!k) return ''; const g=CELL_HOWTO[k]; if(!g) return '';
+            return `<div style="position:fixed;inset:0;z-index:5100;background:rgba(4,6,9,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:460px;max-width:100%;max-height:90vh;overflow:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid ${g.c};border-radius:18px;padding:22px 20px;box-shadow:0 30px 70px rgba(0,0,0,.7);">
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:21px;font-weight:700;color:${g.c};">${g.t}</div>
+                    <p style="text-align:center;font-size:12.5px;color:#9c988e;line-height:1.55;margin:8px 0 16px;">${g.intro}</p>
+                    ${g.steps.map(([ic,nm,tx])=>`<div style="display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--lx-line);"><span style="font-size:22px;flex:0 0 auto;">${ic}</span><div><div style="font-weight:700;color:#f3efe6;font-size:14px;">${nm}</div><div style="font-size:12px;color:#9c988e;line-height:1.5;margin-top:2px;">${tx}</div></div></div>`).join('')}
+                    ${g.foot?`<div style="margin-top:14px;padding:12px;border-radius:11px;background:var(--lx-ink);border:1px solid ${g.c};text-align:center;font-size:12.5px;color:#cdc8bd;line-height:1.55;">${g.foot}</div>`:''}
+                    <button onclick="closeCellInfo()" class="btn" style="width:100%;margin-top:14px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понятно</button>
+                </div>
+            </div>`;
+        }
         // ─── 🕯️ БЛАГОТВОРИТЕЛЬНОСТЬ (Ринат 19июл): значок в шапке → окно. Жертвуй любую сумму (растёт душа);
         // крупные (от 5000$) копятся на АУКЦИОН. Бонусы/связь с картами душ — допилим по концепции Нины.
         const CHARITY_AUCTION_MIN = 5000;   // от какой суммы пожертвование считается «крупным» (к аукциону)
@@ -13335,6 +13425,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }).join('');
 
             return `<div class="sec-in">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:6px;">${infoBtn('develop')}</div>
               <div class="card">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${strip}</div>
                 <div style="font-size:11px;color:var(--lx-muted);margin-top:9px;line-height:1.4;">
@@ -13647,7 +13738,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `<div class="card">
                 <div class="block-title" style="display:flex;justify-content:space-between;align-items:center;">
                     <span>📈 Биржа · Год ${m.game_year||1}</span>
-                    <button onclick="state.showHistory=true;paintOverlays();" title="История сделок (всего за игру)" style="background:#0e2a3a;border:1px solid #23324a;border-radius:9px;color:#7dd3fc;font-size:15px;padding:4px 10px;cursor:pointer;font-weight:700;">🧾${(()=>{const n=Number(p.tradeSeq)||((p.trades&&p.trades.length)||0);return n?` ${n}`:'';})()}</button>
+                    <span style="display:flex;gap:6px;align-items:center;">${infoBtn('exchange')}<button onclick="state.showHistory=true;paintOverlays();" title="История сделок (всего за игру)" style="background:#0e2a3a;border:1px solid #23324a;border-radius:9px;color:#7dd3fc;font-size:15px;padding:4px 10px;cursor:pointer;font-weight:700;">🧾${(()=>{const n=Number(p.tradeSeq)||((p.trades&&p.trades.length)||0);return n?` ${n}`:'';})()}</button></span>
                 </div>
                 <div id="mktTick" style="text-align:center;font-family:ui-monospace,monospace;font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--lx-gold-br);background:rgba(217,184,119,.07);border:1px solid var(--lx-line);border-radius:8px;padding:5px 0;margin-bottom:8px;">⏳ …</div>
                 ${/* 🩹 «дерганная палка» (Ринат 21июл): плашка рождалась СКРЫТОЙ, а показывал её таймер раз
@@ -14938,7 +15029,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${/* 🧱 Плитки (Ринат 21 июл): было 9 полос во всю ширину — до «Пути к победе» надо
                      было крутить пол-экрана. Стало: сетка маленьких плиток, нажал — окно на весь
                      экран. Разметка разделов НЕ тронута, всё решает .sec-grid в CSS. */''}
-                <div class="card" style="border:2px solid #f59e0b; background:linear-gradient(135deg,rgba(180,120,40,0.20),rgba(90,60,25,0.08)); text-align:center; margin-bottom:10px;">
+                <div class="card" style="position:relative; border:2px solid #f59e0b; background:linear-gradient(135deg,rgba(180,120,40,0.20),rgba(90,60,25,0.08)); text-align:center; margin-bottom:10px;">
+                    <button onclick="showFarmInfo()" style="position:absolute; top:12px; right:12px; z-index:2; background:rgba(245,158,11,.14); border:1px solid #f59e0b; border-radius:8px; color:#fcd34d; font-size:11px; padding:5px 10px; cursor:pointer; font-weight:700; white-space:nowrap;">ℹ️ Как это работает</button>
                     <img src="cat_imgs/farm_market.webp" alt="Ферма" style="width:100%; height:180px; object-fit:cover; border-radius:12px; margin-bottom:10px; background:#0a0806;">
                     <div class="block-title" style="color:#fcd34d; border:none; justify-content:center;">🐄 Рынок скота и ферма</div>
                     <p style="font-size:13px; color:#fde68a; margin-bottom:10px;">${p.farm ? 'Твоё хозяйство ждёт — зайди, вырасти и продай. Терпение кормит.' : 'Купи землю, выучись ремеслу и построй живое дело. Всё надо изучать.'}</p>
@@ -15145,6 +15237,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderRumorModal(p)}
                 ${renderCatPopup()}
                 ${renderSoulsInfo()}
+                ${renderFarmInfo()}
+                ${renderCellInfo()}
                 ${renderCellLocked()}
                 ${renderBizModal()}
                 ${renderBizBudget()}
@@ -17266,7 +17360,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const book = cn? (p.contacts||[]).slice(-6).map(c=>`${c.e||'🤝'} ${c.name}`).join(' · ') : 'пока пусто';
             return `
                 <div class="card" style="border-color:#34d399;">
-                    <div class="block-title" style="color:#6ee7b7;">🌐 СВЯЗИ (записная книжка)</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#6ee7b7;margin:0;">🌐 СВЯЗИ (записная книжка)</div>${infoBtn('svyaz')}</div>
                     <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Знакомишься, читаешь человека (стоящий или пиявка) и вкладываешься — хороший садится в книжку и выручает деньгами, делом или репутацией. Пиявка вытянет. В книжке: <b style="color:#6ee7b7;">${cn}</b> — ${book}</p>
                     <button onclick="openSvyazModal(${p.id})" class="btn" style="width:100%;background:#047857;color:#fff;font-weight:800;font-size:14px;">🌐 ПОЗНАКОМИТЬСЯ</button>
                 </div>
@@ -17305,14 +17399,28 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function closeSdelkaModal(){ state.sdelkaModal = null; render(); }
         // ═══ 🤝 ЖИВОЙ КОНТРАГЕНТ (Ринат 1авг): после скана карты садится человек — ты ЧИТАЕШЬ его ═══
         // по деталям (не по уверенному виду) и решаешь: довериться или встать. k карты = скрытая правда
-        // (scam = кидала, остальное = честный). Уверенность ≠ правда — как аналитик на бирже. Фото лиц — потом.
+        // (scam = кидала, остальное = честный). Уверенность ≠ правда — как аналитик на бирже.
+        // 📸 Фото-лица вживлены 5авг (SD_FACES) + «задать свой вопрос» (SD_QUESTIONS).
         const SD_NAMES=[{n:'Азамат',g:'m'},{n:'Дамир',g:'m'},{n:'Марат',g:'m'},{n:'Тимур',g:'m'},{n:'Ерлан',g:'m'},{n:'Санжар',g:'m'},{n:'Аскар',g:'m'},{n:'Данияр',g:'m'},{n:'Арман',g:'m'},{n:'Айгерим',g:'f'},{n:'Динара',g:'f'},{n:'Асель',g:'f'},{n:'Мадина',g:'f'},{n:'Аружан',g:'f'},{n:'Сауле',g:'f'},{n:'Алия',g:'f'},{n:'Виктор',g:'m'},{n:'Настя',g:'f'}];
         const SD_INTRO=['Есть тема — быстрый оборот. Вписываешься?','Дело верное, я в нём давно. Заходишь?','Слушай, только тебе предлагаю, по-дружески.','Возможность редкая — надо решать.','Я честно: риск есть, но и навар хороший.'];
         const SD_GREEN=[{ic:'🧾',t:'Показывает бумаги и цифры, не темнит.'},{ic:'🤝',t:'Ссылается на общих знакомых, которых легко проверить.'},{ic:'🐢',t:'Не давит: «подумай, время есть».'},{ic:'📉',t:'Честно называет риски, не обещает «100% без потерь».'},{ic:'🏠',t:'Готов оставить залог в обеспечение.'}];
         const SD_RED=[{ic:'⏳',t:'Торопит: «решай сейчас или всё».'},{ic:'🌈',t:'Обещает золотые горы без единого риска.'},{ic:'👀',t:'Отводит взгляд, путается в деталях.'},{ic:'🕳️',t:'«Бумаг нет, всё на доверии, потом оформим».'},{ic:'💸',t:'Просит всё и сразу, наличкой, без гарантий.'}];
         const SD_NEU=[{ic:'☕',t:'Держится по-свойски, угостил кофе.'},{ic:'⌚',t:'Дорогие часы, уверенный вид.'},{ic:'📱',t:'Постоянно на телефоне — занятой человек.'}];
+        // 📸 ФОТО-ЛИЦА КОНТРАГЕНТОВ (Ринат 5авг): нейтральные портреты, НЕ связаны с честностью — лицо для
+        // погружения, правда в деталях/ответах. Одно лицо может быть и честным, и кидалой — не суди по морде.
+        const SD_FACES={m:['sd_m1','sd_m2','sd_m3','sd_m4'],f:['sd_f1','sd_f2','sd_f3','sd_f4']};
+        // ❓ «ЗАДАЙ СВОЙ ВОПРОС»: активное чтение. Честный отвечает прямо (зелёный сигнал), кидала юлит (красный).
+        const SD_QUESTIONS=[
+            {q:'Покажешь бумаги?',      g:{ic:'🧾',t:'Спокойно раскладывает документы: «вот отчёты, смотри сам».'}, r:{ic:'🕳️',t:'Отмахивается: «бумаги потом, сейчас всё на доверии».'}},
+            {q:'Почему именно мне?',    g:{ic:'🤝',t:'«Ты надёжный, навёл справки — с тобой можно иметь дело».'},   r:{ic:'⏳',t:'«Только тебе, по-дружески — но решать надо прямо сейчас».'}},
+            {q:'Дашь залог/гарантию?',  g:{ic:'🏠',t:'«Без проблем — оставлю залог в обеспечение».'},              r:{ic:'💸',t:'«Какой залог, мы же не чужие — потом оформим».'}},
+            {q:'А если прогорит?',      g:{ic:'📉',t:'«Риск есть, вот какой именно — я не скрываю».'},              r:{ic:'🌈',t:'«Не прогорит, сто процентов, гарантирую всё до копейки».'}},
+        ];
         function sdShuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-        function sdPerson(){const nm=SD_NAMES[Math.floor(Math.random()*SD_NAMES.length)];return{name:nm.n,g:nm.g,ava:(nm.g==='f'?'👩':'🧑'),intro:SD_INTRO[Math.floor(Math.random()*SD_INTRO.length)]};}
+        function sdPerson(){const nm=SD_NAMES[Math.floor(Math.random()*SD_NAMES.length)];const pool=SD_FACES[nm.g]||SD_FACES.m;return{name:nm.n,g:nm.g,ava:(nm.g==='f'?'👩':'🧑'),face:pool[Math.floor(Math.random()*pool.length)],intro:SD_INTRO[Math.floor(Math.random()*SD_INTRO.length)]};}
+        function sdAskQuestion(i){ const m=state.sdelkaModal; if(!m||!m.drawn||m.drawn.kind!=='read') return; const d=m.drawn; d.asked=d.asked||[];
+            if(d.asked.length>=2 || d.asked.some(a=>a.i===i)) return;   // не больше 2 вопросов, один вопрос — раз
+            const Q=SD_QUESTIONS[i]; if(!Q) return; const ans=d.honest?Q.g:Q.r; d.asked.push({i:i, q:Q.q, ic:ans.ic, t:ans.t}); render(); }
         function sdTells(honest){const g=sdShuffle(SD_GREEN).slice(0,honest?(2+Math.floor(Math.random()*2)):(Math.random()<0.4?1:0));const r=sdShuffle(SD_RED).slice(0,honest?(Math.random()<0.4?1:0):(2+Math.floor(Math.random()*2)));const n=sdShuffle(SD_NEU).slice(0,1+Math.floor(Math.random()*2));return sdShuffle([...g,...r,...n]);}
         // «Деньги идут к деньгам» (Ринат 1авг): человек с предложением подходит ТОЛЬКО к тому, у кого есть
         // деньги или активы. Пустому — никто не интересен. Учит сначала подняться, потом ловить предложения.
@@ -17450,22 +17558,30 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>`;
             }
             if (m.drawn.kind === 'read') {
-                const d = m.drawn, ps = d.person;
+                const d = m.drawn, ps = d.person; const asked = d.asked || [];
                 return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px;">
                     <div style="background:#0f172a;border:2px solid #f472b6;border-radius:16px;padding:20px;max-width:430px;width:100%;max-height:90vh;overflow:auto;">
-                        <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">📇 Карта отсканирована · ${m.deck==='big'?'крупная сделка':'мелкая сделка'} — за ней человек:</div>
-                        <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;">
-                            <div style="width:52px;height:52px;border-radius:13px;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:28px;flex:0 0 auto;">${ps.ava}</div>
-                            <div><div style="font-weight:800;font-size:16px;color:#f9a8d4;">${ps.name}</div><div style="font-size:12px;color:#94a3b8;">предлагает: ${d.card.t}</div></div>
+                        <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">📇 Карта отсканирована · ${m.deck==='big'?'крупная сделка':'мелкая сделка'} — напротив садится человек:</div>
+                        <div style="position:relative;border-radius:13px;overflow:hidden;margin-bottom:12px;background:#1e293b;">
+                            <img src="cat_imgs/${ps.face}.webp" alt="" style="width:100%;height:210px;object-fit:cover;object-position:center 28%;display:block;" onerror="this.style.display='none'">
+                            <div style="position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(9,12,20,.94));padding:22px 13px 10px;">
+                                <div style="font-weight:800;font-size:19px;color:#f9a8d4;line-height:1.1;">${ps.name}</div>
+                                <div style="font-size:12px;color:#cbd5e1;margin-top:2px;">предлагает: ${d.card.t}</div>
+                            </div>
                         </div>
                         <div style="font-size:14px;color:#e5e7eb;background:#0b1220;border-left:3px solid #f472b6;border-radius:8px;padding:11px;margin-bottom:12px;">«${ps.intro}»</div>
                         <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8;font-weight:700;margin-bottom:6px;">👁 Прочитай человека — детали важнее слов</div>
                         ${d.tells.map(t=>`<div style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.5;padding:7px 10px;border-radius:8px;border:1px solid #334155;background:#0b1220;margin:5px 0;color:#cbd5e1;"><span style="flex:0 0 auto;">${t.ic}</span><span>${t.t}</span></div>`).join('')}
-                        <div style="display:flex;gap:8px;margin-top:14px;">
+                        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7dd3fc;font-weight:700;margin:13px 0 6px;">❓ Задать свой вопрос ${asked.length?`· ${asked.length}/2`:''}</div>
+                        ${asked.map(a=>`<div style="background:#0b1220;border:1px solid #23324a;border-radius:9px;padding:8px 10px;margin:5px 0;"><div style="font-size:12px;color:#7dd3fc;font-weight:700;">— ${a.q}</div><div style="display:flex;gap:8px;align-items:flex-start;margin-top:4px;font-size:12.5px;line-height:1.45;color:#cbd5e1;"><span style="flex:0 0 auto;">${a.ic}</span><span>${a.t}</span></div></div>`).join('')}
+                        ${asked.length>=2
+                            ? `<div style="font-size:11.5px;color:#6d6a62;padding:3px 2px;">Больше он говорить не хочет — пора решать.</div>`
+                            : `<div style="display:flex;flex-wrap:wrap;gap:6px;">${SD_QUESTIONS.map((Q,i)=> asked.some(a=>a.i===i) ? '' : `<button onclick="sdAskQuestion(${i})" class="btn" style="font-size:11.5px;padding:7px 10px;background:#0e2a3a;border:1px solid #23324a;color:#7dd3fc;font-weight:700;">${Q.q}</button>`).join('')}</div>`}
+                        <div style="display:flex;gap:8px;margin-top:15px;">
                             <button onclick="walkSdelka()" class="btn btn-gray" style="flex:1;padding:12px;font-weight:800;">🚶 Отказаться</button>
                             <button onclick="applySdelkaTrust()" class="btn" style="flex:1;padding:12px;font-weight:800;background:#059669;color:#fff;">🤝 Довериться</button>
                         </div>
-                        <div style="font-size:11px;color:#6d6a62;margin-top:8px;line-height:1.45;">Читай детали, а не уверенный вид. Доверишься честному — заработаешь. Купишься на кидалу — потеряешь. Гарантий нет.</div>
+                        <div style="font-size:11px;color:#6d6a62;margin-top:8px;line-height:1.45;">Читай детали и ответы, а не уверенный вид и не лицо. Доверишься честному — заработаешь, купишься на кидалу — потеряешь. Гарантий нет.</div>
                     </div>
                 </div>`;
             }
