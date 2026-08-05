@@ -12401,7 +12401,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const laneR = COL_RAR[showRar]||COL_RAR.gray;
             let lotHtml;
             if(!lane){ lotHtml = '<p style="font-size:12px;color:#9c988e;text-align:center;margin:12px 0;">В этой ветке лотов нет — выбери другую редкость в баре.</p>'; }
-            else if(!cur){ lotHtml = `<p style="font-size:12px;color:#9c988e;text-align:center;margin:12px 0;">Ветка «${laneR.t}» отторговала — все её лоты ушли. Загляни в другую редкость.</p>`; }
+            else if(!cur){ lotHtml = (lane.queue && lane.queue.length)
+                ? '<p style="font-size:12px;color:#9c988e;text-align:center;margin:12px 0;">Следующий лот этой ветки выходит на подиум…</p>'
+                : `<p style="font-size:12px;color:#9c988e;text-align:center;margin:12px 0;">Ветка «${laneR.t}» отторговала — все её лоты ушли. Загляни в другую редкость.</p>`; }
             else {
                 const it = COL_ITEMS[cur.item]||{name:cur.item};
                 const r = COL_RAR[(it.rar)||'gray']||COL_RAR.gray;
@@ -13287,6 +13289,46 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ['👁','Читай человека','Не всё, что блестит — партнёр. Смотри на сигналы, а не на обещания: мошенник торопит и сулит золотые горы.'],
                     ['🔗','Круг растёт','Связи копятся: чем шире круг, тем больше и возможностей, и рисков. Доверие — валюта.'],
                 ], foot:'Люди — тоже актив. Но живой: могут и поднять, и подставить.' },
+            gov: { t:'🏛️ Про государство', c:'#fcd34d',
+                intro:'Государство — зеркало твоего поведения. Каким ты был в игре, таким оно и будет с тобой.',
+                steps:[
+                    ['😇','Чистому — помощь','Платишь налоги честно, помогаешь людям, держишь тень в нуле → субсидии, льготы (−налог), гранты и жирные гос-контракты в пассив.'],
+                    ['😈','Теневику — дубина','Уклонение, долги, грязные ходы копят тень → внеплановые проверки, штрафы, а дальше суд и Тюрьма.'],
+                    ['📋','Твоё досье','Оно смотрит на репутацию, тень и долги — а это копится само по ходу партии, из твоих поступков.'],
+                    ['🤝','Выбор у стойки','На клетке решаешь: заявить на субсидию/льготу/контракт (если чист) или как выкрутиться из проверки (если наследил).'],
+                ], foot:'Хочешь, чтобы власть была за тебя — будь чистым. Это долгая игра.' },
+            career: { t:'🎯 Про карьеру', c:'#a5b4fc',
+                intro:'Карьера — твой рост как наёмного работника: ступени поднимают зарплату, но и жизнь дорожает.',
+                steps:[
+                    ['🪜','Ступени','Растёшь по карьере → зарплата ×множитель. Но с ростом дорожают ипотека, авто, уровень жизни — больше зарабатываешь, больше и тратишь.'],
+                    ['💡','Навыки','Навыки дают +% к зарплате (до потолка). Учи их во вкладке «Развивать себя».'],
+                    ['🎯','Потолок','Карьера — это стабильность, но потолок близко. Настоящая свобода приходит от пассива (бизнес, ферма, активы), а не от оклада.'],
+                ], foot:'Зарплата кормит сегодня. Свободу даёт пассив.' },
+            tax: { t:'🏦 Про налоги', c:'#c4b5fd',
+                intro:'Налоги — игра с государством. Приходит счёт, и ты сам решаешь, как с ним быть.',
+                steps:[
+                    ['✅','Честно','Платишь полностью (−15%, если занимаешься благотворительностью). Тень тает, репутация крепнет — потом власть ответит добром.'],
+                    ['🧮','Оптимизировать','Платишь ~60%, но есть риск: схему вскроют — доплатишь сверху и получишь тень.'],
+                    ['🌑','Уйти в тень','Платишь ~15%, но тень +2 и высокий шанс проверки: штраф ×1.5 и угроза суда.'],
+                ], foot:'Экономия сейчас = проблемы потом. Тень копится и бьёт через Государство.' },
+            work: { t:'💼 Про подработку', c:'#fca5a5',
+                intro:'Подработка — быстрые живые деньги руками, без вложений и без риска.',
+                steps:[
+                    ['💼','Разовый заработок','Взял смену — получил кэш сразу в кассу. Ни актива, ни пассива, просто деньги здесь и сейчас.'],
+                    ['⏱️','Когда брать','Полезно на старте или когда просела касса — заткнуть дыру. Но это не путь к свободе.'],
+                ], foot:'Работа выручает деньгами. Но богатеет тот, кто строит пассив.' },
+            med: { t:'⚕️ Про здоровье', c:'#fca5a5',
+                intro:'Здоровье — тоже деньги. Медицина подкидывает события: болезнь, травма, страховка.',
+                steps:[
+                    ['🩺','Событие здоровья','Выпадает болезнь или травма — лечение стоит денег. Сэкономишь на лечении — может выйти дороже потом.'],
+                    ['🛡️','Страховка','Страховка заранее гасит удар: с ней лечение дешевле. Без неё платишь полную цену в самый неудачный момент.'],
+                ], foot:'Здоровье потом за любые деньги не купишь. Подстелить соломку дешевле, чем падать.' },
+            expense: { t:'💸 Про расходы', c:'#fdba74',
+                intro:'Жизнь подкидывает неожиданные траты — но это не тихий минус, а выбор, как поступить.',
+                steps:[
+                    ['💸','Три пути','Дёшево и рискнуть (может аукнуться), дорого и надёжно (бьёт по кассе сейчас) или забить (последствия придут позже).'],
+                    ['⚖️','Последствия','Каждый путь отзовётся по-своему — иногда сэкономить выходит дороже. Решай по ситуации и по кассе.'],
+                ], foot:'Расходы неизбежны. Разница — в том, как ты на них реагируешь.' },
         };
         function showCellInfo(k){ state.cellInfo=k; render(); }
         function closeCellInfo(){ state.cellInfo=null; render(); }
@@ -16619,7 +16661,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 : '<span style="color:#4b5563;font-size:12px;">Навыков пока нет</span>';
             return `
                 <div class="card" style="border-color:#6366f1;">
-                    <div class="block-title" style="color:#a5b4fc;">🎯 КАРЬЕРА (клетка после Зарплаты)</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#a5b4fc;margin:0;">🎯 КАРЬЕРА (клетка после Зарплаты)</div>${infoBtn('career')}</div>
                     <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на «Карьеру» → жми кубик. 97% — новый НАВЫК (+1-2% к зарплате, кап +20%); 3% (6% с Лидерством) — ШАНС сменить профессию (решаешь сам).</p>
                     <div style="margin-bottom:8px;">Бонус навыков: <b style="color:${capped?'#fbbf24':'#10b981'};">+${bonusPct}%${capped?' (кап)':''}</b> · база ${p.prof.salary}$ → <b style="color:#10b981;">${f.salary}$</b></div>
                     <div style="margin-bottom:10px;">${skillsHtml}</div>
@@ -16756,7 +16798,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const st=govStanding(p); const stW=st==='clean'?['на твоей стороне','#34d399']:st==='shady'?['имеет вопросы','#f87171']:['нейтрально','#fbbf24'];
             return `
                 <div class="card" style="border-color:#f59e0b;">
-                    <div class="block-title" style="color:#fcd34d;">🏛️ ГОСУДАРСТВО (зеркало поведения)</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#fcd34d;margin:0;">🏛️ ГОСУДАРСТВО (зеркало поведения)</div>${infoBtn('gov')}</div>
                     <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Государство смотрит на твоё досье — репутацию, тень, долги — и ведёт себя соответственно. Сейчас оно <b style="color:${stW[1]}">${stW[0]}</b>. Чистому — субсидии и контракты, теневику — проверки и суд. Попал на клетку → зайди.</p>
                     <button onclick="openGovModal(${p.id})" class="btn" style="width:100%;background:#d97706;color:#fff;font-weight:800;font-size:14px;">🏛️ ОБРАТИТЬСЯ В ГОСУДАРСТВО</button>
                 </div>
@@ -17052,7 +17094,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function renderWorkPanel(p){
             return `
                 <div class="card" style="border-color:#fb7185;">
-                    <div class="block-title" style="color:#fca5a5;">💼 РАБОТА</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#fca5a5;margin:0;">💼 РАБОТА</div>${infoBtn('work')}</div>
                     <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на клетку → вытяни карту. Обычно работа как работа, но может выпасть повышение, премия, предложение новой работы (выбор) или увольнение — и работа сменится.</p>
                     <button onclick="openWorkModal(${p.id})" class="btn" style="width:100%;background:#be123c;color:#fff;font-weight:800;font-size:14px;">💼 ВЫТЯНУТЬ КАРТУ РАБОТЫ</button>
                 </div>
@@ -17126,7 +17168,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function renderExpensePanel(p){
             return `
                 <div class="card" style="border-color:#fb923c;">
-                    <div class="block-title" style="color:#fdba74;">💸 РАСХОДЫ (неожиданные)</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#fdba74;margin:0;">💸 РАСХОДЫ (неожиданные)</div>${infoBtn('expense')}</div>
                     <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Жизнь подкидывает траты — но это не тихий минус, а ВЫБОР: дёшево-рискнуть / дорого-надёжно / забить. Каждый путь аукается по-своему. Попал на клетку → зайди и реши.</p>
                     <button onclick="openExpenseModal(${p.id})" class="btn" style="width:100%;background:#c2410c;color:#fff;font-weight:800;font-size:14px;">💸 ОТКРЫТЬ РАСХОД</button>
                 </div>
@@ -17262,7 +17304,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function renderTaxPanel(p){
             return `
                 <div class="card" style="border-color:#a78bfa;">
-                    <div class="block-title" style="color:#c4b5fd;">🏦 НАЛОГИ ГОСУДАРСТВУ</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#c4b5fd;margin:0;">🏦 НАЛОГИ ГОСУДАРСТВУ</div>${infoBtn('tax')}</div>
                     <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Платишь налог государству. 20 видов, лёгкие (не давят). Попал на клетку → вытяни карту, спишется с кассы (нехватка — в долг).</p>
                     <button onclick="openTaxModal(${p.id})" class="btn" style="width:100%;background:#6d28d9;color:#fff;font-weight:800;font-size:14px;">🏦 ВЫТЯНУТЬ КАРТУ НАЛОГА</button>
                 </div>
@@ -17731,7 +17773,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const band=healthBand(pHealth(p));
             return `
                 <div class="card" style="border-color:#f87171;">
-                    <div class="block-title" style="color:#fca5a5;">⚕️ МЕДИЦИНА (здоровье)</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#fca5a5;margin:0;">⚕️ МЕДИЦИНА (здоровье)</div>${infoBtn('med')}</div>
                     <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">У тебя скрытая шкала здоровья — судишь по самочувствию (${band.e} ${band.t}). Проверяйся на чек-апе или рискуешь слечь: болезнь бьёт чаще, когда здоровье низкое. Попал на клетку → зайди.</p>
                     <button onclick="openMedModal(${p.id})" class="btn" style="width:100%;background:#b91c1c;color:#fff;font-weight:800;font-size:14px;">⚕️ ЗАЙТИ К ВРАЧУ</button>
                 </div>
