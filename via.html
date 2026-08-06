@@ -11546,9 +11546,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // игрока, хотя рядом стоял комментарий «ведущий тоже увидит вместе со всеми».
             // Он видел, что цены дёрнулись, но не видел, ЧТО случилось. Карту события показываем
             // на любом экране, остальные окна — по-прежнему только в бланке.
-            if (state.view !== 'player') return renderWorldShow();
-            const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return renderWorldShow();
-            return renderWorldShow() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup();
+            if (state.view !== 'player') return renderWorldShow() + renderPayslipModal();   // 💰 получку видит и ведущий (он её выдаёт)
+            const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return renderWorldShow() + renderPayslipModal();
+            return renderWorldShow() + renderPayslipModal() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup();
         }
         // 🎲 Личный попап «Твой ход» — показывается тому, чей ход настал, закрывается крестиком/кнопкой.
         function renderMyTurnPopup(){
@@ -14019,36 +14019,78 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
         }
         function clearNotify(){ const p=state.players.find(x=>x.id==state.currentPlayerId); if(p){ p.notify=null; save(); render(); } }
+        // ═══ 💰 КЛЕТКА ЗАРПЛАТА — ПОЛУЧКА КАК МОМЕНТ (Ринат 31июл СОГЛАСОВАНО, вживлено 6авг) ═══
+        // Не тихая цифра: оклад + пассив → расходы (налоги/долги/жизнь/дети) съели → вот остаток.
+        // Иногда СОБЫТИЕ месяца: премия/13-я/повышение (радость) или задержка/штраф/больничный (боль).
+        // Начисляет ведущий (он авторитет) — save(id) пишет игрока целиком; дебаунс от двойного клика.
+        const SALARY_MONTH = [
+            {w:52, k:'plain'},
+            {w:12, k:'bonus', nm:'💎 Премия за проект', pct:0.35, say:'Начальник доволен — прилетела премия к окладу.'},
+            {w:6,  k:'x13',   nm:'🎁 13-я зарплата',     pct:0.90, say:'Конец года — начислили почти второй оклад.'},
+            {w:8,  k:'raise', nm:'📈 Повышение оклада',  pct:0.08, say:'Тебя повысили — оклад теперь выше НАВСЕГДА.'},
+            {w:12, k:'delay', nm:'⏳ Задержали зарплату', say:'Компания задержала выплату — оклад в этом месяце не пришёл. Расходы никто не отменял.'},
+            {w:6,  k:'fine',  nm:'⚠️ Штраф/удержание',   pct:0.15, say:'Накосячил — часть оклада удержали.'},
+            {w:4,  k:'sick',  nm:'🤒 Больничный',         pct:0.25, say:'Проболел неделю — оплатили не полностью.'},
+        ];
+        function pickSalaryEvent(){ const t=SALARY_MONTH.reduce((s,e)=>s+e.w,0); let r=Math.random()*t; for(const e of SALARY_MONTH){ if((r-=e.w)<0) return e; } return SALARY_MONTH[0]; }
+        const _lastSalaryAt = {};
         function giveSalary(id){
             const p=state.players.find(x=>x.id==id); if(!p) return;
+            if(Date.now() - (_lastSalaryAt[id]||0) < 1800) return;   // дебаунс: не начисляем дважды по быстрому клику
+            _lastSalaryAt[id]=Date.now();
+            const ev=pickSalaryEvent();
+            // повышение меняет оклад НАВСЕГДА (навык-% в p.skills, кап +20%) — применяем ДО расчёта, чтобы учлось и в этом месяце
+            if(ev.k==='raise'){ if(!p.skills)p.skills=[]; const cur=p.skills.reduce((s,x)=>s+(x.pct||0),0); if(cur<0.20) p.skills.push({key:'raise', name:'Повышение оклада 📈', pct:ev.pct}); }
             const f=calc(p);
-            const _st=pstat(p); _st.salaryCount++; _st.salaryTotal=Math.round((_st.salaryTotal+f.flow)*100)/100;   // копилка
-            soulYearTick(p);   // 🕯️ прожитый год: чистые годы, висящий долг, отпускает ли дно
-            if (SERVER_MODE) {
-                // Сервер-авторитет: начисление применяет сервер (атомарно под LOCK) и рассылает всем.
-                // ОПТИМИСТИЧНО обновляем и локальный экран той же суммой — иначе экран ведущего остаётся
-                // устаревшим (антизатирание 2.2с), и следующая правка (налог/касса) пошлёт старую сумму
-                // и ЗАТРЁТ зарплату. Сервер применит ровно то же (broadcast заменит, не удвоит).
-                state.players = state.players.map(x => x.id==id
-                    ? {...x, savings: Math.round(((Number(x.savings)||0) + f.flow)*100)/100,
-                       notify: (f.flow>=0
-                         ? '💵 ЗАРПЛАТА! Ведущий начислил +'+f.flow+'$ (месячный поток). Касса пополнена! 🎉'
-                         : '💸 Месяц в минус: '+f.flow+'$ (расходы выше дохода). Управляй потоком!')} : x);
-                render();
-                fetch('/salary', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({ pid: id, flow: f.flow, txid: uid() })
-                }).then(r=>{ if(!r.ok) alert('Зарплата не прошла — нажми ещё раз.'); })
-                  .catch(e=>{ console.warn('salary error:', e); alert('Зарплата не прошла (сеть) — нажми ещё раз.'); });
-                return;
-            }
-            // Локальный режим (без сервера) — как раньше.
-            p.savings=Math.round((p.savings + f.flow)*100)/100;
-            p.notify = (f.flow>=0
-                ? '💵 ЗАРПЛАТА! Ведущий начислил +'+f.flow+'$ (месячный поток). Касса пополнена! 🎉'
-                : '💸 Месяц в минус: '+f.flow+'$ (расходы выше дохода). Управляй потоком!');
-            save(); render();
+            let salDelta=0;                                          // разовое изменение ОКЛАДА этого месяца
+            if(ev.k==='bonus'||ev.k==='x13') salDelta = Math.round(f.salary*ev.pct);
+            else if(ev.k==='fine'||ev.k==='sick') salDelta = -Math.round(f.salary*ev.pct);
+            else if(ev.k==='delay') salDelta = -f.salary;           // оклад не пришёл, расходы остались
+            const flow = Math.round((f.flow + salDelta)*100)/100;   // фактический поток в кассу этот месяц
+            const _st=pstat(p); _st.salaryCount++; _st.salaryTotal=Math.round((_st.salaryTotal+flow)*100)/100;
+            soulYearTick(p);                                        // 🕯️ прожитый год: чистые годы, висящий долг, отпускает ли дно
+            p.savings=Math.round((Number(p.savings)+flow)*100)/100;
+            p.notify = (flow>=0 ? '💵 Получка: +'+fmtN(flow)+'$ в кассу'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.'
+                                : '💸 Месяц в минус: '+fmtN(flow)+'$'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.');
+            state.payslipModal = { pId:id, evk:ev.k, evnm:ev.nm||'', evsay:ev.say||'', sal:f.salary, salDelta:salDelta,
+                f:{passive:f.passive, taxes:f.taxes, mortgagePay:f.mortgagePay, eduPay:f.eduPay, autoPay:f.autoPay, ccPay:f.ccPay, retailPay:f.retailPay, otherExp:f.otherExp, childExp:f.childExp, bankPay:f.bankPay}, flow:flow };
+            save(id); render();
         }
+        function closePayslip(){ state.payslipModal=null; render(); }
+        function renderPayslipModal(){
+            const m=state.payslipModal; if(!m) return '';
+            const p=state.players.find(x=>x.id==m.pId); const nm=p?p.name:''; const f=m.f;
+            const line=(l,v,cls)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #131c25;font-size:13.5px;"><span style="color:#cbd5e1;">${l}</span><span style="font-family:ui-monospace,monospace;font-weight:800;color:${cls==='plus'?'#37d67a':(cls==='minus'?'#ff5d5d':'#e6edf3')};">${v}</span></div>`;
+            let rows='';
+            if(m.evk==='delay'){ rows+=line('Оклад — задержали','0 $','minus'); }
+            else { rows+=line('Оклад','+'+fmtN(m.sal)+' $','plus'); }
+            if((m.evk==='bonus'||m.evk==='x13') && m.salDelta) rows+=line(m.evnm,'+'+fmtN(m.salDelta)+' $','plus');
+            if((m.evk==='fine'||m.evk==='sick') && m.salDelta) rows+=line(m.evnm,'−'+fmtN(Math.abs(m.salDelta))+' $','minus');
+            if(m.evk==='raise') rows+=line(m.evnm,'оклад +'+Math.round(0.08*100)+'% навсегда','plus');
+            if(f.passive>0) rows+=line('Пассив (бизнес/ферма)','+'+fmtN(f.passive)+' $','plus');
+            const debts=(f.mortgagePay+f.eduPay+f.autoPay+f.ccPay+f.retailPay+f.bankPay);
+            if(f.taxes>0) rows+=line('🏦 Налоги','−'+fmtN(f.taxes)+' $','minus');
+            if(debts>0)   rows+=line('💳 Долги и кредиты','−'+fmtN(debts)+' $','minus');
+            if(f.otherExp>0) rows+=line('🛒 Жизнь (прочие расходы)','−'+fmtN(f.otherExp)+' $','minus');
+            if(f.childExp>0) rows+=line('👶 Дети','−'+fmtN(f.childExp)+' $','minus');
+            const pos=m.flow>=0;
+            const verdict = m.evk==='delay' ? '⏳ Зарплату задержали, а расходы съели кассу — месяц в минус.'
+                : !pos ? '😵 Расходы больше прихода — этот месяц ты проел накопления. Режь расходы или расти доход.'
+                : (m.flow < m.sal*0.15 ? '😐 Свёл концы, но осталось мало — расходы почти съели оклад.'
+                : '✅ Хороший месяц — остаток заметный, подушка копится.');
+            const vcol = (m.evk==='delay'||!pos) ? '#7a2f36' : (m.flow < m.sal*0.15 ? '#7a5a28' : '#1f6b45');
+            return `<div style="position:fixed;inset:0;z-index:5300;background:rgba(4,6,10,.9);display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow:auto;">
+                <div style="width:440px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:18px;">
+                    <div style="text-align:center;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">💰 Расчётный лист${nm?' · '+nm:''}</div>
+                    ${(m.evk!=='plain'&&m.evsay)?`<div style="font-size:12.5px;line-height:1.55;color:#e3ecf3;background:#0c1218;border:1px solid var(--lx-line);border-left:3px solid ${(m.evk==='bonus'||m.evk==='x13'||m.evk==='raise')?'#37d67a':'#ffb454'};border-radius:8px;padding:10px;margin:10px 0;">${m.evsay}</div>`:''}
+                    <div style="border:1px solid var(--lx-line);border-radius:11px;overflow:hidden;margin:10px 0;">${rows}
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 12px;background:#0e1620;"><span style="color:#e6edf3;font-weight:800;">${pos?'В кассу осталось':'Ушёл в минус на'}</span><span style="font-family:ui-monospace,monospace;font-weight:800;font-size:17px;color:var(--lx-gold);">${pos?'+':'−'}${fmtN(Math.abs(m.flow))} $</span></div>
+                    </div>
+                    <div style="font-weight:700;padding:11px;border-radius:9px;text-align:center;font-size:13.5px;color:${(pos&&m.evk!=='delay')?'#8ff0b6':'#ffc9c9'};background:rgba(0,0,0,.2);border:1px solid ${vcol};">${verdict}</div>
+                    <button onclick="closePayslip()" class="btn" style="width:100%;margin-top:12px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понятно</button>
+                </div></div>`;
+        }
+
         function renderLuckPanel(p){
             return `<div class="card casino-felt">
                 <div class="casino-lights"></div>
@@ -15313,6 +15355,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
                 ${/* МОДАЛКИ вынесены в конец, вне сворачиваемых секций, чтобы всплывали поверх (внутри закрытого details они были бы скрыты) */''}
                 ${renderSkillModal()}
+                ${renderInterviewModal()}
                 ${renderGovModal()}
                 ${renderSellModal()}
                 ${renderWorkModal()}
@@ -16701,7 +16744,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const chips=[
                 // 6-й элемент — картинка клетки (cat_imgs). Эмодзи остаётся запасным вариантом,
                 // если файл не подгрузился: строка не должна ломаться из-за картинки.
-                ['🎯','Карьера','career','careerRoll('+p.id+')','var(--c-career)','cell_career'],
+                ['🎯','Карьера','career','openInterview('+p.id+')','var(--c-career)','cell_career'],
                 ['🃏','Навык','skill','openSkillModal('+p.id+')','var(--c-skill)','cell_skill'],
                 ['🏛️','Государство','gov','openGovModal('+p.id+')','var(--c-gov)','cell_gov'],
                 ['💼','Работа','work','openWorkModal('+p.id+')','var(--c-work)','cell_work'],
@@ -16734,12 +16777,96 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#6366f1;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#a5b4fc;margin:0;">🎯 КАРЬЕРА (клетка после Зарплаты)</div>${infoBtn('career')}</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на «Карьеру» → жми кубик. 97% — новый НАВЫК (+1-2% к зарплате, кап +20%); 3% (6% с Лидерством) — ШАНС сменить профессию (решаешь сам).</p>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на «Карьеру» → тебя ждёт СОБЕСЕДОВАНИЕ: наниматель задаёт 5 вопросов, ответы решают — возьмут ли и на какой оклад. Хорошо пройдёшь — прибавка к зарплате (кап +20%); отлично — ещё и шанс сменить работу. Навык «Переговоры» даёт фору.</p>
                     <div style="margin-bottom:8px;">Бонус навыков: <b style="color:${capped?'#fbbf24':'#10b981'};">+${bonusPct}%${capped?' (кап)':''}</b> · база ${p.prof.salary}$ → <b style="color:#10b981;">${f.salary}$</b></div>
                     <div style="margin-bottom:10px;">${skillsHtml}</div>
-                    <button onclick="careerRoll(${p.id})" class="btn" style="width:100%;background:#4f46e5;color:#fff;font-weight:800;font-size:14px;">🎲 КУБИК КАРЬЕРЫ</button>
+                    <button onclick="openInterview(${p.id})" class="btn" style="width:100%;background:#4f46e5;color:#fff;font-weight:800;font-size:14px;">💼 ПОЙТИ НА СОБЕСЕДОВАНИЕ</button>
                 </div>
             `;
+        }
+
+        // ═══ 💼 КЛЕТКА КАРЬЕРА — СОБЕСЕДОВАНИЕ (Ринат 31июл, вживлено 6авг) ═══
+        // Устройство на работу — не тихая цифра, а СЦЕНА: наниматель задаёт вопросы (как суд в Тюрьме),
+        // ответы решают — ВОЗЬМУТ ли и на какой оклад. Учит реально проходить собесы. Навык «Переговоры»
+        // (ветка Работа) даёт +2 впечатления. Итог = прибавка к зарплате (навык-% в p.skills, кап +20%)
+        // по силе ответов; на ОТЛИЧНОМ собесе — ещё шанс сменить профессию. Спека: VIA_КАРЬЕРА_СОБЕС_ПРЕВЬЮ.html.
+        const INTERVIEW_BOSSES = [
+            {ava:'🧑‍💼', boss:'HR Айгуль',      role:'на позицию специалиста'},
+            {ava:'👔',   boss:'Директор Марат',  role:'на старшего специалиста'},
+            {ava:'🏢',   boss:'Владелец Данияр',  role:'на руководителя отдела'},
+        ];
+        const INTERVIEW_QS = [
+            {q:'Почему мы должны взять именно вас?', a:[
+                ['Покажу компании конкретную пользу и цифрами — не про себя, про результат.',3],
+                ['Потому что мне очень нужна эта работа, у меня ипотека.',0],
+                ['Ну… я хороший человек и быстро учусь, наверное.',1]]},
+            {q:'Кем видите себя через 5 лет?', a:[
+                ['Вырасти в эксперта и вести направление здесь, принося больше пользы.',3],
+                ['На вашем месте, если честно.',1],
+                ['Не загадываю так далеко, как пойдёт.',0]]},
+            {q:'Ваш главный недостаток?', a:[
+                ['Бываю слишком дотошным — учусь отпускать мелочи и делегировать.',3],
+                ['У меня нет недостатков, я идеален.',0],
+                ['Люблю поспать и часто опаздываю.',0]]},
+            {q:'Ваши ожидания по зарплате?', a:[
+                ['Назову вилку по рынку и обосную опытом — готов обсуждать по задачам.',3],
+                ['Чем больше, тем лучше — сколько дадите.',1],
+                ['Мне много не надо, заплатите сколько не жалко.',0]]},
+            {q:'Готовы к сложным задачам и переработкам?', a:[
+                ['Выкладываюсь на результат, но берегу и здоровье — так работаю дольше и лучше.',3],
+                ['Готов пахать 24/7 без выходных!',1],
+                ['Переработки — не про меня, строго с 9 до 6.',0]]},
+        ];
+        function openInterview(id){ if(!gate(id,'career')) return; const p=state.players.find(x=>x.id===id); if(!p) return;
+            const bi = Math.min(INTERVIEW_BOSSES.length-1, careerLvl(p));   // наниматель растёт со ступенью
+            state.interviewModal = { pId:id, bi:bi, qi:0, score:0, phase:'q' }; save(); render(); }
+        function closeInterview(){ state.interviewModal = null; render(); }
+        function interviewAnswer(i){ const m=state.interviewModal; if(!m||m.phase!=='q') return;
+            m.score += INTERVIEW_QS[m.qi].a[i][1]; m.qi++;
+            if(m.qi >= INTERVIEW_QS.length) interviewFinish(); else render(); }
+        function interviewFinish(){ const m=state.interviewModal; if(!m) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
+            const nego = hasSkill(p,'work',0) ? 2 : 0;                      // 🤝 «Переговоры» — фора на собесе
+            const sc = m.score + nego, max = INTERVIEW_QS.length*3 + nego, ratio = sc/max;
+            if(!p.skills) p.skills=[]; const cur = p.skills.reduce((s,x)=>s+(x.pct||0),0);
+            let res, raise=0, txt;
+            if(ratio>=0.75){ res='hi';  raise=0.03; }
+            else if(ratio>=0.45){ res='ok';  raise=0.02; }
+            else if(ratio>=0.25){ res='low'; raise=0.01; }
+            else { res='no'; raise=0; }
+            if(raise>0){
+                if(cur>=0.20){ txt='Тебя взяли! Но бонус к зарплате уже на капе +20% — прибавка не идёт, опыт записан.'; }
+                else { p.skills.push({key:'interview', name:'Прошёл собес 🤝', pct:raise});
+                    txt='Тебя взяли на оклад '+(res==='hi'?'ВЫШЕ рынка':(res==='ok'?'по рынку':'ниже, чем мог'))+'. Прибавка к зарплате +'+Math.round(raise*100)+'% (бонус навыков теперь +'+Math.round(Math.min(0.20,cur+raise)*100)+'%).'; }
+            } else { txt='Отказ — ответы не убедили нанимателя. Это тренажёр: подумай, что хочет услышать работодатель, и приходи снова.'; }
+            m.res=res; m.txt=txt; m.ratio=ratio; m.phase='res';
+            m.offerChange = (res==='hi' && Math.random()<0.5);              // отличный собес → редкий шанс прыгнуть в другую профессию
+            p.notify='💼 Собес: '+(res==='no'?'отказ.':'взяли'+(raise>0?' (+'+Math.round(raise*100)+'% к з/п).':'.'));
+            save(); render();
+        }
+        function interviewDone(){ const m=state.interviewModal; if(!m) return; const doChange=m.offerChange, id=m.pId;
+            state.interviewModal=null; render(); if(doChange && typeof offerProfessionChange==='function') offerProfessionChange(id); }
+        function renderInterviewModal(){
+            const m=state.interviewModal; if(!m) return '';
+            const p=state.players.find(x=>x.id===m.pId); if(!p) return '';
+            const b=INTERVIEW_BOSSES[m.bi]||INTERVIEW_BOSSES[0];
+            const wrap=(inner)=>`<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow:auto;"><div style="width:440px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:20px;">${inner}</div></div>`;
+            if(m.phase==='q'){
+                const q=INTERVIEW_QS[m.qi];
+                return wrap(`<div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;">
+                    <div style="width:48px;height:48px;border-radius:12px;background:#0c1218;border:1px solid var(--lx-line);display:flex;align-items:center;justify-content:center;font-size:26px;flex:0 0 auto;">${b.ava}</div>
+                    <div><div style="font-weight:800;font-size:15px;color:#e6edf3;">${b.boss}</div><div style="font-size:11px;color:#9c988e;">Собеседование ${b.role} · вопрос ${m.qi+1} из ${INTERVIEW_QS.length}</div></div></div>
+                    <div style="height:7px;border-radius:6px;background:#0c1218;border:1px solid var(--lx-line);overflow:hidden;margin-bottom:12px;"><i style="display:block;height:100%;width:${Math.round(m.qi/INTERVIEW_QS.length*100)}%;background:linear-gradient(90deg,#4fd1ff,#37d67a);"></i></div>
+                    <div style="font-size:15px;line-height:1.5;color:#e3ecf3;background:#0c1218;border:1px solid var(--lx-line);border-left:3px solid #4fd1ff;border-radius:8px;padding:12px;margin-bottom:12px;">«${q.q}»</div>
+                    ${q.a.map((a,i)=>`<button onclick="interviewAnswer(${i})" class="btn" style="display:block;width:100%;text-align:left;margin:7px 0;padding:12px;font-size:13.5px;line-height:1.4;background:#0c1218;border:1px solid var(--lx-line);color:var(--lx-text);font-weight:600;">${a[0]}</button>`).join('')}
+                    <div style="font-size:11px;color:#6b7885;margin-top:8px;line-height:1.45;">Отвечай как на настоящем собесе — ценят уверенность и пользу делу, а не заискивание или наглость.${hasSkill(p,'work',0)?' 🤝 Навык «Переговоры» уже даёт тебе фору.':''}</div>`);
+            }
+            const okBox = m.res==='no' ? '#7f1d1d' : (m.res==='hi'?'#1f6b45':'#7a6428');
+            const emoji = m.res==='no'?'❌':(m.res==='hi'?'🎉':(m.res==='low'?'🫤':'✅'));
+            return wrap(`<div style="text-align:center;font-size:44px;">${emoji}</div>
+                <div style="text-align:center;font-weight:800;font-size:16px;color:${m.res==='no'?'#f87171':'#efd8a3'};margin:6px 0;">${m.res==='no'?'НЕ ВЗЯЛИ':'ВЗЯЛИ'}</div>
+                <div style="font-size:13.5px;line-height:1.6;color:#e5e7eb;background:#0c1218;border:1px solid ${okBox};border-radius:10px;padding:12px;margin:8px 0 14px;">${m.txt}</div>
+                <div style="font-size:11px;color:#6b7885;text-align:center;margin-bottom:12px;">Впечатление: ${Math.round(m.ratio*100)}%. Дальше — работай, копи опыт и поднимайся по лестнице; упрёшься в потолок — прыгай в своё дело.</div>
+                <button onclick="interviewDone()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">${m.offerChange?'Дальше — есть предложение сменить работу →':'Понятно'}</button>`);
         }
 
         // ═══ ⭐ КЛЕТКА НАВЫК — ПОЗВОНОЧНИК: 3 ВЕТКИ РАЗВИТИЯ (Ринат 31июл, вживлено 6авг) ═══
