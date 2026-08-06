@@ -56,8 +56,17 @@ MAX_GAME_YEARS = 300       # длинная живая партия: рынок 
 # Крипта РАСКОЛОТА (Ринат 19июл «биток не рос»): крупная растёт по циклам как реальный биткоин,
 # мемы бледнеют. Раньше вся крипта была 0.00 → биток топтался на месте.
 TYPE_GROWTH = {"stock": 0.03, "crypto": 0.00, "metal": 0.02, "commodity": 0.00}
-CRYPTO_BLUE_GROWTH = 0.18   # BTC/ETH/BNB/Solana/XRP/AVAX (vol<MEME_VOL): годовой дрейф якоря ВВЕРХ, рост по циклам
+CRYPTO_BLUE_GROWTH = 0.18   # BTC/ETH/BNB/Solana/XRP/AVAX (vol<MEME_VOL): базовый темп роста, дальше модулируется циклом
 MEME_GROWTH        = -0.08  # мемы (vol>=MEME_VOL): без пампа медленно в минус — почти все умирают (шляпа как в жизни)
+
+# 🔄 ЦИКЛЫ БЫК↔МЕДВЕДЬ (Ринат 6авг: «биток не растёт вечно — 2 года падает и стоит на 60к, был 153к»).
+# Раньше рост g был ПОСТОЯННО плюсовым → цена только вверх до потолка. Теперь g умножается на медленную
+# волну: base + amp·sin(фаза). В пике — бычка (рост усилен), в дне — МЕДВЕДЬ: множитель < 0, и годовой
+# рост становится ОТРИЦАТЕЛЬНЫМ → цена падает годами и залипает внизу. Фаза у каждого актива своя
+# (рынок не синхронный), длина цикла — по типу (крипта резче ~4г как халвинг, акции ~6-7л бизнес-цикл).
+CYCLE_BASE  = 0.15          # средний фон (чуть >0: в долгую слегка растёт, но НЕ гарантированно)
+CYCLE_AMP   = 1.25          # амплитуда: пик бык ≈ +1.40·g, дно медведь ≈ −1.10·g (годы вниз)
+CYCLE_YEARS = {"stock": (5.0, 8.0), "crypto": (3.0, 5.0), "metal": (4.0, 7.0), "commodity": (3.0, 6.0)}
 
 # ЛИКВИДНОСТЬ СТАКАНА в $ по типу. РЕАЛЬНЫЙ МАСШТАБ (Ринат 19июл): «воссоздать реальный рынок».
 # Сдвиг цены при сделке = (объём$ / liq) × IMPACT_MULT. Чем глубже стакан — тем меньше двигает объём.
@@ -129,6 +138,9 @@ def load_assets(path=CSV_PATH):
             "price": round(cur, 2), "price0": p0, "min": pmin,
             "avg0": pavg, "avg": round(cur, 2), "anchor": round(cur, 2), "cool": 0, "max": pmax,
             "vol": vol, "liq": asset_liq(typ, vol), "history": [round(cur, 2)],
+            # 🔄 цикл рынка у актива: своя фаза (несинхронный рынок) и длина волны бык↔медведь по типу
+            "cyc_ph": round(random.uniform(0, 2 * math.pi), 4),
+            "cyc_yrs": round(random.uniform(*CYCLE_YEARS.get(typ, (4.0, 6.0))), 3),
         })
     return assets
 
@@ -168,23 +180,27 @@ def tick_market(market):
         if typ == "crypto":
             # cap-aware рост: крупная крипта растёт по циклам как биток, мемы бледнеют
             g = MEME_GROWTH if a["vol"] >= MEME_VOL else CRYPTO_BLUE_GROWTH
+        # 🔄 ФАЗА ЦИКЛА: бык (рост усилен) ↔ медведь (рост отрицательный, цена годами вниз). Волна по годам.
+        _cyc = math.sin(2 * math.pi * (elapsed_years / float(a.get("cyc_yrs") or 4.0)) + float(a.get("cyc_ph") or 0.0))
+        g = g * (CYCLE_BASE + CYCLE_AMP * _cyc)
         price = a["price"]
         anchor = a.get("anchor") or a.get("avg0") or a["price0"]
         cool = int(a.get("cool") or 0)
         sick = int(a.get("sick") or 0)   # «болеет» после краха: якорь дрейфует вниз, скам умирает
 
-        # 1) якорь = случайное блуждание + типовой рост. Больной актив (после rug) тянет ВНИЗ — не оживает.
-        adv = ANCHOR_DRIFT_VOL.get(typ, 0.01)
-        bias = (g / TICKS_PER_YEAR) + (-0.03 if sick > 0 else 0.0)
-        anchor = anchor + anchor * (bias + adv * random.gauss(0, 1))
-        anchor = max(a["min"], min(a["max"], anchor))
+        # 1) СПРАВЕДЛИВАЯ ЦЕНА (anchor) — геометрический ЦИКЛИЧНЫЙ дрейф. БЕЗ потолка/пола (Ринат 6авг:
+        #    «ограничений на цену быть не должно»): диапазон рождается из ДИНАМИКИ, а не из зажимов.
+        #    g уже цикличный (см. выше) — в медвежьей фазе mu<0, справедливая цена падает годами;
+        #    net-рост скромный (g·CYCLE_BASE). Проверено моделью market_model на 25 лет — не разбегается.
+        anchor = anchor * math.exp(g / TICKS_PER_YEAR)
+        if sick > 0: anchor *= 0.985                     # больной после руга тихо тлеет вниз — не оживает
 
-        # 2) цена тянется к якорю (стабильность) + шум. В мёртвой зоне тянет СЛАБО — не отскакивает.
+        # 2) цена тянется к справедливой + волатильность. БЕЗ clamp: обвал/ралли уводят цену,
+        #    а возврат к справедливой тащит её назад — так рождается реалистичный диапазон без потолка.
         k = REVERT_K * (0.3 if cool > 0 else 1.0)
         revert = k * (anchor - price)
-        noise = price * (a["vol"] / 200.0) * random.gauss(0, 1)
-        drift = price * (g / TICKS_PER_YEAR)
-        new = price + revert + noise + drift
+        noise = price * (a["vol"] / 220.0) * random.gauss(0, 1)
+        new = price + revert + noise
 
         # 3) события крипты — только ВНЕ мёртвой зоны; частота/сила растут с volatility.
         # 🐞 Ринат 23июл «почему БТС упал на 93%? Эфир и солана так не падают же!»:
@@ -205,7 +221,7 @@ def tick_market(market):
                     # RUG: цена И ЯКОРЬ рушатся навсегда (−80..−95%) — скам умирает, дно = падающий нож
                     f = random.uniform(0.05, 0.20)
                     new = price * f
-                    anchor = max(a["min"], anchor * f)
+                    anchor = anchor * f                  # справедливая цена рушится вместе (скам умер) — без пола
                     a["cool"] = COOLDOWN_TICKS
                     a["sick"] = 25          # «болеет»: якорь ползёт вниз ~25 тиков — обычно умирает
                     events.append({"id": a["id"], "name": a["name"], "kind": "КРАХ", "pct": round((f - 1) * 100)})
@@ -214,19 +230,19 @@ def tick_market(market):
                     # мягче цены, и годовой цикл (CRYPTO_BLUE_GROWTH) вытаскивает её обратно.
                     f = random.uniform(0.55, 0.75)
                     new = price * f
-                    anchor = max(a["min"], anchor * random.uniform(0.78, 0.90))
+                    anchor = anchor * random.uniform(0.78, 0.90)   # справедливая цена проседает мягче — без пола
                     a["cool"] = COOLDOWN_TICKS
                     events.append({"id": a["id"], "name": a["name"], "kind": "ОБВАЛ", "pct": round((f - 1) * 100)})
             elif r < crash_p + boom_p:
                 f = random.uniform(1.5, 3.0) if meme else random.uniform(1.2, 1.6)
                 new = price * f
                 if random.random() < BOOM_ANCHOR_CHANCE:
-                    anchor = min(a["max"], anchor * random.uniform(1.2, 1.8))   # редкий РЕАЛЬНЫЙ пробой (якорь вверх)
+                    anchor = anchor * random.uniform(1.2, 1.8)   # редкий РЕАЛЬНЫЙ пробой — справедливая цена вверх, без потолка
                 # иначе временный спайк: якорь на месте → памп откатится, опоздавший на пике теряет
                 a["cool"] = COOLDOWN_TICKS
                 events.append({"id": a["id"], "name": a["name"], "kind": "БУМ" if meme else "РАЛЛИ", "pct": round((f - 1) * 100)})
 
-        new = max(a["min"], min(a["max"], new))
+        new = max(1e-9, new)   # только защита от нуля/минуса — НЕ потолок: цена свободна (Ринат 6авг)
         a["anchor"] = round(anchor, 4 if anchor < 1 else 2)
         a["avg"] = a["anchor"]
         a["price"] = round(new, 4 if new < 1 else 2)
