@@ -1,25 +1,25 @@
 AssetID,Название,Тип Актива,Минимальная цена ,Текущая цена ,Средняя цена ,Максимальная Цена ,Volatility,Характер рынка,PriceChange,PriceChangePct,TrendAuto,MarketPhaseAuto
-1,Apple (AAPL),Stock,120,240,220,400,3,Stable,240,240,Flat,Range
-2,Microsoft (MSFT),Stock,250,450,420,650,3,Stable,450,450,Flat,Range
-3,Nvidia (NVDA),Stock,50,140,120,300,6,Aggressive,140,140,Flat,Range
-4,Amazon (AMZN),Stock,100,220,200,360,4,Stable,220,220,Flat,Range
-5,Tesla (TSLA),Stock,120,400,300,700,7,Aggressive,400,400,Flat,Range
-6,Bitcoin (BTC),Crypto,30000,100000,80000,200000,12,Chaotic,100000,100000,Flat,Range
-7,Ethereum (ETH),Crypto,1000,3500,3000,8000,15,Chaotic,3500,3500,Flat,Range
-8,BNB,Crypto,200,700,550,1300,12,Adaptive,700,700,Flat,Range
-9,Solana (SOL),Crypto,20,200,160,500,20,Chaotic,200,200,Flat,Range
-10,XRP,Crypto,0.3,2.5,1.5,5,18,Adaptive,2.5,2.5,Flat,Range
-11,Cardano (ADA),Crypto,0.2,1.0,0.8,3,20,Chaotic,1.0,1.0,Flat,Range
-12,Dogecoin (DOGE),Crypto,0.05,0.35,0.25,1,30,Chaotic,0.35,0.35,Flat,Range
-13,Avalanche (AVAX),Crypto,8,40,35,150,22,Chaotic,40,40,Flat,Range
-14,Chainlink (LINK),Crypto,5,25,20,60,20,Adaptive,25,25,Flat,Range
-15,Polkadot (DOT),Crypto,3,8,7,30,20,Chaotic,8,8,Flat,Range
-16,Золото (Gold),Metals,1500,2600,2200,4000,1,Stable,2600,2600,Flat,Range
-17,Серебро (Silver),Metals,15,30,26,60,2,Stable,30,30,Flat,Range
-18,Платина (Platinum),Metals,700,1000,950,2000,2,Adaptive,1000,1000,Flat,Range
-19,Нефть (Oil),Commodities,40,75,70,150,3,Adaptive,75,75,Flat,Range
-20,Пшеница (Wheat),Commodities,3,6,7,20,2,Stable,6,6,Flat,Range
-21,Кукуруза (Corn),Commodities,2,4.5,6,20,2,Stable,4.5,4.5,Flat,Range
+1,Apple (AAPL),Stock,150,240,220,340,3,Stable,240,240,Flat,Range
+2,Microsoft (MSFT),Stock,300,450,420,620,3,Stable,450,450,Flat,Range
+3,Nvidia (NVDA),Stock,80,140,120,240,6,Aggressive,140,140,Flat,Range
+4,Amazon (AMZN),Stock,140,220,200,320,4,Stable,220,220,Flat,Range
+5,Tesla (TSLA),Stock,200,400,300,620,7,Aggressive,400,400,Flat,Range
+6,Bitcoin (BTC),Crypto,55000,100000,80000,155000,12,Chaotic,100000,100000,Flat,Range
+7,Ethereum (ETH),Crypto,1800,3500,3000,5500,15,Chaotic,3500,3500,Flat,Range
+8,BNB,Crypto,400,700,550,1100,12,Adaptive,700,700,Flat,Range
+9,Solana (SOL),Crypto,90,200,160,330,20,Chaotic,200,200,Flat,Range
+10,XRP,Crypto,1.2,2.5,1.5,4.2,18,Adaptive,2.5,2.5,Flat,Range
+11,Cardano (ADA),Crypto,0.4,1.0,0.8,1.8,20,Chaotic,1.0,1.0,Flat,Range
+12,Dogecoin (DOGE),Crypto,0.12,0.35,0.25,0.9,30,Chaotic,0.35,0.35,Flat,Range
+13,Avalanche (AVAX),Crypto,18,40,35,72,22,Chaotic,40,40,Flat,Range
+14,Chainlink (LINK),Crypto,12,25,20,46,20,Adaptive,25,25,Flat,Range
+15,Polkadot (DOT),Crypto,3.5,8,7,15,20,Chaotic,8,8,Flat,Range
+16,Золото (Gold),Metals,2000,2600,2200,3400,1,Stable,2600,2600,Flat,Range
+17,Серебро (Silver),Metals,20,30,26,46,2,Stable,30,30,Flat,Range
+18,Платина (Platinum),Metals,700,1000,950,1500,2,Adaptive,1000,1000,Flat,Range
+19,Нефть (Oil),Commodities,45,75,70,120,3,Adaptive,75,75,Flat,Range
+20,Пшеница (Wheat),Commodities,4,6,7,10,2,Stable,6,6,Flat,Range
+21,Кукуруза (Corn),Commodities,3,4.5,6,8,2,Stable,4.5,4.5,Flat,Range
 22,Dombra (DMBR),Crypto,0.001,0.05,0.08,8,60,Chaotic,0.05,0.05,Flat,Range
 23,KAZAXSTAN (KZT),Crypto,0.0005,0.02,0.03,5,62,Chaotic,0.02,0.02,Flat,Range
 24,KAZAX (KZX),Crypto,0.0002,0.008,0.012,3,65,Chaotic,0.008,0.008,Flat,Range

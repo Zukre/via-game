@@ -11341,7 +11341,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // перерисовку от тика рынка, когда открыто окно или крутится слот: картинка бы моргала,
             // барабаны слота сбивались, прокрутка прыгала. Живые цены догонят при закрытии окна / действии.
             const _winOpen = !!(state.catPopup||state.soulsInfo||state.farmInfo||state.cellInfo||state.howto||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.bankModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.marginModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.childModal||state.showHistory||state.doorOpen||state.soulCard);
-            if (!_slotSpinning && (_nmChanged || (state.view === 'player' && !_winOpen))) safeRerender();
+            // 🛡️ (Ринат 6авг «окно покупки/продажи дёргается от живой цены»): пока открыто окно СДЕЛКИ,
+            // полный ре-рендер НЕ трогаем вообще — иначе тик рынка/чужой ход пересобирает модалку и поле
+            // ввода прыгает. Живую цену выхода держит slipRefresh точечно (slipBox), не рушя ввод.
+            const _tradeOpen = !!(state.buyModal || state.sellModal);
+            if (!_slotSpinning && !_tradeOpen && (_nmChanged || (state.view === 'player' && !_winOpen))) safeRerender();
             _lastNonMarket = _nonMarket;
             // окно сделки перерисовалось (тик рынка/чужой ход) → блок проскальзывания сбросился,
             // считаем заново, иначе человек смотрит на «впиши количество» с уже введённым числом
@@ -11818,7 +11822,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.holdings[id]=h; logTrade(p,'BUY',a.name,q,fill,cost,fee); save(); render();
             const moved = Math.abs(fill-p0)>0.0001 ? ('\n📈 Твой объём двинул рынок: витрина была '+p0+'$, ты взял по ~'+fill+'$/шт.') : '';
             const trimmed = q<origQ ? ('\n✂️ Подогнал под кассу: взял '+fmtN(q)+' вместо '+fmtN(origQ)+' шт (у мемов стакан дорогой).') : '';
-            alert('✅ Куплено '+fmtN(q)+' «'+a.name+'» по ~'+fill+'$ · комиссия биржи '+fmtN(fee)+'$ ('+(feePct*100).toFixed(1)+'%) · всего −'+fmtN(totalCost)+'$'+trimmed+moved);
+            autoToast(('✅ Куплено '+fmtN(q)+' «'+a.name+'» по ~'+fill+'$ · комиссия '+fmtN(fee)+'$ ('+(feePct*100).toFixed(1)+'%) · всего −'+fmtN(totalCost)+'$'+trimmed+moved).replace(/\n/g,' · '), '#065f46');
         }
         // Ядро продажи: q штук актива id → импакт + комиссия + запись в историю. Возвращает итог (или null).
         async function sellHolding(p,id,q){
@@ -13778,7 +13782,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const ownIds=Object.keys(p.holdings);
             let holdHtml = ownIds.length ? ownIds.map(id=>{
                 const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, plPct=h.avg?((pr/h.avg-1)*100):0, plAbs=Math.round((pr-h.avg)*h.qty), c=plPct>=0?'#10b981':'#f43f5e';
-                return `<div class="row-item"><div style="flex:1;"><b style="font-family:ui-monospace,monospace;letter-spacing:.02em;">${assetTicker(h.name)}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="sellFrac('${id}',0.5)" class="btn btn-sell" style="margin-top:4px;" title="Продать половину позиции">½&nbsp;50%</button> <button onclick="sellWhole('${id}')" class="btn btn-sell" style="margin-top:4px;">Продать</button></div></div>`;
+                return `<div class="row-item"><div style="flex:1;"><b style="font-family:ui-monospace,monospace;letter-spacing:.02em;">${assetTicker(h.name)}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="openSellModal('${id}',0.5)" class="btn btn-sell" style="margin-top:4px;" title="Продать половину — сперва покажем цену выхода">½&nbsp;50%</button> <button onclick="openSellModal('${id}')" class="btn btn-sell" style="margin-top:4px;">Продать</button></div></div>`;
             }).join('') : '<div style="color:#9ca3af;font-size:13px;">пока нет активов — открой биржу ниже и купи</div>';
             const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
             const alertHtml = ev.length ? ev.map(e=>{const bad=(e.kind==='КРАХ'||e.kind==='ОБВАЛ');return `<div style="background:${bad?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${bad?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`;}).join('') : '';
@@ -13871,7 +13875,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 : (pnl<0 ? 'Ты в минусе. Биржа — не единственный инструмент: бизнес и депозиты дают поток спокойнее.'
                 : 'Ровно в ноль.'));
             const cell=(lbl,val,c)=>`<div style="flex:1;min-width:88px;padding:7px 4px;text-align:center;"><div style="font-size:9.5px;color:#6d6a62;text-transform:uppercase;letter-spacing:.09em;">${lbl}</div><div style="font-family:ui-monospace,monospace;font-weight:800;font-size:13px;color:${c||'#f3efe6'};margin-top:2px;">${val}</div></div>`;
-            return `<div style="margin:0 14px 10px;background:radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.06),transparent 70%),#0a0d12;border:1px solid var(--lx-gold-ln);border-radius:13px;overflow:hidden;">
+            return `<div style="margin:0 14px 10px;background:radial-gradient(120% 90% at 50% 0,rgba(217,184,119,.06),transparent 70%),#0a0d12;border:1px solid var(--lx-gold-ln);border-radius:13px;overflow:hidden;flex-shrink:0;">
                 <div style="text-align:center;padding:11px 10px 4px;">
                     <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#b98a3e;font-weight:800;">📊 Твой итог по бирже</div>
                     <div style="font-family:ui-monospace,monospace;font-size:26px;font-weight:800;color:${col};margin-top:4px;line-height:1.15;">${sign}${fmtN(Math.round(pnl))}$</div>
@@ -13911,13 +13915,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const tbtn=(key,label,n)=>`<button onclick="setHistoryTab('${key}')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:800;cursor:pointer;border:none;border-bottom:2px solid ${tab===key?(key==='BUY'?'#93c5fd':'#fca5a5'):'transparent'};background:${tab===key?'#0d1016':'#0a0d12'};color:${tab===key?(key==='BUY'?'#93c5fd':'#fca5a5'):'#6b7280'};">${label} (${n})</button>`;
             return `<div style="position:fixed;inset:0;z-index:4000;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;">
                 <div style="width:540px;max-width:100%;max-height:86vh;display:flex;flex-direction:column;background:#0d1016;border:1px solid var(--lx-gold-ln);border-radius:16px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;flex-shrink:0;">
                         <div style="font-family:Georgia,serif;font-size:19px;font-weight:700;color:#efd8a3;">🧾 История сделок</div>
                         <button onclick="state.showHistory=false;paintOverlays();" class="btn btn-gray" style="flex:0 0 auto;">✕ Закрыть</button>
                     </div>
                     ${renderTradePnl(p, all)}
-                    <div style="display:flex;border-bottom:1px solid #1f2937;">${tbtn('BUY','🛒 Покупки',nBuy)}${tbtn('SELL','📤 Продажи',nSell)}</div>
-                    <div style="overflow-y:auto;padding:4px 14px 16px;">${rows}</div>
+                    <div style="display:flex;border-bottom:1px solid #1f2937;flex-shrink:0;">${tbtn('BUY','🛒 Покупки',nBuy)}${tbtn('SELL','📤 Продажи',nSell)}</div>
+                    <div style="flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 14px 16px;">${rows}</div>
                 </div>
             </div>`;
         }
@@ -14910,11 +14914,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     btn.style.color = ok ? '#20180a' : '#9ca3af'; } }
         }
         // ── ОКНО ПРОДАЖИ (вместо системного prompt, где ничего не показать) ──
-        function openSellModal(id){
+        function openSellModal(id, presetFrac){
             const a = assetById(id); if(!a) return;
             const p = state.players.find(x=>x.id==state.currentPlayerId);
             if(!p || !p.holdings || !p.holdings[id]) return;
-            state.sellModal = {assetId:String(id), qty:0}; render(); slipSoon('sell');
+            const have = Number(p.holdings[id].qty)||0;
+            // «½ 50%» предзаполняет количество, но цену ВЫХОДА всё равно показываем ДО сделки — можно передумать и ждать.
+            const q0 = presetFrac ? Math.max(1, Math.floor(have*presetFrac)) : 0;
+            state.sellModal = {assetId:String(id), qty:q0}; render(); slipSoon('sell');
         }
         function closeSellModal(){ state.sellModal = null; render(); }
         function sellHave(){ const m=state.sellModal; const p=state.players.find(x=>x.id==state.currentPlayerId);
@@ -14937,8 +14944,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
             lastSaveT = Date.now();
             const r = await sellHolding(p, id, q); save(); render();
-            if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Твой объём просадил рынок: витрина была '+r.p0+'$, выход по ~'+r.fill+'$/шт.') : '';
-                alert('✅ Продано '+fmtN(r.qty)+' «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу · чистая прибыль по позиции '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$'+moved); }
+            if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? (' · 📉 объём просадил рынок: витрина была '+r.p0+'$, выход по ~'+r.fill+'$/шт') : '';
+                autoToast('✅ Продано '+fmtN(r.qty)+' «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу · прибыль по позиции '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$'+moved, r.profit>=0?'#065f46':'#7f1d1d'); }
         }
         function renderSellModal(){
             const m = state.sellModal; if(!m) return '';
@@ -15588,12 +15595,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         setInterval(tickTimers, 1000);
 
         // ─── 🤖 АВТОПРОГОН БОТОВ (видимая имитация игры для проверки; ускоренная скорость) ───
+        let _autoToastT=null;
         function autoToast(msg, color){
             let el=document.getElementById('autoToast');
             if(!el){ el=document.createElement('div'); el.id='autoToast';
-                el.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;background:#0b1020;border:2px solid #334155;color:#e9eefb;padding:10px 18px;border-radius:10px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:90vw;text-align:center;';
+                el.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;background:#0b1020;border:2px solid #334155;color:#e9eefb;padding:10px 18px;border-radius:10px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:90vw;text-align:center;transition:opacity .4s;';
                 document.body.appendChild(el); }
-            el.style.borderColor=color||'#334155'; el.textContent=msg;
+            el.style.borderColor=color||'#334155'; el.textContent=msg; el.style.opacity='1';
+            // ненавязчиво гаснет сам (Ринат 6авг: сделка не должна выкидывать блокирующее окно). Сброс на каждый вызов.
+            clearTimeout(_autoToastT); _autoToastT=setTimeout(()=>{ if(el) el.style.opacity='0'; }, 3500);
         }
         function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
         async function autoBuyStock(p){
