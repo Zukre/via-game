@@ -11160,6 +11160,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             state.deals = JSON.parse(localStorage.getItem('v0_deals')) || [];
             state.world = JSON.parse(localStorage.getItem('v0_world') || 'null');
             maybeShowWorld();
+            maybeShowHowto();
         }
 
         // BroadcastChannel — самый надёжный канал между вкладками (работает в file://).
@@ -11328,6 +11329,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             // recent && lastSavedId==null (полная запись ведущего) — держим локальное 2.2с, не трогаем
             maybeShowWorld();
+            maybeShowHowto();
             updateTurnPlate();   // ход/таймеры обновляем ВСЕГДА — точечно (textContent), без перерисовки всего
             // 🩹 АНТИ-МИГАНИЕ (Ринат 18июл): рынок тикает каждые 30с и раньше на каждый тик целиком
             // перерисовывал экран (вспышка бланка). Бланк ведущего / аналитика / лобби живые цены НЕ
@@ -11338,7 +11340,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // 🛡️ (Ринат 19июл: «тик цен обновляет страницу, окна сбиваются») — НЕ дёргаем полную
             // перерисовку от тика рынка, когда открыто окно или крутится слот: картинка бы моргала,
             // барабаны слота сбивались, прокрутка прыгала. Живые цены догонят при закрытии окна / действии.
-            const _winOpen = !!(state.catPopup||state.soulsInfo||state.farmInfo||state.cellInfo||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.bankModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.marginModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.childModal||state.showHistory||state.doorOpen||state.soulCard);
+            const _winOpen = !!(state.catPopup||state.soulsInfo||state.farmInfo||state.cellInfo||state.howto||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.bankModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.marginModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.childModal||state.showHistory||state.doorOpen||state.soulCard);
             if (!_slotSpinning && (_nmChanged || (state.view === 'player' && !_winOpen))) safeRerender();
             _lastNonMarket = _nonMarket;
             // окно сделки перерисовалось (тик рынка/чужой ход) → блок проскальзывания сбросился,
@@ -11382,7 +11384,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const baseSalary = p.prof.salary;
             const _rank = careerRank(p);   // 🪜 карьерная ступень
             const _clvl = careerLvl(p);
-            const salary = Math.round(baseSalary * (1 + skillBonus) * _rank.salMult);   // ступень поднимает зарплату
+            const salary = Math.round(baseSalary * (1 + skillBonus + branchSalBonus(p)) * _rank.salMult);   // ступень + ветка «Работа» (Трудоголик/ЛИДЕР) поднимают зарплату
             // 🕯️ ДНО (закон души 2.0): бизнесы перестают кормить — поток ×0.7. Нигде не объявлено,
             // человек просто видит, что дела пошли хуже. Выход — сменить поведение (soulYearTick).
             const farmInc = Math.round(farmIncome(p) * farmStaffedFrac(p));   // недобор фермеров → доход фермы падает
@@ -12176,19 +12178,26 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p=state.players.find(x=>x.id==state.bankModal.pId); if(!p) return '';
             const owe=Number(p.bankLoan)||0;
             const pending=state.deals.some(d=>d.pId==p.id && d.type==='TAKE_LOAN' && d.status==='PENDING');
+            const payPending=state.deals.some(d=>d.pId==p.id && d.type==='PAY_BANK' && d.status==='PENDING');
+            const canPay=Math.min(Math.round(owe), Math.max(0,Math.floor(Number(p.savings)||0)));
             return `<div style="position:fixed;inset:0;z-index:5260;background:rgba(4,5,8,.92);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
                 <div style="width:390px;max-width:100%;max-height:92vh;overflow-y:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:20px 18px;">
                     <div style="text-align:center;font-size:36px;line-height:1;">🏦</div>
                     <div style="text-align:center;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#efd8a3;margin:4px 0 3px;">Кредит банка</div>
                     <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin-bottom:14px;">В кассе <b style="color:#f3efe6;">${fmtN(Math.round(p.savings))}$</b>${owe>0?` · долг банку <b style="color:#fca5a5;">${fmtN(owe)}$</b>`:''}</div>
                     ${owe>0?`<div style="background:var(--lx-ink);border:1px solid rgba(217,184,119,.28);border-radius:12px;padding:11px 13px;margin-bottom:12px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
-                            <div style="flex:1;">
-                                <div style="font-size:12.5px;font-weight:700;color:var(--lx-gold);">Кредит банка · 10% в месяц</div>
-                                <div style="font-size:11px;color:#9c988e;margin-top:2px;">платёж ${fmtN(Math.round(owe*0.10))}$/мес · самый дорогой долг в игре, гасится целиком</div>
-                            </div>
-                            <button onclick="state.bankModal=null;payBank()" class="btn btn-debt-gold" style="flex:0 0 auto;padding:8px 14px;">Погасить ${fmtN(owe)}$</button>
+                        <div style="font-size:12.5px;font-weight:700;color:var(--lx-gold);">Кредит банка · 10% в месяц</div>
+                        <div style="font-size:11px;color:#9c988e;margin:2px 0 8px;">платёж ${fmtN(Math.round(owe*0.10))}$/мес с остатка · можно гасить частями</div>
+                        ${p.autoDebtFlag?`<div style="font-size:11px;color:#fca5a5;background:rgba(207,154,154,.08);border:1px solid #7f1d1d;border-radius:8px;padding:7px 9px;margin-bottom:9px;line-height:1.5;">⚠️ Часть долга набежала сама: на клетках не хватило кассы, и недостающее ушло в кредит под 10%/мес. Гаси, как появятся деньги.</div>`:''}
+                        ${payPending?`<div style="font-size:12px;color:#efd8a3;background:rgba(217,184,119,.08);border:1px solid var(--lx-gold-ln);border-radius:10px;padding:9px 11px;">⏳ Платёж у ведущего — спишется после одобрения.</div>`:`
+                        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;">
+                            <input type="number" id="bankPayAmt" value="${canPay}" min="1" max="${Math.round(owe)}" step="100" class="inp" style="font-family:ui-monospace,monospace;font-weight:700;" placeholder="Сколько погасить?">
+                            <button onclick="payBank(Number((document.getElementById('bankPayAmt')||{}).value))" class="btn btn-debt-gold" style="padding:10px 14px;">Погасить</button>
                         </div>
+                        <div style="display:flex;gap:6px;margin-top:6px;">
+                            <button onclick="var el=document.getElementById('bankPayAmt'); if(el) el.value=${canPay};" class="btn btn-gray" style="flex:1;padding:5px;font-size:11px;">Сколько есть · ${fmtN(canPay)}$</button>
+                            <button onclick="var el=document.getElementById('bankPayAmt'); if(el) el.value=${Math.round(owe)};" class="btn btn-gray" style="flex:1;padding:5px;font-size:11px;">Весь долг · ${fmtN(owe)}$</button>
+                        </div>`}
                     </div>`:''}
                     <p style="font-size:12px;color:var(--lx-muted);line-height:1.55;margin:0 2px 10px;">Занимать кратно 1000$. Каждый занятый доллар просит 10 центов в месяц — 5000$ превращаются в 500$ платежа. Деньги придут в кассу после одобрения ведущим.</p>
                     ${(()=>{ const cap=bankCap(p), fl=Math.round(calc(p).flow);
@@ -13346,6 +13355,30 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${g.steps.map(([ic,nm,tx])=>`<div style="display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--lx-line);"><span style="font-size:22px;flex:0 0 auto;">${ic}</span><div><div style="font-weight:700;color:#f3efe6;font-size:14px;">${nm}</div><div style="font-size:12px;color:#9c988e;line-height:1.5;margin-top:2px;">${tx}</div></div></div>`).join('')}
                     ${g.foot?`<div style="margin-top:14px;padding:12px;border-radius:11px;background:var(--lx-ink);border:1px solid ${g.c};text-align:center;font-size:12.5px;color:#cdc8bd;line-height:1.55;">${g.foot}</div>`:''}
                     <button onclick="closeCellInfo()" class="btn" style="width:100%;margin-top:14px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:12px;">Понятно</button>
+                </div>
+            </div>`;
+        }
+        // ─── ❓ КАК ИГРАТЬ (Ринат 5авг: онбординг под миссию «тренажёр для тех, кто не знает чего хочет») ───
+        const HOWTO_PLAY = [
+            ['🎲','Ходишь по клеткам','Кубик ведёт по кругу. На каждой клетке — событие или выбор: работа, биржа, сделка, налоги, ферма, связи, казино. Реши по уму и иди дальше.'],
+            ['💵','Зарабатывай и вкладывай','Зарплата кормит сегодня. Но цель — ПАССИВ: бизнес, ферма, активы, что приносят деньги сами, без тебя. Свобода = когда пассив покрывает расходы.'],
+            ['🏆','Цель — свобода','Закрой все долги и доведи пассив до ×20 расходов — и ты на вершине «Пути свободы». Это и есть выигрыш.'],
+            ['🕯️','Собери душу','Кроме денег — 5 карт души. Их не купить: они даются за то, КАКОЙ ты (честность, щедрость, чистые ходы). 5 душ + свобода открывают дверь на 2-й круг.'],
+            ['👁','Читай, не верь на слово','Аналитик на бирже врёт, контрагент в сделке может кинуть, казино затягивает. Не суди по уверенному виду и лицу — читай детали и поступки. Это главный навык жизни.'],
+            ['ℹ️','Не теряйся','На каждой сложной клетке есть кнопка «ℹ️ Как это работает» — жми, если что-то непонятно.'],
+        ];
+        function showHowToPlay(){ state.howto=true; render(); }
+        function closeHowToPlay(){ state.howto=false; render(); }
+        function renderHowToPlay(){
+            if(!state.howto) return '';
+            return `<div style="position:fixed;inset:0;z-index:5100;background:rgba(4,6,9,.93);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
+                <div style="width:480px;max-width:100%;max-height:92vh;overflow:auto;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:24px 20px;box-shadow:0 30px 70px rgba(0,0,0,.7);">
+                    <div style="text-align:center;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--lx-gold-br);font-weight:800;">Via · тренажёр жизни</div>
+                    <div style="text-align:center;font-family:Georgia,serif;font-size:24px;font-weight:700;color:#f3efe6;margin:4px 0 8px;">Как играть</div>
+                    <p style="text-align:center;font-size:13px;color:#9c988e;line-height:1.6;margin:0 0 18px;">Здесь можно ошибиться и не умереть, потерять и встать. Проживи путь от зарплаты к свободе — и научись на фишках тому, за что снаружи платят временем.</p>
+                    ${HOWTO_PLAY.map(([ic,nm,tx])=>`<div style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--lx-line);"><span style="font-size:23px;flex:0 0 auto;">${ic}</span><div><div style="font-weight:700;color:#f3efe6;font-size:14.5px;">${nm}</div><div style="font-size:12.5px;color:#9c988e;line-height:1.55;margin-top:2px;">${tx}</div></div></div>`).join('')}
+                    <div style="margin-top:16px;padding:13px;border-radius:12px;background:radial-gradient(120% 80% at 50% 0,rgba(217,184,119,.10),transparent 70%),var(--lx-ink);border:1px solid var(--lx-gold-ln);text-align:center;font-family:Georgia,serif;font-size:14px;color:#efd8a3;line-height:1.6;">Проигрывать тут не страшно — на то и тренажёр.<br>Пробуй, теряй фишки, вставай. Снаружи время одно.</div>
+                    <button onclick="closeHowToPlay()" class="btn" style="width:100%;margin-top:16px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:13px;">Понял, поехали</button>
                 </div>
             </div>`;
         }
@@ -15046,10 +15079,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${/* Ринат 23июл: «Дать в долг» — рядом с депозитом у кассы, чтобы люди давали в долг */''}
                     ${/* Ринат 23июл (скрин со стрелками): депозит/дать в долг/кредит — В ЛИНИЮ, не в столб */''}
                     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
+                      <button onclick="showHowToPlay()" style="background:rgba(217,184,119,.16);border:1px solid var(--lx-gold-ln);border-radius:10px;color:var(--lx-gold-br);font-size:12px;font-weight:800;padding:7px 13px;cursor:pointer;white-space:nowrap;">❓ Как играть</button>
                       <button onclick="openSecWindow('🏦 Депозиты')" style="background:rgba(217,184,119,.1);border:1px solid var(--lx-gold-ln);border-radius:10px;color:var(--lx-gold-br);font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">🏦 Депозит</button>
                       <button onclick="openLoanModal(${p.id})" style="background:rgba(92,176,139,.1);border:1px solid ${p2pInbox(p).length?'#b98a3e':'#234436'};border-radius:10px;color:#7fd3ad;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">💰 Дать в долг${p2pInbox(p).length?` <b style="color:#efd8a3;">· ${p2pInbox(p).length}</b>`:''}</button>
                       ${/* Ринат 23июл: «Взять кредит» — тоже у кассы, а то далеко и неудобно */''}
-                      <button onclick="state.bankModal={pId:${p.id}};render();" style="background:rgba(207,154,154,.08);border:1px solid ${(Number(p.bankLoan)||0)>0?'#7f1d1d':'#3a2a2a'};border-radius:10px;color:#e0a8a8;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">💳 Кредит${(Number(p.bankLoan)||0)>0?` <b style="color:#fca5a5;">· ${fmtN(p.bankLoan)}$</b>`:''}</button>
+                      <button onclick="state.bankModal={pId:${p.id}};render();" style="background:rgba(207,154,154,.08);border:1px solid ${(Number(p.bankLoan)||0)>0?'#7f1d1d':'#3a2a2a'};border-radius:10px;color:#e0a8a8;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;white-space:nowrap;">${p.autoDebtFlag?'⚠️ ':''}💳 Кредит${(Number(p.bankLoan)||0)>0?` <b style="color:#fca5a5;">· ${fmtN(p.bankLoan)}$</b>`:''}</button>
                     </div>
                     <span style="font-family:ui-monospace,monospace;font-weight:700;font-size:13px;color:${f.flow>=0?'#5cb08b':'#cf9a9a'};background:${f.flow>=0?'rgba(92,176,139,.12)':'rgba(207,154,154,.12)'};padding:5px 10px;border-radius:999px;white-space:nowrap;">${f.flow>=0?'▲ +':'▼ '}${fmtN(f.flow)}/мес</span>
                   </div>
@@ -15231,9 +15265,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                 <div style="flex:1;min-width:0;">
                                     <div class="debt-name" style="color:var(--lx-gold);">Кредит банка · 10% в месяц</div>
                                     <div class="debt-sum" style="color:var(--lx-gold-br);">${fmtN(p.bankLoan)} $</div>
-                                    <div class="debt-meta">Самый дорогой долг в игре — гасится целиком</div>
+                                <div class="debt-meta">Самый дорогой долг в игре — можно гасить частями</div>
                                 </div>
-                                <button onclick="payBank()" ${hasP?'disabled':''} class="btn btn-debt-gold">Погасить</button>
+                                <button onclick="state.bankModal={pId:${p.id}};render();" ${hasP?'disabled':''} class="btn btn-debt-gold">Погасить</button>
                             </div>
                         ` : ''}
                     </div>
@@ -15285,6 +15319,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderSoulsInfo()}
                 ${renderFarmInfo()}
                 ${renderCellInfo()}
+                ${renderHowToPlay()}
                 ${renderCellLocked()}
                 ${renderBizModal()}
                 ${renderBizBudget()}
@@ -15760,7 +15795,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const owe = Number(p.bankLoan)||0;
             if(owe <= 0 || (Number(p.savings)||0) < owe) return;
             p.savings = Math.round(((Number(p.savings)||0) - owe)*100)/100;
-            p.bankLoan = 0; save(p.id);
+            p.bankLoan = 0; p.autoDebtFlag = false; save(p.id);
             autoToast('🏦 '+p.name+' закрыл кредит '+fmtN(owe)+'$', '#5cb08b');
         }
         // 💼 депозит: кладём по-настоящему в p.deposits (те же поля, что и у живого),
@@ -16384,7 +16419,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                 else if (d.type === 'PAY_AUTO') details = `Закрыть <b>авто-кредит</b>`;
                                 else if (d.type === 'PAY_CC') details = `Закрыть <b>долг по кредитной карте</b>`;
                                 else if (d.type === 'PAY_RETAIL') details = `Закрыть <b>розничный долг</b>`;
-                                else if (d.type === 'PAY_BANK') details = `Закрыть <b>кредит банка</b> полностью`;
+                                else if (d.type === 'PAY_BANK') details = (d.details && d.details.amount) ? `Погасить <b>кредит банка</b> на <b style="color:#fbbf24;">${fmtN(d.details.amount)}$</b>` : `Закрыть <b>кредит банка</b> полностью`;
 
                                 return `
                                 <div style="background:#030712; padding:14px; border-radius:8px; margin-bottom:10px; border:1px solid #1f2937;">
@@ -16615,8 +16650,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p = state.players.find(x => x.id === id);
             if (!p) return;
             if (!p.skills) p.skills = [];
-            const hasLead = p.skills.some(s => s.key === 'lead');
-            const changeChance = hasLead ? 6 : 3;
+            const hasLead = p.skills.some(s => s.key === 'lead') || hasSkill(p,'work',3);   // 👑 ЛИДЕР ветки «Работа» — прирождённый руководитель
+            let changeChance = hasLead ? 6 : 3;
+            if (hasSkill(p,'work',0)) changeChance += 2;   // 🤝 Переговоры: выше шанс сменить/поднять профессию (собес)
             const d100 = Math.floor(Math.random()*100) + 1;
             if (d100 <= changeChance) { offerProfessionChange(id); return; }
             const sk = CAREER_SKILLS[Math.floor(Math.random()*CAREER_SKILLS.length)];
@@ -16694,72 +16730,126 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             `;
         }
 
-        // ─── Клетка НАВЫК: окно с 5 картами (рубашкой вниз), выбираешь одну.
-        // Шанс навыка = SKILL_CHANCE (10%), иначе пусто. «Вкладываешь в себя». ───
-        const SKILL_CHANCE = 0.10;  // ← Rinat может менять процент здесь
-        const SKILL_PITY = 6;       // ГАРАНТИЯ: каждое 6-е открытие даёт навык 100% (пити-счётчик p.skillTries)
-        function openSkillModal(id) { if(!gate(id,'skill')) return; state.skillModal = { pId:id, revealed:null, gotKey:null }; render(); }
-        function closeSkillModal() { state.skillModal = null; render(); }
-        function pickSkillCard(idx) {
-            const m = state.skillModal; if (!m || m.revealed !== null) return;
-            const p = state.players.find(x => x.id === m.pId); if (!p) return;
-            if (!p.lifeSkills) p.lifeSkills = {};
-            const tries = (Number(p.skillTries)||0) + 1;   // это открытие
-            const pity = tries >= SKILL_PITY;              // каждое 6-е — навык ГАРАНТИРОВАН
-            if (pity || Math.random() < SKILL_CHANCE) {
-                const sk = LIFE_SKILLS[Math.floor(Math.random()*LIFE_SKILLS.length)];
-                p.lifeSkills[sk.key] = (p.lifeSkills[sk.key]||0) + 1;
-                m.gotKey = sk.key;
-                p.skillTries = 0;                          // сброс счётчика после навыка
-                p.notify = `💡 НАВЫК! Выпал «${sk.name}» — уровень ${p.lifeSkills[sk.key]}.${pity?' 🎯 Гарантия за 6 открытий!':''} (${sk.draft})`;
-            } else {
-                m.gotKey = null;
-                p.skillTries = tries;                      // копим до гарантии
-                p.notify = `💡 Навык: пусто. До гарантированного навыка осталось ${SKILL_PITY - tries} открыт. (шанс ${Math.round(SKILL_CHANCE*100)}%)`;
+        // ═══ ⭐ КЛЕТКА НАВЫК — ПОЗВОНОЧНИК: 3 ВЕТКИ РАЗВИТИЯ (Ринат 31июл, вживлено 6авг) ═══
+        // Клетка «Навык» даёт ОЧКО навыка. Очки тратишь в дереве из 3 веток (Работа/Фрилансер/Дух);
+        // навыки открываются ПО ПОРЯДКУ внутри ветки (1→2→3→5 оч., 4-й — легенда). Каждый навык
+        // реально меняет ДРУГУЮ клетку — поэтому прокачка залипает. Растекаться можно, но легендарный
+        // пик даёт только глубина в ОДНОЙ ветке. Спека: VIA_НАВЫКИ_3ВЕТКИ_ПРЕВЬЮ.html.
+        //   Живые баффы (6авг): Работа → Трудоголик +5% и ЛИДЕР +10% к зарплате (calc → и авто-зарплата
+        //   сервера), Переговоры/ЛИДЕР → выше шанс сменить/поднять профессию на Карьере (careerRoll).
+        //   Ветки Фрилансер (Биржа/Сделки) и Дух (Души/Благотв.) провязываем следующими блоками — их
+        //   баффы помечены «скоро», чтобы игрок не ждал эффекта, которого пока нет.
+        const SKILL_BRANCHES = [
+          { key:'work', name:'🛠️ РАБОТА', col:'#e8c987', tag:'профессионал/наёмник · стабильный путь',
+            skills:[
+              {ic:'🤝', nm:'Переговоры',      ds:'На собеседовании впечатляешь сильнее.', buff:'Карьера: выше шанс сменить/поднять профессию', cost:1, live:true},
+              {ic:'🔥', nm:'Трудоголик',      ds:'Пашешь на результат.',                   buff:'Зарплата +5% на всех ступенях', cost:2, live:true},
+              {ic:'🛡️', nm:'Незаменимый',     ds:'Тебя не тронут в кризис.',               buff:'Мировое событие: не увольняют при кризисе', cost:3},
+              {ic:'👑', nm:'ЛИДЕР (легенда)', ds:'Прирождённый руководитель.',             buff:'Зарплата +10% и молниеносный рост в карьере', cost:5, legend:true, live:true},
+            ]},
+          { key:'free', name:'💹 ФРИЛАНСЕР', col:'#8fd4f0', tag:'предприниматель/инвестор · строит капитал сам',
+            skills:[
+              {ic:'📈', nm:'Чутьё рынка',     ds:'Видишь рынок яснее.',        buff:'Биржа: аналитик реже врёт, сигналы точнее', cost:1},
+              {ic:'🛟', nm:'Риск-менеджмент', ds:'Держишь риск в узде.',       buff:'Биржа: мягче маржин-колл, плечо безопаснее', cost:2},
+              {ic:'🏗️', nm:'Предприниматель', ds:'Дело в твоих руках цветёт.', buff:'Сделки/Бизнес: дешевле вход, жирнее доход', cost:3},
+              {ic:'💎', nm:'МАГНАТ (легенда)',ds:'Капитал липнет к рукам.',    buff:'Недвижка/сделки максимально выгодны, ниже комиссии', cost:5, legend:true},
+            ]},
+          { key:'spirit', name:'🕯️ ДУХ', col:'#c9a9ff', tag:'святой · путь смысла, а не денег',
+            skills:[
+              {ic:'💗', nm:'Милосердие',      ds:'Твоя доброта весомее.', buff:'Благотворительность даёт больше эффекта', cost:1},
+              {ic:'🙏', nm:'Смирение',        ds:'Душа открыта.',         buff:'Карты Души приходят быстрее (пороги ниже)', cost:2},
+              {ic:'✨', nm:'Праведник',       ds:'Тьма тебя не берёт.',    buff:'Щит от проклятия/тени чёрного рынка', cost:3},
+              {ic:'😇', nm:'СВЯТОЙ (легенда)',ds:'Особый статус света.',   buff:'Души ~на 95% быстрее, путь к победе через смысл', cost:5, legend:true},
+            ]},
+        ];
+        function skillBranches(p){ if(!p.branches||typeof p.branches!=='object') p.branches={work:[],free:[],spirit:[]};
+            for(const k of ['work','free','spirit']) if(!Array.isArray(p.branches[k])) p.branches[k]=[]; return p.branches; }
+        function hasSkill(p, bk, idx){ return !!p && !!p.branches && Array.isArray(p.branches[bk]) && p.branches[bk].includes(idx); }
+        // 💰 живой бафф зарплаты ветки «Работа» — читается прямо в calc() (значит и на авто-зарплате сервера).
+        function branchSalBonus(p){ return (hasSkill(p,'work',1)?0.05:0) + (hasSkill(p,'work',3)?0.10:0); }
+        function skillCanUnlock(p, bk, idx){ const u=skillBranches(p)[bk]; if(u.includes(idx)) return false; if(idx>0 && !u.includes(idx-1)) return false; return true; }
+
+        // Клетка на поле: даёт ОЧКО и открывает дерево. Гейтится (одноразовое разрешение ведущего).
+        function openSkillModal(id){ if(!gate(id,'skill')) return; const p=state.players.find(x=>x.id===id); if(!p) return;
+            skillBranches(p); p.skillPts=(Number(p.skillPts)||0)+1;
+            p.notify='🧠 Клетка Навыка: +1 очко навыка (всего '+p.skillPts+'). Открой дерево и вложи в свой путь.';
+            state.skillModal={ pId:id }; save(); render(); }
+        // Открыть дерево БЕЗ клетки (посмотреть/потратить очки) — из панели: без гейта и без начисления очка.
+        function openSkillTree(id){ const p=state.players.find(x=>x.id===id); if(!p) return; skillBranches(p); state.skillModal={ pId:id }; render(); }
+        function closeSkillModal(){ state.skillModal=null; render(); }
+        function skillInvestSelf(){ const m=state.skillModal; if(!m) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
+            const cost=4000; if((Number(p.savings)||0)<cost){ alert('Вложиться в себя стоит '+fmtN(cost)+'$ — не хватает кассы.'); return; }
+            p.savings=Math.round(((Number(p.savings)||0)-cost)*100)/100; p.skillPts=(Number(p.skillPts)||0)+1;
+            p.notify='📚 Вложился в себя −'+fmtN(cost)+'$ → +1 очко навыка. Развитие двигает игру.'; save(); render(); }
+        function skillUnlock(bk, idx){ const m=state.skillModal; if(!m) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
+            const b=SKILL_BRANCHES.find(x=>x.key===bk); if(!b) return; const sk=b.skills[idx]; if(!sk) return;
+            if(!skillCanUnlock(p,bk,idx)){ alert('Сначала открой предыдущий навык этой ветки.'); return; }
+            const pts=Number(p.skillPts)||0; if(pts<sk.cost){ alert('Не хватает очков навыка: нужно '+sk.cost+', есть '+pts+'. Очко даёт клетка «Навык» или «вложиться в себя».'); return; }
+            p.skillPts=pts-sk.cost; skillBranches(p)[bk].push(idx);
+            p.notify=(sk.legend?'🌟 ЛЕГЕНДА! ':'✅ ')+'Открыт навык «'+sk.nm+'» — '+sk.buff+'.'; save(); render(); }
+
+        function skillActiveBuffs(p){ let out=[]; const br=skillBranches(p);
+            for(const b of SKILL_BRANCHES){ for(const i of (br[b.key]||[]).slice().sort((a,c)=>a-c)){ const s=b.skills[i]; out.push({col:b.col, t:s.buff, legend:s.legend, live:!!s.live}); } } return out; }
+        function skillDepthNote(p){ const br=skillBranches(p);
+            const depths=SKILL_BRANCHES.map(b=>({name:b.name, n:(br[b.key]||[]).length, legend:(br[b.key]||[]).includes(3)}));
+            const leg=depths.filter(d=>d.legend);
+            if(leg.length) return {c:'#f0c674', t:'🌟 Ты достиг ЛЕГЕНДЫ в ветке '+leg.map(d=>d.name).join(', ')+' — вот сила глубины.'};
+            const spread=depths.filter(d=>d.n>0).length;
+            if(spread>=3) return {c:'#6b7885', t:'Ты растекаешься по всем веткам — гибко, но легендарный пик даёт только глубина в ОДНОЙ.'};
+            const max=Math.max(0,...depths.map(d=>d.n));
+            if(max>=2) return {c:'#4fd1ff', t:'Ты идёшь вглубь — ещё пара навыков до легендарного пика ветки.'};
+            return {c:'#6b7885', t:'Начни качать ветку — эффект почувствуешь на других клетках сразу.'}; }
+
+        function renderSkillModal(){
+            const m=state.skillModal; if(!m) return '';
+            const p=state.players.find(x=>x.id===m.pId); if(!p) return '';
+            const pts=Number(p.skillPts)||0; const br=skillBranches(p);
+            const wrap=(inner)=>`<div style="position:fixed;inset:0;background:rgba(3,5,8,.9);z-index:2000;display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow:auto;"><div style="background:linear-gradient(180deg,#111820,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:18px;max-width:480px;width:100%;">${inner}</div></div>`;
+            let h=`<div style="text-align:center;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">🧠 Навыки · 3 ветки</div>
+              <div style="text-align:center;font-size:12px;color:#9c988e;line-height:1.5;margin:6px 0 12px;">Каждый навык реально меняет <b>другую клетку</b> — поэтому прокачка залипает. Выбери путь: <b style="color:#e8c987;">Работа</b> тянет Карьеру/Зарплату, <b style="color:#8fd4f0;">Фрилансер</b> — Биржу/Сделки, <b style="color:#c9a9ff;">Дух</b> — Души/Репутацию.</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;background:var(--lx-ink);border:1px solid var(--lx-gold-ln);border-radius:11px;padding:9px 12px;margin-bottom:10px;">
+                <span style="font-size:13px;color:#cdd7e0;">Очки навыка: <b style="font-family:ui-monospace,monospace;color:#4fd1ff;font-size:16px;">${pts}</b></span>
+                <button onclick="skillInvestSelf()" class="btn" style="background:linear-gradient(180deg,#241f10,#171308);color:#f0c674;border:1px solid #7a6428;font-weight:700;padding:8px 12px;font-size:12px;">📚 Вложиться в себя · 4 000$ (+1)</button>
+              </div>`;
+            for(const b of SKILL_BRANCHES){
+                h+=`<div style="border:1px solid var(--lx-line);border-radius:12px;padding:11px;background:#0c1218;margin:9px 0;">
+                    <div style="font-size:15px;font-weight:800;color:${b.col};">${b.name}</div>
+                    <div style="font-size:11px;color:#6b7885;margin-bottom:7px;">${b.tag}</div>`;
+                b.skills.forEach((sk,i)=>{
+                    const done=(br[b.key]||[]).includes(i); const open=skillCanUnlock(p,b.key,i);
+                    const bd=done?(sk.legend?'#7a6428':'#2c6b45'):'var(--lx-line)';
+                    const bg=done&&sk.legend?'linear-gradient(180deg,#241f10,#141008)':(done?'#0e1d15':'#0a1016');
+                    h+=`<div style="display:flex;gap:9px;align-items:flex-start;padding:8px 9px;border-radius:9px;border:1px solid ${bd};background:${bg};margin:5px 0;${!done&&!open?'opacity:.5;':''}">
+                        <span style="font-size:18px;">${sk.ic}</span>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:800;font-size:13px;color:${sk.legend&&done?b.col:'#e6edf3'};">${sk.nm}${sk.live?'':'<span style="font-size:9px;color:#6b7885;font-weight:600;"> · скоро</span>'}</div>
+                            <div style="font-size:11.5px;color:#9fb0bd;line-height:1.35;">${sk.ds}</div>
+                            <div style="font-size:11px;color:#37d67a;margin-top:2px;">↳ ${sk.buff}</div>
+                        </div>
+                        ${done?'<span style="color:#37d67a;font-weight:800;font-size:12px;align-self:center;">✓</span>'
+                              :`<button onclick="skillUnlock('${b.key}',${i})" ${open?'':'disabled'} class="btn" style="align-self:center;flex:0 0 auto;font-size:12px;font-weight:800;padding:7px 11px;${open?'background:linear-gradient(180deg,#241f10,#171308);color:#f0c674;border:1px solid #7a6428;':'background:#0a1016;color:#4b5563;border:1px solid var(--lx-line);'}">${sk.cost} оч.</button>`}
+                    </div>`;
+                });
+                h+=`</div>`;
             }
-            m.revealed = idx;
-            save(); render();
+            const buffs=skillActiveBuffs(p);
+            h+=`<div style="border:1px solid var(--lx-line);border-radius:12px;padding:11px;background:#0c1218;margin:9px 0;">
+                <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#6b7885;margin-bottom:7px;">Как твои навыки меняют игру</div>`;
+            if(buffs.length){ h+=buffs.map(x=>`<div style="border-left:2px solid ${x.col};padding-left:8px;margin:3px 0;font-size:12.5px;color:#cdd7e0;">${x.legend?'🌟 ':''}${x.t}${x.live?'':' <span style="color:#6b7885;font-size:10px;">(скоро)</span>'}</div>`).join(''); }
+            else { h+=`<div style="font-size:11.5px;color:#6b7885;">Пока навыков нет — открой первый и увидишь, как поменяется соответствующая клетка.</div>`; }
+            const dn=skillDepthNote(p);
+            h+=`<div style="margin-top:9px;font-size:12.5px;color:${dn.c};font-weight:600;">${dn.t}</div></div>`;
+            h+=`<button onclick="closeSkillModal()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;padding:11px;margin-top:4px;">Готово</button>`;
+            return wrap(h);
         }
-        function renderSkillModal() {
-            const m = state.skillModal; if (!m) return '';
-            const mp = state.players.find(x=>x.id===m.pId);
-            const left = mp ? (SKILL_PITY - (Number(mp.skillTries)||0)) : SKILL_PITY;
-            const skName = m.gotKey ? ((LIFE_SKILLS.find(s=>s.key===m.gotKey)||{}).name || '') : '';
-            const cards = [0,1,2,3,4].map(i => {
-                let face='🂠', bg='#1e293b', label='';
-                if (m.revealed !== null) {
-                    if (i === m.revealed) {
-                        if (m.gotKey) { face='💡'; bg='#065f46'; label=skName; }
-                        else { face='✖'; bg='#374151'; label='Пусто'; }
-                    } else { face='·'; bg='#0b0f19'; }
-                }
-                const click = m.revealed===null ? `onclick="pickSkillCard(${i})"` : '';
-                const cur = m.revealed===null ? 'cursor:pointer;' : '';
-                return `<div ${click} style="${cur}width:62px;height:90px;background:${bg};border:2px solid #475569;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:26px;">${face}<div style="font-size:9px;color:#cbd5e1;margin-top:3px;text-align:center;line-height:1.1;">${label}</div></div>`;
-            }).join('');
-            const footer = m.revealed===null
-                ? `<p style="color:#94a3b8;font-size:12px;margin-top:12px;">Выбери ОДНУ карту. Шанс навыка ${Math.round(SKILL_CHANCE*100)}% · <b style="color:#7dd3fc;">гарантия через ${left} открыт.</b></p>`
-                : `<button onclick="closeSkillModal()" class="btn" style="margin-top:14px;background:#0284c7;color:#fff;font-weight:800;padding:8px 22px;">Закрыть</button>`;
-            return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:2000;display:flex;align-items:center;justify-content:center;">
-                <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:22px;max-width:420px;text-align:center;">
-                    <div style="font-size:16px;font-weight:800;color:#7dd3fc;margin-bottom:10px;">💡 НАВЫК — вытяни карту</div>
-                    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">${cards}</div>
-                    ${footer}
-                </div>
-            </div>`;
-        }
-        function renderSkillPanel(p) {
-            const ls = p.lifeSkills || {};
-            const owned = LIFE_SKILLS.filter(s => ls[s.key]);
-            const chips = owned.length
-                ? owned.map(s=>`<span style="display:inline-block;background:#0b0f19;border:1px solid #334155;border-radius:6px;padding:2px 8px;margin:2px;font-size:11px;">${s.name} ур.${ls[s.key]} <span style="color:#64748b;">— ${s.draft}</span></span>`).join('')
-                : '<span style="color:#4b5563;font-size:12px;">Навыков пока нет</span>';
+        function renderSkillPanel(p){
+            skillBranches(p); const pts=Number(p.skillPts)||0;
+            const n=p.branches.work.length+p.branches.free.length+p.branches.spirit.length;
             return `
                 <div class="card" style="border-color:#0ea5e9;">
-                    <div class="block-title" style="color:#7dd3fc;">💡 НАВЫК (вкладываешь в себя — не всегда про работу)</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Клетка «Навык» → окно с 5 картами, выбери одну. Шанс навыка ${Math.round(SKILL_CHANCE*100)}%, но <b style="color:#7dd3fc;">каждое ${SKILL_PITY}-е открытие — навык гарантированно</b>${(Number(p.skillTries)||0)>0?` (до гарантии ${SKILL_PITY-(Number(p.skillTries)||0)})`:''}.</p>
-                    <div style="margin-bottom:10px;">${chips}</div>
-                    <button onclick="openSkillModal(${p.id})" class="btn" style="width:100%;background:#0284c7;color:#fff;font-weight:800;font-size:14px;">🃏 КЛЕТКА «НАВЫК» (5 карт)</button>
+                    <div class="block-title" style="color:#7dd3fc;">🧠 НАВЫК (3 ветки развития)</div>
+                    <p style="font-size:12px;color:#9ca3af;margin:6px 0 8px;">Клетка «Навык» даёт очко. Тратишь его в дереве из трёх веток — каждый навык реально меняет другую клетку. Очков: <b style="color:#4fd1ff;">${pts}</b>${n?` · открыто навыков: ${n}`:''}.</p>
+                    <button onclick="openSkillTree(${p.id})" class="btn" style="width:100%;background:#0284c7;color:#fff;font-weight:800;font-size:14px;">🧠 ОТКРЫТЬ ДЕРЕВО НАВЫКОВ</button>
                 </div>
             `;
         }
@@ -16773,7 +16863,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 🏛️ ГОСУДАРСТВО 2.0 (Ринат: ЗЕРКАЛО ПОВЕДЕНИЯ). Досье = репутация + тень + долги → standing.
         //   Чистому — субсидии/льготы/гос-контракт. Теневику — проверка: штраф честно / взятка (тень++) / суд.
         function govStanding(p){ const rep=Number(p.repScore)||0, sh=Number(p.shadow)||0; if(sh>=3||rep<=-20) return 'shady'; if(rep>=15&&sh<=0) return 'clean'; return 'mid'; }
-        function govPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0)p.bankLoan=(Number(p.bankLoan)||0)+rest; return amt; }
+        function govPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0){p.bankLoan=(Number(p.bankLoan)||0)+rest; p.autoDebtFlag=true;} return amt; }
         function openGovModal(id) { if(!gate(id,'gov')) return; state.govModal = { pId:id, phase:'intro', done:false }; render(); }
         function closeGovModal() { state.govModal = null; render(); }
         function govAct(kind){
@@ -16992,6 +17082,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
         }
         function dismissWorldShow(){ state.worldShow = null; paintOverlays(); }
+        // 👋 первый вход игрока → показать «Как играть» ОДИН раз (потом только по кнопке)
+        function maybeShowHowto(){
+            if(state.view!=='player') return;
+            let seen=0; try{ seen=+(localStorage.getItem('v0_howto_seen')||0); }catch(e){}
+            if(seen) return;
+            try{ localStorage.setItem('v0_howto_seen','1'); }catch(e){}
+            state.howto=true;
+        }
         function renderWorldModal(){
             const m = state.worldDraw; if (!m) return '';
             if (!m.done) {
@@ -17149,7 +17247,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         //   (деньгами или ЗДОРОВЬЕМ — связка с Медициной), 45% пронесёт. Клиент-сайд, без сервера.
         function openExpenseModal(id){ if(!gate(id,'expense')) return; const c=EXPENSE_CARDS[Math.floor(Math.random()*EXPENSE_CARDS.length)]; state.expenseModal = { pId:id, card:c, phase:'choose', done:false }; render(); }
         function closeExpenseModal(){ state.expenseModal = null; render(); }
-        function expPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0)p.bankLoan=(Number(p.bankLoan)||0)+rest; return amt; }
+        function expPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0){p.bankLoan=(Number(p.bankLoan)||0)+rest; p.autoDebtFlag=true;} return amt; }
         function expenseChoose(kind){
             const m=state.expenseModal; if(!m||m.done) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
             const c=m.card, base=Math.max(30,Math.round((p.prof.salary||3000)*c.m)); let text, tone='ok';
@@ -17371,7 +17469,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const SVYAZ_NM_M=['Арман','Данияр','Ерлан','Нурлан','Тимур','Асхат','Бекзат','Мади','Олжас'];
         const SVYAZ_NM_F=['Айгуль','Динара','Жанна','Камила','Сауле','Аружан','Мадина','Асель'];
         function svShuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
-        function svPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0)p.bankLoan=(Number(p.bankLoan)||0)+rest; return amt; }
+        function svPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0){p.bankLoan=(Number(p.bankLoan)||0)+rest; p.autoDebtFlag=true;} return amt; }
         function openSvyazModal(id){ if(!gate(id,'svyaz')) return;
             const p=state.players.find(x=>x.id===id);
             const good=Math.random() < (0.45 + Math.min(0.2,(Number(p&&p.repScore)||0)/200));   // репутация притягивает хороших
@@ -17743,7 +17841,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function healthBand(h){ return h>=75?{t:'бодр и здоров',c:'#34d399',e:'💪'}:h>=50?{t:'потрёпан, но держишься',c:'#fbbf24',e:'🙂'}:h>=25?{t:'часто недомогаешь',c:'#fb923c',e:'😪'}:{t:'совсем плохо, на грани',c:'#f87171',e:'🤒'}; }
         const MED_DISEASES=[{t:'Простуда 🤧',sev:1},{t:'Скачки давления 🩸',sev:1},{t:'Спина и суставы 🦴',sev:2},{t:'Сердце 🫀',sev:2},{t:'Серьёзная болезнь 🏥',sev:3},{t:'Опасная болезнь ☠️',sev:4}];
         function medDiseaseChance(p,checked){ const h=pHealth(p); let base=Math.max(0.06,(100-h)/140); if(checked) base*=0.4; return Math.min(0.9,base); }
-        function medPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0)p.bankLoan=(Number(p.bankLoan)||0)+rest; return amt; }
+        function medPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0){p.bankLoan=(Number(p.bankLoan)||0)+rest; p.autoDebtFlag=true;} return amt; }
         function medCheckup(){ const m=state.medModal; if(!m||m.checked) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return; const cost=500; if((Number(p.savings)||0)<cost){ alert('Чек-ап стоит '+cost+'$ — не хватает кассы.'); return; } p.savings=(Number(p.savings)||0)-cost; p.health=Math.min(100,pHealth(p)+6); m.checked=true; save(); render(); }
         function medFace(){ const m=state.medModal; if(!m||m.done) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
             if(Math.random() < medDiseaseChance(p,m.checked)){
@@ -17818,7 +17916,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 isM: false, isE: pr.initEdu===0, isA: false, isCC: false, isR: false,
                 mLeft: pr.initMortgage, eLeft: pr.initEdu, aLeft: pr.initAuto,
                 ccLeft: pr.initCC, rLeft: pr.initRetail,
-                assets: [], skills: [], lifeSkills: {}, taxMod: 0, jail: 0, jailCount: 0, allow: null, farm: null,
+                assets: [], skills: [], lifeSkills: {}, branches: {work:[],free:[],spirit:[]}, skillPts: 0, taxMod: 0, jail: 0, jailCount: 0, allow: null, farm: null,
                 otherExpPct: 0, taxDiscPct: 0, jailPress: 0, jailPending: null, ownedCards: [], skillTries: 0,
                 trades: [], soulCard: null, soulSeen: {}, soulPoison: 0, shadow: 0, lastCell: 0, joinYear: null,
                 soul5: [], doorsDone: {}, doorOpen: null, soulNew: null, soulBurn: null, cursed: false, briefSeen: false,
@@ -18620,13 +18718,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(); render();
         }
 
-        function payBank() {
+        // Погашение кредита банка — теперь ЧАСТЯМИ (Ринат 6авг): гасишь сколько есть, долг
+        // уменьшается, проценты (10%/мес) падают с остатка. Без аргумента = «погасить сколько
+        // можешь сейчас». Снимает долговую спираль: раньше требовалась вся сумма разом.
+        function payBank(amt) {
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
-            const owe = Number(p.bankLoan) || 0, cash = Number(p.savings) || 0;
+            const owe = Math.round(Number(p.bankLoan) || 0), cash = Math.floor(Number(p.savings) || 0);
             if (owe <= 0) { alert('Кредита банка нет — гасить нечего.'); return; }
-            if (cash < owe) { alert('🚫 Не хватает кассы, чтобы закрыть кредит банка: нужно '+fmtN(owe)+'$, а у тебя '+fmtN(cash)+'$.'); return; }
-            if (!confirm('Закрыть кредит банка за '+fmtN(owe)+'$? Спишется с кассы (у тебя '+fmtN(cash)+'$).')) return;
-            state.deals.push({ id: uid(), pId: p.id, pName: p.name, type:'PAY_BANK', details:{}, status:'PENDING' });
+            amt = Math.floor(Number(amt) || 0);
+            if (amt <= 0) amt = Math.min(owe, cash);        // без суммы — закрываем сколько тянет касса
+            amt = Math.min(amt, owe);                        // не больше самого долга
+            if (cash <= 0 || amt < 1) { alert('🚫 В кассе пусто — гасить нечем. Подними поток и приходи.'); return; }
+            if (amt > cash) { alert('🚫 В кассе только '+fmtN(cash)+'$ — на такой платёж не хватает. Погаси суммой поменьше.'); return; }
+            if (state.deals.some(d => d.pId == p.id && d.type === 'PAY_BANK' && d.status === 'PENDING')) {
+                alert('⏳ Платёж по кредиту уже у ведущего — дождись одобрения, не дублируй.'); return;
+            }
+            const full = amt >= owe;
+            if (!confirm((full ? 'Закрыть кредит банка полностью за ' : 'Погасить часть кредита — ')+fmtN(amt)+'$? Спишется с кассы (у тебя '+fmtN(cash)+'$).'+(full?'':' Остаток '+fmtN(owe-amt)+'$ продолжит капать 10%/мес.'))) return;
+            state.deals.push({ id: uid(), pId: p.id, pName: p.name, type:'PAY_BANK', details:{amount: amt}, status:'PENDING' });
+            if (state.bankModal) state.bankModal = null;
             save(); render();
         }
 
@@ -18748,7 +18858,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     p.savings = Math.round(((p.savings||0) + d.details.payout) * 100) / 100;
                     p.notify = '🎉 ПОЗДРАВЛЯЕМ! Ведущий подтвердил твой выигрыш +' + d.details.payout + '$! 👑 Касса пополнена.';
                 }
-                else if (d.type === 'PAY_BANK') { const owe=Number(p.bankLoan)||0; p.savings=Math.round(((p.savings||0)-owe)*100)/100; p.bankLoan = 0; p.notify='🏦 Кредит банка закрыт: −'+fmtN(owe)+'$ с кассы.'; }
+                else if (d.type === 'PAY_BANK') {
+                    const owe=Math.round(Number(p.bankLoan)||0);
+                    let pay = Math.round(Number(d.details && d.details.amount) || owe);   // старые заявки без суммы = весь долг
+                    pay = Math.min(pay, owe, Math.floor(Number(p.savings)||0));            // не больше долга и не больше кассы
+                    if (pay < 1) { p.notify='🏦 Погасить не вышло — в кассе не хватило денег.'; }
+                    else {
+                        p.savings=Math.round(((Number(p.savings)||0)-pay)*100)/100;
+                        p.bankLoan=Math.round((owe-pay)*100)/100;
+                        if (p.bankLoan<=0) { p.bankLoan=0; p.autoDebtFlag=false; }
+                        p.notify = p.bankLoan>0 ? ('🏦 Погашено '+fmtN(pay)+'$ · остаток долга '+fmtN(p.bankLoan)+'$ (10%/мес).') : ('🏦 Кредит банка закрыт: −'+fmtN(pay)+'$ с кассы.');
+                    }
+                }
                 else if (d.type === 'TAKE_LOAN') {
                     if ((Number(p.bankLoan)||0) > 0) { p.notify='🏦 Кредит не выдан: у тебя уже есть непогашенный кредит. Один за раз.'; }
                     else { p.bankLoan = (Number(p.bankLoan)||0) + d.details.amount; p.savings = Math.round(((Number(p.savings)||0) + d.details.amount) * 100) / 100; }
