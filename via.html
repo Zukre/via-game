@@ -11388,7 +11388,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const baseSalary = p.prof.salary;
             const _rank = careerRank(p);   // 🪜 карьерная ступень
             const _clvl = careerLvl(p);
-            const salary = Math.round(baseSalary * (1 + skillBonus + branchSalBonus(p)) * _rank.salMult);   // ступень + ветка «Работа» (Трудоголик/ЛИДЕР) поднимают зарплату
+            // 🔓 уволен в кризис → оклада НЕТ (только пассив), пока не устроится заново через собес (Карьера)
+            const salary = p.unemployed ? 0 : Math.round(baseSalary * (1 + skillBonus + branchSalBonus(p)) * _rank.salMult);   // ступень + ветка «Работа» (Трудоголик/ЛИДЕР) поднимают зарплату
             // 🕯️ ДНО (закон души 2.0): бизнесы перестают кормить — поток ×0.7. Нигде не объявлено,
             // человек просто видит, что дела пошли хуже. Выход — сменить поведение (soulYearTick).
             const farmInc = Math.round(farmIncome(p) * farmStaffedFrac(p));   // недобор фермеров → доход фермы падает
@@ -11669,7 +11670,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const FEE_BASE = 0.005;   // базовый спред 0.5% на каждую сделку
         const FEE_STEP = 0.001;   // +0.1% за каждую совершённую сделку в игре (мягкий анти-скальп)
         const FEE_CAP  = 0.03;    // потолок 3% (было 6%)
-        function tradeFeePct(p){ const s=p.stats||{}; const n=(Number(s.buys)||0)+(Number(s.sells)||0); return Math.min(FEE_CAP, FEE_BASE + n*FEE_STEP); }
+        function tradeFeePct(p){ const s=p.stats||{}; const n=(Number(s.buys)||0)+(Number(s.sells)||0); const base=Math.min(FEE_CAP, FEE_BASE + n*FEE_STEP); return base * (hasSkill(p,'free',3)?0.6:1); }   // 💎 МАГНАТ (ветка Фрилансер): комиссия −40%
         // Каждая сделка получает РАСТУЩИЙ номер `no` (Ринат 19июл: «счётчик застыл на 120, не понять какая сделка прошла»).
         // Номер не сбрасывается, даже когда список подрезается. Храним последние 250 записей (было 120).
         function logTrade(p,side,name,qty,price,gross,fee){ p.trades=p.trades||[]; p.tradeSeq=(Number(p.tradeSeq)||0)+1; p.trades.push({no:p.tradeSeq,t:Date.now(),side,name,qty,price:Math.round((Number(price)||0)*1e6)/1e6,gross:Math.round(gross),fee:Math.round(fee)}); if(p.trades.length>250) p.trades=p.trades.slice(-250); }
@@ -12915,10 +12916,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const price=Number(a.price)||0, cf=Number(a.cf)||0;
             return (a.type==='BUSINESS' && cf>0) ? Math.max(price, Math.round(cf*WIN_MULT)) : price;
         }
-        function hasSkill(p,k){ return !!p && (p.selfSkills||[]).indexOf(k)>=0; }
+        // ⚠️ 7авг: раньше называлась hasSkill(p,k) и КОНФЛИКТОВАЛА с 3-арг hasSkill веток (ниже по файлу,
+        // объявлена позже → перекрывала эту). Из-за коллизии selfSkill «Продажи» молча не работал.
+        // Переименована в hasSelfSkill — теперь +5% к цене продажи снова живой. Ветки не задеты (они 3-арг).
+        function hasSelfSkill(p,k){ return !!p && (p.selfSkills||[]).indexOf(k)>=0; }
         function assetSale(a, p){
             let v = Math.max(0, bizValue(a) - (Number(a.liab)||0));
-            if(hasSkill(p,'sales')) v = Math.round(v*1.05);   // навык «Продажи»: активы дороже на 5%
+            if(hasSelfSkill(p,'sales')) v = Math.round(v*1.05);   // навык «Продажи»: активы дороже на 5%
             return v;
         }
         // ─── ПАРТНЁРЫ: владелец развил дело → поток вырос У ВСЕХ (правило Рината, 20 июл).
@@ -13012,7 +13016,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const u=BIZ_UPGRADES.find(x=>x.k===m.key); if(!u) return;
             const key=m.cards[i]; const out=BIZ_DECK.find(d=>d.k===key); if(!out) return;
             m.picked=i;
-            const story=BIZ_STORY[m.key][key], add=bizAdd(m.key, key, m.mult);   // размер зависит от вклада
+            const story=BIZ_STORY[m.key][key]; let add=bizAdd(m.key, key, m.mult);   // размер зависит от вклада
+            if(add>0) add=entrepGain(p, add);   // 🏗️ Предприниматель: прибыльная карта развития жирнее на 15%
             const oldCf=Number(a.cf)||0;
             // Дело с партнёрами: карта двигает ПОЛНЫЙ поток, а он потом делится на всех.
             if((a.mates||[]).length){
@@ -13407,8 +13412,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.shadow=Math.max(0,(Number(p.shadow)||0));   // (не трогаем тень — это чистое добро)
             // Ринат 22июл: карта души за благотворительность — за РАЗЫ, не за суммы.
             // Отдал в пятый раз (сколько угодно — главное отдал) → «Благие намерения».
-            p.donations=(Number(p.donations)||0)+1;
-            const soulNow = (p.donations>=CHARITY_SOUL_NEED) && s5give(p,'intent');
+            p.donations=(Number(p.donations)||0)+(hasSkill(p,'spirit',0)?2:1);   // 💗 Милосердие (ветка Дух): доброта весомее — жертва считается вдвое к карте души
+            const soulNow = (p.donations>=soulNeedCharity(p)) && s5give(p,'intent');
             state.charityModal=false;
             const aucNow=(Number(p.bigDonations)||0)>=CHARITY_AUCTION_NEED;
             p.notify='🕯️ Ты отдал '+fmtN(amt)+'$ на благотворительность. Щедрость запоминается.'+(amt>=CHARITY_AUCTION_MIN?(aucNow?' 🎟️ Аукцион открыт!':' 🎟️ +1 к аукциону.'):'');
@@ -13429,7 +13434,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <input id="charAmt" type="number" min="1" placeholder="Сумма пожертвования, $" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;margin-bottom:8px;">
                         <div style="display:flex;gap:6px;margin-bottom:14px;">${quick}</div>
                         <div style="background:var(--lx-ink);border:1px solid var(--lx-line);border-radius:12px;padding:10px 14px;margin-bottom:13px;">
-                            ${(()=>{ const dn=Number(p.donations)||0, dneed=CHARITY_SOUL_NEED, dhas=s5has(p,'intent');
+                            ${(()=>{ const dn=Number(p.donations)||0, dneed=soulNeedCharity(p), dhas=s5has(p,'intent');
                               return `<div style="display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:12.5px;color:#cdc8bd;line-height:1.45;"><span style="color:#5cb08b;font-size:15px;">🕯️</span><div>${
                                 dhas ? `Карта души <b style="color:#efd8a3;">«Благие намерения»</b> уже у тебя — но щедрость игра помнит всегда.`
                                      : `Карта души за щедрость: пожертвовал <b style="color:#efd8a3;">${Math.min(dn,dneed)} из ${dneed}</b> раз. Сумма не важна — важно, что отдаёшь.`}</div></div>`; })()}
@@ -13618,7 +13623,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const a=src[Math.floor(Math.random()*src.length)];
             const anchor=Number(a.avg)||Number(a.avg0)||a.price;
             const trueDir = a.price < anchor ? 'up' : 'down';
-            const dir = (Math.random()<A.acc) ? trueDir : (trueDir==='up'?'down':'up');
+            const _acc = Math.min(0.97, A.acc + (hasSkill(p,'free',0)?0.15:0));   // 📈 Чутьё рынка (Фрилансер): аналитик вернее, но даже так не идеален
+            const dir = (Math.random()<_acc) ? trueDir : (trueDir==='up'?'down':'up');
             p.savings=Math.round(((Number(p.savings)||0)-A.fee)*100)/100;
             p.analyst={tier, assetId:String(a.id), name:a.name, dir, atPrice:a.price, atTime:Date.now(), resolved:false, right:null};
             lastSaveT=Date.now(); save(); render();
@@ -13702,10 +13708,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             amt=Math.floor(Number(amt)||0); lev=Number(lev)||1;
             if(!a) return 'Выбери актив.';
             if(amt<1) return 'Впиши сумму — покажу, чем рискуешь и сколько контролируешь.';
-            const ctrl=amt*lev, per1=Math.round(amt*lev*0.01), liq=(100/lev);
+            const pMe=state.players.find(x=>x.id==state.currentPlayerId); const rm=marginRiskMult(pMe);
+            const ctrl=amt*lev, per1=Math.round(amt*lev*0.01), liq=(100*rm/lev);
             return 'Ставка <b>'+fmtN(amt)+'$</b> × плечо ×'+lev+' = контролируешь <b style="color:var(--lx-gold-br);">'+fmtN(ctrl)+'$</b> «'+a.name+'».<br>'
               +'Каждый 1% движения цены = <b>±'+fmtN(per1)+'$</b> тебе.<br>'
-              +'<span style="color:#ffb0b0;">⚠️ Движение ПРОТИВ тебя на ~'+liq.toFixed(0)+'% сожжёт всю ставку (маржин-колл).</span>';
+              +'<span style="color:#ffb0b0;">⚠️ Движение ПРОТИВ тебя на ~'+liq.toFixed(0)+'% сожжёт всю ставку (маржин-колл).</span>'
+              +(rm>1?'<br><span style="color:#8ff0b6;">🛟 Риск-менеджмент: буфер +'+Math.round((rm-1)*100)+'% — маржин-колл дальше, плечо безопаснее.</span>':'');
         }
         function confirmMargin(dir){
             const mm=state.marginModal; if(!mm) return;
@@ -13730,12 +13738,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                      :('❌ Закрыл '+(c.dir==='long'?'лонг':'шорт')+' «'+c.name+'» в минус '+fmtN(pnl)+'$'));
             p.mpos=null; lastSaveT=Date.now(); save(); render();
         }
-        function checkMarginCall(p){ const c=p&&p.mpos; if(!c) return; if(marginPnl(p) <= -c.stake) closeMargin(true); }
+        // 🛟 Навык «Риск-менеджмент» (ветка Фрилансер): буфер перед маржин-коллом — позиция переживает
+        // более глубокую просадку и успевает отскочить. Максимальный убыток всё равно = ставка (ret≥0 в closeMargin).
+        function marginRiskMult(p){ return hasSkill(p,'free',1)?1.30:1.0; }
+        function checkMarginCall(p){ const c=p&&p.mpos; if(!c) return; if(marginPnl(p) <= -c.stake*marginRiskMult(p)) closeMargin(true); }
         function renderMarginCard(p){
             const c=p.mpos; let inner;
             if(c){
                 const pnl=marginPnl(p), cl=pnl>=0?'#10b981':'#f43f5e';
-                const liq=c.lev>1?'<div style="font-size:11px;color:#8a8378;margin-top:5px;">⚠️ Плечо ×'+c.lev+': если минус дойдёт до −'+fmtN(c.stake)+'$ — маржин-колл, ставка сгорит.</div>':'';
+                const rm=marginRiskMult(p);
+                const liq=c.lev>1?'<div style="font-size:11px;color:#8a8378;margin-top:5px;">⚠️ Плечо ×'+c.lev+': маржин-колл при минусе −'+fmtN(Math.round(c.stake*rm))+'$ — сгорит ставка ('+fmtN(c.stake)+'$)'+(rm>1?' · 🛟 буфер риск-менеджмента':'')+'.</div>':'';
                 inner='<div style="font-size:12px;color:#9c988e;">Открыто: <b style="color:#f3efe6;">'+(c.dir==='long'?'📈 ЛОНГ':'📉 ШОРТ')+' '+c.name+'</b> · ставка '+fmtN(c.stake)+'$ · ×'+c.lev+' · вход '+fmtPrice(c.entry)+'$</div>'
                   +'<div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:800;margin:6px 0;color:'+cl+';">'+(pnl>=0?'+':'')+fmtN(pnl)+'$</div>'
                   +'<button onclick="closeMargin(false)" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">Закрыть позицию</button>'+liq;
@@ -14049,6 +14061,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const flow = Math.round((f.flow + salDelta)*100)/100;   // фактический поток в кассу этот месяц
             const _st=pstat(p); _st.salaryCount++; _st.salaryTotal=Math.round((_st.salaryTotal+flow)*100)/100;
             soulYearTick(p);                                        // 🕯️ прожитый год: чистые годы, висящий долг, отпускает ли дно
+            try{ bizYearTick(p); }catch(e){}                        // 🏢 годовой тик бизнеса: тяготы + закон внимания (износ потока без развития)
             p.savings=Math.round((Number(p.savings)+flow)*100)/100;
             p.notify = (flow>=0 ? '💵 Получка: +'+fmtN(flow)+'$ в кассу'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.'
                                 : '💸 Месяц в минус: '+fmtN(flow)+'$'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.');
@@ -14175,6 +14188,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const RISK_BAD_MAX = 3;        // 4-е нарушение — закрыта навсегда
         const RISK_DEALS = 20;         // сделок на бирже (покупки + продажи)
         const RISK_ASSETS = 3;         // бизнесов / недвижимости
+        // 🕯️ Ветка ДУХ: Смирение (idx1) снижает пороги карт Души, Святой (idx3, легенда) — почти обнуляет (~95% быстрее).
+        function soulThreshMult(p){ if(hasSkill(p,'spirit',3)) return 0.05; if(hasSkill(p,'spirit',1)) return 0.70; return 1; }
+        function soulNeedCharity(p){ return Math.max(1, Math.round(CHARITY_SOUL_NEED * soulThreshMult(p))); }
+        function soulNeedDeals(p){   return Math.max(1, Math.round(RISK_DEALS      * soulThreshMult(p))); }
+        function soulNeedAssets(p){  return Math.max(1, Math.round(RISK_ASSETS     * soulThreshMult(p))); }
         function riskCheck(p){
             if(!p || p.cursed || p.riskDead || s5has(p,'risk')) return;
             const st = pstat(p);
@@ -14193,7 +14211,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(cap > 0 && portfolioValue(p) / cap > RISK_MAX_STOCK) return;
             const deals  = (Number(st.buys)||0) + (Number(st.sells)||0);   // сделки на бирже
             const assets = (p.assets||[]).length;                          // бизнесы и недвижимость
-            if(deals >= RISK_DEALS && assets >= RISK_ASSETS) s5give(p, 'risk');
+            if(deals >= soulNeedDeals(p) && assets >= soulNeedAssets(p)) s5give(p, 'risk');   // 🕯️ Смирение/Святой снижают пороги
         }
 
         // НЕПОБЕДИМЫЙ ЛЕВ — Ринат: набрал кредитов, наделал долгов, ПАССИВ упал до 0-100,
@@ -14211,8 +14229,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 if((Number(p.lionPeak)||0) > LION_FLOOR && pas <= LION_FLOOR){ p.lionHit = Number(p.lionPeak)||0; }
                 return;
             }
-            // встал: вернулся туда, откуда упал, или выше
-            if(pas >= Number(p.lionHit)) s5give(p, 'lion');
+            // встал: вернулся туда, откуда упал, или выше (🕯️ Смирение/Святой — вернуться легче)
+            if(pas >= Number(p.lionHit)*soulThreshMult(p)) s5give(p, 'lion');
         }
         // Экран ведущего: кому выдать «Служение людям»
         function renderServe(){
@@ -14338,7 +14356,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 // 100к — разминка, карты не даёт. 500к — Благие намерения. Миллион — Благодарность.
                 if(id === 'd500') s5give(p, 'intent');
                 if(id === 'd1m')  s5give(p, 'grat');
-                if((Number(p.donations)||0) >= CHARITY_SOUL_NEED) s5give(p, 'intent');   // пятый раз отдал — карта, даже на первой двери
+                if((Number(p.donations)||0) >= soulNeedCharity(p)) s5give(p, 'intent');   // отдал нужное число раз — карта, даже на первой двери (🕯️ Смирение/Святой снижают)
             }
             else if(choice === 'skip'){ /* 100к: не страшно, игра спросит ещё раз на 500к */ }
             else if(choice === 'coin'){ p.savings = (Number(p.savings)||0) + 1000; }
@@ -14802,8 +14820,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // ⚖️ Ринат 22июл: проклятие не за одну ошибку — за накопленную ГРЯЗНУЮ репутацию.
             // Много раз играл против живых (тень, кидки, взятки, долги, лудомания) → колода сгорает.
             if(!p.cursed && repScore(p).rep <= REP_CURSE_AT && soulWeight(p).light < SOUL_FORGIVE_AT){
-                s5burn(p, 'rep');   // (свет ≥ порога прощения держит от повторного сгорания)
-                dirty = true;
+                // ✨ Навык «Праведник» (ветка Дух, idx2): щит от проклятия — тень чёрного рынка/грязная
+                // репутация НЕ сжигает колоду. Осознанные сделки с дьяволом (s5burn 'buy'/'cheat') щит НЕ спасает.
+                if(hasSkill(p,'spirit',2)){
+                    if(!p.righteousShield){ p.righteousShield=true; p.notify='✨ Праведник: тьма подступила, но не взяла — колода уцелела. Щит держит.'; dirty=true; }
+                } else {
+                    s5burn(p, 'rep');   // (свет ≥ порога прощения держит от повторного сгорания)
+                    dirty = true;
+                }
             }
             if(soulBottomCheck(p)) dirty = true;
             // теневые ходы: откуп из тюрьмы (см. jailBuyout) + визит на «Чёрный рынок» (клетка 15)
@@ -16777,6 +16801,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#6366f1;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#a5b4fc;margin:0;">🎯 КАРЬЕРА (клетка после Зарплаты)</div>${infoBtn('career')}</div>
+                    ${p.unemployed?`<div style="background:rgba(255,106,106,.10);border:1px solid #7a2f36;border-radius:9px;padding:9px 11px;margin-bottom:8px;font-size:12.5px;color:#ffb0b0;line-height:1.5;">🔓 <b>Ты уволен</b> — оклада нет, живёшь только на пассив. Пройди собеседование, чтобы снова устроиться и вернуть зарплату.</div>`:''}
                     <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на «Карьеру» → тебя ждёт СОБЕСЕДОВАНИЕ: наниматель задаёт 5 вопросов, ответы решают — возьмут ли и на какой оклад. Хорошо пройдёшь — прибавка к зарплате (кап +20%); отлично — ещё и шанс сменить работу. Навык «Переговоры» даёт фору.</p>
                     <div style="margin-bottom:8px;">Бонус навыков: <b style="color:${capped?'#fbbf24':'#10b981'};">+${bonusPct}%${capped?' (кап)':''}</b> · база ${p.prof.salary}$ → <b style="color:#10b981;">${f.salary}$</b></div>
                     <div style="margin-bottom:10px;">${skillsHtml}</div>
@@ -16833,11 +16858,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else if(ratio>=0.45){ res='ok';  raise=0.02; }
             else if(ratio>=0.25){ res='low'; raise=0.01; }
             else { res='no'; raise=0; }
+            const _wasJobless = !!p.unemployed;
+            if(res!=='no') p.unemployed=false;                              // 🔓 взяли на работу → снимаем «уволен», оклад вернётся
             if(raise>0){
                 if(cur>=0.20){ txt='Тебя взяли! Но бонус к зарплате уже на капе +20% — прибавка не идёт, опыт записан.'; }
                 else { p.skills.push({key:'interview', name:'Прошёл собес 🤝', pct:raise});
                     txt='Тебя взяли на оклад '+(res==='hi'?'ВЫШЕ рынка':(res==='ok'?'по рынку':'ниже, чем мог'))+'. Прибавка к зарплате +'+Math.round(raise*100)+'% (бонус навыков теперь +'+Math.round(Math.min(0.20,cur+raise)*100)+'%).'; }
-            } else { txt='Отказ — ответы не убедили нанимателя. Это тренажёр: подумай, что хочет услышать работодатель, и приходи снова.'; }
+            } else { txt = _wasJobless ? 'Отказ — снова без работы и без зарплаты. Это тренажёр: подумай, что хочет услышать наниматель, и приходи ещё.' : 'Отказ — ответы не убедили нанимателя. Это тренажёр: подумай, что хочет услышать работодатель, и приходи снова.'; }
+            if(_wasJobless && res!=='no') txt = '🎉 Снова при деле! Зарплата возвращается. '+txt;
             m.res=res; m.txt=txt; m.ratio=ratio; m.phase='res';
             m.offerChange = (res==='hi' && Math.random()<0.5);              // отличный собес → редкий шанс прыгнуть в другую профессию
             p.notify='💼 Собес: '+(res==='no'?'отказ.':'взяли'+(raise>0?' (+'+Math.round(raise*100)+'% к з/п).':'.'));
@@ -16874,31 +16902,33 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // навыки открываются ПО ПОРЯДКУ внутри ветки (1→2→3→5 оч., 4-й — легенда). Каждый навык
         // реально меняет ДРУГУЮ клетку — поэтому прокачка залипает. Растекаться можно, но легендарный
         // пик даёт только глубина в ОДНОЙ ветке. Спека: VIA_НАВЫКИ_3ВЕТКИ_ПРЕВЬЮ.html.
-        //   Живые баффы (6авг): Работа → Трудоголик +5% и ЛИДЕР +10% к зарплате (calc → и авто-зарплата
-        //   сервера), Переговоры/ЛИДЕР → выше шанс сменить/поднять профессию на Карьере (careerRoll).
-        //   Ветки Фрилансер (Биржа/Сделки) и Дух (Души/Благотв.) провязываем следующими блоками — их
-        //   баффы помечены «скоро», чтобы игрок не ждал эффекта, которого пока нет.
+        //   ВСЕ 12 навыков живые (7авг). Работа: Переговоры→careerRoll, Трудоголик +5%/ЛИДЕР +10% зарплата
+        //   (calc + авто-зарплата сервера), Незаменимый→не увольняют в кризис (wFire). Фрилансер: Чутьё→точнее
+        //   аналитик, Риск-менеджмент→буфер маржин-колла +30% (marginRiskMult), Предприниматель→Сделки вход −15%/
+        //   доход +15% и развитие Бизнеса +15% (entrepCost/entrepGain), МАГНАТ→комиссия биржи −40%. Дух:
+        //   Милосердие→жертва ×2, Смирение/Святой→пороги карт Души ×0.7/×0.05 (soulThreshMult), Праведник→щит
+        //   от проклятия за грязную репутацию (righteousShield).
         const SKILL_BRANCHES = [
           { key:'work', name:'🛠️ РАБОТА', col:'#e8c987', tag:'профессионал/наёмник · стабильный путь',
             skills:[
               {ic:'🤝', nm:'Переговоры',      ds:'На собеседовании впечатляешь сильнее.', buff:'Карьера: выше шанс сменить/поднять профессию', cost:1, live:true},
               {ic:'🔥', nm:'Трудоголик',      ds:'Пашешь на результат.',                   buff:'Зарплата +5% на всех ступенях', cost:2, live:true},
-              {ic:'🛡️', nm:'Незаменимый',     ds:'Тебя не тронут в кризис.',               buff:'Мировое событие: не увольняют при кризисе', cost:3},
+              {ic:'🛡️', nm:'Незаменимый',     ds:'Тебя не тронут в кризис.',               buff:'Кризис: тебя НЕ увольняют, когда режут остальных', cost:3, live:true},
               {ic:'👑', nm:'ЛИДЕР (легенда)', ds:'Прирождённый руководитель.',             buff:'Зарплата +10% и молниеносный рост в карьере', cost:5, legend:true, live:true},
             ]},
           { key:'free', name:'💹 ФРИЛАНСЕР', col:'#8fd4f0', tag:'предприниматель/инвестор · строит капитал сам',
             skills:[
-              {ic:'📈', nm:'Чутьё рынка',     ds:'Видишь рынок яснее.',        buff:'Биржа: аналитик реже врёт, сигналы точнее', cost:1},
-              {ic:'🛟', nm:'Риск-менеджмент', ds:'Держишь риск в узде.',       buff:'Биржа: мягче маржин-колл, плечо безопаснее', cost:2},
-              {ic:'🏗️', nm:'Предприниматель', ds:'Дело в твоих руках цветёт.', buff:'Сделки/Бизнес: дешевле вход, жирнее доход', cost:3},
-              {ic:'💎', nm:'МАГНАТ (легенда)',ds:'Капитал липнет к рукам.',    buff:'Недвижка/сделки максимально выгодны, ниже комиссии', cost:5, legend:true},
+              {ic:'📈', nm:'Чутьё рынка',     ds:'Видишь рынок яснее.',        buff:'Биржа: аналитик реже врёт (+15% к точности совета)', cost:1, live:true},
+              {ic:'🛟', nm:'Риск-менеджмент', ds:'Держишь риск в узде.',       buff:'Биржа: маржин-колл дальше на +30% — плечо переживает просадку', cost:2, live:true},
+              {ic:'🏗️', nm:'Предприниматель', ds:'Дело в твоих руках цветёт.', buff:'Сделки: вход −15%, доход +15%; развитие Бизнеса +15%', cost:3, live:true},
+              {ic:'💎', nm:'МАГНАТ (легенда)',ds:'Капитал липнет к рукам.',    buff:'Биржа: комиссия на сделки −40%', cost:5, legend:true, live:true},
             ]},
           { key:'spirit', name:'🕯️ ДУХ', col:'#c9a9ff', tag:'святой · путь смысла, а не денег',
             skills:[
-              {ic:'💗', nm:'Милосердие',      ds:'Твоя доброта весомее.', buff:'Благотворительность даёт больше эффекта', cost:1},
-              {ic:'🙏', nm:'Смирение',        ds:'Душа открыта.',         buff:'Карты Души приходят быстрее (пороги ниже)', cost:2},
-              {ic:'✨', nm:'Праведник',       ds:'Тьма тебя не берёт.',    buff:'Щит от проклятия/тени чёрного рынка', cost:3},
-              {ic:'😇', nm:'СВЯТОЙ (легенда)',ds:'Особый статус света.',   buff:'Души ~на 95% быстрее, путь к победе через смысл', cost:5, legend:true},
+              {ic:'💗', nm:'Милосердие',      ds:'Твоя доброта весомее.', buff:'Благотворительность к карте души идёт вдвое быстрее', cost:1, live:true},
+              {ic:'🙏', nm:'Смирение',        ds:'Душа открыта.',         buff:'Карты Души приходят быстрее — пороги −30%', cost:2, live:true},
+              {ic:'✨', nm:'Праведник',       ds:'Тьма тебя не берёт.',    buff:'Щит: грязная репутация/тень НЕ сжигают колоду души', cost:3, live:true},
+              {ic:'😇', nm:'СВЯТОЙ (легенда)',ds:'Особый статус света.',   buff:'Души ~на 95% быстрее — пороги почти обнулены', cost:5, legend:true, live:true},
             ]},
         ];
         function skillBranches(p){ if(!p.branches||typeof p.branches!=='object') p.branches={work:[],free:[],spirit:[]};
@@ -16906,6 +16936,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function hasSkill(p, bk, idx){ return !!p && !!p.branches && Array.isArray(p.branches[bk]) && p.branches[bk].includes(idx); }
         // 💰 живой бафф зарплаты ветки «Работа» — читается прямо в calc() (значит и на авто-зарплате сервера).
         function branchSalBonus(p){ return (hasSkill(p,'work',1)?0.05:0) + (hasSkill(p,'work',3)?0.10:0); }
+        // 🏗️ Навык «Предприниматель» (ветка Фрилансер, idx 2): Сделки/Бизнес — дешевле вход, жирнее доход.
+        function hasEntrep(p){ return hasSkill(p,'free',2); }
+        function entrepCost(p,v){ return hasEntrep(p)?Math.round((Number(v)||0)*0.85):Math.round(Number(v)||0); }   // вход −15%
+        function entrepGain(p,v){ return hasEntrep(p)?Math.round((Number(v)||0)*1.15):Math.round(Number(v)||0); }   // доход +15%
         function skillCanUnlock(p, bk, idx){ const u=skillBranches(p)[bk]; if(u.includes(idx)) return false; if(idx>0 && !u.includes(idx-1)) return false; return true; }
 
         // Клетка на поле: даёт ОЧКО и открывает дерево. Гейтится (одноразовое разрешение ведущего).
@@ -17082,6 +17116,47 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return 'other';
         }
         function bizSectorLabel(a){ const s=BIZ_SECTORS[bizSector(a)]; return s ? s.ic+' '+s.t : '📦 Прочее'; }
+        // ═══ БИЗНЕС · ГОДОВОЙ ТИК: тяготы + ЗАКОН ВНИМАНИЯ (Ринат 9авг). Универсально на
+        //     ЛЮБУЮ бизнес-карточку (по потоку cf + сектору). Не следишь/не развиваешь →
+        //     дело ветшает, поток тает (мир идёт, приходят конкуренты). Развиваешь
+        //     (существующее «Развить дело» поднимает cf) → перебиваешь износ и растёшь.
+        //     Тикает РАЗ В ИГРОВОЙ ГОД по дельте curYear() — как ферма. Устойчивость (resist)
+        //     от развития смягчает удары. Гейт BIZ_YEAR_TICK — легко выключить при откате.
+        const BIZ_YEAR_TICK = true;                 // ⚙️ выключатель на случай отката
+        const BIZ_DECAY = 0.04;                     // базовый износ потока в год (закон внимания)
+        const BIZ_TROUBLES = {
+            food:      [['❄️ мёртвый сезон',-0.08],['🥊 конкурент рядом',-0.10],['📦 поставки дороже',-0.06],['🌟 поймал волну',0.11],['⚖️ ровный год',0]],
+            retail:    [['🥊 конкурент',-0.10],['📦 поставщик поднял цены',-0.08],['🛍️ удачный сезон',0.09],['⚖️ ровный год',0]],
+            realty:    [['🏚️ простой объекта',-0.09],['🏛️ налог вырос',-0.05],['📈 спрос подрос',0.09],['⚖️ ровный год',0]],
+            tech:      [['🚪 ушёл ключевой',-0.11],['📉 ушёл клиент',-0.10],['🌟 крупный заказ',0.13],['⚖️ ровный год',0]],
+            service:   [['🔧 сломалось оборудование',-0.09],['🚪 ушёл мастер',-0.08],['💚 постоянники держат',0.09],['⚖️ ровный год',0]],
+            transport: [['🔧 ремонт техники',-0.08],['❄️ сезонный спад',-0.07],['📦 топливо дороже',-0.06],['🌟 крупный контракт',0.10]],
+            other:     [['🥊 трудности дела',-0.08],['⚖️ ровный год',0],['🌟 удачный год',0.10]],
+        };
+        function bizYearTick(p){
+            if(!BIZ_YEAR_TICK || !p || !Array.isArray(p.assets)) return;
+            const y = curYear(); let changed=false, note='';
+            for(const a of p.assets){
+                if(!a || a.type!=='BUSINESS'){ continue; }
+                let cf = Number(a.cf)||0;
+                if(a.bizY==null){ a.bizY=y; continue; }         // первый заход — без ретро-начисления
+                if(cf<=0){ a.bizY=y; continue; }                // дело без потока не трогаем
+                let dy = y - a.bizY; if(dy<=0) continue; dy=Math.min(dy,3);
+                const sec = (typeof bizSector==='function' ? bizSector(a) : 'other');
+                const pool = BIZ_TROUBLES[sec] || BIZ_TROUBLES.other;
+                const shield = 1 - Math.min(70, Number(a.resist)||0)/100;
+                for(let i=0;i<dy;i++){
+                    const t = pool[Math.floor(Math.random()*pool.length)];
+                    const eff = (t[1] < 0 ? t[1]*shield : t[1]) - BIZ_DECAY;   // тягота (смягчена устойчивостью) минус износ
+                    cf = cf * (1 + eff);
+                    if(i===dy-1) note = t[0];
+                }
+                cf = Math.max(0, Math.round(cf));
+                if(cf !== (Number(a.cf)||0)){ a.cf = cf; changed=true; }
+                a.bizY = y;
+            }
+            if(changed) p.bizYearNote = '🏢 За год: '+(note||'мир идёт своим чередом')+'. Без развития поток дела тает — следи за бизнесом.';
+        }
         // f — множитель потока. sec — сектор (или null = все бизнесы, как раньше).
         // Устойчивость (сотрудники/сеть/франшиза) гасит ТОЛЬКО удар, подарки не режет.
         const wBiz = (ps, f, sec) => ps.forEach(p => (p.assets||[]).forEach(a => {
@@ -17093,6 +17168,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }));
         const wCash   = (ps, fn) => ps.forEach(p => { p.savings = Math.max(0, (Number(p.savings)||0) + Math.round(fn(p))); });
         const wTax    = (ps, d) => ps.forEach(p => { const cap=p.prof.taxes*2; p.taxMod = Math.max(-p.prof.taxes, Math.min(cap, (Number(p.taxMod)||0)+Math.round(d))); });
+        // 🔓 УВОЛЬНЕНИЕ В КРИЗИС (Ринат 7авг: тягота «в кризис первыми режут людей»). Уволенному зарплата=0
+        //   (calc), пока не пройдёт собес заново (Карьера → openInterview снимает флаг). 🛡️ Навык «Незаменимый»
+        //   (ветка Работа) — иммунитет. Вешаем на самые злые кризисы.
+        const wFire   = (ps, chance) => ps.forEach(p => { if(p.unemployed || hasSkill(p,'work',2)) return; if(Math.random()<chance){ p.unemployed=true; p.notify='🔓 Кризис ударил — тебя СОКРАТИЛИ. Зарплата пропала, пока не найдёшь новую (Карьера → собеседование).'; } });
         const WORLD_EVENTS = [
             // 🟢 бумы/хорошее
             { w:7, emoji:'🚀', title:'Технологический бум',  text:'Биржа взлетела: акции +15% у всех.',                 apply:ps=>wStocks(ps,1.15) },
@@ -17101,9 +17180,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             { w:5, emoji:'💵', title:'Господдержка/стимул',   text:'Стимулы населению: всем +0.5 зарплаты в кассу.',      apply:ps=>wCash(ps,p=>p.prof.salary*0.5) },
             { w:5, emoji:'⛽', title:'Сырьевой бум',          text:'Сырьё/ценности дорожают: прочие активы +12%.',       apply:ps=>wOther(ps,1.12) },
             // 🔴 кризисы
-            { w:7, emoji:'📉', title:'Мировой кризис',        text:'Биржа рухнула: акции −20%. Держи актив — отрастёт.', apply:ps=>wStocks(ps,0.80) },
-            { w:6, emoji:'🦠', title:'Пандемия (вирус)',      text:'Локдаун: доход бизнесов −20% и мед-расход у всех.',   apply:ps=>{ wBiz(ps,0.80); wCash(ps,p=>-p.prof.salary*0.2); } },
-            { w:5, emoji:'⚔️', title:'Военный конфликт',      text:'Нестабильность: акции −10% и военный налог +20$/мес всем.', apply:ps=>{ wStocks(ps,0.90); wTax(ps,20); } },
+            { w:7, emoji:'📉', title:'Мировой кризис',        text:'Биржа рухнула: акции −20%, и по компаниям пошли СОКРАЩЕНИЯ.', apply:ps=>{ wStocks(ps,0.80); wFire(ps,0.25); } },
+            { w:6, emoji:'🦠', title:'Пандемия (вирус)',      text:'Локдаун: доход бизнесов −20%, мед-расход, и кого-то сокращают.',   apply:ps=>{ wBiz(ps,0.80); wCash(ps,p=>-p.prof.salary*0.2); wFire(ps,0.20); } },
+            { w:5, emoji:'⚔️', title:'Военный конфликт',      text:'Нестабильность: акции −10%, военный налог +20$/мес, и увольнения.', apply:ps=>{ wStocks(ps,0.90); wTax(ps,20); wFire(ps,0.18); } },
             { w:5, emoji:'🔥', title:'Инфляция',              text:'Цены растут: налоги всем +15$/мес.',                  apply:ps=>wTax(ps,15) },
             { w:5, emoji:'🏦', title:'Банковский кризис',     text:'Банки шатает: с кассы у всех −10% (не в минус).',     apply:ps=>wCash(ps,p=>-(Number(p.savings)||0)*0.10) },
             { w:5, emoji:'₿', title:'Крах крипты',            text:'Спекулятив падает: прочие активы −25%.',              apply:ps=>wOther(ps,0.75) },
@@ -17365,20 +17444,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // ─── Клетка РАСХОДЫ: 30 карт неожиданных трат (только на игрока). Списывает с
         // кассы; нехватка → долг банку (как везде). m = доля от зарплаты. ───
         const EXPENSE_CARDS = [
-            {e:'🧓',t:'Мама попросила помочь',m:0.20}, {e:'🚗',t:'Сломалась машина, ремонт',m:0.35},
-            {e:'🦷',t:'Заболел зуб, стоматолог',m:0.18}, {e:'📱',t:'Разбил телефон',m:0.15},
-            {e:'🚿',t:'Прорвало трубу, сантехник',m:0.12}, {e:'🅿️',t:'Штраф за парковку',m:0.05},
+            {e:'🧓',t:'Мама попросила помочь',m:0.20}, {e:'🚗',t:'Сломалась машина, ремонт',m:0.35,opp:'tool',gig:'извоз на авто'},
+            {e:'🦷',t:'Заболел зуб, стоматолог',m:0.18}, {e:'📱',t:'Разбил телефон',m:0.15,opp:'tool',gig:'съёмка на телефон'},
+            {e:'🚿',t:'Прорвало трубу, сантехник',m:0.12,opp:'home'}, {e:'🅿️',t:'Штраф за парковку',m:0.05},
             {e:'🧊',t:'Сломался холодильник',m:0.20}, {e:'🐱',t:'Кот заболел, ветеринар',m:0.10},
             {e:'🤝',t:'Помог другу деньгами',m:0.15}, {e:'💍',t:'Свадьба друга, подарок',m:0.12},
             {e:'🎂',t:'Дни рождения, подарки',m:0.08}, {e:'🏠',t:'Залил соседей снизу',m:0.25},
             {e:'👛',t:'Потерял кошелёк',m:0.10}, {e:'✈️',t:'Срочный билет домой',m:0.30},
             {e:'💔',t:'Разбил чужое имущество',m:0.18}, {e:'🤧',t:'Простуда, лекарства',m:0.06},
-            {e:'🎒',t:'Сбор в школу/садик',m:0.10}, {e:'💻',t:'Ремонт ноутбука',m:0.14},
+            {e:'🎒',t:'Сбор в школу/садик',m:0.10}, {e:'💻',t:'Ремонт ноутбука',m:0.14,opp:'tool',gig:'фриланс на ноуте'},
             {e:'🏥',t:'Родственник в больнице',m:0.30}, {e:'👓',t:'Сломались очки',m:0.07},
-            {e:'🚓',t:'Штраф ГАИ',m:0.10}, {e:'🖼️',t:'Протёк потолок, ремонт',m:0.22},
+            {e:'🚓',t:'Штраф ГАИ',m:0.10}, {e:'🖼️',t:'Протёк потолок, ремонт',m:0.22,opp:'home'},
             {e:'⚰️',t:'Помощь семье (похороны)',m:0.25}, {e:'🔑',t:'Потерял ключи, замена замка',m:0.06},
             {e:'🧾',t:'Недоплата по налогам',m:0.12}, {e:'⏰',t:'Пеня за просрочку',m:0.08},
-            {e:'⚡',t:'Сгорела проводка',m:0.20}, {e:'🚲',t:'Украли велосипед',m:0.10},
+            {e:'⚡',t:'Сгорела проводка',m:0.20,opp:'home'}, {e:'🚲',t:'Украли велосипед',m:0.10,opp:'tool',gig:'доставка на велике'},
             {e:'🛂',t:'Срочные документы/виза',m:0.15}, {e:'🍽️',t:'Внезапные гости',m:0.07}
         ];
         // 💸 РАСХОДЫ 2.0 (Ринат: не тихий минус, а ДИЛЕММА). Дёшево-рискнуть / дорого-надёжно / забить.
@@ -17392,7 +17471,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const c=m.card, base=Math.max(30,Math.round((p.prof.salary||3000)*c.m)); let text, tone='ok';
             if(kind==='safe'){
                 const spent=expPay(p,base);
-                if(Math.random()<0.22){ const back=Math.round(base*0.4); p.savings=(Number(p.savings)||0)+back; text='Сделал дорого и на совесть −'+fmtN(spent)+'$ — и окупилось: вышло даже в плюс +'+fmtN(back)+'$. Иногда «дорого» = выгодно.'; }
+                // 🌱 СКРЫТАЯ ВОЗМОЖНОСТЬ (Ринат): вложился по-нормальному → трата иногда открывает дверь.
+                //   Только на «дорого» и только на картах-семенах (opp). Инструмент → подработка (поток
+                //   НАВСЕГДА, актив в p.assets как в Связях/Сделках). Жильё → подорожало (разовый возврат > траты).
+                if(c.opp==='tool' && Math.random()<0.30){
+                    const cf=Math.max(30,Math.round(base*0.30)); p.assets=p.assets||[];
+                    p.assets.push({id:Date.now()+Math.floor(Math.random()*1000),type:'BUSINESS',title:'Подработка · '+(c.gig||'своё дело'),cf,price:0,down:0});
+                    text='Сделал дорого и на совесть −'+fmtN(spent)+'$ — и вещь заиграла: взял на ней подработку («'+(c.gig||'своё дело')+'»). Пассив +'+fmtN(cf)+'$/мес НАВСЕГДА. Иногда трата открывает дверь.';
+                }
+                else if(c.opp==='home' && Math.random()<0.30){
+                    const gain=Math.round(base*1.2); p.savings=(Number(p.savings)||0)+gain;
+                    text='Отремонтировал капитально −'+fmtN(spent)+'$ — и имущество подорожало: отбил +'+fmtN(gain)+'$. Трата окупилась как актив.';
+                }
+                else if(Math.random()<0.22){ const back=Math.round(base*0.4); p.savings=(Number(p.savings)||0)+back; text='Сделал дорого и на совесть −'+fmtN(spent)+'$ — и окупилось: вышло даже в плюс +'+fmtN(back)+'$. Иногда «дорого» = выгодно.'; }
                 else text='Сделал дорого и надёжно −'+fmtN(spent)+'$. Вопрос закрыт, аукаться нечему — спишь спокойно.';
             } else if(kind==='cheap'){
                 const spent=expPay(p,Math.round(base*0.5));
@@ -17761,14 +17852,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p = state.players.find(x => x.id === m.pId); if (!p) return;
             const c = m.drawn.card; let text, color;
             if (c.k === 'partner') {
-                const cf = Math.max(20, Math.round(p.prof.salary * c.m));
+                const cf = entrepGain(p, Math.max(20, Math.round(p.prof.salary * c.m)));
                 p.assets = p.assets || [];
                 p.assets.push({ id: Date.now()+Math.floor(Math.random()*1000), type:'BUSINESS', title:'Сделка: '+c.t, cf, price:0, down:0 });
-                text = `Честная сделка! Приносит +${cf}$/мес пассивного дохода.`; color='#34d399';
+                text = `Честная сделка! Приносит +${cf}$/мес пассивного дохода.${hasEntrep(p)?' 🏗️ Предприниматель — доход жирнее.':''}`; color='#34d399';
             } else if (c.k === 'cash') {
-                const b = Math.max(30, Math.round(p.prof.salary * c.m));
+                const b = entrepGain(p, Math.max(30, Math.round(p.prof.salary * c.m)));
                 p.savings = (Number(p.savings)||0) + b;
-                text = `Сделка честная — прибыль +${b}$ в кассу.`; color='#34d399';
+                text = `Сделка честная — прибыль +${b}$ в кассу.${hasEntrep(p)?' 🏗️ Предприниматель — жирнее.':''}`; color='#34d399';
             } else if (c.k === 'scam') {
                 const cost = Math.max(30, Math.round(p.prof.salary * c.m));
                 const fc = Math.min(cost, Math.max(0, Number(p.savings)||0));
@@ -17797,12 +17888,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const m = state.sdelkaModal; if (!m || !m.drawn || m.drawn.kind!=='business') return;
             const p = state.players.find(x => x.id === m.pId); if (!p) return;
             const c = m.drawn.card;
-            if ((Number(p.savings)||0) < c.price){ alert('🔒 Не хватает денег. Нужно '+c.price+'$, есть '+Math.round(Number(p.savings)||0)+'$ — нельзя.'); return; }
-            p.savings = Math.round(((Number(p.savings)||0) - c.price)*100)/100;
+            const price = (c.k==='risk') ? (Number(c.price)||0) : entrepCost(p, c.price);   // 🏗️ Предприниматель: вход в дело −15% (кроме ставки-риска)
+            if ((Number(p.savings)||0) < price){ alert('🔒 Не хватает денег. Нужно '+price+'$, есть '+Math.round(Number(p.savings)||0)+'$ — нельзя.'); return; }
+            p.savings = Math.round(((Number(p.savings)||0) - price)*100)/100;
             if (c.k === 'flip') {                       // купил и сразу перепродал (разовый кэш)
-                p.savings = Math.round(((Number(p.savings)||0) + c.income)*100)/100;
-                const net = c.income - c.price;
-                m.drawn = { emoji:c.e, title:(net>=0?'Перепродал: ':'Не окупилось: ')+c.t, text:`Купил за ${c.price}$, продал за ${c.income}$ → ${net>=0?'+':''}${net}$.`, color: net>=0?'#34d399':'#f87171' };
+                const income = entrepGain(p, c.income);
+                p.savings = Math.round(((Number(p.savings)||0) + income)*100)/100;
+                const net = income - price;
+                m.drawn = { emoji:c.e, title:(net>=0?'Перепродал: ':'Не окупилось: ')+c.t, text:`Купил за ${price}$, продал за ${income}$ → ${net>=0?'+':''}${net}$.`, color: net>=0?'#34d399':'#f87171' };
                 p.notify = `♻️ Перепродажа «${c.t}»: ${net>=0?'+':''}${net}$.`;
             } else if (c.k === 'risk') {                 // займ/ставка: бросок ≥thr → вернут income, иначе 0
                 const roll = 1+Math.floor(Math.random()*6);
@@ -17816,8 +17909,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 }
             } else {                                     // пассивный актив (доход/мес)
                 p.assets = p.assets || [];
-                const saleVal = c.val || c.price;   // стоимость при продаже (у недвижки = цена покупки, не аванс)
-                const _asset = { id: Date.now()+Math.floor(Math.random()*1000), type:'BUSINESS', title:c.t, cf:c.cf, price:saleVal, liab:c.liab||0, down:0, note:c.note };
+                const cf = entrepGain(p, c.cf);        // 🏗️ Предприниматель: доход дела +15%
+                const saleVal = c.val || price;   // стоимость при продаже (у недвижки = цена покупки со скидкой входа)
+                const _asset = { id: Date.now()+Math.floor(Math.random()*1000), type:'BUSINESS', title:c.t, cf, price:saleVal, liab:c.liab||0, down:0, note:c.note };
                 // 😈 АДСКИЙ ЧИТ: кто-то на миллионе выбрал этого игрока жертвой.
                 // Он платит СВОИ деньги — актив уходит вору. Чит одноразовый.
                 const _thief = (state.players||[]).find(x => x.id !== p.id && Number(x.cheatOn) === p.id);
@@ -17826,13 +17920,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     _thief.assets.push(_asset);
                     _thief.cheatOn = null;
                     _thief.notify = `😈 «${c.t}» пришла тебе. Заплатил ${p.name}.`;
-                    m.drawn = { emoji:'😈', title:'Сделка ушла: '+c.t, text:`Ты заплатил ${c.price}$ — а актив забрал ${_thief.name}. Он выбрал тебя.`, color:'#f87171' };
+                    m.drawn = { emoji:'😈', title:'Сделка ушла: '+c.t, text:`Ты заплатил ${price}$ — а актив забрал ${_thief.name}. Он выбрал тебя.`, color:'#f87171' };
                     p.notify = `😈 «${c.t}» ушла к ${_thief.name}. Ты заплатил — получил он.`;
                     save(_thief.id);
                 } else {
                     p.assets.push(_asset);
-                    m.drawn = { emoji:c.e, title:'Куплено: '+c.t, text:`Твой актив! +${c.cf}$/мес пассива.${(c.liab||0)>0?` Обязательства ${c.liab}$ спишутся при продаже.`:''}`, color:'#34d399', followUp:true };
-                    p.notify = `🏢 Куплен актив «${c.t}»: +${c.cf}$/мес${(c.liab||0)>0?`, обязательства ${c.liab}$`:''}.`;
+                    m.drawn = { emoji:c.e, title:'Куплено: '+c.t, text:`Твой актив! +${cf}$/мес пассива.${hasEntrep(p)?' 🏗️ Предприниматель — вход дешевле, доход жирнее.':''}${(c.liab||0)>0?` Обязательства ${c.liab}$ спишутся при продаже.`:''}`, color:'#34d399', followUp:true };
+                    p.notify = `🏢 Куплен актив «${c.t}»: +${cf}$/мес${(c.liab||0)>0?`, обязательства ${c.liab}$`:''}.`;
                 }
             }
             // 🔒 карта конкретного объекта потрачена → закрепляем за игроком (другой её не отсканит)
@@ -18971,7 +19065,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     const dd = d.details;
                     if (p.holdings && p.holdings[dd.assetId]) {
                         const sq = Math.min(dd.qty, p.holdings[dd.assetId].qty);
-                        const _sm = hasSkill(p,'sales') ? 1.05 : 1;   // навык «Продажи»: акции дороже на 5%
+                        const _sm = hasSelfSkill(p,'sales') ? 1.05 : 1;   // навык «Продажи»: акции дороже на 5%
                         p.savings = Math.round(((p.savings || 0) + sq * dd.price * _sm) * 100) / 100;
                         p.holdings[dd.assetId].qty -= sq;
                         if (p.holdings[dd.assetId].qty <= 0) delete p.holdings[dd.assetId];
