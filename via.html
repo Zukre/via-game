@@ -111,18 +111,24 @@
 
         .btn {
             border: none;
-            padding: 10px 16px;
+            padding: 11px 16px;
             border-radius: 8px;
+            /* 🕌 арабская гранёная кромка (восьмиугольник) — единый стиль всех кнопок */
+            clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
             font-weight: 700;
             cursor: pointer;
             font-size: 13px;
-            transition: all 0.18s;
+            letter-spacing: .03em;
+            position: relative;
+            transition: all 0.16s ease;
         }
         .btn-blue { background: #2563eb; color: white; }
-        .btn-green { background: linear-gradient(180deg,var(--lx-gold-br),var(--lx-gold)); color:#20180a; width: 100%; padding: 13px; font-size: 14px; box-shadow:0 8px 22px rgba(217,184,119,.20); }
+        .btn-green { background: linear-gradient(180deg,#f9e6ad 0%,#e7bd63 42%,#c79433 75%,#a8791f 100%); color:#231a08; width: 100%; padding: 13px; font-size: 14px; letter-spacing:.05em;
+            box-shadow:0 1px 0 rgba(255,247,220,.55) inset, 0 -2px 5px rgba(120,80,10,.3) inset, 0 10px 24px rgba(217,169,74,.28);
+            text-shadow:0 1px 0 rgba(255,240,200,.35); }
         .btn-amber { background: #d97706; color: white; }
         .btn-orange { background: #ea580c; color: white; font-size: 11px; text-transform: uppercase; padding: 6px 12px; }
-        .btn-gray { background: var(--lx-panel); color: var(--lx-text); border:1px solid var(--lx-line); }
+        .btn-gray { background: linear-gradient(180deg,#171310,#0c0906); color:#e6d9b8; border:1px solid var(--lx-gold-ln); }
         .btn-gray:hover { border-color: var(--lx-gold-ln); color: var(--lx-gold-br); filter:none; }
         /* Люкс-кнопки покупки/продажи (Ринат 19июл: старые зелёные/оранжевые стрёмные) */
         .btn-buy { background: rgba(217,184,119,.09); color: var(--lx-gold-br); border:1px solid var(--lx-gold-ln); font-weight:800; }
@@ -152,7 +158,8 @@
         /* Шкала веса: какую долю от всех долгов занимает этот */
         .debt-bar  { height:2px; background:rgba(207,154,154,.12); border-radius:2px; margin-top:8px; overflow:hidden; }
         .debt-bar>i{ display:block; height:100%; background:linear-gradient(90deg,rgba(207,154,154,.45),var(--lx-rose)); }
-        .btn:hover { filter: brightness(1.08); }
+        .btn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow:0 7px 20px rgba(217,169,74,.20); }
+        .btn:active { transform: translateY(1px) scale(.996); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .row-item {
