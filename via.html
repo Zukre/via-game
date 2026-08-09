@@ -172,6 +172,28 @@
             clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px),0 8px);
             opacity:0;transform:translateY(12px);transition:opacity .3s ease,transform .3s ease;text-align:center;line-height:1.42;max-width:400px;}
         .via-toast.in{opacity:1;transform:translateY(0);}
+        /* 🎉 праздничное окно ВЫИГРЫША в казино (арабский стиль) */
+        #casinoWinOv{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;
+            background:radial-gradient(60% 50% at 50% 45%,rgba(231,189,99,.12),rgba(5,4,2,.82) 70%);backdrop-filter:blur(3px);
+            animation:cwFade .25s ease;}
+        @keyframes cwFade{from{opacity:0}to{opacity:1}}
+        .cw-card{position:relative;width:min(360px,88vw);text-align:center;padding:26px 24px 22px;border-radius:20px;
+            background:linear-gradient(180deg,#211a10,#0c0906);border:2px solid transparent;
+            background-clip:padding-box;box-shadow:0 30px 80px rgba(0,0,0,.7),0 0 60px rgba(231,189,99,.25);
+            animation:cwPop .35s cubic-bezier(.2,1.3,.4,1);}
+        .cw-card::before{content:"";position:absolute;inset:-2px;border-radius:20px;padding:2px;
+            background:linear-gradient(160deg,#f9e6ad,#c79433 45%,#8a5f1c 70%,#e7bd63);
+            -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;}
+        @keyframes cwPop{0%{transform:scale(.7);opacity:0}100%{transform:scale(1);opacity:1}}
+        .cw-stars{color:#e7bd63;letter-spacing:.5em;font-size:14px;margin-bottom:6px;opacity:.85;}
+        .cw-title{font-family:Georgia,serif;font-weight:800;font-size:26px;color:#ffe9b0;letter-spacing:.04em;text-shadow:0 2px 10px rgba(231,189,99,.5);margin-bottom:10px;}
+        .cw-reels{font-size:38px;letter-spacing:.12em;margin:6px 0 10px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5));}
+        .cw-amt{font-family:ui-monospace,monospace;font-weight:800;font-size:34px;color:#f9e6ad;text-shadow:0 0 20px rgba(231,189,99,.5);}
+        .cw-sub{font-size:12.5px;color:#a89778;margin:4px 0 18px;letter-spacing:.04em;}
+        .cw-btn{cursor:pointer;border:none;font-family:Georgia,serif;font-weight:800;font-size:16px;letter-spacing:.08em;text-transform:uppercase;
+            color:#231a08;padding:12px 30px;border-radius:11px;background:linear-gradient(180deg,#f9e6ad,#e7bd63 45%,#c79433 100%);
+            box-shadow:0 1px 0 rgba(255,247,220,.6) inset,0 8px 22px rgba(217,169,74,.35);transition:transform .12s;}
+        .cw-btn:hover{transform:translateY(-1px);} .cw-btn:active{transform:translateY(1px);}
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .row-item {
@@ -12934,7 +12956,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function bizValue(a){
             if(!a) return 0;
             const price=Number(a.price)||0, cf=Number(a.cf)||0;
-            return (a.type==='BUSINESS' && cf>0) ? Math.max(price, Math.round(cf*WIN_MULT)) : price;
+            return (a.type==='BUSINESS' && cf>0) ? Math.round(cf*WIN_MULT) : price;   // 9авг: продажа = поток×20 всегда (убрал max с раздутой ценой созданных — давало нереальные суммы)
         }
         // ⚠️ 7авг: раньше называлась hasSkill(p,k) и КОНФЛИКТОВАЛА с 3-арг hasSkill веток (ниже по файлу,
         // объявлена позже → перекрывала эту). Из-за коллизии selfSkill «Продажи» молча не работал.
@@ -14042,12 +14064,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(payout-bet))*100)/100;
                 p.notify='🎰🎉 '+finals.join(' ')+' ×'+_m+'! +'+Math.round(payout-bet)+'$ чистыми.';
                 save(); render();
-                alert((_m>=100?'🎰👑 ДЖЕКПОТ 7️⃣7️⃣7️⃣ ×'+_m+' → +':'🎰🎉 Три '+out.s+' ×'+_m+' → +')+payout+'$ сразу в кассу!');
+                casinoWin(finals, payout, _m, _m>=100);   // 🎉 красивое окно только на выигрыш
             } else {
                 st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
                 save(); render();
-                // выигрыш мог сгореть в затухании — человек видит обычный проигрыш, закон молчит
-                alert('🎰 '+finals.join(' ')+' — не сошлось. −'+bet+'$. Казино не спешит отдавать. Рискни ещё разок!');
+                // проигрыш — молча (Ринат 9авг: окно не нужно). Барабаны и касса сами показывают итог.
             }
         }
         function clearNotify(){ const p=state.players.find(x=>x.id==state.currentPlayerId); if(p){ p.notify=null; save(); render(); } }
@@ -16243,7 +16264,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 🧹 Снести строение и освободить слот (Александр 27июл: не быть прикованным к первому выбору). Возврат 40%.
         function farmDemolish(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!(p.farm.buildings||{})[bkey]) return; if(farmBuildingUsed(p,bkey)>0){ alert('🚧 В «'+B.name+'» ещё есть живность. Сначала продай или зарежь всех оттуда, потом сноси.'); return; } const back=Math.round(B.price*0.4); if(!confirm('Снести «'+B.name+'»? Вернётся '+fmtN(back)+'$ (40%), место освободится.')) return; delete p.farm.buildings[bkey]; farmSpend(p,-back); save(p.id); render(); alert('🧹 «'+B.name+'» снесено. +'+fmtN(back)+'$, место свободно.'); }
         function farmUpgradeStructure(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B||!B.up) return; const b=(p.farm.buildings||{})[bkey]; if(!b){ alert('Сначала построй строение.'); return; } if(b.lvl>=2){ alert('«'+B.name+'» уже улучшено до максимума.'); return; } if(p.savings<B.up.price){ alert('Не хватает кассы. Улучшение стоит '+B.up.price+'$.'); return; } farmSpend(p,B.up.price); b.lvl=2; save(p.id); render(); alert('⬆️ «'+B.name+'» улучшено — теперь вмещает '+B.up.cap+'.'); }
-        function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ alert('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); alert('🏡 Амбар построен! Выучи «Фермерство» и заводи скот.'); }
+        function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ alert('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); }
         function farmLearn(key){ const _sy=window.scrollY; const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); farmToast('🎓 Изучено: '+FARM_CFG.courseName[key]); }
         function farmBuyAnimal(kind){ const _sy=window.scrollY; const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const isPast=(bkey==='pasture'); const B=isPast?{name:'🐄 Пастбище (выгул)'}:FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(isPast ? farmPastureTier(p)<=0 : (!p.farm.buildings || !p.farm.buildings[bkey])){ alert(isPast?'🐄 Сначала купи ПАСТБИЩЕ для ангусов — отдельная земля-выгул (раздел «Строения» на вкладке 🛒 Купить). На нём только выгул, строить нельзя.':('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).')); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert(isPast?('🐄 Пастбище заполнено: '+_used+'/'+_cap+'. Расширь площадь или продай/зарежь часть.'):('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.')); return; } farmAskQty({ title:'Купить «'+c.name+'»', note:'Цена '+fmtN(c.buy)+'$/'+(c.crop?'шт':'гол')+' · свободно '+_room+' в «'+B.name+'»', def:1, min:1, max:_room, okLabel:'Купить',
                 preview:(q)=>{ const cost=c.buy*q; const pp=farmMe(); return 'Итого <b>'+fmtN(cost)+'$</b>'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
@@ -16288,7 +16309,6 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.farm.batches=p.farm.batches||[];
             p.farm.batches.push({bid:'b'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,years:0,layY:curYear()});
             save(p.id); render();
-            alert('🍷 Заложено: '+cfg.name+'! Ушло '+cfg.srcQty+' '+cfg.srcName+'. Годами дорожает — терпи, и продашь дороже.');
         }
         function farmSellBatch(bid){ const p=farmMe(); if(!p||!p.farm) return; const b=(p.farm.batches||[]).find(x=>x.bid===bid); if(!b) return; const cfg=FARM_CFG.aging[b.kind]; const val=batchValue(b); farmSpend(p,-val); p.farm.batches=p.farm.batches.filter(x=>x.bid!==bid); save(p.id); render(); alert('💰 Продано: '+cfg.name+' выдержки '+(b.years||0)+' лет — +'+val+'$ в кассу!'); }
 
@@ -17168,6 +17188,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // alert → мягкий тост снизу; confirm → сразу «да» (действие выполняется без вопроса).
         try{ window.alert = function(m){ toast(m); }; }catch(e){}
         try{ window.confirm = function(){ return true; }; }catch(e){}
+        // 🎉 красивое окно ВЫИГРЫША в казино (проигрыш — молча).
+        function casinoWin(finals, payout, m, jackpot){
+            try{
+                const old=document.getElementById('casinoWinOv'); if(old) old.remove();
+                const ov=document.createElement('div'); ov.id='casinoWinOv';
+                const nice=(typeof fmtN==='function')?fmtN(payout):payout;
+                ov.innerHTML='<div class="cw-card"><div class="cw-stars">✦ ✦ ✦</div>'
+                    +'<div class="cw-title">'+(jackpot?'👑 ДЖЕКПОТ!':'🎉 ВЫИГРЫШ!')+'</div>'
+                    +'<div class="cw-reels">'+finals.join(' ')+'</div>'
+                    +'<div class="cw-amt">+'+nice+' $</div>'
+                    +'<div class="cw-sub">×'+m+' — сразу в кассу</div>'
+                    +'<button class="cw-btn" onclick="var o=document.getElementById(\'casinoWinOv\');if(o)o.remove();">Забрать</button></div>';
+                ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
+                document.body.appendChild(ov);
+            }catch(e){}
+        }
         function bizYearTick(p){
             if(!BIZ_YEAR_TICK || !p || !Array.isArray(p.assets)) return;
             const y = curYear(); let changed=false, note='';
