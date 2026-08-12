@@ -11141,7 +11141,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function trainPrice(p, t){ return Math.round(t.cost * trainMult((p.selfSkills||[]).length)); }
         function createMult(made){ return Math.min(5, 1 + Math.max(0,made)*0.3); }   // каждое созданное дело +30% к цене следующего. Ринат 28июл (было 0.2)
         const CREATE_YIELD = 0.30;   // 🟢 доход создания = 30% от цены/мес (Ринат 28июл). Синхронно с сервером CREATE_YIELD.
-        function crCf(cr){ return Math.round((cr.cost||0) * CREATE_YIELD); }   // ожидаемый поток создания
+        function crCf(cr){ return Number(cr.cf) || Math.round((cr.cost||0) * CREATE_YIELD); }   // земной поток: заданный cf (книга 800, программа 1000…), НЕ cost×30% — иначе база втрое выше замысла и продажа×20 улетает в космос (Ринат 12авг, было cost*CREATE_YIELD)
         function createPrice(p, cr){ return Math.round(cr.cost * createMult((p.creations||[]).length)); }
         // Состав колоды ровно как на сервере: 7 провалов, каждый усилитель и каждое прошлое падение
         // снимают по одной карте провала. Пол — 2 провала: чуда без риска не бывает никогда.
