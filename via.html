@@ -11591,7 +11591,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // на любом экране, остальные окна — по-прежнему только в бланке.
             if (state.view !== 'player') return renderWorldShow() + renderPayslipModal();   // 💰 получку видит и ведущий (он её выдаёт)
             const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return renderWorldShow() + renderPayslipModal();
-            return renderWorldShow() + renderPayslipModal() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup();
+            return renderWorldShow() + renderPayslipModal() + renderBizReport() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup();
         }
         // 🎲 Личный попап «Твой ход» — показывается тому, чей ход настал, закрывается крестиком/кнопкой.
         function renderMyTurnPopup(){
@@ -14103,6 +14103,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const _st=pstat(p); _st.salaryCount++; _st.salaryTotal=Math.round((_st.salaryTotal+flow)*100)/100;
             soulYearTick(p);                                        // 🕯️ прожитый год: чистые годы, висящий долг, отпускает ли дно
             try{ bizYearTick(p); }catch(e){}                        // 🏢 годовой тик бизнеса: тяготы + закон внимания (износ потока без развития)
+            try{ bizReportCheck(p); }catch(e){}                     // 🏢 раз в 3 года — окно отчёта «было→стало» + решение развивать
             p.savings=Math.round((Number(p.savings)+flow)*100)/100;
             p.notify = (flow>=0 ? '💵 Получка: +'+fmtN(flow)+'$ в кассу'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.'
                                 : '💸 Месяц в минус: '+fmtN(flow)+'$'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.');
@@ -14522,6 +14523,86 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         'linear-gradient(168deg,#3d3320 0%,#574526 30%,#6d5628 52%,#3b2f17 80%,#191308 100%);' +
                         'border:1px solid #e2c576;';
 
+        // 🕊️ Обряд перехода: запуск (кнопка «Дверь на 2-й круг» при выполненных 3 условиях)
+        function startTransition(pid){
+            const p = state.players.find(x=>x.id==pid);
+            if(!p || p.crossed) return;
+            p.crossPending = true; save(p.id); render();
+        }
+        // Шаг через дверь: засеять Душу архетипом входа, отметить переход
+        function enterSoulCircle(pid){
+            const p = state.players.find(x=>x.id==pid);
+            if(!p) return;
+            const a = archetypeOf(p);
+            seedSoul(p, a.key);
+            p.crossed = true; p.crossPending = false; p.viewSoul = true; p.soulEnteredAt = Date.now();
+            save(p.id); render();
+        }
+        function cancelTransition(pid){
+            const p = state.players.find(x=>x.id==pid);
+            if(!p) return; p.crossPending=false; save(p.id); render();
+        }
+        // Модал обряда — палитра Круга Души: стекло, небо, серебро (не золото-песок денег)
+        function renderTransitionModal(p){
+            const a = archetypeOf(p);
+            const A = a.arch, dark = A.tone==='shadow';
+            const crackTxt = A.crack ? Object.entries(A.crack).map(([k,v])=>`${k} ${v>0?'+':''}${v}`).join(', ') : '';
+            return `<div style="position:fixed;inset:0;z-index:121;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;
+                background:radial-gradient(120% 90% at 50% 8%,rgba(196,224,246,.16),transparent 60%),linear-gradient(180deg,#0d1622 0%,#101c2b 45%,#0a1119 100%);">
+              <div style="max-width:560px;width:100%;text-align:center;font-family:Georgia,serif;">
+                <div style="font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:#8fb4d6;margin-bottom:14px;">Обряд перехода</div>
+                <div style="font-size:46px;line-height:1;margin-bottom:10px;filter:drop-shadow(0 0 22px rgba(150,200,240,.45));">🚪</div>
+                <div style="font-size:15px;color:#c6d8ea;font-weight:600;margin-bottom:4px;">Деньги открыли дверь.</div>
+                <div style="font-size:13px;color:#7f9cb8;margin-bottom:22px;">Пройти через неё можно только с Душой.</div>
+
+                <div style="margin:0 auto 20px;max-width:430px;padding:22px 20px;border-radius:18px;
+                    background:linear-gradient(180deg,rgba(226,240,252,.10),rgba(180,210,238,.04));
+                    border:1px solid rgba(160,200,236,${dark?'.24':'.42'});
+                    box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 0 40px rgba(120,170,220,.10);">
+                    <div style="font-size:40px;margin-bottom:8px;">${A.icon}</div>
+                    <div style="font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#88a9c8;margin-bottom:3px;">Ты входишь как</div>
+                    <div style="font-size:27px;font-weight:700;color:#eaf3fb;letter-spacing:.01em;">${A.title}</div>
+                    <div style="font-size:14px;color:#b8cee2;font-style:italic;line-height:1.55;margin-top:14px;">«${A.whisper}»</div>
+                    ${dark ? `<div style="margin-top:16px;padding:10px 12px;border-radius:11px;background:rgba(90,60,80,.20);border:1px solid rgba(190,120,150,.3);">
+                        <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#d29ab0;">Трещина на входе</div>
+                        <div style="font-size:12.5px;color:#e6c4d2;margin-top:4px;">Дверь впустила, но след денег вошёл с тобой. Закон Зеркала уже начался${crackTxt?` · <span style="opacity:.7;">${crackTxt}</span>`:''}.</div>
+                      </div>`
+                      : `<div style="margin-top:16px;font-size:12px;color:#7fb59c;">Ты входишь чистым. Свет, что ты нёс на поле денег, — с тобой.</div>`}
+                </div>
+
+                <button onclick="enterSoulCircle(${p.id})" style="cursor:pointer;border:none;font-family:Georgia,serif;font-size:16px;font-weight:700;
+                    padding:14px 30px;border-radius:13px;color:#0c1620;
+                    background:linear-gradient(180deg,#dcecfa,#a9cae8);box-shadow:0 6px 22px rgba(120,170,220,.35);">
+                    Войти в Круг Души →</button>
+                <div style="margin-top:14px;"><button onclick="cancelTransition(${p.id})" style="cursor:pointer;background:none;border:none;color:#5f7d99;font-size:12px;text-decoration:underline;">Ещё не сейчас</button></div>
+              </div>
+            </div>`;
+        }
+        // Порог Круга Души — минимальный экран за дверью (поле 40 клеток придёт следующим слоем)
+        function renderSoulThreshold(p){
+            const A = ARCHETYPES[p.archetype]||{};
+            const soul = p.soul||{};
+            const shown = SOUL_KEYS.filter(k=>(Number(soul[k])||0)!==0)
+                .map(k=>`<span style="display:inline-block;margin:3px;padding:5px 11px;border-radius:20px;font-size:12px;
+                    background:rgba(200,226,248,.08);border:1px solid rgba(160,200,236,.28);color:#cfe0f0;">${k} <b style="color:#eaf3fb;">${soul[k]>0?'+':''}${soul[k]}</b></span>`).join('');
+            return `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;font-family:Georgia,serif;text-align:center;
+                background:radial-gradient(120% 80% at 50% 6%,rgba(196,224,246,.14),transparent 58%),linear-gradient(180deg,#0d1622,#0a1119);">
+              <div style="max-width:520px;">
+                <div style="font-size:44px;margin-bottom:6px;">🕊️</div>
+                <div style="font-size:12px;letter-spacing:.26em;text-transform:uppercase;color:#8fb4d6;">Круг Души · Глава 3</div>
+                <div style="font-size:26px;font-weight:700;color:#eaf3fb;margin:10px 0;">Ты прошёл первый круг</div>
+                <div style="font-size:14px;color:#b0c6db;line-height:1.6;margin-bottom:20px;">
+                    Деньги остались за дверью — они были дорогой, не целью.
+                    Ты вошёл как <b style="color:#eaf3fb;">${A.icon||''} ${A.title||'—'}</b>. Твоя Душа начинает не с нуля —
+                    с того, каким ты был на поле денег.</div>
+                <div style="margin-bottom:22px;">${shown||'<span style="color:#7f9cb8;font-size:12px;">чистый лист</span>'}</div>
+                <div style="font-size:12.5px;color:#6f8ba6;line-height:1.6;">Здесь начнётся второй круг из 40 клеток — вопросы, на которые нельзя ответить деньгами.
+                    Поле Души собирается. Скоро оно откроется прямо здесь.</div>
+                <div style="margin-top:24px;"><button onclick="var q=state.players.find(x=>x.id==${p.id});if(q){q.viewSoul=false;render();}" style="cursor:pointer;background:none;border:1px solid rgba(160,200,236,.3);color:#8fb4d6;font-size:12px;padding:9px 18px;border-radius:10px;">← вернуться на поле денег</button></div>
+              </div>
+            </div>`;
+        }
+
         function renderDoorModal(p){
             const id = p.doorOpen; const D = DOORS.find(x => x.id === id); if(!D) return '';
             const cap = pnetWorth(p);
@@ -14734,6 +14815,65 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const bias = p.bottom ? -0.10
                        : 0.10 * (light / 60) - 0.10 * (Math.min(dark,100) / 100);
             return {light, dark, bias};
+        }
+
+        // ══════════ 🕊️ МОСТ ДЕНЬГИ → ДУША (обряд перехода) ══════════
+        // Дизайн: VIA_ДАННЫЕ_ИГРЫ.json → transition. Закон: «Деньги открывают дверь.
+        // Пройти через неё можно только с Душой.» КАК игрок прошёл деньги (доминирующий
+        // след, который игра УЖЕ копит: soulWeight/betrayals/donated/casino/shadow) →
+        // задаёт АРХЕТИП входа: имя двери + стартовый seed скрытой Души. Светлые входы —
+        // чистый бонус; теневые впускают, но со «трещиной» (минус к совести) — закон
+        // Зеркала уже на старте. Имена и цифры — черновой дефолт, поле Рината правит.
+        const SOUL_KEYS = ['любовь','страх','искренность','мужество','гордыня','служение','совесть','прощение'];
+        const ARCHETYPES = {
+            'помогал_другим': { title:'Служитель', tone:'light', icon:'🤲',
+                seed:{служение:3, любовь:1}, crack:null,
+                whisper:'Ты вошёл, отдавая. Помни это, когда станет тяжело.' },
+            'держал_слово':   { title:'Честный', tone:'light', icon:'🕊️',
+                seed:{искренность:3, совесть:1}, crack:null,
+                whisper:'Ты держал слово там, где мог солгать. Дверь узнала тебя.' },
+            'жертвовал_ради_будущего': { title:'Строитель', tone:'light', icon:'🌱',
+                seed:{любовь:2, служение:1}, crack:null,
+                whisper:'Ты строил не для себя. Кто-то после тебя будет свободен.' },
+            'рисковал':       { title:'Завоеватель', tone:'shadow', icon:'⚔️',
+                seed:{мужество:3}, crack:{гордыня:1},
+                whisper:'Ты не боялся падать. Но спроси — ради чего был весь этот риск?' },
+            'выбирал_выгоду': { title:'Делец', tone:'shadow', icon:'💰',
+                seed:{гордыня:3}, crack:{совесть:-2},
+                whisper:'Ты выбирал выгоду. Дверь впустит тебя — но Зеркало запомнит.' },
+            'шёл_в_тень':     { title:'Теневик', tone:'shadow', icon:'🌑',
+                seed:{страх:2}, crack:{совесть:-3},
+                whisper:'Ты прошёл в тени. Здесь тени нет. Здесь только ты.' }
+        };
+        // Доминирующий след — из счётчиков, которые игра уже ведёт. Возвращает ключ архетипа + все баллы.
+        function archetypeOf(p){
+            const st = pstat(p);
+            const nw = Math.max(1, pnetWorth(p));
+            const donShare = (Number(p.donatedTotal)||0) / nw;                 // доля отданного
+            const rep = (repScore(p).rep)||0;
+            const bizCount = ((p.assets)||[]).filter(a=>a.type==='BUSINESS').length;
+            const betr = Number(p.betrayals)||0;
+            const scores = {
+                'помогал_другим':        donShare*140 + (Number(p.helpedBack)||0)*8,
+                // Честный ≠ просто «никого не кинул» (это норма). Честность — активный след:
+                // возвращённые займы, чистые годы, добрая репутация. Предательство обнуляет путь.
+                'держал_слово':          betr? 0 : (6 + Math.max(0,rep)*0.5 + (Number(p.helpedBack)||0)*4 + (Number(p.cleanYears)||0)*3),
+                'жертвовал_ради_будущего': (Number(p.children)||0)*14 + colRepWeight(p)*0.6 + bizCount*6,
+                'рисковал':              (Number(st.casinoPlays)||0)*3.5 + (Number(p.marginPlays)||0)*4,
+                'выбирал_выгоду':        10 + Math.max(0, 12 - donShare*140),   // капитал сколочен без щедрости
+                'шёл_в_тень':            (Number(p.shadow)||0)*6 + (Number(p.soulPoison)||0)*5 + betr*18
+            };
+            let best='выбирал_выгоду', bv=-1;
+            for(const k of Object.keys(ARCHETYPES)){ if(scores[k]>bv){ bv=scores[k]; best=k; } }
+            return { key:best, scores, arch:ARCHETYPES[best] };
+        }
+        // Засеять Душу архетипом входа (один раз). Инициализирует 8 скрытых параметров, кладёт seed + трещину.
+        function seedSoul(p, key){
+            const A = ARCHETYPES[key]; if(!A) return;
+            if(!p.soul || typeof p.soul!=='object'){ p.soul={}; SOUL_KEYS.forEach(k=>p.soul[k]=0); }
+            const put=(o)=>{ for(const k in o){ p.soul[k]=(Number(p.soul[k])||0)+o[k]; } };
+            put(A.seed); if(A.crack) put(A.crack);
+            p.archetype = key;
         }
         // ══════════ ⚖️ ШКАЛА РЕПУТАЦИИ ══════════ (Ринат 22июл)
         // Одна шкала на игрока: каждый хороший поступок двигает вправо, каждый грязный — влево.
@@ -15097,6 +15237,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (p.soulNew)   { app.innerHTML = renderS5New(p);    return; }      // 🕯️ «Поздравляю, ты получил карту души»
             if (p.cheatPick) { app.innerHTML = renderCheatPick(p);return; }      // 😈 выбор жертвы
             if (p.doorOpen)  { app.innerHTML = renderDoorModal(p);return; }      // 🚪 карты выбора
+            if (p.crossPending) { app.innerHTML = renderTransitionModal(p); return; }        // 🕊️ обряд перехода Деньги→Душа
+            if (p.crossed && p.viewSoul) { app.innerHTML = renderSoulThreshold(p); return; } // 🕊️ порог Круга Души
             rumorResultCheck(p);                                                 // 🗞️ слух сбылся или нет — сказать один раз
             ipoResultCheck(p);                                                   // 🚀 IPO: луна/скам/увернулся — сказать один раз
             soulCheck(p);                                                        // 🕯️ карта духа приходит сама
@@ -15412,7 +15554,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                       ${cond(c2,'Пассив ≥ расходы ×'+WIN_MULT,fmtN(f.passive)+' / '+fmtN(f.target))}
                       ${cond(c3,'Добра в тебе больше, чем тьмы',c3?'да':'пока нет')}
                     </div>
-                    ${ready?`<div style="margin-top:12px;padding:11px;border-radius:10px;background:rgba(6,78,59,.22);border:1px solid #10b981;color:#6ee7b7;font-weight:800;font-size:13px;">🎉 ДВЕРЬ ОТКРЫТА — ты прошёл 1-й круг! Дальше твой выбор.</div>`:`<div style="margin-top:12px;font-size:11px;color:#9c988e;">Собери все три — и дверь наверх откроется.</div>`}
+                    ${ready?(p.crossed
+                        ? `<button onclick="var q=state.players.find(x=>x.id==${p.id});if(q){q.viewSoul=true;render();}" style="cursor:pointer;margin-top:12px;width:100%;padding:13px;border-radius:11px;border:1px solid #a9cae8;font-weight:800;font-size:13px;color:#0c1620;background:linear-gradient(180deg,#dcecfa,#a9cae8);">🕊️ Ты уже прошёл — войти в Круг Души</button>`
+                        : `<div style="margin-top:12px;padding:11px 11px 4px;border-radius:10px;background:rgba(6,78,59,.22);border:1px solid #10b981;"><div style="color:#6ee7b7;font-weight:800;font-size:13px;margin-bottom:9px;">🎉 Три условия сошлись. Деньги открыли дверь.</div><button onclick="startTransition(${p.id})" style="cursor:pointer;width:100%;padding:13px;border-radius:11px;border:none;font-weight:800;font-size:14px;color:#0c1620;background:linear-gradient(180deg,#dcecfa,#a9cae8);box-shadow:0 5px 18px rgba(120,170,220,.3);">🚪 Пройти обряд перехода →</button></div>`)
+                        :`<div style="margin-top:12px;font-size:11px;color:#9c988e;">Собери все три — и дверь наверх откроется.</div>`}
                   </div>`; })()}
                 </div></details>
 
@@ -17227,6 +17372,79 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 a.bizY = y;
             }
             if(changed) p.bizYearNote = '🏢 За год: '+(note||'мир идёт своим чередом')+'. Без развития поток дела тает — следи за бизнесом.';
+        }
+        // ══════════ 🏢 ОТЧЁТ РАЗ В 3 ГОДА (Ринат 12авг) ══════════
+        // Игра быстрая — 3 года пролетают. Каждые 3 года дело САМО приходит с итогом:
+        // было → стало (плюс/минус за годы тягот и внимания), и требует решения — развивать
+        // (в готовую колоду ступеней) или оставить. Забросил → Закон Внимания уже съел поток,
+        // видно в окне. Всё тихо пишется в скрытую шкалу (bizCareSpells/bizNeglectSpells) —
+        // её видит только админ, а в финале раскрывает Зеркало.
+        const BIZ_REPORT_EVERY = 3;   // лет между отчётами
+        function bizReportCheck(p){
+            if(!BIZ_YEAR_TICK || !p || !Array.isArray(p.assets)) return;
+            const biz = p.assets.filter(a=>a && a.type==='BUSINESS' && (Number(a.cfRep)||Number(a.cf)||0)>0);
+            if(!biz.length){ return; }
+            const y = curYear();
+            if(p.bizRepY==null){ p.bizRepY=y; p.assets.forEach(a=>{ if(a&&a.type==='BUSINESS') a.cfRep=Number(a.cf)||0; }); return; }
+            if(y - p.bizRepY < BIZ_REPORT_EVERY) return;
+            // прошло ≥3 года — собираем итог
+            const items=[]; let wasSum=0, nowSum=0;
+            for(const a of p.assets){
+                if(!a || a.type!=='BUSINESS') continue;
+                const was = Number(a.cfRep); const now = Number(a.cf)||0;
+                if((was||0)<=0 && now<=0) continue;
+                const w = (was==null? now : was);
+                items.push({ idx:p.assets.indexOf(a), title:a.title||'Дело', sec:(typeof bizSectorLabel==='function'?bizSectorLabel(a):''), was:w, now:now });
+                wasSum+=w; nowSum+=now;
+                a.cfRep = now;   // новая отметка
+            }
+            p.bizRepY = y;
+            if(!items.length) return;
+            // скрытая шкала для Зеркала: следил за делом или забросил
+            if(nowSum < wasSum*0.98){ p.bizNeglectSpells=(Number(p.bizNeglectSpells)||0)+1; }
+            else if(nowSum > wasSum*1.02){ p.bizCareSpells=(Number(p.bizCareSpells)||0)+1; }
+            state.bizReport = { pId:p.id, years:BIZ_REPORT_EVERY, items, wasSum, nowSum };
+        }
+        function closeBizReport(){ state.bizReport=null; render(); }
+        function bizReportDevelop(pid, idx){ state.bizReport=null; openBizModal(pid, idx); }
+        function renderBizReport(){
+            const m=state.bizReport; if(!m) return '';
+            const p=state.players.find(x=>x.id==m.pId); if(!p) return '';
+            if(state.view==='player' && state.currentPlayerId!=m.pId) return '';   // чужой отчёт не показываем
+            const verdictOf=(w,n)=>{
+                if(n>=w*1.05) return {ic:'📈', t:'дело выросло', c:'#37d67a'};
+                if(n>=w*0.92) return {ic:'➖', t:'держится', c:'#e6edf3'};
+                if(n>=w*0.5)  return {ic:'📉', t:'просело — внимание ело поток', c:'#ffb454'};
+                return {ic:'💀', t:'на грани — без вложения дело закроется', c:'#ff5d5d'};
+            };
+            const rows = m.items.map(it=>{
+                const v=verdictOf(it.was, it.now);
+                const dPct = it.was>0 ? Math.round((it.now-it.was)/it.was*100) : 0;
+                return `<div style="border:1px solid var(--lx-line);border-radius:11px;padding:12px;margin-bottom:10px;background:#0c1218;">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+                        <span style="font-weight:800;color:#e6edf3;font-size:14px;">${it.title}</span>
+                        <span style="font-size:10.5px;color:#9c988e;">${it.sec}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;margin:9px 0 4px;font-family:ui-monospace,monospace;font-weight:800;">
+                        <span style="color:#9c988e;">${fmtN(it.was)}$</span>
+                        <span style="color:#6d6a62;">→</span>
+                        <span style="color:${v.c};font-size:16px;">${fmtN(it.now)}$/мес</span>
+                        <span style="font-size:11px;color:${v.c};">${dPct>0?'+':''}${dPct}%</span>
+                    </div>
+                    <div style="font-size:12px;color:${v.c};margin-bottom:9px;">${v.ic} ${v.t}</div>
+                    <button onclick="bizReportDevelop(${m.pId},${it.idx})" class="btn" style="width:100%;padding:10px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">🚀 Развивать дело</button>
+                </div>`;
+            }).join('');
+            const grew = m.nowSum>=m.wasSum;
+            return `<div style="position:fixed;inset:0;z-index:5305;background:rgba(4,6,10,.9);display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow:auto;">
+                <div style="width:460px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:18px;">
+                    <div style="text-align:center;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">🏢 Отчёт по делам · прошло ${m.years} года</div>
+                    <div style="text-align:center;font-size:12.5px;color:#9c988e;margin:6px 0 14px;">Три года пролетели. Вот что стало с твоими делами${grew?'':' — за ними надо было смотреть'}.</div>
+                    ${rows}
+                    <div style="font-weight:700;padding:10px;border-radius:9px;text-align:center;font-size:12.5px;color:${grew?'#8ff0b6':'#ffc9c9'};background:rgba(0,0,0,.2);border:1px solid ${grew?'#1f6b45':'#7a2f36'};margin-top:2px;">
+                        ${grew?'Ты вложился — и дела ответили ростом.':'Пассив не бесплатный: не смотришь за делом — оно тает. Реши, во что вложиться.'}</div>
+                    <button onclick="closeBizReport()" class="btn btn-gray" style="width:100%;margin-top:12px;padding:11px;">Оставить как есть</button>
+                </div></div>`;
         }
         // f — множитель потока. sec — сектор (или null = все бизнесы, как раньше).
         // Устойчивость (сотрудники/сеть/франшиза) гасит ТОЛЬКО удар, подарки не режет.
