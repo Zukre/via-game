@@ -15225,6 +15225,53 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
             </div>`;
         }
+        // ══════════ 🏢🏠 ВЕТКИ БИЗНЕС / НЕДВИЖИМОСТЬ (Ринат 12авг) ══════════
+        // Отдельные плитки: развитие, продажа, слежка живут ТУТ. В «Доход и расходы» —
+        // только описание, без кнопок. Карты сделок сканируются и падают: бизнес → в Бизнес,
+        // недвижка → в Недвижимость (по type BUSINESS / ESTATE).
+        function assetMgmtCard(a, p, hasP){
+            const _price=Number(a.price||0), _liab=Number(a.liab||0), _cf=Number(a.cf||0);
+            const _sale=assetSale(a, p);
+            const isEstate=a.type==='ESTATE';
+            const _typeLbl=isEstate?'Недвижимость':a.type==='BUSINESS'?'Бизнес':'Актив';
+            const cover=isEstate?'hero_estate':'hero_biz';
+            return `<div class="row-item" style="display:block; padding:12px;">
+                <div style="height:74px;overflow:hidden;border-radius:10px;position:relative;margin:-12px -12px 10px;"><img src="cat_imgs/${cover}.webp" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'"><div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,.1),rgba(11,14,20,.9));"></div></div>
+                <div class="flex-between" style="margin-bottom:8px;">
+                    <b>${a.title}</b>
+                    <span class="badge ${isEstate?'b-amber':a.type==='BUSINESS'?'b-green':'b-rose'}">${_typeLbl}${a.type==='BUSINESS'?' · '+bizSectorLabel(a):''}</span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; font-size:12px; margin-bottom:10px;">
+                    <div style="color:#9ca3af;">Цена покупки: <b style="color:#e5e7eb;">${fmtN(_price)}$</b></div>
+                    <div style="color:#9ca3af;">${isEstate?'Ипотека':'Обязательства'}: <b style="color:${_liab>0?'#f87171':'#6b7280'};">${fmtN(_liab)}$</b></div>
+                    <div style="color:#9ca3af;">Пассив/доход: <b style="color:${_cf>0?'#10b981':_cf<0?'#f87171':'#6b7280'};">${_cf>0?'+':''}${fmtN(_cf)}$/мес</b></div>
+                    <div style="color:#9ca3af;">При продаже: <b style="color:#fbbf24;">${fmtN(_sale)}$</b></div>
+                </div>
+                ${a.note?`<div style="font-size:11px; color:#fbbf24; margin-bottom:8px;">⚡ ${a.note}</div>`:''}
+                ${bizLevel(a)?`<div style="font-size:11px;color:#efd8a3;margin-bottom:8px;">🏗️ Развит до ступени ${bizLevel(a)}/4${bizResist(a)?` · устойчивость ${bizResist(a)}%`:''}</div>`:''}
+                <div style="display:flex;gap:7px;">
+                ${a.partnerOf
+                  ? `<div style="flex:1;font-size:11px;color:#9c988e;line-height:1.4;padding:3px 0;">🤝 Твоя доля в чужом деле. Развивает владелец — поток растёт и тебе.</div>`
+                  : `${(a.type==='BUSINESS'||_cf>0)?`<button onclick="openBizModal(${p.id},${p.assets.indexOf(a)})" class="btn" style="flex:1;padding:6px 12px;font-size:11px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">🏗️ Развивать</button>`:''}
+                  <button onclick="send('SELL_ASSET', {aId:${a.id}, sale:${_sale}, title:'${(a.title||'').replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-sell" style="flex:0 0 auto;padding:6px 12px; font-size:11px;">📤 Продать (${fmtN(_sale)}$)</button>`}
+                </div>
+            </div>`;
+        }
+        function renderBizBranch(p, hasP){
+            const biz=(p.assets||[]).filter(a=>a&&a.type==='BUSINESS');
+            if(!biz.length) return '<p style="font-size:12px;color:#9ca3af;padding:4px 2px;">Бизнесов пока нет. Отсканируй карту бизнеса (📷) или создай своё в «Развивать себя» — дело появится здесь <b style="color:#22d3ee;">автоматически</b>.</p>';
+            const tot=biz.reduce((s,a)=>s+(Number(a.cf)||0),0);
+            return `<div style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Твои дела: <b style="color:#10b981;">+${fmtN(tot)}$/мес</b> пассива. Развивай — растёт поток; забросишь — тает (следи за отчётом раз в 3 года).</div>`
+                + biz.map(a=>assetMgmtCard(a,p,hasP)).join('');
+        }
+        function renderRealtyBranch(p, hasP){
+            const est=(p.assets||[]).filter(a=>a&&a.type==='ESTATE');
+            if(!est.length) return '<p style="font-size:12px;color:#9ca3af;padding:4px 2px;">Недвижимости пока нет. Отсканируй карту недвижимости (📷) — объект появится здесь <b style="color:#22d3ee;">автоматически</b> и его можно будет улучшать и продавать.</p>';
+            const tot=est.reduce((s,a)=>s+(Number(a.cf)||0),0);
+            return `<div style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Твоя недвижимость: <b style="color:#10b981;">+${fmtN(tot)}$/мес</b> ренты. Улучшай объект — растёт стоимость и рента.</div>`
+                + est.map(a=>assetMgmtCard(a,p,hasP)).join('');
+        }
+
         function renderPlayer(app) {
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
             if (!p) { state.view='lobby'; render(); return; }
@@ -15400,6 +15447,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
                 </div></details>
 
+                ${/* 🏢 БИЗНЕС — ветка: развитие/продажа/слежка живут тут (Ринат 12авг) */''}
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_assets.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏢 Бизнес <span class="sec-hint">— развивай и продавай дела</span></summary><div class="sec-in">${winCover('win_assets')}
+                <div class="card"><div class="block-title">🏢 Мои дела</div>${renderBizBranch(p, hasP)}</div>
+                </div></details>
+
+                ${/* 🏠 НЕДВИЖИМОСТЬ — ветка: объекты (type ESTATE), улучшение/продажа */''}
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_assets.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏠 Недвижимость <span class="sec-hint">— улучшай и продавай объекты</span></summary><div class="sec-in">${winCover('win_assets')}
+                <div class="card"><div class="block-title">🏠 Мои объекты</div>${renderRealtyBranch(p, hasP)}</div>
+                </div></details>
+
                 ${/* 💎🔨 Ринат 23июл: «Друг на друге» ушёл в окно кнопки «Дать в долг» у кассы,
                      а его место заняли коллекция и аукцион. LIVE-бейдж торгов — свечением рамки,
                      НЕ текстом: _openSecs помнит окна по тексту шапки, смена текста закрыла бы окно. */''}
@@ -15466,13 +15523,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                                             </div>
                                             ${a.note?`<div style="font-size:11px; color:#fbbf24; margin-bottom:8px;">⚡ ${a.note}</div>`:''}
                                             ${bizLevel(a)?`<div style="font-size:11px;color:#efd8a3;margin-bottom:8px;">🏗️ Развит до ступени ${bizLevel(a)}/4${bizResist(a)?` · устойчивость ${bizResist(a)}%`:''}</div>`:''}
-                                            <div style="display:flex;gap:7px;">
-                                            ${/* 🤝 доля в чужом деле: партнёр не владеет — не развивает и не продаёт */''}
-                                            ${a.partnerOf
-                                              ? `<div style="flex:1;font-size:11px;color:#9c988e;line-height:1.4;padding:3px 0;">🤝 Твоя доля в чужом деле. Развивает владелец — поток растёт и тебе.</div>`
-                                              : `${(a.type==='BUSINESS'||_cf>0)?`<button onclick="openBizModal(${p.id},${p.assets.indexOf(a)})" class="btn" style="flex:1;padding:4px 12px;font-size:11px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">🏗️ Развить дело</button>`:''}
-                                            <button onclick="send('SELL_ASSET', {aId:${a.id}, sale:${_sale}, title:'${a.title.replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-sell" style="flex:0 0 auto;padding:4px 12px; font-size:11px;">📤 Продать (${_sale}$)</button>`}
-                                            </div>
+                                            ${/* 💼 Ринат 12авг: «Доход и расходы» = ТОЛЬКО описание. Развитие/продажа ушли в ветки 🏢 Бизнес / 🏠 Недвижимость. */''}
+                                            <div style="font-size:11px;color:#6b7280;padding:4px 0;border-top:1px solid #1f2937;">${a.partnerOf?'🤝 Твоя доля в чужом деле — развивает владелец.':'⚙️ Развивать и продавать — в разделе '+(a.type==='ESTATE'?'«🏠 Недвижимость»':'«🏢 Бизнес»')+'.'}</div>
                                         </div>
                                     `;
                                 }).join('')}

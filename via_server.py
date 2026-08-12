@@ -1934,7 +1934,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
                         pl['savings'] = round(float(pl.get('savings') or 0) - price, 2)
                         won = (drawn == 'win')
-                        _cf = int(round(cr['cost'] * CREATE_YIELD))   # доход = 25% от цены/мес (Ринат 28июл)
+                        _cf = int(cr.get('cf') or round(cr['cost'] * CREATE_YIELD))   # земной поток: заданный cf (книга 800, программа 1000…), НЕ cost×30% — иначе база втрое выше замысла и продажа×20 в космос (Ринат 12авг)
                         if won:
                             pl.setdefault('assets', []).append({
                                 'id': int(time.time() * 1000) % 10**9,
