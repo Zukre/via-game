@@ -1947,7 +1947,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                 'cf': _cf,
                                 'grow': cr.get('grow', 0),  # блог: +150 каждый круг
                             })
-                            pl['creations'].append({'key': key, 'cf': _cf, 'level': 1})
+                            pl['creations'].append({'key': key, 'cf': _cf, 'level': 1, 'base': price})   # base = реально уплаченная цена: от неё считаются ступени развития
                         else:
                             pl['failExp'] = int(pl['failExp']) + 1
                         save_data(DATA)
@@ -1971,10 +1971,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             self._send_json({'ok': False, 'reason': 'max_level'}, 200)
                             return
                         nxt = lvl + 1
-                        price = round(cr['cost'] * DEV_COST_MULT[nxt])
-                        if float(pl.get('savings') or 0) < price:
-                            self._send_json({'ok': False, 'reason': 'not_enough', 'cost': price}, 200)
-                            return
                         # 🩹 Ищем по КЛЮЧУ, а не по названию: после первой ступени актив
                         # переименовывается («… · ур.2»), и поиск по имени переставал его находить —
                         # запись росла, а поток в активе оставался старым. Ключ проставляем и старым.
@@ -1989,10 +1985,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         if hit is None:
                             self._send_json({'ok': False, 'reason': 'asset_missing'}, 200)
                             return
+                        # 💰 Цена ступени — от РЕАЛЬНО уплаченной цены создания (base), а не от голой базы
+                        # из таблицы. Кто создал дорого (много уже создал → +30%/шт), тот и развивает
+                        # дорого: 2-я ступень = как само творение, 3-я = втрое. Иначе улучшение выходило
+                        # дешевле покупки (Ринат 13авг). Старые сейвы без base — берём цену из актива.
+                        base = int(item.get('base') or hit.get('price') or cr['cost'])
+                        price = round(base * DEV_COST_MULT[nxt])
+                        if float(pl.get('savings') or 0) < price:
+                            self._send_json({'ok': False, 'reason': 'not_enough', 'cost': price}, 200)
+                            return
                         newcf = int(item.get('cf') or cr['cf']) * 2   # ступень УДВАИВАЕТ поток
                         pl['savings'] = round(float(pl.get('savings') or 0) - price, 2)
                         item['level'] = nxt
                         item['cf'] = newcf
+                        item['base'] = base   # закрепляем, чтобы 3-я ступень считалась от той же цены
                         hit['ckey'] = key
                         hit['cf'] = newcf
                         hit['title'] = hit['t'] = f"{cr['name']} · ур.{nxt}"

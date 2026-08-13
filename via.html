@@ -164,6 +164,19 @@
         .debt-bar>i{ display:block; height:100%; background:linear-gradient(90deg,rgba(207,154,154,.45),var(--lx-rose)); }
         .btn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow:0 7px 20px rgba(217,169,74,.20); }
         .btn:active { transform: translateY(1px) scale(.996); }
+        /* 🔨 ВЕЧНАЯ ДВЕРЬ В ЖИВЫЕ ТОРГИ (Ринат 13авг): пока идут — золотая кнопка-огонёк над всем экраном,
+           чтобы аукцион не терялся при переключении разделов/экранов. z выше открытых окон-разделов (900). */
+        .auc-pill{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:920;
+            display:flex;align-items:center;gap:8px;cursor:pointer;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;
+            font-size:13px;font-weight:800;letter-spacing:.02em;color:#20180a;
+            background:linear-gradient(180deg,#f4dfa0,#d9b877);border:1px solid #b98a3e;border-radius:24px;
+            padding:11px 18px;box-shadow:0 10px 30px -8px rgba(0,0,0,.6),0 0 22px -4px rgba(231,189,99,.6);
+            animation:aucGlow 1.8s ease-in-out infinite;}
+        .auc-pill:active{transform:translateX(-50%) translateY(1px);}
+        .auc-dot{width:9px;height:9px;border-radius:50%;background:#b91c1c;box-shadow:0 0 0 0 rgba(185,28,28,.7);
+            animation:aucDot 1.2s ease-out infinite;}
+        @keyframes aucDot{0%{box-shadow:0 0 0 0 rgba(185,28,28,.7);}70%{box-shadow:0 0 0 9px rgba(185,28,28,0);}100%{box-shadow:0 0 0 0 rgba(185,28,28,0);}}
+        @keyframes aucGlow{0%,100%{box-shadow:0 10px 30px -8px rgba(0,0,0,.6),0 0 18px -6px rgba(231,189,99,.5);}50%{box-shadow:0 10px 30px -8px rgba(0,0,0,.6),0 0 28px -2px rgba(231,189,99,.85);}}
         /* 🔔 тосты вместо блокирующих alert — купил и всё, окно не выскакивает */
         #viaToasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column-reverse;gap:8px;align-items:center;pointer-events:none;max-width:92vw;}
         .via-toast{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13.5px;font-weight:600;color:#efe0bf;
@@ -10783,6 +10796,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return Math.round(trend*cycle*100)/100;
         }
         function priceIdx(prod){ const f = state.market && state.market.farm; if(f && f[prod]) return f[prod]; return farmPriceIdx(prod, curYear()); }
+        // 🐄💹 ЖИВАЯ ЦЕНА ПОКУПКИ СКОТА (Ринат 13авг): рынок дорожает → дорожает и скот, как в жизни.
+        //   Цена животного едет за индексом ТОГО продукта, что оно даёт: мясной бык — за мясом, дойная
+        //   корова — за молоком, осётр — за икрой. Как телёнок тянется за ценой говядины. Индекс тот же
+        //   farmPriceIdx (тренд ~3%/год + цикл ±10%), что и у продажи — поэтому маржа держится, а не
+        //   разъезжается. Скот без продукта (быки/самцы на мясо) считаем по индексу мяса.
+        function farmBuyPrice(c){ if(!c) return 0; return Math.round((Number(c.buy)||0) * priceIdx(c.prod || 'meat')); }
         // месячный доход фермы = Σ по зрелым животным yield×count×живая цена
         // сырьё-ресурсы (молоко/виноград) НЕ капают деньгами — они идут в склад на переработку (честная цепочка)
         const FARM_RAW = ['milk','fruits'];
@@ -11520,6 +11539,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     const ok = secKey(o); if(ok) _openSecs.delete(ok);
                 });
             }
+            if(typeof updateAucPill==='function') updateAucPill();   // 🔨 открыл/закрыл аукцион рукой → мгновенно спрятать/показать кнопку-огонёк
         }, true);
         // Открыть окно раздела снаружи (кнопкой), не имея плитки. Ищем по началу текста шапки.
         function openSecWindow(label){
@@ -11580,6 +11600,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             updateDebugBar();
             paintOverlays();   // всплывающие окна рисуем в отдельный слой — их появление не пересобирает #app
+            updateAucPill();   // 🔨 вечная дверь в живые торги — над любым экраном, пока торги идут
         }
         // Слой всплывающих окон (покупка/история/карта/событие). Рисуется отдельно от #app, поэтому
         // открытие/закрытие окна не перестраивает весь экран → нет мигания и рывка за окном.
@@ -11607,6 +11628,30 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function closeMyTurnPopup(){ state.myTurnPopup=false; paintOverlays(); }
         function paintOverlays(){ const ov=document.getElementById('overlay'); if(ov) ov.innerHTML = renderOverlays(); }
+        // 🔨 ВЕЧНАЯ ДВЕРЬ В ЖИВЫЕ ТОРГИ (Ринат 13авг): аукцион — событие с таймером, а окна-разделы
+        // во весь экран взаимоисключающие (открыл другую ветку → аукцион закрылся и забылся _openSecs).
+        // Пока status==='live', держим над всем экраном кнопку-огонёк: куда бы игрок ни ушёл (другой
+        // раздел, ферма, лобби) — тапнул и снова у молотка. Правило «одно окно за раз» не трогаем.
+        function openLiveAuc(){
+            if(state.view!=='player'){ state.view='player'; render(); }   // render синхронный — DOM готов сразу
+            openSecWindow('🔨 Аукцион');                                   // откроет секцию по началу шапки
+        }
+        function updateAucPill(){
+            const live = !!(state.auction && state.auction.status==='live');
+            let el = document.getElementById('aucPill');
+            // прячем, когда сам аукцион уже открыт во весь экран — чтобы не перекрывать кнопки ставок
+            let aucOpen=false;
+            document.querySelectorAll('.sec-grid>details.sec[open]>summary').forEach(s=>{ if(s.textContent.trim().startsWith('🔨 Аукцион')) aucOpen=true; });
+            if(!live || aucOpen){ if(el) el.remove(); return; }
+            if(!el){
+                el = document.createElement('button');
+                el.id = 'aucPill'; el.className = 'auc-pill';
+                el.title = 'Живые торги идут — тапни, чтобы вернуться к молотку';
+                el.onclick = openLiveAuc;
+                document.body.appendChild(el);
+            }
+            el.innerHTML = '<span class="auc-dot"></span>🔨 Торги идут · открыть';
+        }
 
         function renderLobby(app) {
             app.innerHTML = `
@@ -13531,7 +13576,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const mine = madeBy[cr.key];
                 const lvl = mine ? (Number(mine.level) || 1) : 0;
                 const nxt = lvl + 1;
-                const devCost = lvl && lvl < 3 ? Math.round(cr.cost * DEV_COST_MULT[nxt]) : 0;
+                // 💰 База ступеней = реально уплаченная цена создания (base/цена актива), а не голая cr.cost.
+                // До создания показываем прогноз по текущей цене создания. Мирроринг сервера (Ринат 13авг).
+                const mineAsset = (p.assets||[]).find(a => a.kind==='CREATION' && (a.ckey===cr.key || String(a.title||'').startsWith(cr.name)));
+                const devBase = mine ? (Number(mine.base) || Number(mineAsset&&mineAsset.price) || cr.cost) : createPrice(p, cr);
+                const devCost = lvl && lvl < 3 ? Math.round(devBase * DEV_COST_MULT[nxt]) : 0;
                 const devPoor = devCost > cash;
                 return `<div class="card" style="padding:0;overflow:hidden;border-color:${done?'#10b981':(lock?'var(--lx-line)':'var(--lx-gold-ln)')};">
                   <div style="height:92px;position:relative;">
@@ -13543,8 +13592,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${/* лестница видна ВСЕГДА, даже до создания: человек должен знать, ради чего вкладывается */''}
                     <div style="font-size:10px;line-height:1.5;color:var(--lx-muted);border-top:1px dashed var(--lx-line);border-bottom:1px dashed var(--lx-line);padding:5px 0;margin-bottom:7px;">
                       <span style="color:${lvl>=1?'#5cb08b':'#6d6a62'};">1 · ${cr.step1 || cr.name.replace(/\s*[^\wа-яА-ЯёЁ\s].*$/,'').trim()} — ${fmtN(crCf(cr))}$</span><br>
-                      <span style="color:${lvl>=2?'#5cb08b':'#6d6a62'};">2 · ${CREATION_STEPS[cr.key][2]} — ${fmtN(crCf(cr)*2)}$ за ${fmtN(cr.cost)}$</span><br>
-                      <span style="color:${lvl>=3?'#5cb08b':'#6d6a62'};">3 · ${CREATION_STEPS[cr.key][3]} — ${fmtN(crCf(cr)*4)}$ за ${fmtN(cr.cost*3)}$</span>
+                      <span style="color:${lvl>=2?'#5cb08b':'#6d6a62'};">2 · ${CREATION_STEPS[cr.key][2]} — ${fmtN(crCf(cr)*2)}$ за ${fmtN(Math.round(devBase*DEV_COST_MULT[2]))}$</span><br>
+                      <span style="color:${lvl>=3?'#5cb08b':'#6d6a62'};">3 · ${CREATION_STEPS[cr.key][3]} — ${fmtN(crCf(cr)*4)}$ за ${fmtN(Math.round(devBase*DEV_COST_MULT[3]))}$</span>
                     </div>
                     ${done ? `<div style="font-size:11px;color:#5cb08b;font-weight:700;margin-bottom:6px;">✓ ступень ${lvl} из 3 · ${fmtN(mine.cf)}$/мес</div>
                         ${lvl >= 3 ? `<div style="font-size:11px;color:var(--lx-gold-br);font-weight:700;">👑 развито до конца</div>`
@@ -13606,7 +13655,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const mine = (p.creations||[]).find(c => c.key===key); if(!mine) return;
             const lvl = Number(mine.level)||1, nxt = lvl+1;
             if(nxt > 3) return;
-            const cost = Math.round(cr.cost * DEV_COST_MULT[nxt]);
+            // цена ступени от реально уплаченной цены создания (мирроринг сервера, Ринат 13авг)
+            const mineAsset = (p.assets||[]).find(a => a.kind==='CREATION' && (a.ckey===key || String(a.title||'').startsWith(cr.name)));
+            const base = Number(mine.base) || Number(mineAsset&&mineAsset.price) || cr.cost;
+            const cost = Math.round(base * DEV_COST_MULT[nxt]);
             if(!confirm(`«${CREATION_STEPS[key][nxt]}» за ${fmtN(cost)}$?\n\nПоток удвоится: ${fmtN(mine.cf)} → ${fmtN(mine.cf*2)}$/мес.\nЭто не лотерея — ступень берётся наверняка.`)) return;
             try{
                 const r = await fetch('/self/develop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:p.id, key})});
@@ -16305,7 +16357,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     : (c.prod && FARM_RAW.indexOf(c.prod)>=0) ? (c.prod==='milk'?'🥛 молоко → сыроварня':'🍇 виноград → вино/виски')
                     : c.crop ? `урожай ~${c.yield}/год → на склад`
                     : (c.prod?`продукт ~${c.yield}/гол/год → на склад`:'на развод / мясо');
-                return `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}</div><div style="font-size:11px;color:#9ca3af;">${desc}</div>${locked&&lockTxt?`<div style="font-size:10px;color:#f59e0b;margin-top:4px;">${lockTxt}</div>`:''}<button onclick="farmBuyAnimal('${kind}')" ${locked?'disabled':''} class="btn ${locked?'btn-gray':'btn-green'}" style="width:100%;margin-top:6px;">${fmtN(c.buy)}$${c.crop?'':'/гол'}</button></div>`;
+                return `<div class="card" style="padding:8px;margin:0;">${farmImg(c.img)}<div style="font-weight:800;margin-top:6px;">${c.name}</div><div style="font-size:11px;color:#9ca3af;">${desc}</div>${locked&&lockTxt?`<div style="font-size:10px;color:#f59e0b;margin-top:4px;">${lockTxt}</div>`:''}<button onclick="farmBuyAnimal('${kind}')" ${locked?'disabled':''} class="btn ${locked?'btn-gray':'btn-green'}" style="width:100%;margin-top:6px;">${fmtN(farmBuyPrice(c))}$${c.crop?'':'/гол'}</button></div>`;
             };
             const kinds = Object.keys(FARM_CFG.animals);
             const livestockKinds = kinds.filter(k=>!FARM_CFG.animals[k].crop);
@@ -16463,11 +16515,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmUpgradeStructure(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B||!B.up) return; const b=(p.farm.buildings||{})[bkey]; if(!b){ alert('Сначала построй строение.'); return; } if(b.lvl>=2){ alert('«'+B.name+'» уже улучшено до максимума.'); return; } if(p.savings<B.up.price){ alert('Не хватает кассы. Улучшение стоит '+B.up.price+'$.'); return; } farmSpend(p,B.up.price); b.lvl=2; save(p.id); render(); alert('⬆️ «'+B.name+'» улучшено — теперь вмещает '+B.up.cap+'.'); }
         function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ alert('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); }
         function farmLearn(key){ const _sy=window.scrollY; const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); farmToast('🎓 Изучено: '+FARM_CFG.courseName[key]); }
-        function farmBuyAnimal(kind){ const _sy=window.scrollY; const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const isPast=(bkey==='pasture'); const B=isPast?{name:'🐄 Пастбище (выгул)'}:FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(isPast ? farmPastureTier(p)<=0 : (!p.farm.buildings || !p.farm.buildings[bkey])){ alert(isPast?'🐄 Сначала купи ПАСТБИЩЕ для ангусов — отдельная земля-выгул (раздел «Строения» на вкладке 🛒 Купить). На нём только выгул, строить нельзя.':('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).')); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert(isPast?('🐄 Пастбище заполнено: '+_used+'/'+_cap+'. Расширь площадь или продай/зарежь часть.'):('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.')); return; } farmAskQty({ title:'Купить «'+c.name+'»', note:'Цена '+fmtN(c.buy)+'$/'+(c.crop?'шт':'гол')+' · свободно '+_room+' в «'+B.name+'»', def:1, min:1, max:_room, okLabel:'Купить',
-                preview:(q)=>{ const cost=c.buy*q; const pp=farmMe(); return 'Итого <b>'+fmtN(cost)+'$</b>'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
-                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=c.buy*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } const ex=(pp.farm.animals||[]).find(x=>x.kind===kind); farmSpend(pp,cost); if(ex){ ex.count=(ex.count||1)+qty; } else { pp.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,by:curYear(),count:qty}); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); const tot=((pp.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; farmToast('✅ Куплено '+qty+' «'+c.name+'» — всего '+tot); } }); }
+        function farmBuyAnimal(kind){ const _sy=window.scrollY; const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const isPast=(bkey==='pasture'); const B=isPast?{name:'🐄 Пастбище (выгул)'}:FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(isPast ? farmPastureTier(p)<=0 : (!p.farm.buildings || !p.farm.buildings[bkey])){ alert(isPast?'🐄 Сначала купи ПАСТБИЩЕ для ангусов — отдельная земля-выгул (раздел «Строения» на вкладке 🛒 Купить). На нём только выгул, строить нельзя.':('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).')); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert(isPast?('🐄 Пастбище заполнено: '+_used+'/'+_cap+'. Расширь площадь или продай/зарежь часть.'):('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.')); return; } farmAskQty({ title:'Купить «'+c.name+'»', note:'Цена '+fmtN(farmBuyPrice(c))+'$/'+(c.crop?'шт':'гол')+' · свободно '+_room+' в «'+B.name+'»', def:1, min:1, max:_room, okLabel:'Купить',
+                preview:(q)=>{ const cost=farmBuyPrice(c)*q; const pp=farmMe(); return 'Итого <b>'+fmtN(cost)+'$</b>'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
+                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=farmBuyPrice(c)*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } const ex=(pp.farm.animals||[]).find(x=>x.kind===kind); farmSpend(pp,cost); if(ex){ ex.count=(ex.count||1)+qty; } else { pp.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,by:curYear(),count:qty}); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); const tot=((pp.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; farmToast('✅ Куплено '+qty+' «'+c.name+'» — всего '+tot); } }); }
         // 🧹 УБРАТЬ / УТИЛИЗИРОВАТЬ (Ринат 27июл): культуры и живность без убоя — выкосить/убрать, освободить место. Возврат 30% цены.
-        function farmCull(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c) return; const have=a.count||1; const per=Math.max(1,Math.round((c.buy||0)*0.3)); const word=c.crop?'Выкосить/убрать':'Убрать';
+        function farmCull(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c) return; const have=a.count||1; const per=Math.max(1,Math.round(farmBuyPrice(c)*0.3)); const word=c.crop?'Выкосить/убрать':'Убрать';
             farmAskQty({ title:word+' «'+c.name+'»', note:'Есть '+have+'. Вернётся ~'+fmtN(per)+'$/шт (30% цены).', def:have, min:1, max:have, okLabel:'Убрать',
                 preview:(q)=>'Вернётся <b>'+fmtN(per*q)+'$</b>',
                 onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm) return; const aa=(pp.farm.animals||[]).find(x=>x.aid===aid); if(!aa) return; const hv=aa.count||1; const n=Math.min(qty,hv); const pay=per*n; farmSpend(pp,-pay); aa.count=hv-n; if(aa.count<=0){ pp.farm.animals=pp.farm.animals.filter(x=>x.aid!==aid); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); farmToast('🧹 Убрано '+n+' «'+c.name+'»: +'+fmtN(pay)+'$'); } }); }
