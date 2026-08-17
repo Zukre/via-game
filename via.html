@@ -377,6 +377,33 @@
             text-shadow:0 1px 2px rgba(0,0,0,.4); letter-spacing:.04em;}
         .casino-spin:hover{filter:brightness(1.08)}
         .suit-r{color:#d98a8a} .suit-b{color:#cdc8bd}
+        /* ─── 🎲🃏🎡 ПРЕМИУМ-СТОЛЫ КАЗИНО (17авг): объёмный кубик, настоящая карта, стеклянное колесо ─── */
+        .cz-die{width:92px;height:92px;margin:4px auto 12px;border-radius:20px;position:relative;
+            background:linear-gradient(145deg,#fffdf5 0%,#f3ead0 45%,#d8c9a4 100%);
+            box-shadow:0 14px 30px -10px rgba(0,0,0,.7),inset 0 3px 6px rgba(255,255,255,.9),inset 0 -8px 14px rgba(120,95,45,.35),0 0 0 2px #b8912f;
+            display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:14px;gap:3px;transition:box-shadow .3s;}
+        .cz-die .pip{align-self:center;justify-self:center;width:14px;height:14px;border-radius:50%;
+            background:radial-gradient(circle at 35% 30%,#4a3316,#140c04 80%);box-shadow:inset 0 1px 2px rgba(255,255,255,.25);opacity:0;}
+        .cz-die .pip.on{opacity:1}
+        .cz-die.rolling{animation:czTumble .12s linear infinite}
+        .cz-die.win{box-shadow:0 14px 34px -8px rgba(0,0,0,.7),inset 0 3px 6px rgba(255,255,255,.9),inset 0 -8px 14px rgba(120,95,45,.35),0 0 0 2px #f2d27a,0 0 26px 4px rgba(242,210,122,.7);}
+        @keyframes czTumble{0%{transform:rotate(-9deg) translateY(0)}25%{transform:rotate(6deg) translateY(-8px)}50%{transform:rotate(-5deg) translateY(2px)}75%{transform:rotate(8deg) translateY(-6px)}100%{transform:rotate(-9deg)}}
+        .cz-deck{position:relative;width:110px;height:150px;margin:4px auto 10px;}
+        .cz-deck .back{position:absolute;inset:0;border-radius:13px;background:linear-gradient(180deg,#f7f4ec,#dcd6c6);box-shadow:0 10px 24px -10px rgba(0,0,0,.6);}
+        .cz-deck .back.b1{transform:translate(6px,6px) rotate(3deg);opacity:.5}
+        .cz-deck .back.b2{transform:translate(3px,3px) rotate(1.5deg);opacity:.8}
+        .cz-card{position:absolute;inset:0;border-radius:13px;background:linear-gradient(160deg,#ffffff,#f0ece0);
+            box-shadow:0 14px 30px -10px rgba(0,0,0,.65),inset 0 0 0 1px rgba(0,0,0,.06);border:1px solid #d9d3c3;font-family:Georgia,serif;}
+        .cz-card .corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:.95;font-weight:800;}
+        .cz-card .corner .r{font-size:20px}.cz-card .corner .s{font-size:15px}
+        .cz-card .tl{top:7px;left:8px}.cz-card .br{bottom:7px;right:8px;transform:rotate(180deg)}
+        .cz-card .pipbig{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:58px;}
+        .cz-red{color:#c62b3f}.cz-black{color:#1a1a1a}
+        @keyframes czFlip{0%{transform:rotateY(85deg)}100%{transform:rotateY(0)}}
+        .cz-lamp{animation:czLamp 1.8s ease-in-out infinite}
+        .cz-lamp:nth-child(even){animation-delay:.9s}
+        @keyframes czLamp{0%,100%{opacity:.35}50%{opacity:1}}
+        @media (prefers-reduced-motion:reduce){.cz-die.rolling{animation:none}.cz-lamp{animation:none;opacity:.8}}
         /* ─── НОВЫЙ БЛАНК (19июл): эмблема + сворачивающиеся разделы, чтоб не «простыня» ─── */
         .blank-crest{display:flex; justify-content:center; margin:2px 0 0;}
         .blank-crest .bc{width:60px; height:60px; border-radius:50%;
@@ -11204,7 +11231,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             svyazModal: null,
             sdelkaModal: null,
             medModal: null,
-            childModal: null
+            childModal: null,
+            casinoUnlocked: false
         };
 
         // Глобально уникальный id заявки: время + счётчик + случайное.
@@ -11406,7 +11434,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // полный ре-рендер НЕ трогаем вообще — иначе тик рынка/чужой ход пересобирает модалку и поле
             // ввода прыгает. Живую цену выхода держит slipRefresh точечно (slipBox), не рушя ввод.
             const _tradeOpen = !!(state.buyModal || state.sellModal);
-            if (!_slotSpinning && !_tradeOpen && (_nmChanged || (state.view === 'player' && !_winOpen))) safeRerender();
+            if (!_slotSpinning && !_casinoAnim && !_tradeOpen && (_nmChanged || (state.view === 'player' && !_winOpen))) safeRerender();
             _lastNonMarket = _nonMarket;
             // окно сделки перерисовалось (тик рынка/чужой ход) → блок проскальзывания сбросился,
             // считаем заново, иначе человек смотрит на «впиши количество» с уже введённым числом
@@ -14045,12 +14073,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Ставка в казино долей кассы (10/25/50/80%/макс) — заполняет поле, игрок может поправить вручную.
         function setBet(frac){ const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return; const el=document.getElementById('betAmt'); if(el){ el.value=Math.max(1,Math.floor((Number(p.savings)||0)*frac)); el.focus(); } }
         function gambleRoll(){
+            if(_casinoAnim) return;
             const p=state.players.find(x=>x.id==state.currentPlayerId);
             if(!p) return;
             const el=document.getElementById('betAmt');
             const bet=Math.floor(Number(el? el.value : 0));
-            if(!bet||bet<1){ alert('Введи ставку (число больше 0).'); return; }
-            if(bet>p.savings){ alert('Не хватает кассы. У тебя '+Math.round(p.savings)+'$.'); return; }
+            if(!bet||bet<1){ toast('Введи ставку (число больше 0).'); return; }
+            if(bet>p.savings){ toast('Не хватает кассы. У тебя '+fmtN(p.savings)+'$.'); return; }
             let roll=1+Math.floor(Math.random()*6);
             // ставка списывается СРАЗУ (committed). Проигрыш мгновенный.
             p.savings=Math.round((p.savings-bet)*100)/100;
@@ -14059,21 +14088,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // если выигрыш сгорел — и кубик показывает проигрышную грань: иначе на экране
             // была бы шестёрка вместе с минусом, и закон объявил бы себя вслух.
             if(mult <= 0 && (CASINO_PAYOUT[roll]||0) > 0) roll = 1+Math.floor(Math.random()*4);
+            const die=document.getElementById('diceFace');
+            if(die){ _casinoAnim=true; die.classList.remove('win'); die.classList.add('rolling'); let n=0;
+                const iv=setInterval(()=>{ paintDicePips(1+Math.floor(Math.random()*6));
+                if(++n>10){ clearInterval(iv); die.classList.remove('rolling'); paintDicePips(roll);
+                    if(mult>0) die.classList.add('win'); _casinoAnim=false; diceResolve(p,st,bet,mult,roll); } },70); }
+            else diceResolve(p,st,bet,mult,roll);
+        }
+        function diceResolve(p,st,bet,mult,roll){
+            _lastDie=roll;
             if(mult > 0){
                 const payout=Math.round(bet*mult*100)/100;   // возврат (включает ставку)
-                p.savings=Math.round((p.savings+payout)*100)/100;   // МГНОВЕННО: если выиграл — выиграл (без одобрения)
+                p.savings=Math.round((p.savings+payout)*100)/100;   // МГНОВЕННО: выиграл — выиграл
                 st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(payout-bet))*100)/100;
-                p.notify='🎰🎉 ВЫИГРЫШ ×'+mult+'! +'+Math.round(payout-bet)+'$ чистыми (вернулось '+payout+'$).';
+                p.notify='🎲🎉 Выпало '+roll+' — ВЫИГРЫШ ×'+mult+'! +'+Math.round(payout-bet)+'$ чистыми.';
                 save(); render();
-                const msg = roll===6
-                    ? '🎰🎉 ШЕСТЁРКА!!! ДЖЕКПОТ ×'+mult+' → +'+payout+'$ СРАЗУ в кассу! 👑⭐'
-                    : '🎲✨ Пятёрка! Выигрыш ×'+mult+' → +'+payout+'$ сразу в кассу!';
-                alert(msg);
+                casinoWin([DICE_PIPS[roll]], payout, mult, roll===6);   // 🎉 красивое окно только на выигрыш
             } else {
                 st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
-                const near=['Так близко! 😤','Ещё чуть-чуть! 🎲','Удача уже рядом — чувствуешь? 🔥','Не сдавайся, фортуна любит упорных! 💪','В следующий раз точно шестёрка! 😏'];
-                save(); render();
-                alert('🎲 Выпало '+roll+'... '+near[Math.floor(Math.random()*near.length)]+'\n−'+bet+'$. Казино не спешит отдавать. Рискни ещё разок!');
+                save(); render();   // проигрыш — молча (Ринат 9авг), кубик и касса сами говорят
             }
         }
         // ─── 🎰 СЛОТ-АВТОМАТ (Ринат 19июл): 3 одинаковых фрукта = выигрыш, у каждого свой множитель.
@@ -14081,6 +14114,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const SLOT_TIERS=[{s:'7️⃣',m:100,p:1/10000},{s:'💎',m:9,p:1/1000},{s:'🔔',m:7,p:1/500},{s:'🍇',m:5,p:1/200},{s:'🍊',m:3,p:1/90},{s:'🍋',m:2,p:1/50},{s:'🍒',m:1,p:1/20}];
         const SLOT_ALL=['🍒','🍋','🍊','🍇','🔔','💎','7️⃣'];
         let _slotSpinning=false;
+        // ── 🎰 ПОЛ КАЗИНО: несколько столов (Ринат 16авг «не одна игра»). Состояние живёт в модульных
+        // переменных — сброс при смене игрока (там же, где casinoUnlocked=false). _casinoAnim гейтит
+        // автопере-рендер во время бросков/вращений, чтобы DOM не пересобирался посреди анимации.
+        let _casinoAnim=false, _lastDie=0, _hl=null, _ld=null, _wheelAngle=0;
+        const DICE_PIPS={1:'⚀',2:'⚁',3:'⚂',4:'⚃',5:'⚄',6:'⚅'};
+        // объёмный кубик: реальные точки в сетке 3×3 (какие ячейки залиты для каждой грани)
+        const DICE_PIPMAP={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+        function dicePips(face){ const on=DICE_PIPMAP[face]||[]; let h=''; for(let i=0;i<9;i++) h+='<div class="pip'+(on.includes(i)?' on':'')+'"></div>'; return h; }
+        function paintDicePips(face){ const d=document.getElementById('diceFace'); if(d) d.innerHTML=dicePips(face); }
+        const WHEEL_SEGS=[['×0',0,'#3a1420'],['×2',2,'#0c3a2a'],['×0',0,'#3a1420'],['×3',3,'#12402e'],['×0',0,'#3a1420'],['×1.5',1.5,'#0c3a2a'],['×0',0,'#3a1420'],['×5',5,'#4a3a12'],['×0',0,'#3a1420'],['×2',2,'#0c3a2a'],['×0',0,'#3a1420'],['×20 💎',20,'#5a2a12']];
+        const LADDER_RUNGS=[1.5,2,3,5,8,15,30];
+        const LADDER_BUST=[0.28,0.34,0.42,0.5,0.6,0.7];   // шанс срыва на шаге; дальше — .75
+        const HL_MULT=1.4;
+        function setCasinoTab(k){ if(_casinoAnim) return; state.casinoTab=k; render(); }
         function slotRnd(){ return SLOT_ALL[Math.floor(Math.random()*SLOT_ALL.length)]; }
         function spinSlot(){
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
@@ -14198,7 +14245,85 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div></div>`;
         }
 
+        // ── 🎰 КАЗИНО-ГЕЙТ (табу): перед входом — зеркало разрухи. Вживил 16 авг.
+        const CASINO_REP_HIT = 8;   // −рейтинг за вход в казино (ручка баланса)
+        const CASINO_RUIN = [
+            ['01','Пустая квартира','вывезли всё, только экран телефона'],
+            ['02','Ушедшая семья','чемоданы у двери'],
+            ['03','Гора долгов','расписки и порванные деньги'],
+            ['04','Ночь у автомата','пустые глаза лудомана'],
+            ['05','Заложено всё','пустой гараж, ключи на полу'],
+            ['06','Дно','один на ночной скамейке'],
+            ['07','Продал дом','вещи на улице под дождём'],
+            ['08','Тень долга','пришли за деньгами'],
+            ['09','Было / стало','зеркало гибели'],
+            ['10','Один за столом','телефон светит угрозами'],
+        ];
+        // 🎞️ ПРОЦЕССИЯ РАЗРУХИ (Ринат 17авг): плитки сами перелистывают все 10 кадров с плавным затуханием,
+        // две панели идут со сдвигом на пол-набора — на экране всегда две РАЗНЫЕ сцены, и обе движутся.
+        // Медленный перелив заставляет подсознательно притормозить перед ставкой. Таймер живёт вне рендера:
+        // игра пересобирает гейт ~раз/сек, но плитки всегда рисуют ТЕКУЩИЙ _cgIdx, поэтому перелистывание
+        // не сбрасывается пересборкой; сам сдвиг индекса ведёт отдельный интервал (cgTick).
+        let _cgIdx=0, _cgTimer=null;
+        function cgTint(s){ return `linear-gradient(rgba(8,6,10,0) 38%,rgba(8,6,10,.55) 68%,rgba(8,6,10,.92)),url('cat_imgs/casino_ruin_${s[0]}.webp')`; }
+        function cgPaint(){
+            const N=CASINO_RUIN.length, off=Math.floor(N/2);
+            [['cgTileA',_cgIdx],['cgTileB',(_cgIdx+off)%N]].forEach(([id,idx])=>{
+                const el=document.getElementById(id); if(!el) return;
+                const s=CASINO_RUIN[idx];
+                el.style.opacity='0';   // угасание в темноту, потом всплывает следующая беда
+                setTimeout(()=>{ const e=document.getElementById(id); if(!e) return;
+                    e.style.backgroundImage=cgTint(s);
+                    const n=e.querySelector('.cg-n'), t=e.querySelector('.cg-t'), c=e.querySelector('.cg-s');
+                    if(n)n.textContent='#'+s[0]; if(t)t.textContent=s[1]; if(c)c.textContent=s[2];
+                    e.style.opacity='1';
+                }, 520);
+            });
+        }
+        function cgTick(){ _cgIdx=(_cgIdx+1)%CASINO_RUIN.length; cgPaint(); }
+        function renderCasinoGate(p){
+            if(!_cgTimer) _cgTimer=setInterval(cgTick, 2800);   // запускаем процессию один раз
+            const N=CASINO_RUIN.length, off=Math.floor(N/2);
+            const tile=(id,idx)=>{ const s=CASINO_RUIN[idx];
+                return `<div id="${id}" style="flex:1;min-width:0;border-radius:12px;position:relative;overflow:hidden;border:1px solid #241a24;background:#0c0910;background-image:${cgTint(s)};background-size:cover;background-position:center;min-height:188px;display:flex;flex-direction:column;justify-content:flex-end;padding:12px;transition:opacity .55s ease;opacity:1;">
+                    <div class="cg-n" style="position:absolute;top:8px;left:10px;font-size:11px;color:#cbd2de;font-weight:800;text-shadow:0 1px 4px #000;">#${s[0]}</div>
+                    <div class="cg-t" style="position:relative;font-weight:800;font-size:15px;line-height:1.2;text-shadow:0 2px 8px #000;">${s[1]}</div>
+                    <div class="cg-s" style="position:relative;color:#d3dae6;font-size:11px;margin-top:3px;text-shadow:0 1px 6px #000;">${s[2]}</div>
+                </div>`; };
+            const tiles=tile('cgTileA',_cgIdx)+tile('cgTileB',(_cgIdx+off)%N);
+            return `<div class="card" style="background:linear-gradient(180deg,#0b0e14,#0a0c11);border:1px solid #2a1620;">
+                <div style="font-size:30px;font-weight:900;letter-spacing:3px;color:#ff4d5e;text-align:center;text-shadow:0 0 20px rgba(255,77,94,.35);">СТОП.</div>
+                <div style="text-align:center;color:#c9d0dc;font-size:13px;line-height:1.4;margin:4px 0 12px;">Вот как азарт сломал их жизни. Посмотри им в глаза.</div>
+                <div style="display:flex;gap:8px;margin-bottom:12px;">${tiles}</div>
+                <div style="display:flex;align-items:center;gap:10px;background:#0e1119;border:1px solid #232a38;border-radius:12px;padding:12px 14px;margin-bottom:12px;">
+                    <div style="font-weight:800;font-size:14px;">Готов так же сломать <span style="color:#ff4d5e;">СВОЮ</span>?</div>
+                    <div style="margin-left:auto;text-align:right;"><div style="color:var(--lx-gold-br);font-weight:900;font-size:17px;">${fmtN(p.savings)} $</div><div style="color:#8891a3;font-size:11px;">твоё — пока цело</div></div>
+                </div>
+                <button onclick="casinoLeave()" class="btn" style="width:100%;padding:15px;border:none;border-radius:12px;font-size:16px;font-weight:800;color:#08130f;background:linear-gradient(180deg,#5ff0c2,#28c79a);box-shadow:0 8px 24px rgba(55,224,176,.3);margin-bottom:10px;">← Уйти. Оно того не стоит</button>
+                <div id="cgPlay" onmousedown="casinoHoldStart(event)" onmouseup="casinoHoldEnd()" onmouseleave="casinoHoldEnd()" ontouchstart="casinoHoldStart(event)" ontouchend="casinoHoldEnd()" style="position:relative;padding:12px;border:1px solid #3a2f36;border-radius:12px;overflow:hidden;text-align:center;font-size:13px;font-weight:700;color:#8a7580;background:#140f14;cursor:pointer;user-select:none;-webkit-user-select:none;">
+                    <div id="cgFill" style="position:absolute;inset:0;width:0%;background:linear-gradient(90deg,#7a1f3a,#ff3d8b);opacity:.85;transition:width .06s linear;"></div>
+                    <div style="position:relative;">Всё равно играть<small style="display:block;font-weight:600;color:#6a5a62;margin-top:2px;font-size:10px;">держи 3 сек, если не боишься…</small></div>
+                </div>
+            </div>`;
+        }
+        let _cgHold=null,_cgProg=0;
+        function casinoHoldStart(e){ if(e&&e.preventDefault&&e.cancelable)e.preventDefault(); _cgProg=0;
+            _cgHold=setInterval(()=>{ _cgProg+=2; const f=document.getElementById('cgFill'); if(f)f.style.width=_cgProg+'%';
+                if(_cgProg>=100){ clearInterval(_cgHold); _cgHold=null; casinoEnter(); } },60); }
+        function casinoHoldEnd(){ if(_cgHold){ clearInterval(_cgHold); _cgHold=null; } if(_cgProg<100){ const f=document.getElementById('cgFill'); if(f)f.style.width='0%'; } _cgProg=0; }
+        function casinoEnter(){ const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            if(!state.casinoUnlocked){ p.repScore=(Number(p.repScore)||0)-CASINO_REP_HIT; p.ludoman=(Number(p.ludoman)||0)+1;
+                state.casinoUnlocked=true; p.notify='🎰🩸 Ты вошёл в казино. Метка «Лудоман» +1, репутация −'+CASINO_REP_HIT+'. Это видят другие, и колода темнеет.'; save(); }
+            render(); }
+        function casinoLeave(){ const p=state.players.find(x=>x.id==state.currentPlayerId);
+            document.querySelectorAll('.sec-grid>details.sec').forEach(d=>{ const s=d.querySelector('summary'); if(s&&s.textContent.trim().startsWith('🎰 Казино')){ d.open=false; _openSecs.delete(secKey(d)); } });
+            if(p){ p.notify='🕊️ Ты ушёл от казино. Верное решение — спокойствие дороже денег.'; save(); render(); } }
+
         function renderLuckPanel(p){
+            const ct=state.casinoTab||'slots';
+            const tabs=[['slots','🎰 Слоты'],['dice','🎲 Кости'],['hilo','🃏 Выше/Ниже'],['ladder','📈 Лесенка'],['wheel','🎡 Колесо']];
+            const tabBar=tabs.map(([k,l])=>`<button onclick="setCasinoTab('${k}')" class="btn" style="padding:6px 10px;font-size:11.5px;background:${ct===k?'#3a2a12':'#140f0a'};color:${ct===k?'#efd8a3':'#8f8470'};border:1px solid ${ct===k?'#b98a3e':'#3a2f1e'};font-weight:${ct===k?'800':'600'};white-space:nowrap;">${l}</button>`).join('');
+            const body = ct==='dice'?luckDice(p): ct==='hilo'?luckHilo(p): ct==='ladder'?luckLadder(p): ct==='wheel'?luckWheel(p): luckSlots(p);
             return `<div class="card casino-felt">
                 <div class="casino-lights"></div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;">
@@ -14208,20 +14333,212 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     </div>
                     <div style="font-size:19px;letter-spacing:2px;white-space:nowrap;"><span class="suit-r">♥</span><span class="suit-b">♠</span><span class="suit-r">♦</span><span class="suit-b">♣</span></div>
                 </div>
-                <div class="reels"><div class="reel" id="reel0">🍒</div><div class="reel" id="reel1">🍋</div><div class="reel" id="reel2">🍊</div></div>
+                <div style="display:flex;gap:5px;overflow-x:auto;margin:12px 0;padding-bottom:2px;">${tabBar}</div>
+                ${body}
+                <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(217,184,119,.15);font-size:10.5px;color:#8fa398;text-align:center;line-height:1.5;">🪞 Ни один стол не отдаёт на дистанции — так устроены все казино. Настоящая победа — уметь встать и уйти.</div>
+            </div>`;
+        }
+        // общий блок ставки (слоты/кости/колесо + старт hi-lo/лесенки) — заполняет #betAmt
+        function casinoBet(p, act, label){
+            return `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:8px;">
+                    ${[['10%',0.10],['25%',0.25],['50%',0.50],['80%',0.80],['МАКС 💰',1]].map(([lbl,fr])=>`<button onclick="setBet(${fr})" class="btn" style="padding:4px 12px;font-size:12px;background:#3a2a12;color:#efd8a3;border:1px solid #b98a3e;font-weight:700;">${lbl}</button>`).join('')}
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <input id="betAmt" type="number" min="1" placeholder="ставка, $ (или % сверху)" class="inp" style="flex:1;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;">
+                    <button onclick="${act}" class="btn casino-spin" style="flex:0 0 auto;font-size:15px;padding:12px 20px;">${label}</button>
+                </div>
+                <p style="font-size:11px;color:#a9b8ae;margin-top:11px;text-align:center;">Сам решаешь, сколько рискнуть 🍾 · твоя касса: <b style="color:var(--lx-gold-br);">${fmtN(p.savings)} $</b></p>`;
+        }
+        function luckSlots(p){
+            return `<div class="reels"><div class="reel" id="reel0">🍒</div><div class="reel" id="reel1">🍋</div><div class="reel" id="reel2">🍊</div></div>
                 <div style="font-size:11px;color:#d8e6dd;text-align:center;margin-bottom:10px;line-height:1.7;">
                     <b style="color:#efd8a3;">3 одинаковых фрукта = выигрыш.</b><br>
                     <span style="font-family:ui-monospace,monospace;color:#cdc8bd;">7️⃣×100 · 💎×9 · 🔔×7 · 🍇×5 · 🍊×3 · 🍋×2 · 🍒×1</span><br>
                     <span style="color:#9c988e;font-size:10px;">Джекпот 7️⃣ редкий (1 из 10 000). Не сошлось — ставка сгорает 🔥</span></div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:8px;">
-                    ${[['10%',0.10],['25%',0.25],['50%',0.50],['80%',0.80],['МАКС 💰',1]].map(([lbl,fr])=>`<button onclick="setBet(${fr})" class="btn" style="padding:4px 12px;font-size:12px;background:#3a2a12;color:#efd8a3;border:1px solid #b98a3e;font-weight:700;">${lbl}</button>`).join('')}
+                ${casinoBet(p,'spinSlot()','🎰 КРУТИТЬ')}`;
+        }
+        function luckDice(p){
+            return `<div id="diceFace" class="cz-die">${dicePips(_lastDie||5)}</div>
+                <div style="font-size:11px;color:#d8e6dd;text-align:center;margin-bottom:10px;line-height:1.7;">
+                    <b style="color:#efd8a3;">Бросок кубика.</b><br>
+                    <span style="font-family:ui-monospace,monospace;color:#cdc8bd;">6 → ×2 · 5 → ×1.5</span><br>
+                    <span style="color:#9c988e;font-size:10px;">Остальное — ставка сгорает 🔥. Выигрыш кажется близким, но дом в плюсе.</span></div>
+                ${casinoBet(p,'gambleRoll()','🎲 БРОСИТЬ')}`;
+        }
+        // SVG-колесо: множители НА секторах золотом, спицы, огоньки по ободу, стеклянный блик.
+        // Вращается весь <svg id="casinoWheel"> (spinWheelGame крутит его же). Ступица VIA и указатель —
+        // отдельные HTML-слои поверх, они НЕ вращаются (эмблема стоит ровно, стрелка держит верх).
+        function wheelSVGInner(){
+            const N=WHEEL_SEGS.length, seg=360/N;
+            const pol=(r,deg)=>{const a=(deg-90)*Math.PI/180;return [200+r*Math.cos(a),200+r*Math.sin(a)];};
+            const fill=m=> m===0?'url(#czBurn)': m>=20?'url(#czJack)': m>=5?'url(#czBig)':'url(#czWin)';
+            let segs='',labels='';
+            WHEEL_SEGS.forEach((w,i)=>{
+                const a0=i*seg,a1=(i+1)*seg;
+                const [x0,y0]=pol(170,a0),[x1,y1]=pol(170,a1);
+                segs+='<path d="M200,200 L'+x0.toFixed(1)+','+y0.toFixed(1)+' A170,170 0 0 1 '+x1.toFixed(1)+','+y1.toFixed(1)+' Z" fill="'+fill(w[1])+'" stroke="#171009" stroke-width="1"/>';
+                segs+='<line x1="200" y1="200" x2="'+x0.toFixed(1)+'" y2="'+y0.toFixed(1)+'" stroke="url(#czSpoke)" stroke-width="2.2"/>';
+                const mid=a0+seg/2, ll=pol(128,mid), jack=w[1]>=20;
+                labels+='<text x="'+ll[0].toFixed(1)+'" y="'+ll[1].toFixed(1)+'" transform="rotate('+mid.toFixed(1)+','+ll[0].toFixed(1)+','+ll[1].toFixed(1)+')" text-anchor="middle" dominant-baseline="central" font-family="Georgia,serif" font-weight="700" font-size="'+(jack?17:15)+'" fill="'+(w[1]===0?'#8f5b66':'#f6e6b8')+'" style="paint-order:stroke;stroke:#160f07;stroke-width:2.2px">'+w[0]+'</text>';
+            });
+            let lamps=''; const NL=24;
+            for(let i=0;i<NL;i++){ const l=pol(182,i*(360/NL)); lamps+='<circle class="cz-lamp" cx="'+l[0].toFixed(1)+'" cy="'+l[1].toFixed(1)+'" r="3" fill="#ffe9a8"/>'; }
+            return '<defs>'
+                +'<radialGradient id="czWin" cx="50%" cy="30%" r="80%"><stop offset="0%" stop-color="#1c6b4d"/><stop offset="100%" stop-color="#0a3324"/></radialGradient>'
+                +'<radialGradient id="czBig" cx="50%" cy="30%" r="80%"><stop offset="0%" stop-color="#7a5f1e"/><stop offset="100%" stop-color="#3d3010"/></radialGradient>'
+                +'<radialGradient id="czJack" cx="50%" cy="30%" r="80%"><stop offset="0%" stop-color="#c9862f"/><stop offset="55%" stop-color="#8a4f18"/><stop offset="100%" stop-color="#5a2a12"/></radialGradient>'
+                +'<radialGradient id="czBurn" cx="50%" cy="30%" r="80%"><stop offset="0%" stop-color="#4a1a26"/><stop offset="100%" stop-color="#25101a"/></radialGradient>'
+                +'<linearGradient id="czSpoke" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f2d27a"/><stop offset="100%" stop-color="#8a6a22"/></linearGradient>'
+                +'<linearGradient id="czRing" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f6dd94"/><stop offset="50%" stop-color="#a97f2c"/><stop offset="100%" stop-color="#5c3f14"/></linearGradient>'
+                +'<radialGradient id="czGloss" cx="50%" cy="30%" r="75%"><stop offset="0%" stop-color="rgba(255,255,255,.28)"/><stop offset="45%" stop-color="rgba(255,255,255,0)"/></radialGradient>'
+                +'</defs>'
+                +'<circle cx="200" cy="200" r="182" fill="none" stroke="url(#czRing)" stroke-width="13"/>'
+                +'<circle cx="200" cy="200" r="174" fill="none" stroke="#2a1d08" stroke-width="2"/>'
+                +lamps+segs+labels
+                +'<circle cx="200" cy="200" r="170" fill="url(#czGloss)" pointer-events="none"/>';
+        }
+        function luckWheel(p){
+            return `<div style="display:flex;justify-content:center;margin:2px 0 12px;">
+                    <div style="position:relative;width:212px;height:212px;">
+                        <div style="position:absolute;top:-4px;left:50%;transform:translateX(-50%);z-index:3;filter:drop-shadow(0 3px 4px rgba(0,0,0,.8));">
+                            <svg width="28" height="32" viewBox="0 0 30 34"><polygon points="15,32 3,4 27,4" fill="#e6c46e"/><polygon points="15,32 9,7 21,7" fill="#fff1c4" opacity=".55"/></svg>
+                        </div>
+                        <svg id="casinoWheel" viewBox="0 0 400 400" style="width:212px;height:212px;overflow:visible;transition:transform 3.6s cubic-bezier(.15,.9,.2,1);transform:rotate(${_wheelAngle}deg);transform-origin:50% 50%;filter:drop-shadow(0 14px 30px rgba(0,0,0,.6));">${wheelSVGInner()}</svg>
+                        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:76px;height:76px;border-radius:50%;z-index:2;background:radial-gradient(circle at 42% 34%,#fff1c4,#d9b24a 42%,#7c5a1e 70%,#2a1d08);box-shadow:0 4px 12px rgba(0,0,0,.5),inset 0 2px 4px rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;border:2px solid #2a1d08;">
+                            <div style="width:54px;height:54px;border-radius:50%;background:#150e05;border:1.4px solid #a97f2c;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-weight:700;font-size:19px;letter-spacing:1px;color:#e9c766;">VIA</div>
+                        </div>
+                    </div>
                 </div>
-                <div style="display:flex;gap:8px;">
-                    <input id="betAmt" type="number" min="1" placeholder="ставка, $ (или выбери % сверху)" class="inp" style="flex:1;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;">
-                    <button onclick="spinSlot()" class="btn casino-spin" style="flex:0 0 auto;font-size:15px;padding:12px 22px;">🎲 КРУТИТЬ</button>
-                </div>
-                <p style="font-size:11px;color:#a9b8ae;margin-top:11px;text-align:center;">Сам решаешь, сколько рискнуть 🍾 · твоя касса: <b style="color:var(--lx-gold-br);">${fmtN(p.savings)} $</b></p>
-            </div>`;
+                <div style="font-size:11px;color:#d8e6dd;text-align:center;margin-bottom:10px;line-height:1.7;">
+                    <b style="color:#efd8a3;">Колесо Фортуны.</b><br>
+                    <span style="color:#9c988e;font-size:10px;">Половина секторов — ×0 (сгорает). Редкий ×20 💎 манит, но математика за домом.</span></div>
+                ${casinoBet(p,'spinWheelGame()','🎡 КРУТИТЬ')}`;
+        }
+        function hlFace(v){ return v===14?'A':v===13?'K':v===12?'Q':v===11?'J':String(v); }
+        const HL_SUITS=[['♠','cz-black'],['♥','cz-red'],['♦','cz-red'],['♣','cz-black']];
+        // настоящая карта: ранг в двух углах, крупная масть по центру, красная/чёрная, колода за спиной для глубины
+        function hlCardHTML(v,si){ const s=HL_SUITS[si]||HL_SUITS[0]; const face=hlFace(v);
+            return `<div class="cz-deck"><div class="back b1"></div><div class="back b2"></div>
+                <div class="cz-card" id="hlCard">
+                    <div class="corner tl ${s[1]}"><span class="r">${face}</span><span class="s">${s[0]}</span></div>
+                    <div class="pipbig ${s[1]}">${s[0]}</div>
+                    <div class="corner br ${s[1]}"><span class="r">${face}</span><span class="s">${s[0]}</span></div>
+                </div></div>`;
+        }
+        function luckHilo(p){
+            if(_hl){
+                return `${hlCardHTML(_hl.card,_hl.suit)}
+                    <div style="text-align:center;font-size:12px;color:#d8e6dd;margin-bottom:10px;">Серия <b style="color:#efd8a3;">${_hl.streak}</b> · банк <b style="color:var(--lx-gold-br);">${fmtN(_hl.pot)} $</b><br><span style="color:#9c988e;font-size:10.5px;">Следующая карта выше или ниже?</span></div>
+                    <div style="display:flex;gap:8px;margin-bottom:8px;">
+                        <button onclick="hlGuess('hi')" class="btn" style="flex:1;padding:13px;font-weight:800;background:#0c2a1e;color:#5ff0c2;border:1px solid rgba(52,224,161,.4);">▲ Выше</button>
+                        <button onclick="hlGuess('lo')" class="btn" style="flex:1;padding:13px;font-weight:800;background:#2a1420;color:#ff8fa0;border:1px solid rgba(255,92,114,.4);">▼ Ниже</button>
+                    </div>
+                    <button onclick="hlCash()" class="btn" style="width:100%;padding:12px;font-weight:800;background:linear-gradient(180deg,#5ff0c2,#28c79a);color:#08130f;">💰 Забрать ${fmtN(_hl.pot)} $</button>`;
+            }
+            return `<div class="cz-deck"><div class="back b1"></div><div class="back b2"></div>
+                    <div class="cz-card" style="display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#20303a,#101c24);color:#7d94a2;font-family:Georgia,serif;font-size:42px;border:1px solid #2c4136;">?</div></div>
+                <div style="font-size:11px;color:#d8e6dd;text-align:center;margin-bottom:10px;line-height:1.7;">
+                    <b style="color:#efd8a3;">Выше или Ниже.</b><br>
+                    <span style="color:#9c988e;font-size:10px;">Карта 2–14. Угадал — банк ×1.4, идёшь дальше. Ошибся — сгорает всё. Забрать можно в любой момент.</span></div>
+                ${casinoBet(p,'hlStart()','🃏 ПОСТАВИТЬ')}`;
+        }
+        function hlStart(){
+            const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            const el=document.getElementById('betAmt'); const bet=Math.floor(Number(el?el.value:0));
+            if(!bet||bet<1){ toast('Введи ставку больше 0.'); return; }
+            if(bet>p.savings){ toast('Не хватает кассы. У тебя '+fmtN(p.savings)+'$.'); return; }
+            p.savings=Math.round((p.savings-bet)*100)/100; pstat(p).casinoPlays++;
+            _hl={card:2+Math.floor(Math.random()*13), suit:Math.floor(Math.random()*4), pot:bet, streak:0, bet:bet};
+            save(); render();
+        }
+        function hlGuess(dir){
+            if(!_hl) return; const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            let next; do{ next=2+Math.floor(Math.random()*13); }while(next===_hl.card);
+            const ok=(dir==='hi'&&next>_hl.card)||(dir==='lo'&&next<_hl.card);
+            const shown=hlFace(next); _hl.card=next; _hl.suit=Math.floor(Math.random()*4);
+            if(ok){ _hl.streak++; _hl.pot=Math.round(_hl.pot*HL_MULT); save(); render();
+                const c=document.getElementById('hlCard'); if(c) c.style.animation='czFlip .32s ease'; }
+            else { const st=pstat(p); st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+_hl.bet)*100)/100;
+                const lost=_hl.pot; _hl=null; save(); render(); toast('🃏 '+shown+' — мимо. Банк '+fmtN(lost)+'$ сгорел.'); }
+        }
+        function hlCash(){
+            if(!_hl) return; const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            const won=_hl.pot, bet=_hl.bet, net=won-bet, streak=_hl.streak; _hl=null;
+            p.savings=Math.round((p.savings+won)*100)/100;
+            const st=pstat(p); if(net>0){ st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+net)*100)/100; }
+            save(); render();
+            if(net>0 && streak>=3) casinoWin(['🃏'], won, +(won/bet).toFixed(1), false);
+            else toast('💰 Забрал '+fmtN(won)+'$ (серия '+streak+'). Вовремя встал — умница.');
+        }
+        function luckLadder(p){
+            const rung=(m,i,cls)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:9px;margin-bottom:4px;background:${cls==='cur'?'#12271b':'#07130d'};border:1px solid ${cls==='cur'?'var(--lx-gold)':'#14392a'};opacity:${cls==='done'?'.4':'1'};font-size:12.5px;">
+                    <span style="color:#cdd8cf;">Ступень ${i+1}</span><span style="font-family:ui-monospace,monospace;font-weight:800;color:var(--lx-gold-br);">×${m}</span>
+                    <span style="font-family:ui-monospace,monospace;color:#8fdcb8;font-size:11.5px;">${_ld?fmtN(Math.round(_ld.bet*m))+'$':''}</span></div>`;
+            const rows=LADDER_RUNGS.map((m,i)=>rung(m,i, _ld? (i<_ld.step?'done':(i===_ld.step?'cur':'')) : '')).reverse().join('');
+            const ladderBox=`<div style="margin:2px 0 12px;">${rows}</div>`;
+            if(_ld){
+                const atTop=_ld.step>=LADDER_RUNGS.length-1;
+                const acts=_ld.step<0
+                    ? `<button onclick="ldClimb()" class="btn" style="flex:1;padding:14px;font-weight:800;background:linear-gradient(180deg,#f4dd9c,#d9b877);color:#20180a;">↑ Шагнуть на лесенку</button>`
+                    : `<button onclick="ldCash()" class="btn" style="flex:1;padding:14px;font-weight:800;background:linear-gradient(180deg,#5ff0c2,#28c79a);color:#08130f;">💰 Забрать ${fmtN(Math.round(_ld.bet*LADDER_RUNGS[_ld.step]))} $</button>${atTop?'':`<button onclick="ldClimb()" class="btn" style="flex:1;padding:14px;font-weight:800;background:linear-gradient(180deg,#f4dd9c,#d9b877);color:#20180a;">↑ Ещё выше</button>`}`;
+                return `${ladderBox}
+                    <div style="text-align:center;font-size:11px;color:#9c988e;margin-bottom:8px;">${_ld.step<0?'Жми «Шагнуть» — первый шаг уже с риском срыва.':'Жадность или холодная голова? Где-то ждёт срыв.'}</div>
+                    <div style="display:flex;gap:8px;">${acts}</div>`;
+            }
+            return `${ladderBox}
+                <div style="font-size:11px;color:#d8e6dd;text-align:center;margin-bottom:10px;line-height:1.7;">
+                    <b style="color:#efd8a3;">Лесенка жадности.</b><br>
+                    <span style="color:#9c988e;font-size:10px;">Множитель растёт со ступенькой. На каждой — Забрать или Ещё. Где-то спрятан СРЫВ — сгорает всё. Умеешь остановиться?</span></div>
+                ${casinoBet(p,'ldStart()','📈 ВОЙТИ НА ЛЕСЕНКУ')}`;
+        }
+        function ldStart(){
+            const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            const el=document.getElementById('betAmt'); const bet=Math.floor(Number(el?el.value:0));
+            if(!bet||bet<1){ toast('Введи ставку больше 0.'); return; }
+            if(bet>p.savings){ toast('Не хватает кассы. У тебя '+fmtN(p.savings)+'$.'); return; }
+            p.savings=Math.round((p.savings-bet)*100)/100; pstat(p).casinoPlays++;
+            _ld={bet:bet, step:-1}; save(); render();
+        }
+        function ldClimb(){
+            if(!_ld) return; const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            const bustP = LADDER_BUST[_ld.step+1] != null ? LADDER_BUST[_ld.step+1] : 0.75;
+            if(Math.random()<bustP){ const bet=_ld.bet; _ld=null;
+                const st=pstat(p); st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
+                save(); render(); toast('💥 Срыв! Банк '+fmtN(bet)+'$ сгорел дотла.'); return; }
+            _ld.step=Math.min(_ld.step+1, LADDER_RUNGS.length-1); save(); render();
+        }
+        function ldCash(){
+            if(!_ld || _ld.step<0) return; const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            const mult=LADDER_RUNGS[_ld.step], bet=_ld.bet, pay=Math.round(bet*mult*100)/100, net=pay-bet, jack=mult>=15; _ld=null;
+            p.savings=Math.round((p.savings+pay)*100)/100;
+            const st=pstat(p); st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+net)*100)/100;
+            save(); render();
+            if(jack) casinoWin(['📈'], pay, mult, true);
+            else toast('💰 Забрал '+fmtN(pay)+'$ на ×'+mult+'. Вот это и есть — уметь встать.');
+        }
+        function spinWheelGame(){
+            if(_casinoAnim) return;
+            const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
+            const el=document.getElementById('betAmt'); const bet=Math.floor(Number(el?el.value:0));
+            if(!bet||bet<1){ toast('Введи ставку больше 0.'); return; }
+            if(bet>p.savings){ toast('Не хватает кассы. У тебя '+fmtN(p.savings)+'$.'); return; }
+            p.savings=Math.round((p.savings-bet)*100)/100; const st=pstat(p); st.casinoPlays++;
+            let idx=Math.floor(Math.random()*WHEEL_SEGS.length);
+            let mult=casinoAdjust(p, WHEEL_SEGS[idx][1]);
+            if(mult<=0 && WHEEL_SEGS[idx][1]>0){ const zeros=WHEEL_SEGS.map((s,i)=>s[1]===0?i:-1).filter(i=>i>=0); idx=zeros[Math.floor(Math.random()*zeros.length)]; mult=0; }
+            const seg=360/WHEEL_SEGS.length;
+            _wheelAngle += 360*5 + (360 - (idx*seg + seg/2));
+            const w=document.getElementById('casinoWheel');
+            if(w){ _casinoAnim=true; w.style.transform='rotate('+_wheelAngle+'deg)';
+                setTimeout(()=>{ _casinoAnim=false; wheelResolve(p,st,bet,mult,idx); }, 3700); }
+            else wheelResolve(p,st,bet,mult,idx);
+        }
+        function wheelResolve(p,st,bet,mult,idx){
+            if(mult>0){ const pay=Math.round(bet*mult*100)/100; p.savings=Math.round((p.savings+pay)*100)/100;
+                st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(pay-bet))*100)/100;
+                p.notify='🎡🎉 '+WHEEL_SEGS[idx][0]+'! +'+Math.round(pay-bet)+'$ чистыми.'; save(); render();
+                casinoWin([WHEEL_SEGS[idx][0]], pay, mult, mult>=20);
+            } else { st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100; save(); render(); }
         }
 
         // ── БРИФИНГ: зачем ты вообще здесь ──
@@ -15485,7 +15802,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                      «окно на весь экран», и при каждой перерисовке она вылезала поверх депозитов. */''}
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_market.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">📈 Биржа <span class="sec-hint">— торгуй в любой момент</span></summary><div class="sec-in">${winCover('win_market')}${renderMarketPanel(p)}</div></details>
 
-                ${p.casinoOff ? '' : `<details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_casino.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🎰 Казино</summary><div class="sec-in">${winCover('win_casino')}${renderLuckPanel(p)}</div></details>`}
+                ${p.casinoOff ? '' : `<details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_casino.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🎰 Казино</summary><div class="sec-in">${winCover('win_casino')}${ state.casinoUnlocked ? renderLuckPanel(p) : renderCasinoGate(p) }</div></details>`}
 
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_assets.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🛒 Мои активы <span class="sec-hint">— бизнес, недвижимость</span></summary><div class="sec-in">${winCover('win_assets')}
                 <div class="card">
@@ -19274,7 +19591,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     try { localStorage.setItem('via_me', JSON.stringify({id, pin:entered})); } catch(e){}
                 }
             }
-            state.currentPlayerId = id; state.view='player'; render();
+            state.currentPlayerId = id; state.view='player'; state.casinoUnlocked=false; _hl=null; _ld=null; render();
             if(state.pendingQR){ const t=state.pendingQR; state.pendingQR=null; applyQRCard(t); }   // отсканированная карта применяется сама
         }
         function login() {
