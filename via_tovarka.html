@@ -495,7 +495,8 @@ function tickHold(){
       return; }
     a.age++;
     const hold = a.wh.rent + (a.m.rent||0);
-    if(hold>0){ cash -= hold; a.realized -= hold; a.holdBurn=hold; }
+    // В игре (мост с бланком) НЕ грызём реальные деньги вхолостую — движение только по действиям.
+    if(hold>0 && !BRIDGED){ cash -= hold; a.realized -= hold; a.holdBurn=hold; }
   });
 }
 
@@ -650,6 +651,7 @@ function refreshHero(){
   document.getElementById('skVal').textContent=Math.round(skill);
   document.getElementById('skFill').style.width=clamp(skill,2,100)+'%';
   document.getElementById('skRank').textContent=skRank();
+  tvSync();   // ← пишем кассу и партии обратно в бланк игрока (если мост подключён)
 }
 
 // ══════════ МАСТЕР: завести товар ══════════
@@ -848,7 +850,32 @@ function closeInfo(){ document.getElementById('infoWrap').classList.remove('open
 
 let tT; function toast(t){ const el=document.getElementById('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(tT); tT=setTimeout(()=>el.classList.remove('show'),3800); }
 
+// ══════════ МОСТ С ИГРОЙ: касса товарки = баланс игрока в бланке ══════════
+let BRIDGED=false, _tickId=null;
+function serBatch(a){ return {pid:a.p.id,q:a.q,qLeft:a.qLeft,cid:a.c.id,lid:a.l.id,mid:a.m.id,wid:a.wh.id,landed:a.landed,invest:a.invest,phase:a.phase,daysLeft:a.daysLeft,realized:a.realized,adSpent:a.adSpent,campN:a.campN,age:a.age,lastCamp:a.lastCamp,dumped:a.dumped}; }
+function deserBatch(s){ const p=PRODUCTS.find(x=>x.id===s.pid),c=COUNTRY.find(x=>x.id===s.cid),l=LOG.find(x=>x.id===s.lid),m=MP.find(x=>x.id===s.mid),wh=WH.find(x=>x.id===s.wid); if(!p||!c||!l||!m||!wh) return null; return {p,q:s.q,c,l,m,wh,landed:s.landed,invest:s.invest,qLeft:s.qLeft,daysLeft:s.daysLeft||0,realized:s.realized||0,adSpent:s.adSpent||0,campN:s.campN||0,age:s.age||0,phase:s.phase||'selling',lastCamp:s.lastCamp||null,dumped:s.dumped}; }
+function tvSnapshot(){
+  // месячный расход держания: аренда склада+точки по всем лежащим партиям → в поток бланка
+  const rent = active.reduce((s,a)=> s + (a.phase==='selling' ? (a.wh.rent + (a.m.rent||0)) : 0), 0);
+  return { skill, active: active.map(serBatch), rent };
+}
+let _syncPend=false;
+function tvSync(){ if(!BRIDGED||_syncPend) return; _syncPend=true; setTimeout(()=>{ _syncPend=false; try{ parent.postMessage({type:'tv_state', cash:Math.round(cash*100)/100, state:tvSnapshot()}, '*'); }catch(_){} }, 120); }
+window.addEventListener('message', function(e){
+  const d=e.data; if(!d||d.type!=='tv_init') return;
+  BRIDGED=true;
+  if(typeof d.cash==='number') cash=d.cash;                  // касса = баланс из бланка игрока
+  if(d.state && Array.isArray(d.state.active)){              // восстановить сохранённые партии
+    if(typeof d.state.skill==='number') skill=d.state.skill;
+    active = d.state.active.map(deserBatch).filter(Boolean);
+  } else { active = []; }                                     // первый вход — старт без партий
+  if(_tickId){ clearInterval(_tickId); _tickId=setInterval(stepMonth, 11000); }  // в игре месяцы медленнее
+  const foot=document.querySelector('.foot'); if(foot) foot.style.display='none';// это уже не превью
+  renderClock(); renderStrip(); renderList(); refreshHero();
+});
+
 // старт
 renderClock(); renderStrip(); renderList(); refreshHero();
-setInterval(stepMonth, 2800); // 1 шаг = +1 игровой месяц
+_tickId = setInterval(stepMonth, 2800); // 1 шаг = +1 игровой месяц (мост замедлит в игре)
+try{ parent.postMessage({type:'tv_ready'}, '*'); }catch(_){} // сообщить игре: готов, пришли баланс
 </script>

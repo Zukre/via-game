@@ -11500,8 +11500,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const otherExp = Math.round((p.prof.otherExp + (Number(p.expMod) || 0)) * (1 + expUpPct / 100) * (_rank.expMult||1));   // 🪜 уровень жизни растёт со ступенью
             const childExp = p.children * p.prof.childCost;
             const bankPay = Math.round(p.bankLoan * 0.10);
+            // 📦 ТОВАРКА в месячном денежном потоке бланка: склад/точка = месячный РАСХОД держания товара.
+            // Доход с кампаний остаётся живым спотом в кассу (см. мост), а несущая стоимость склада —
+            // честный пассивный расход, влияет на поток и на условие победы. Ринат 20авг: «касса И месячный поток».
+            const tovarkaRent = Math.max(0, Math.round(Number(p.tovarka && p.tovarka.rent) || 0));
 
-            const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay + farmWage + farmFeedExp;
+            const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay + farmWage + farmFeedExp + tovarkaRent;
             const flow = income - totalExp;
             const target = totalExp * WIN_MULT;   // ПОБЕДА: пассив ≥ WIN_MULT × расходов (см. WIN_MULT выше)
 
@@ -11512,7 +11516,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (p) p._flow = flow;
 
             return { salary, baseSalary, skillBonus, passive, income, taxes, mortgagePay, eduPay, autoPay, ccPay, retailPay,
-                     otherExp, childExp, bankPay, farmInc, farmWage, farmFeed: farmFeedExp, totalExp, flow, target,
+                     otherExp, childExp, bankPay, farmInc, farmWage, farmFeed: farmFeedExp, tovarkaRent, totalExp, flow, target,
                      win: passive >= target };
         }
         // 5 УРОВНЕЙ «Путь свободы» (центр поля): по доле пассив/расходы. L5 = свобода (пассив ≥ расходов).
@@ -15977,6 +15981,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <div class="row-item" style="background:#1e1b4b;"><span>Платёж по кредиту банка:</span><b style="color:#ef4444;">${f.bankPay} $</b></div>
                         ${(f.farmFeed||0)>0?`<div class="row-item" style="background:#14251b;"><span>🌾 Корм и содержание фермы (${farmHeads(p)} гол):</span><b style="color:#ef4444;">${f.farmFeed} $</b></div>`:''}
                         ${(f.farmWage||0)>0?`<div class="row-item" style="background:#14251b;"><span>👔 Управляющий фермы:</span><b style="color:#ef4444;">${f.farmWage} $</b></div>`:''}
+                        ${(f.tovarkaRent||0)>0?`<div class="row-item" style="background:#241a0c;"><span>📦 Склад товарки (держание партий):</span><b style="color:#ef4444;">${f.tovarkaRent} $</b></div>`:''}
                         <div class="sub-section">
                             <div class="row-item" style="background:#7f1d1d; border-color:#ef4444;">
                                 <b>Общий расход:</b>
@@ -16644,8 +16649,26 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.farm.animals=Object.values(by);
             p.farm.capUsed=farmHeads(p);
         }
-        // 📦 ТОВАРКА — товарный бизнес отдельным видом (модуль via_tovarka.html в iframe, полная изоляция).
-        function openTovarka(){ state.view='tovarka'; render(); }
+        // 📦 ТОВАРКА — товарный бизнес отдельным видом (модуль via_tovarka.html в iframe).
+        // МОСТ: касса товарки = баланс игрока в бланке. Товарка шлёт tv_ready → шлём ей баланс;
+        // товарка шлёт tv_state на каждое движение → пишем savings и партии игроку и сохраняем.
+        function tvBridgeInit(){
+            if(window._tvBridge) return; window._tvBridge=true;
+            window.addEventListener('message', function(e){
+                const d=e.data; if(!d||(d.type!=='tv_ready'&&d.type!=='tv_state')) return;
+                const p=me(); if(!p) return;
+                if(d.type==='tv_ready'){
+                    const fr=document.getElementById('tovarkaFrame');
+                    if(fr&&fr.contentWindow) fr.contentWindow.postMessage({type:'tv_init', cash:Number(p.savings)||0, state:p.tovarka||null}, '*');
+                } else {
+                    let ch=false;
+                    if(typeof d.cash==='number' && isFinite(d.cash) && Math.abs((Number(p.savings)||0)-d.cash)>0.001){ p.savings=Math.round(d.cash*100)/100; ch=true; }
+                    if(d.state){ p.tovarka=d.state; ch=true; }
+                    if(ch) save(p.id);
+                }
+            });
+        }
+        function openTovarka(){ tvBridgeInit(); state.view='tovarka'; render(); }
         function renderTovarka(app){
             // Не пересобираем, если iframe уже смонтирован — иначе тик рынка/чужой ход перезагружали бы модуль.
             if(app.querySelector('#tovarkaFrame')) return;
