@@ -11611,6 +11611,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else if (state.view === 'analytics') renderAnalytics(app);
             else if (state.view === 'serve') app.innerHTML = renderServe();   // 🕯️ ведущий выдаёт Служение
             else if (state.view === 'farm') renderFarm(app);                  // 🐄 Рынок скота / ферма
+            else if (state.view === 'tovarka') renderTovarka(app);            // 📦 Товарка (товарный бизнес)
             app.setAttribute('data-view', state.view);
             restoreSecs(app);                         // раскрытое человеком остаётся раскрытым
             if (_secSy > 0) {                         // и позицию прокрутки ВНУТРИ открытого окна тоже держим
@@ -11768,6 +11769,29 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function assetById(id){ const m=state.market; return (m&&m.assets)?m.assets.find(x=>String(x.id)===String(id)):null; }
         function curPrice(id){ const a=assetById(id); return a?a.price:null; }
         function portfolioValue(p){ let v=0; if(p&&p.holdings){for(const id in p.holdings){const pr=curPrice(id); if(pr) v+=pr*p.holdings[id].qty;}} return v; }
+        // история стоимости портфеля = сумма (кол-во × история цены) по всем активам — для герой-графика биржи.
+        function portfolioHistory(p){
+            if(!p||!p.holdings) return [];
+            const ids=Object.keys(p.holdings); if(!ids.length) return [];
+            const hs=[]; let L=Infinity;
+            for(const id of ids){ const a=assetById(id); const h=(a&&a.history)?a.history.slice(-30):null;
+                if(h&&h.length>=2){ hs.push({q:Number(p.holdings[id].qty)||0, h:h}); L=Math.min(L,h.length); } }
+            if(!hs.length||!isFinite(L)) return [];
+            const out=[]; for(let i=0;i<L;i++){ let s=0; for(const x of hs){ s+=x.q*x.h[x.h.length-L+i]; } out.push(s); } return out;
+        }
+        // герой-спарклайн портфеля: широкая линия с градиентной заливкой (мятный рост / алый спад).
+        function heroSpark(hist, up){
+            const h=(hist||[]).slice(-30); if(h.length<2) return '';
+            const lo=Math.min(...h), hi=Math.max(...h), span=(hi-lo)||1, W=300, H=52;
+            const xy=h.map((v,i)=>[(i/(h.length-1)*W).toFixed(1),(H-2-((v-lo)/span)*(H-6)).toFixed(1)]);
+            const line=xy.map((c,i)=>(i?'L':'M')+c[0]+' '+c[1]).join(' ');
+            const col=up?'#34e0a1':'#ff5c72', gid='hgp'+(up?'u':'d');
+            return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;width:100%;height:52px;margin-top:8px;overflow:visible;">
+                <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${up?'rgba(52,224,161,.28)':'rgba(255,92,114,.28)'}"/><stop offset="1" stop-color="${up?'rgba(52,224,161,0)':'rgba(255,92,114,0)'}"/></linearGradient></defs>
+                <path d="${line} L ${W} ${H} L 0 ${H} Z" fill="url(#${gid})"/>
+                <path d="${line}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+            </svg>`;
+        }
         // Окно покупки: открывается на 1 мин, когда кто-то встаёт на клетку «Акции/Крипта» (для ВСЕХ).
         function buyWindowOpen(){ const b=state.board; return !!(b && b.buyWindowEndsAt && b.buyWindowEndsAt*1000 > Date.now()); }
         // Разделение разрядов (1 000 000) — числа легче читать. Только для ПОКАЗА, не для арифметики.
@@ -11822,6 +11846,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             paintOverlays(); slipSoon('buy');
         }
         function setBuyMin(){ const bm=state.buyModal; if(bm){ bm.qty=1; paintOverlays(); slipSoon('buy'); } }
+        // 💵 покупка «своей суммой» (Ринат 15авг): игрок вводит бюджет в $, переводим в кол-во лотов
+        // по цене с комиссией. Обновляем оценку/кнопку/стакан БЕЗ полного render (не терять фокус ввода).
+        function onBuyAmount(v){
+            const bm=state.buyModal; if(!bm) return;
+            const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(bm.assetId); if(!p||!a) return;
+            const amount=Math.max(0,Math.floor(Number(String(v).replace(/[\s ]/g,''))||0));
+            const unit=a.price*(1+tradeFeePct(p));
+            bm.qty = unit>0 ? Math.floor(amount/unit) : 0;
+            const q=bm.qty, price=a.price, cost=q*price, fee=q*price*tradeFeePct(p), total=cost+fee, enough=total<=p.savings;
+            const est=document.getElementById('buyEst'); if(est) est.innerHTML=buyEstHtml(q,price,cost,fee,total,p.savings);
+            const btn=document.getElementById('buyConfirmBtn');
+            if(btn){ btn.disabled=(q<1); btn.style.background=(enough&&q>0)?'linear-gradient(180deg,#f4dd9c,#d9b877)':'#374151'; btn.style.color=(enough&&q>0)?'#20180a':'#9ca3af'; btn.textContent=q>0?(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`):'Впиши сумму'; }
+            slipSoon('buy');
+        }
         function onBuyManual(v){   // ручной ввод: обновляем оценку и кнопку БЕЗ полного render (не терять фокус)
             const bm=state.buyModal; if(!bm) return;
             bm.qty=Math.max(0,Math.floor(Number(v)||0));
@@ -11851,32 +11889,32 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const cost=q*price, fee=q*price*tradeFeePct(p), total=cost+fee, enough=total<=p.savings;
             const base=a.price0||price, chg=base?((price/base-1)*100):0;
             const pctBtn=(lbl,frac,bg)=>`<button onclick="setBuyByFrac(${frac})" class="btn" style="flex:1;min-width:52px;padding:8px 4px;font-size:13px;background:${bg||'#241a0c'};color:#efd8a3;border:1px solid #b98a3e;font-weight:700;">${lbl}</button>`;
-            return `<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;">
-                <div style="width:400px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 32px -8px #d9b877;">
-                    <div style="height:4px;background:linear-gradient(90deg,transparent,#efd8a3,transparent);"></div>
-                    <div style="padding:20px;">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-                            <div><div style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Покупка на бирже</div>
-                            <div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:800;letter-spacing:.02em;color:#f3efe6;line-height:1.1;">${assetTicker(a.name)}</div>
-                            <div style="font-size:12px;color:${chg>=0?'#10b981':'#f43f5e'};font-weight:700;margin-top:2px;">${fmtPrice(price)}$ · ${chg>=0?'▲':'▼'} ${fmtPct(chg)}</div></div>
-                            <button onclick="closeBuyModal()" class="btn btn-gray" style="flex:0 0 auto;">✕</button>
-                        </div>
-                        <div style="font-size:12px;color:#9c988e;margin:14px 0 8px;">💰 Касса: <b style="color:var(--lx-gold-br);">${fmtN(p.savings)} $</b> &nbsp;·&nbsp; комиссия брокера ${(tradeFeePct(p)*100).toFixed(1)}%</div>
-                        ${(function(){ const cat=assetCat(a);
-                            if(cat==='meme') return '<div style="background:rgba(120,20,20,.28);border:1px solid #b91c1c;border-radius:10px;padding:9px 11px;font-size:12px;color:#fca5a5;line-height:1.55;margin-bottom:8px;">⚠️ <b>МЕМКОИН</b> — крошечный объём, дикий риск. В жизни мемы почти всегда в минус. Заходишь на свой страх и риск — можешь потерять <b>ВСЁ</b>. Один из сотни срывает куш.</div>';
-                            if(cat==='crypto') return '<div style="background:rgba(80,60,10,.22);border:1px solid #a16207;border-radius:10px;padding:9px 11px;font-size:12px;color:#fcd34d;line-height:1.55;margin-bottom:8px;">⚡ <b>Крипта</b> — высокая волатильность. Может резко взлететь и так же рухнуть. На свой страх и риск.</div>';
-                            return '<div style="background:rgba(16,60,40,.18);border:1px solid #14532d;border-radius:10px;padding:8px 11px;font-size:12px;color:#86efac;line-height:1.5;margin-bottom:8px;">🛟 Тихая гавань — растёт мало, но стабильно. Большие деньги стоят спокойно.</div>';
-                        })()}
-                        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">
-                            <button onclick="setBuyMin()" class="btn" style="flex:1;min-width:48px;padding:8px 4px;font-size:13px;background:#1f2937;color:#fff;font-weight:700;">Мин</button>
-                            ${pctBtn('10%',0.10)}${pctBtn('25%',0.25)}${pctBtn('50%',0.50)}${pctBtn('100%',1)}
-                            <button onclick="setBuyByFrac(1)" class="btn" style="flex:1;min-width:58px;padding:8px 4px;font-size:13px;background:#166534;color:#fff;font-weight:800;border:1px solid #22c55e;">МАКС 💰</button>
-                        </div>
-                        <input id="buyManualQty" type="number" min="1" value="${q||''}" placeholder="или впиши количество вручную" oninput="onBuyManual(this.value)" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;margin-bottom:10px;">
-                        <div id="buyEst" style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.8;margin-bottom:8px;">${buyEstHtml(q,price,cost,fee,total,p.savings)}</div>
-                        <div id="slipBox" style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.7;margin-bottom:12px;">Впиши количество — покажу, по какой цене сделка пройдёт на самом деле.</div>
-                        <button id="buyConfirmBtn" onclick="confirmBuy()" ${q<1?'disabled':''} class="btn" style="width:100%;background:${q>0?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'};color:${q>0?'#20180a':'#9ca3af'};font-weight:800;font-size:15px;padding:13px;">${q<1?'Выбери количество':(SERVER_MODE?'⏳ Считаю точную цену со стаканом…':(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`))}</button>
+            const col=chg>=0?'#34e0a1':'#ff5c72';
+            const amtVal = q>0 ? fmtN(Math.round(total)) : '';
+            const riskNote=(function(){ const cat=assetCat(a);
+                if(cat==='meme') return '<div style="background:rgba(255,92,114,.10);border:1px solid rgba(255,92,114,.4);border-radius:11px;padding:9px 11px;font-size:12px;color:#ff9ba8;line-height:1.55;margin-bottom:12px;">☠️ <b>МЕМКОИН</b> — крошечный объём, дикий риск. Почти всегда в минус, можешь потерять <b>ВСЁ</b>. На свой страх и риск.</div>';
+                if(cat==='crypto') return '<div style="background:rgba(232,200,119,.08);border:1px solid var(--lx-gold-ln);border-radius:11px;padding:9px 11px;font-size:12px;color:#f4dd9c;line-height:1.55;margin-bottom:12px;">⚡ <b>Крипта</b> — высокая волатильность. Может резко взлететь и так же рухнуть.</div>';
+                return '<div style="background:rgba(52,224,161,.08);border:1px solid rgba(52,224,161,.28);border-radius:11px;padding:8px 11px;font-size:12px;color:#8fe6c2;line-height:1.5;margin-bottom:12px;">🛟 Тихая гавань — растёт мало, но стабильно. Большие деньги стоят спокойно.</div>';
+            })();
+            return `<div style="position:fixed;inset:0;z-index:4200;background:rgba(3,5,9,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)closeBuyModal()">
+                <div style="width:520px;max-width:100%;background:radial-gradient(120% 80% at 50% 0,rgba(232,200,119,.08),transparent 60%),linear-gradient(180deg,#141b28,#0c121d);border:1px solid var(--lx-gold-ln);border-bottom:none;border-radius:22px 22px 0 0;box-shadow:0 -20px 60px rgba(0,0,0,.6);padding:16px 18px calc(20px + env(safe-area-inset-bottom));">
+                    <div style="width:40px;height:4px;border-radius:3px;margin:0 auto 14px;background:var(--lx-gold);opacity:.55;"></div>
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;">
+                        <div style="font-family:ui-monospace,monospace;font-size:21px;font-weight:800;color:#f3efe6;">${assetTicker(a.name)}</div>
+                        <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:ui-monospace,monospace;font-size:17px;font-weight:800;color:${col};">${fmtPrice(price)} $</span><button onclick="closeBuyModal()" class="btn btn-gray" style="flex:0 0 auto;padding:4px 10px;">✕</button></div>
                     </div>
+                    <div style="font-size:12.5px;color:#8492a6;margin:3px 0 14px;">${a.name} · <span style="color:${col};font-weight:700;">${chg>=0?'▲ +':'▼ '}${fmtPct(chg)}</span> · касса <b style="color:var(--lx-gold-br);">${fmtN(p.savings)} $</b> · брокер ${(tradeFeePct(p)*100).toFixed(1)}%</div>
+                    ${riskNote}
+                    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:#5d6b7e;margin-bottom:9px;">Сколько вложить</div>
+                    <div style="display:flex;gap:8px;margin-bottom:13px;">
+                        <input id="buyAmount" inputmode="numeric" value="${amtVal}" oninput="onBuyAmount(this.value)" placeholder="Своя сумма, $" style="flex:1;min-width:0;border-radius:12px;padding:12px 14px;font-size:16px;font-weight:800;border:1px solid var(--lx-line);background:#0d1420;color:#e4ebf5;font-family:ui-monospace,monospace;">
+                        <button onclick="setBuyMin()" style="flex:0 0 auto;min-width:64px;border-radius:12px;padding:12px 10px;font-size:13.5px;font-weight:800;cursor:pointer;border:1px solid var(--lx-line);background:#0d1420;color:#c9d4e4;">Мин</button>
+                        <button onclick="setBuyByFrac(1)" style="flex:0 0 auto;min-width:72px;border-radius:12px;padding:12px 10px;font-size:13.5px;font-weight:800;cursor:pointer;border:1px solid rgba(52,224,161,.4);background:rgba(52,224,161,.12);color:#34e0a1;">Макс 💰</button>
+                    </div>
+                    <div id="buyEst" style="background:#0b1119;border:1px solid var(--lx-line);border-radius:12px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.8;margin-bottom:8px;">${buyEstHtml(q,price,cost,fee,total,p.savings)}</div>
+                    <div id="slipBox" style="background:#0b1119;border:1px solid var(--lx-line);border-radius:12px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.7;margin-bottom:13px;">Впиши сумму — покажу, по какой цене сделка пройдёт на самом деле.</div>
+                    <button id="buyConfirmBtn" onclick="confirmBuy()" ${q<1?'disabled':''} style="width:100%;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;background:${q>0?'linear-gradient(180deg,#f4dd9c,#d9b877)':'#374151'};color:${q>0?'#20180a':'#9ca3af'};">${q<1?'Впиши сумму':(SERVER_MODE?'⏳ Считаю точную цену со стаканом…':(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`))}</button>
+                    <div style="font-size:11px;text-align:center;color:#5d6b7e;margin-top:11px;line-height:1.5;">Комиссию берут и на покупке, и на продаже (спред). «Мин» — 1 лот, «Макс» — вся касса.</div>
                 </div>
             </div>`;
         }
@@ -13468,6 +13506,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ['💸','Три пути','Дёшево и рискнуть (может аукнуться), дорого и надёжно (бьёт по кассе сейчас) или забить (последствия придут позже).'],
                     ['⚖️','Последствия','Каждый путь отзовётся по-своему — иногда сэкономить выходит дороже. Решай по ситуации и по кассе.'],
                 ], foot:'Расходы неизбежны. Разница — в том, как ты на них реагируешь.' },
+            tovarka: { t:'📦 Как работает Товарка', c:'#f4dd9c',
+                intro:'Тренажёр товарного бизнеса. Закупаешь партию — она приходит мёртвым грузом и сама не продаётся, а склад ест деньги. Продажи вытаскиваешь руками — рекламой.',
+                steps:[
+                    ['🛒','Заводишь товар','Выбираешь что везём (цена живая), СКОЛЬКО ШТУК берёшь сам, откуда закуп (страна: цена/пошлина/срок/риск кидка), логистику, склад и где продаём (Kaspi / свой профиль / точка).'],
+                    ['📦','Партия = мёртвый груз','Пришла — лежит, продаж ноль, а склад отщипывает от кассы каждый месяц. Хочешь денег — иди раскручивай.'],
+                    ['📣','Запусти рекламу','Канал (TikTok / YouTube / Instagram — у каждого своё попадание под нишу) × бюджет (Проба / Норма / Мощно) → ПУСК. Деньги ушли — получаешь исход.'],
+                    ['🎲','Исход с разбросом','Решают попадание канала, цена товара сейчас, твой скилл и удача. Может залететь виралом, может слиться впустую.'],
+                    ['🎯','Скилл от практики','Каждая кампания качает таргет-скилл: дешевле лиды, точнее попадание. Мастерство — реальный перевес.'],
+                    ['🧹','Завис — слей','Рынок повернулся, остаток лежит и ест склад? Кнопка «Слить» вернёт часть денег. Держать мёртвый груз — ошибка.'],
+                ], foot:'Два закона: 🪞 Зеркало — как ведёшь дело, такова судьба. ⚖️ Внимание — пассив не бесплатный: не следишь, груз ест деньги.' },
         };
         function showCellInfo(k){ state.cellInfo=k; render(); }
         function closeCellInfo(){ state.cellInfo=null; render(); }
@@ -13719,7 +13767,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const lo = Math.min(...h), hi = Math.max(...h), span = (hi-lo)||1;
             const W = 100, H = 26;
             const pts = h.map((v,i)=>`${(i/(h.length-1)*W).toFixed(1)},${(H - (v-lo)/span*H).toFixed(1)}`).join(' ');
-            const col = up ? '#5cb08b' : '#cf9a9a';
+            const col = up ? '#34e0a1' : '#ff5c72';
             return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1;height:26px;min-width:52px;display:block;">
                 <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".95"></polyline>
               </svg>`;
@@ -13917,7 +13965,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.holdings=p.holdings||{};
             const ownIds=Object.keys(p.holdings);
             let holdHtml = ownIds.length ? ownIds.map(id=>{
-                const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, plPct=h.avg?((pr/h.avg-1)*100):0, plAbs=Math.round((pr-h.avg)*h.qty), c=plPct>=0?'#10b981':'#f43f5e';
+                const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, plPct=h.avg?((pr/h.avg-1)*100):0, plAbs=Math.round((pr-h.avg)*h.qty), c=plPct>=0?'#34e0a1':'#ff5c72';
                 return `<div class="row-item"><div style="flex:1;"><b style="font-family:ui-monospace,monospace;letter-spacing:.02em;">${assetTicker(h.name)}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="openSellModal('${id}',0.5)" class="btn btn-sell" style="margin-top:4px;" title="Продать половину — сперва покажем цену выхода">½&nbsp;50%</button> <button onclick="openSellModal('${id}')" class="btn btn-sell" style="margin-top:4px;">Продать</button></div></div>`;
             }).join('') : '<div style="color:#9ca3af;font-size:13px;">пока нет активов — открой биржу ниже и купи</div>';
             const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
@@ -13925,7 +13973,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             let listHtml='';
             if(state.showMarket){
                 const tab=state.marketTab||'crypto';
-                const tabBar=`<div style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0 6px;">${MARKET_TABS.map(([k,lbl])=>`<button onclick="setMarketTab('${k}')" class="btn" style="padding:4px 10px;font-size:12px;background:${tab===k?'#2563eb':'#1f2937'};color:#fff;font-weight:${tab===k?'800':'400'};">${lbl}</button>`).join('')}</div>`;
+                const tabBar=`<div style="display:flex;gap:7px;overflow-x:auto;margin:8px 0 8px;padding-bottom:2px;">${MARKET_TABS.map(([k,lbl])=>`<button onclick="setMarketTab('${k}')" style="flex:0 0 auto;border:1px solid ${tab===k?'#f4dd9c':'var(--lx-line)'};background:${tab===k?'linear-gradient(180deg,#f4dd9c,#d9b877)':'#0d1420'};color:${tab===k?'#20180a':'#9fb0c6'};border-radius:11px;padding:8px 14px;font-size:12.5px;font-weight:${tab===k?'800':'700'};white-space:nowrap;cursor:pointer;">${lbl}</button>`).join('')}</div>`;
                 // СОРТИРОВКА (Ринат): где больше всего капитала вложено — та акция/крипта СВЕРХУ. По убыванию.
                 // Капитал = сумма по всем игрокам (кол-во × текущая цена). Ничего не вложено → по цене (крупные выше).
                 const sorted=m.assets.filter(a=>assetCat(a)===tab).map(a=>{
@@ -13934,7 +13982,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     return {a, chg, invested: heldQty*a.price};
                 }).sort((x,y)=> (y.invested - x.invested) || (y.a.price - x.a.price));
                 const rows=sorted.length?sorted.map(({a,chg,invested})=>{
-                    const c=chg>=0?'#5cb08b':'#cf9a9a', arrow=chg>=0?'▲':'▼';
+                    const c=chg>=0?'#34e0a1':'#ff5c72', arrow=chg>=0?'▲':'▼';
                     const cap=invested>0?`<span style="color:var(--lx-gold-br);font-size:10.5px;font-weight:700;white-space:nowrap;">💰 ${fmtN(invested)}$</span>`:'';
                     return `<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--lx-line);border-radius:12px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));margin-bottom:6px;">
                       <div style="flex:0 0 82px;min-width:0;overflow:hidden;">
@@ -13969,16 +14017,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderAnalystCard(p)}
                 ${renderIpoPosition(p)}
                 ${renderMarginCard(p)}
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                  <div style="border:1px solid var(--lx-line);border-radius:11px;padding:9px 11px;background:var(--lx-ink);">
-                    <div style="font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#9c988e;font-weight:700;">Портфель</div>
-                    <div style="font-family:ui-monospace,monospace;font-size:17px;font-weight:700;color:#efd8a3;margin-top:2px;">${fmtN(portfolioValue(p))}$</div>
-                  </div>
-                  <div style="border:1px solid var(--lx-line);border-radius:11px;padding:9px 11px;background:var(--lx-ink);">
-                    <div style="font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#9c988e;font-weight:700;">Касса</div>
-                    <div style="font-family:ui-monospace,monospace;font-size:17px;font-weight:700;color:#efd8a3;margin-top:2px;">${fmtN(p.savings)}$</div>
-                  </div>
-                </div>
+                ${(function(){
+                    const port=portfolioValue(p), cash=Number(p.savings)||0;
+                    const hist=portfolioHistory(p), up = hist.length>=2 ? hist[hist.length-1]>=hist[0] : true;
+                    let invested=0; for(const _id in (p.holdings||{})){ const hh=p.holdings[_id]; invested += (Number(hh.avg)||0)*(Number(hh.qty)||0); }
+                    const pl=port-invested, plPct=invested>0?pl/invested*100:0, c=pl>=0?'#34e0a1':'#ff5c72';
+                    return `<div style="position:relative;border:1px solid var(--lx-gold-ln);border-radius:20px;overflow:hidden;background:radial-gradient(120% 90% at 100% 0,rgba(52,224,161,.08),transparent 55%),radial-gradient(120% 100% at 0 0,rgba(232,200,119,.10),transparent 50%),linear-gradient(180deg,#131a28,#0c121d);padding:16px 17px 8px;margin-bottom:14px;">
+                        <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--lx-gold);font-weight:700;">Портфель</div>
+                        <div style="font-family:ui-monospace,monospace;font-size:32px;font-weight:800;letter-spacing:-.01em;margin-top:2px;line-height:1.05;color:#f3efe6;">${fmtN(port)} $</div>
+                        ${invested>0?`<div style="font-family:ui-monospace,monospace;font-size:13px;font-weight:800;color:${c};margin-top:3px;">${pl>=0?'▲ +':'▼ '}${fmtN(Math.abs(Math.round(pl)))} $ · ${pl>=0?'+':''}${plPct.toFixed(1)}%</div>`:''}
+                        <div style="font-size:12.5px;color:#8492a6;margin-top:3px;">Касса <b style="color:#cbd6e6;font-family:ui-monospace,monospace;font-weight:700;">${fmtN(cash)} $</b> · свободно для покупки</div>
+                        ${hist.length>=2?heroSpark(hist,up):''}
+                    </div>`;
+                })()}
                 <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">💸 Комиссия биржи сейчас: <b style="color:#fbbf24;">${(tradeFeePct(p)*100).toFixed(1)}%</b> на сделку <span style="color:#6b7280;">(спред ${(FEE_BASE*100).toFixed(1)}% + надбавка за частоту, до ${(FEE_CAP*100).toFixed(0)}%)</span></div>
                 <div style="font-size:11px;color:#8a8378;background:#0d1016;border:1px solid #242833;border-radius:8px;padding:7px 9px;margin-bottom:8px;line-height:1.5;">🧭 Как в жизни: комиссию берут <b>и на покупке, и на продаже</b> (это спред). Поэтому суета мелкими сделками съедается в ноль. Биржа — не про мелкий пассив, а про <b style="color:#cdc8bd;">поймать момент</b>: в разное время «горит» разный рынок (то крипта, то акции, то сырьё). Кто это видит — тот и зарабатывает.</div>
                 <button onclick="state.showMarket=!state.showMarket;render();" style="width:100%;margin:2px 0 8px;padding:11px;cursor:pointer;border-radius:11px;font-family:Georgia,serif;font-size:14px;font-weight:700;letter-spacing:.02em;background:${state.showMarket?'var(--lx-ink)':'linear-gradient(180deg,#efd8a3,#d9b877)'};color:${state.showMarket?'var(--lx-gold-br)':'#20180a'};border:1px solid var(--lx-gold-ln);">${state.showMarket?'Свернуть торги ▲':'Открыть торги ▼'}</button>
@@ -15804,6 +15855,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
                 ${p.casinoOff ? '' : `<details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_casino.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🎰 Казино</summary><div class="sec-in">${winCover('win_casino')}${ state.casinoUnlocked ? renderLuckPanel(p) : renderCasinoGate(p) }</div></details>`}
 
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_tovarka.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">📦 Товарка <span class="sec-hint">— товарный бизнес</span></summary><div class="sec-in">${winCover('win_tovarka')}
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">${infoBtn('tovarka')}</div>
+                    <p style="font-size:13px;color:#9c988e;line-height:1.55;margin:0 0 12px;">Закупаешь партию — она приходит мёртвым грузом и сама не продаётся. Продажи вытаскиваешь руками: запускаешь рекламные кампании по каналам. Таргет-скилл качается от практики.</p>
+                    <button onclick="openTovarka()" class="btn" style="width:100%;background:linear-gradient(180deg,#f4dd9c,#d9b877);color:#20180a;font-weight:800;padding:13px;border-radius:12px;">📦 Открыть Товарку</button>
+                </div></details>
+
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_assets.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🛒 Мои активы <span class="sec-hint">— бизнес, недвижимость</span></summary><div class="sec-in">${winCover('win_assets')}
                 <div class="card">
                     <div class="block-title">🛒 Мои активы (бизнес · недвижимость · прочее)</div>
@@ -16586,6 +16643,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             p.farm.animals=Object.values(by);
             p.farm.capUsed=farmHeads(p);
+        }
+        // 📦 ТОВАРКА — товарный бизнес отдельным видом (модуль via_tovarka.html в iframe, полная изоляция).
+        function openTovarka(){ state.view='tovarka'; render(); }
+        function renderTovarka(app){
+            // Не пересобираем, если iframe уже смонтирован — иначе тик рынка/чужой ход перезагружали бы модуль.
+            if(app.querySelector('#tovarkaFrame')) return;
+            app.innerHTML = `<div style="max-width:660px;margin:0 auto;padding:8px 10px calc(14px + env(safe-area-inset-bottom));">
+                <button onclick="state.view='player';render();" class="btn" style="background:#1a2233;border:1px solid var(--lx-gold-ln);color:var(--lx-gold-br);font-weight:800;padding:9px 15px;border-radius:11px;margin-bottom:10px;">← Назад в бланк</button>
+                <iframe id="tovarkaFrame" src="via_tovarka.html" title="Товарка" style="width:100%;height:calc(100vh - 96px);border:1px solid var(--lx-gold-ln);border-radius:16px;background:#06090f;display:block;"></iframe>
+            </div>`;
         }
         function openFarm(){ const p=farmMe(); if(!p) return; if(p.farm){ farmMergeHerds(p); farmClock(p); save(p.id); } state.view='farm'; state.farmTab = p.farm ? 'mine' : 'buy'; render(); }
 

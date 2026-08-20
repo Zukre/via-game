@@ -1,0 +1,854 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Товарка VIA</title>
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root{
+    color-scheme:dark;
+    --bg:#080b12; --bg2:#05070c;
+    --surf:#111826; --surf2:#0d1420; --line:#1c2635;
+    --ink:#e4ebf5; --muted:#8492a6; --dim:#5d6b7e;
+    --gold:#e8c877; --gold-br:#f4dd9c; --gold-ln:rgba(232,200,119,.28);
+    --up:#34e0a1; --down:#ff5c72; --warn:#f2b559;
+  }
+  html,body{ background:var(--bg2); }
+  body{ font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink);
+    background:radial-gradient(130% 55% at 50% -8%, rgba(232,200,119,.07), transparent 60%), linear-gradient(180deg,#0a0e16,#06090f);
+    min-height:100vh; padding:calc(14px + env(safe-area-inset-top)) 0 40px; }
+  .mono{ font-family:ui-monospace,"SF Mono","Cascadia Code",Consolas,monospace; font-variant-numeric:tabular-nums; }
+  .wrap{ max-width:620px; margin:0 auto; padding:0 15px; }
+
+  .head{ display:flex; align-items:center; gap:9px; margin-bottom:14px; }
+  .mark{ width:34px; height:34px; border-radius:10px; flex:0 0 34px; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(120% 120% at 30% 20%, #f4dd9c, #d9b877 55%, #b8912f);
+    color:#20180a; font-weight:800; font-family:Georgia,serif; font-size:17px; box-shadow:0 4px 14px -4px rgba(232,200,119,.5); }
+  .head h1{ font-size:19px; font-weight:800; letter-spacing:.01em; }
+  .live{ margin-left:auto; display:flex; align-items:center; gap:6px; font-size:10.5px; font-weight:800; letter-spacing:.08em;
+    color:var(--up); text-transform:uppercase; }
+  .live .dot{ width:8px; height:8px; border-radius:50%; background:var(--up); box-shadow:0 0 0 0 rgba(52,224,161,.6); animation:pulse 1.8s infinite; }
+  @keyframes pulse{ 0%{box-shadow:0 0 0 0 rgba(52,224,161,.55)} 70%{box-shadow:0 0 0 7px rgba(52,224,161,0)} 100%{box-shadow:0 0 0 0 rgba(52,224,161,0)} }
+  @media (prefers-reduced-motion:reduce){ .live .dot{ animation:none; } }
+
+  /* Герой-сводка дела */
+  .hero{ position:relative; border:1px solid var(--gold-ln); border-radius:20px; overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 100% 0, rgba(52,224,161,.08), transparent 55%),
+      radial-gradient(120% 100% at 0 0, rgba(232,200,119,.10), transparent 50%),
+      linear-gradient(180deg,#131a28,#0c121d);
+    padding:17px 18px 16px; margin-bottom:15px; }
+  .hero .lbl{ font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--gold); font-weight:700; }
+  .hero .big{ font-size:33px; font-weight:800; letter-spacing:-.01em; margin-top:2px; line-height:1.05; }
+  .hero .row2{ display:flex; align-items:baseline; gap:14px; margin-top:6px; flex-wrap:wrap; }
+  .hero .chg{ font-size:13px; font-weight:800; color:var(--up); }
+  .hero .cash{ font-size:12.5px; color:var(--muted); }
+  .hero .cash b{ color:#cbd6e6; font-weight:700; }
+
+  /* Таргет-скилл */
+  .skill{ margin-top:13px; padding-top:12px; border-top:1px solid rgba(255,255,255,.06); }
+  .skill .sk-top{ display:flex; align-items:center; justify-content:space-between; font-size:11px; }
+  .skill .sk-top .nm{ font-weight:800; color:#cbd6e6; letter-spacing:.02em; }
+  .skill .sk-top .nm em{ font-style:normal; color:var(--gold); }
+  .skill .sk-top .val{ font-weight:800; color:var(--gold-br); }
+  .skbar{ height:7px; border-radius:5px; background:rgba(255,255,255,.07); margin-top:7px; overflow:hidden; }
+  .skbar i{ display:block; height:100%; border-radius:5px; transition:width .6s;
+    background:linear-gradient(90deg,#d9b877,#f4dd9c,#34e0a1); box-shadow:0 0 10px -2px rgba(232,200,119,.6); }
+  .skill .sk-hint{ font-size:10.5px; color:var(--dim); margin-top:6px; }
+
+  .cta{ width:100%; border:none; border-radius:15px; padding:15px; font-size:15.5px; font-weight:800; cursor:pointer; margin:15px 0 20px;
+    font-family:inherit; background:linear-gradient(180deg,#f4dd9c,#d9b877); color:#20180a; box-shadow:0 6px 20px -8px rgba(232,200,119,.55); }
+  .cta:active{ transform:scale(.99); }
+
+  /* Живой рынок */
+  .mktbar{ display:flex; align-items:center; justify-content:space-between; margin:2px 3px 9px; }
+  .mktbar .t{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.09em; color:var(--dim); }
+  .mktbar .h{ font-size:10.5px; color:var(--gold); font-weight:700; }
+  .strip{ display:flex; gap:9px; overflow-x:auto; padding:1px 0 15px; scrollbar-width:none; }
+  .strip::-webkit-scrollbar{ display:none; }
+  .hot{ flex:0 0 auto; width:132px; border:1px solid var(--line); border-radius:14px; padding:11px 12px;
+    background:linear-gradient(180deg,var(--surf),var(--surf2)); }
+  .hot .e{ font-size:19px; }
+  .hot .nm{ font-size:11px; color:var(--muted); font-weight:600; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hot .pr{ font-size:16px; font-weight:800; margin-top:2px; transition:color .4s; }
+  .hot .row{ display:flex; align-items:center; justify-content:space-between; margin-top:3px; }
+  .hot .chg{ font-size:11.5px; font-weight:800; }
+  .hot .dem{ font-size:9.5px; color:var(--dim); font-weight:700; }
+
+  .secttl{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.09em; color:var(--dim); margin:2px 3px 11px; }
+
+  .list{ display:grid; grid-template-columns:1fr; gap:12px; }
+  .card{ background:linear-gradient(180deg,var(--surf),var(--surf2));
+    border:1px solid var(--line); border-radius:16px; padding:13px 14px; position:relative; }
+  .card .top{ display:flex; align-items:center; gap:12px; }
+  .card .ic{ flex:0 0 44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+    font-size:22px; border:1px solid var(--line); background:var(--surf2); }
+  .card .nm{ flex:1; min-width:0; }
+  .card .nm b{ display:block; font-size:15px; font-weight:700; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card .nm span{ font-size:11.5px; color:var(--muted); line-height:1.4; }
+  .card .pr{ flex:0 0 96px; text-align:right; }
+  .card .pr b{ display:block; font-size:14.5px; font-weight:800; transition:color .4s; }
+  .card .pr span{ font-size:11px; font-weight:700; color:var(--muted); }
+  .grow{ height:5px; border-radius:3px; background:rgba(255,255,255,.07); margin-top:10px; overflow:hidden; }
+  .grow i{ display:block; height:100%; border-radius:3px; transition:width .5s; }
+  .badge{ position:absolute; top:-8px; right:11px; font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+    border-radius:6px; padding:2px 7px; }
+  .badge.ok{ color:#08301f; background:linear-gradient(180deg,#4ff0b6,#2bc98c); }
+  .badge.bad{ color:#3a0d12; background:linear-gradient(180deg,#ff8a99,#ff5c72); }
+  .badge.warn{ color:#2e1e02; background:linear-gradient(180deg,#ffd583,#f2b559); }
+  .badge.dead{ color:#e4ebf5; background:linear-gradient(180deg,#3a4557,#26303f); }
+
+  .cardacts{ display:flex; gap:8px; margin-top:11px; }
+  .actBtn{ flex:1; border:none; border-radius:11px; padding:11px 10px; font-size:12.5px; font-weight:800;
+    cursor:pointer; font-family:inherit; transition:.13s; }
+  .actBtn:active{ transform:scale(.97); }
+  .actBtn.push{ background:linear-gradient(180deg,#f4dd9c,#d9b877); color:#20180a; box-shadow:0 5px 16px -8px rgba(232,200,119,.6); }
+  .actBtn.dump{ flex:0 0 auto; border:1px solid rgba(242,181,89,.45); background:rgba(242,181,89,.10); color:var(--warn); }
+  .actBtn.clr{ border:1px solid rgba(93,107,126,.4); background:var(--surf2); color:var(--dim); }
+  .card.dim{ opacity:.6; }
+
+  .lastcamp{ margin-top:10px; font-size:11px; border-radius:10px; padding:8px 10px; line-height:1.45;
+    background:rgba(255,255,255,.03); border:1px solid var(--line); color:var(--muted); }
+  .lastcamp b{ color:#cbd6e6; }
+  .lastcamp .win{ color:var(--up); font-weight:800; }
+  .lastcamp .los{ color:var(--down); font-weight:800; }
+
+  .foot{ text-align:center; font-size:11px; color:var(--dim); margin-top:22px; line-height:1.6; }
+
+  /* Шторки (мастер + кампания) */
+  .sw{ position:fixed; inset:0; z-index:9500; display:none; }
+  .sw.open{ display:block; }
+  .sw .bd{ position:absolute; inset:0; background:rgba(3,5,9,.66); backdrop-filter:blur(2px); }
+  .sh{ position:absolute; left:0; right:0; bottom:0; max-width:560px; margin:0 auto; max-height:94vh;
+    transform:translateY(103%); transition:transform .33s cubic-bezier(.2,.8,.2,1); display:flex; flex-direction:column; }
+  .sw.open .sh{ transform:none; }
+  @media (prefers-reduced-motion:reduce){ .sh{ transition:none; } }
+  .sh-in{ border-radius:22px 22px 0 0; border:1px solid var(--gold-ln); border-bottom:none; overflow:hidden;
+    background:radial-gradient(120% 40% at 50% 0, rgba(232,200,119,.08), transparent 60%), linear-gradient(180deg,#141b28,#0c121d);
+    display:flex; flex-direction:column; min-height:0; }
+  .grab{ width:40px; height:4px; border-radius:3px; margin:12px auto 8px; background:var(--gold); opacity:.55; flex:0 0 auto; }
+  .sh-scroll{ overflow-y:auto; padding:4px 18px 16px; -webkit-overflow-scrolling:touch; }
+  .sh-ttl{ font-size:19px; font-weight:800; padding:2px 2px 2px; }
+  .sh-ttl small{ display:block; font-size:12px; font-weight:600; color:var(--muted); margin-top:3px; }
+
+  .step{ margin-top:17px; }
+  .step .q{ font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); font-weight:800; margin-bottom:9px; display:flex; align-items:center; gap:7px; }
+  .step .q i{ width:18px; height:18px; border-radius:6px; background:rgba(232,200,119,.14); color:var(--gold); font-style:normal;
+    font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:0 0 18px; }
+  .step .q .qs{ color:var(--dim); font-weight:600; text-transform:none; letter-spacing:0; }
+
+  .qtybox{ display:flex; gap:8px; }
+  .qtybox .amt{ flex:1; min-width:0; border-radius:12px; padding:12px 14px; font-size:16px; font-weight:800;
+    border:1px solid var(--line); background:var(--surf2); color:var(--ink); }
+  .qtybox .amt:focus{ outline:none; border-color:var(--gold-ln); }
+  .qtybox .amt::placeholder{ color:var(--dim); font-weight:600; }
+  .qtybox .qbtn{ flex:0 0 auto; border-radius:12px; padding:12px 12px; font-size:12.5px; font-weight:800; cursor:pointer;
+    border:1px solid var(--line); background:var(--surf2); color:#c9d4e4; font-family:inherit; }
+  .qtybox .qbtn.max{ background:rgba(52,224,161,.12); border-color:rgba(52,224,161,.4); color:var(--up); }
+  .qtyinfo{ font-size:12px; color:var(--muted); margin-top:8px; line-height:1.5; }
+  .qtyinfo b{ color:var(--gold-br); }
+
+  .prodgrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .prod{ display:flex; align-items:center; gap:9px; border:1px solid var(--line); background:var(--surf2); border-radius:13px; padding:9px 10px; cursor:pointer; transition:.13s; }
+  .prod:hover{ border-color:var(--gold-ln); }
+  .prod.on{ border-color:var(--gold-br); background:rgba(232,200,119,.08); }
+  .prod .e{ font-size:19px; flex:0 0 auto; }
+  .prod .t{ min-width:0; flex:1; }
+  .prod .t b{ display:block; font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .prod .t span{ font-size:10px; color:var(--dim); }
+  .prod .pp{ text-align:right; flex:0 0 auto; }
+  .prod .pp b{ font-size:12.5px; font-weight:800; transition:color .4s; }
+  .prod .pp span{ display:block; font-size:9.5px; font-weight:700; }
+
+  .opts{ display:flex; gap:7px; flex-wrap:wrap; }
+  .opt{ flex:1 1 auto; min-width:0; border:1px solid var(--line); background:var(--surf2); border-radius:12px; padding:10px 11px; cursor:pointer; transition:.13s; }
+  .opt:hover{ border-color:var(--gold-ln); }
+  .opt.on{ border-color:var(--gold-br); background:rgba(232,200,119,.08); }
+  .opt.bad{ border-color:rgba(255,92,114,.5); background:rgba(255,92,114,.06); }
+  .opt b{ display:block; font-size:13px; font-weight:800; }
+  .opt .price{ font-size:12.5px; font-weight:800; color:var(--gold-br); margin-top:3px; }
+  .opt .fit{ font-size:10px; font-weight:800; margin-top:3px; }
+  .opt span{ display:block; font-size:10.5px; color:var(--muted); margin-top:2px; line-height:1.35; }
+
+  /* Живой P&L подвал */
+  .pnl{ flex:0 0 auto; border-top:1px solid var(--line); padding:13px 18px calc(15px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,#0e1420,#0b101a); }
+  .pnl .grid{ display:flex; gap:10px; margin-bottom:11px; }
+  .pnl .box{ flex:1; background:var(--surf2); border:1px solid var(--line); border-radius:13px; padding:9px 11px; }
+  .pnl .box .k{ font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); font-weight:700; }
+  .pnl .box .v{ font-size:17px; font-weight:800; margin-top:3px; }
+  .pnl .meta{ font-size:11.5px; color:var(--muted); line-height:1.5; margin-bottom:11px; }
+  .pnl .meta b{ color:#cbd6e6; }
+  .launch{ width:100%; border:none; border-radius:14px; padding:15px; font-size:15.5px; font-weight:800; cursor:pointer;
+    font-family:inherit; background:linear-gradient(180deg,#f4dd9c,#d9b877); color:#20180a; }
+  .launch:disabled{ opacity:.4; }
+  .launch:active{ transform:scale(.99); }
+
+  /* Тост */
+  #toast{ position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(30px); z-index:9600; opacity:0; pointer-events:none;
+    background:linear-gradient(180deg,#1a2233,#111826); border:1px solid var(--gold-ln); color:var(--ink);
+    padding:12px 18px; border-radius:14px; font-size:13.5px; font-weight:700; max-width:88%; text-align:center; transition:.28s; box-shadow:0 12px 30px -10px rgba(0,0,0,.7); }
+  #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* Кнопка «ℹ️» и окно «как это работает» — как во всей игре */
+  .infoBtn{ flex:0 0 auto; background:rgba(232,200,119,.1); border:1px solid var(--gold-ln); border-radius:9px;
+    color:var(--gold-br); font-size:14px; padding:3px 9px; cursor:pointer; font-weight:700; font-family:inherit; line-height:1; }
+  .infoBtn:active{ transform:scale(.95); }
+  .infomodal{ position:fixed; inset:0; z-index:9700; display:none; align-items:center; justify-content:center; padding:16px; overflow:auto; background:rgba(4,6,9,.92); }
+  .infomodal.open{ display:flex; }
+  .infocard{ width:460px; max-width:100%; max-height:90vh; overflow:auto; border:1px solid var(--gold-br); border-radius:18px;
+    padding:22px 20px; background:linear-gradient(180deg,#141821,#0b0e14); box-shadow:0 30px 70px rgba(0,0,0,.7); }
+  .infocard .ttl{ text-align:center; font-family:Georgia,serif; font-size:21px; font-weight:700; color:var(--gold-br); }
+  .infocard .intro{ text-align:center; font-size:12.5px; color:var(--muted); line-height:1.55; margin:8px 0 16px; }
+  .infocard .step{ display:flex; gap:11px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--line); }
+  .infocard .step .ic{ font-size:22px; flex:0 0 auto; line-height:1.2; }
+  .infocard .step .nm{ font-weight:700; color:#f3efe6; font-size:14px; }
+  .infocard .step .tx{ font-size:12px; color:var(--muted); line-height:1.5; margin-top:2px; }
+  .infocard .foot{ margin-top:14px; padding:12px; border-radius:11px; background:var(--surf2); border:1px solid var(--gold-ln);
+    text-align:center; font-size:12.5px; color:#cdc8bd; line-height:1.55; }
+  .infocard .ok{ width:100%; margin-top:14px; border:none; border-radius:12px; background:linear-gradient(180deg,#f4dd9c,#d9b877);
+    color:#20180a; font-weight:800; padding:12px; font-family:inherit; font-size:14px; cursor:pointer; }
+  .infocard .ok:active{ transform:scale(.99); }
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <div class="mark">V</div>
+    <h1>Товарка</h1>
+    <button class="infoBtn" onclick="openInfo()" aria-label="Как это работает">ℹ️</button>
+    <span class="live"><span class="dot"></span> <span id="clock">Год 4 · Апрель</span></span>
+  </div>
+
+  <div class="hero">
+    <div class="lbl">Касса дела · свободно</div>
+    <div class="big mono" id="hCap">$18 000</div>
+    <div class="row2">
+      <span class="chg mono" id="hProfit">▲ +$0 заработано всего</span>
+      <span class="cash">склад ест <b id="hBurn">−$0</b>/мес</span>
+    </div>
+    <div class="row2">
+      <span class="cash">🚢 В пути: <b id="hTransit">$0</b></span>
+      <span class="cash">📦 Мёртвый груз: <b id="hShelf">0 шт</b></span>
+    </div>
+
+    <div class="skill">
+      <div class="sk-top">
+        <div class="nm">🎯 Таргет-скилл <em id="skRank">новичок</em></div>
+        <div class="val mono" id="skVal">12</div>
+      </div>
+      <div class="skbar"><i id="skFill" style="width:12%"></i></div>
+      <div class="sk-hint">Растёт с каждой кампанией — чем больше пускаешь рекламу, тем дешевле лиды и точнее попадание.</div>
+    </div>
+  </div>
+
+  <button class="cta" onclick="openWiz()">＋ Завести новый товар</button>
+
+  <div class="mktbar">
+    <div class="t">🔥 Горячее сейчас</div>
+    <div class="h">меняется каждый месяц · за месяц</div>
+  </div>
+  <div class="strip" id="strip"></div>
+
+  <div class="secttl">Товары в работе · продаёшь руками</div>
+  <div class="list" id="list"></div>
+
+  <div class="foot">
+    Превью модуля «Товарка» · законы Зеркала и Внимания.<br>
+    Товар сам не продаётся — лежит мёртвым грузом и ест склад. Продажи вытаскиваешь рекламными кампаниями: канал × бюджет × твой скилл × попадание × удача.
+  </div>
+</div>
+
+<!-- ШТОРКА-МАСТЕР: завести товар -->
+<div class="sw" id="sw">
+  <div class="bd" onclick="closeWiz()"></div>
+  <div class="sh">
+    <div class="sh-in">
+      <div class="grab"></div>
+      <div class="sh-scroll" id="shScroll">
+        <div class="sh-ttl">Новый товар <small>Закупка партии — экономика считается вживую внизу. Продавать будешь потом, руками.</small></div>
+
+        <div class="step">
+          <div class="q"><i>1</i> Что везём <span class="qs">· цена рынка живая</span></div>
+          <div class="prodgrid" id="prodGrid"></div>
+        </div>
+
+        <div class="step">
+          <div class="q"><i>2</i> Сколько берём <span class="qs">· впиши количество, штук</span></div>
+          <div class="qtybox">
+            <input id="qtyInput" class="amt mono" inputmode="numeric" placeholder="сколько штук" oninput="onQty()">
+            <button class="qbtn" onclick="setQty('min')">Мин партия</button>
+            <button class="qbtn max" onclick="setQty('max')">Макс</button>
+          </div>
+          <div class="qtyinfo" id="qtyInfo">—</div>
+        </div>
+
+        <div class="step">
+          <div class="q"><i>3</i> Откуда закуп <span class="qs">· цена закупа за 1 шт</span></div>
+          <div class="opts" id="optCountry"></div>
+        </div>
+
+        <div class="step">
+          <div class="q"><i>4</i> Логистика</div>
+          <div class="opts" id="optLog"></div>
+        </div>
+
+        <div class="step">
+          <div class="q"><i>5</i> Склад <span class="qs">· где держать партию</span></div>
+          <div class="opts" id="optWh"></div>
+        </div>
+
+        <div class="step">
+          <div class="q"><i>6</i> Где продаём <span class="qs">· маркетплейс или своя точка</span></div>
+          <div class="opts" id="optMp"></div>
+        </div>
+      </div>
+
+      <div class="pnl">
+        <div class="grid">
+          <div class="box"><div class="k">Вложить в партию</div><div class="v mono" id="pInvest">—</div></div>
+          <div class="box"><div class="k">Маржа с 1 шт</div><div class="v mono" id="pMargin">—</div></div>
+        </div>
+        <div class="meta" id="pMeta">Выбери товар, чтобы увидеть расклад.</div>
+        <button class="launch" id="pBtn" disabled onclick="launch()">Заказать партию</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ШТОРКА-КАМПАНИЯ: сердце активной продажи -->
+<div class="sw" id="cw">
+  <div class="bd" onclick="closeCamp()"></div>
+  <div class="sh">
+    <div class="sh-in">
+      <div class="grab"></div>
+      <div class="sh-scroll" id="cScroll">
+        <div class="sh-ttl"><span id="cTtlTxt">Запустить рекламу</span> <small id="cSub">—</small></div>
+
+        <div class="step">
+          <div class="q"><i>1</i> Канал <span class="qs">· у каждого свой охват и попадание под товар</span></div>
+          <div class="opts" id="cChan"></div>
+        </div>
+
+        <div class="step">
+          <div class="q"><i>2</i> Бюджет кампании <span class="qs">· разовый запуск, деньги уходят сразу</span></div>
+          <div class="opts" id="cBud"></div>
+        </div>
+      </div>
+
+      <div class="pnl">
+        <div class="grid">
+          <div class="box"><div class="k">Бюджет уйдёт</div><div class="v mono" id="cSpend">—</div></div>
+          <div class="box"><div class="k">Прогноз продаж</div><div class="v mono" id="cSold">—</div></div>
+        </div>
+        <div class="meta" id="cMeta">Выбери канал и бюджет.</div>
+        <button class="launch" id="cBtn" disabled onclick="fireCampaign()">📣 ПУСК рекламы</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ℹ️ КАК ЭТО РАБОТАЕТ -->
+<div id="infoWrap" class="infomodal" onclick="if(event.target===this)closeInfo()">
+  <div class="infocard" id="infoCard"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Деньги ($) ──
+function money(n){
+  const a=Math.abs(n);
+  if(a>=1000) return '$'+Math.round(n).toLocaleString('en-US').replace(/,/g,' ');
+  if(a>=100)  return '$'+Math.round(n);
+  return '$'+n.toFixed(1);
+}
+function signed(n){ return (n>=0?'+':'−')+money(Math.abs(n)); }
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+// ── 23 живых трендовых товара, цены $ за 1 шт ──
+const PRODUCTS = [
+  {id:'case', e:'📱', nm:'Чехол iPhone',        niche:'Электроника', sell:6,     buy:2,     dem:380, big:false, moq:200, src:'Китай'},
+  {id:'pb',   e:'🔋', nm:'Повербанк магнит.',   niche:'Электроника', sell:19,    buy:9,     dem:170, big:false, moq:100, src:'Китай'},
+  {id:'tws',  e:'🎧', nm:'Наушники TWS',        niche:'Электроника', sell:26,    buy:12,    dem:150, big:false, moq:100, src:'Китай'},
+  {id:'watch',e:'⌚', nm:'Смарт-часы',          niche:'Электроника', sell:42,    buy:22,    dem:95,  big:false, moq:50,  src:'Китай'},
+  {id:'cam',  e:'📷', nm:'Экшн-камера',         niche:'Электроника', sell:78,    buy:46,    dem:40,  big:false, moq:30,  src:'Китай'},
+  {id:'pad',  e:'🎮', nm:'Геймпад',             niche:'Электроника', sell:34,    buy:17,    dem:70,  big:false, moq:50,  src:'Китай'},
+  {id:'proj', e:'📽️', nm:'Мини-проектор',       niche:'Электроника', sell:90,    buy:54,    dem:35,  big:false, moq:30,  src:'Китай'},
+  {id:'lash', e:'💅', nm:'Ресницы, набор',      niche:'Красота',     sell:5,     buy:1,     dem:560, big:false, moq:300, src:'Китай'},
+  {id:'serum',e:'🧴', nm:'Сыворотка гиалурон',  niche:'Красота',     sell:14,    buy:4,     dem:240, big:false, moq:200, src:'Корея'},
+  {id:'tooth',e:'🪥', nm:'Электрощётка',        niche:'Красота',     sell:21,    buy:9,     dem:130, big:false, moq:100, src:'Китай'},
+  {id:'curl', e:'💇', nm:'Стайлер для волос',   niche:'Красота',     sell:33,    buy:15,    dem:100, big:false, moq:50,  src:'Китай'},
+  {id:'mass', e:'💆', nm:'Массажёр для лица',   niche:'Красота',     sell:24,    buy:9,     dem:110, big:false, moq:100, src:'Китай'},
+  {id:'vac',  e:'🤖', nm:'Робот-пылесос',       niche:'Быт.техника', sell:220,   buy:120,   dem:22,  big:true,  moq:15,  src:'Китай'},
+  {id:'bl',   e:'🍹', nm:'Блендер-комбайн',     niche:'Быт.техника', sell:85,    buy:46,    dem:40,  big:true,  moq:20,  src:'Китай'},
+  {id:'fry',  e:'🌀', nm:'Аэрогриль',           niche:'Быт.техника', sell:74,    buy:40,    dem:48,  big:true,  moq:20,  src:'Китай'},
+  {id:'cof',  e:'☕', nm:'Кофемашина',          niche:'Быт.техника', sell:130,   buy:78,    dem:26,  big:true,  moq:15,  src:'Турция'},
+  {id:'led',  e:'💡', nm:'LED-подсветка',       niche:'Быт.техника', sell:16,    buy:5,     dem:200, big:false, moq:200, src:'Китай'},
+  {id:'tire', e:'🛞', nm:'Зимняя резина (шип)', niche:'Автотовары',  sell:95,    buy:55,    dem:30,  big:true,  moq:100, src:'Китай / Россия'},
+  {id:'mag',  e:'📻', nm:'Магнитола Android',   niche:'Автотовары',  sell:65,    buy:33,    dem:38,  big:true,  moq:40,  src:'Китай'},
+  {id:'dvr',  e:'🎥', nm:'Видеорегистратор',    niche:'Автотовары',  sell:40,    buy:18,    dem:80,  big:false, moq:60,  src:'Китай'},
+  {id:'car',  e:'🚗', nm:'Авто (пригон)',       niche:'Автотовары',  sell:15000, buy:10500, dem:3,   big:true,  moq:1,   src:'Корея / Китай'},
+  {id:'toy',  e:'🧸', nm:'Игрушка-тренд',       niche:'Детское',     sell:17,    buy:5,     dem:320, big:false, moq:300, src:'Китай'},
+  {id:'scoot',e:'🛴', nm:'Детский самокат',     niche:'Детское',     sell:110,   buy:62,    dem:20,  big:true,  moq:15,  src:'Китай'},
+];
+PRODUCTS.forEach(p=>{ p.base={sell:p.sell, dem:p.dem}; p.mom=0; p.pchg=0; });
+
+const COUNTRY = [
+  {id:'cn', nm:'🇨🇳 Китай',  mult:1.00, duty:0.15, days:30, scam:18, note:'дёшево, пошлина 15%, долго'},
+  {id:'ru', nm:'🇷🇺 Россия', mult:1.30, duty:0.00, days:10, scam:6,  note:'дороже, ЕАЭС без пошлин, быстро'},
+  {id:'tr', nm:'🇹🇷 Турция', mult:1.45, duty:0.08, days:18, scam:8,  note:'качество, средний срок'},
+];
+const LOG = [
+  {id:'truck', nm:'🚚 Фура / море', pct:0.02, days:15, note:'дёшево, дольше'},
+  {id:'air',   nm:'✈️ Авиа',       pct:0.05, days:-6, note:'быстро, дороже'},
+];
+// Где продаём. convMult = насколько площадка помогает конверсии рекламы. rent = месячная за точку.
+const MP = [
+  {id:'kaspi', nm:'🛒 Kaspi',        fee:0.12, convMult:1.20, rent:0,   note:'доверие, комиссия 12% — реклама заходит легче'},
+  {id:'own',   nm:'📲 Свой профиль', fee:0.00, convMult:1.00, rent:0,   note:'Insta/WhatsApp, без комиссии, весь трафик на тебе'},
+  {id:'point', nm:'🏪 Точка на улице',fee:0.00, convMult:0.85, rent:150, note:'без комиссии, аренда $150/мес, продаёшь сам'},
+];
+// Склад
+const WH = [
+  {id:'home', nm:'🏠 Дома / гараж', rent:0,   per:0,   cap:150, big:false, note:'бесплатно, но только мелочь и до 150 шт'},
+  {id:'rent', nm:'🏬 Свой склад',   rent:100, per:0,   cap:1e9, big:true,  note:'аренда $100/мес, вмещает габарит и партии'},
+  {id:'ff',   nm:'📦 Фулфилмент',   rent:0,   per:0.6, cap:1e9, big:true,  note:'хранят и отгружают они, ~$0.6 за отгрузку'},
+];
+
+// ── СЕРДЦЕ: рекламные каналы ──
+// cpl = базовая цена «заинтересованного лида» ($), conv = доля лидов, что покупают.
+const CHANNELS = [
+  {id:'tt', nm:'🎵 TikTok',    cpl:0.25, conv:0.120, note:'дёшево, огромный охват, импульсная покупка'},
+  {id:'ig', nm:'📸 Instagram', cpl:0.45, conv:0.090, note:'красивая витрина, средний охват'},
+  {id:'yt', nm:'▶️ YouTube',   cpl:0.85, conv:0.070, note:'дорого, но люди изучают перед покупкой'},
+];
+// Попадание канала под нишу (фит). >1 хорошо, <1 мимо.
+const FIT = {
+  'Электроника':{tt:0.85, ig:0.95, yt:1.35},
+  'Красота':    {tt:1.35, ig:1.30, yt:0.80},
+  'Быт.техника':{tt:0.85, ig:1.05, yt:1.25},
+  'Автотовары': {tt:0.90, ig:0.85, yt:1.30},
+  'Детское':    {tt:1.25, ig:1.20, yt:0.85},
+};
+const BUDGETS = [
+  {id:'try', nm:'Проба',  mult:1,    note:'прощупать канал'},
+  {id:'norm',nm:'Норма',  mult:3,    note:'ровный залив'},
+  {id:'push',nm:'Мощно',  mult:7.5,  note:'жать в потолок'},
+];
+const BUD_BASE = 60; // $ за «Пробу» на дешёвом товаре
+
+// ── Скилл таргетолога (0..100), качается ОТ ПРАКТИКИ ──
+let skill = 12;
+const SK_RANKS = [[0,'новичок'],[20,'практик'],[40,'уверенный'],[60,'таргетолог'],[80,'мастер'],[92,'гуру']];
+function skRank(){ let r='новичок'; SK_RANKS.forEach(x=>{ if(skill>=x[0]) r=x[1]; }); return r; }
+
+let cash = 18000; // живая касса дела
+
+// ── Партии ──
+// phase: transit → selling(мёртвый груз/в работе) → done | scam
+function priceScale(p){ return clamp(Math.sqrt(p.sell/25), 0.7, 15); }
+function buyPrice(p,c){ return p.buy * c.mult * (1+c.duty); }
+function landedOf(p,c,l){ return buyPrice(p,c) + p.sell*l.pct; }
+function mkBatch(p,q,c,l,m,wh,st){
+  const landed=landedOf(p,c,l);
+  const b={p,q,c,l,m,wh, landed, invest:landed*q, qLeft:q, daysLeft:0,
+           realized:0, adSpent:0, campN:0, age:0, phase:'selling', lastCamp:null};
+  return Object.assign(b, st||{});
+}
+let active = [
+  mkBatch(PRODUCTS[7],  400, COUNTRY[0], LOG[0], MP[0], WH[2], {phase:'selling', qLeft:250, age:5, realized:2600, adSpent:1400, campN:6,
+    lastCamp:{ch:'🎵 TikTok', budget:180, sold:74, profit:190, luck:1.3}}),
+  mkBatch(PRODUCTS[4],  30,  COUNTRY[0], LOG[0], MP[0], WH[1], {phase:'transit', qLeft:30, daysLeft:24}),
+  mkBatch(PRODUCTS[17], 100, COUNTRY[0], LOG[0], MP[2], WH[1], {phase:'selling', qLeft:100, age:1, realized:0, adSpent:0, campN:0}),
+];
+
+function liveDem(a){ return Math.round(a.p.dem); }
+
+// ── ЖИВОЙ РЫНОК: каждый игровой месяц ──
+const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+let clock={year:4, mon:3};
+function renderClock(){
+  const el=document.getElementById('clock');
+  el.textContent='Год '+clock.year+' · '+MONTHS[clock.mon];
+  el.style.transition='none'; el.style.color='var(--gold-br)';
+  requestAnimationFrame(()=>{ el.style.transition='color .9s'; el.style.color=''; });
+}
+function stepMonth(){
+  clock.mon++; if(clock.mon>11){ clock.mon=0; clock.year++; }
+  PRODUCTS.forEach(p=>{
+    p.mom = p.mom*0.7 + (Math.random()-0.5)*0.03;
+    let d = p.mom + (Math.random()-0.5)*0.04 + (p.base.sell - p.sell)/p.base.sell*0.05;
+    let ns = clamp(p.sell*(1+d), p.base.sell*0.6, p.base.sell*1.5);
+    p.pchg=(ns-p.sell)/p.sell; p.sell=ns;
+    let dd = p.mom*1.8 + (Math.random()-0.5)*0.06 + (p.base.dem-p.dem)/p.base.dem*0.05;
+    p.dem = clamp(p.dem*(1+dd), p.base.dem*0.4, p.base.dem*2.0);
+  });
+  if(Math.random()<0.35){ const p=PRODUCTS[(Math.random()*PRODUCTS.length)|0]; p.mom += (Math.random()<0.5?1:-1)*0.12; }
+  tickHold();                                   // склад/точка ест деньги — товар сам не продаётся
+  renderClock(); renderStrip(); renderList(); refreshHero();
+  if(wizOpen){ renderProds(); renderCountry(); renderWh(); recompute(); }
+  if(campOpen){ renderChan(); renderBud(); recompute2(); }
+}
+// Только УДЕРЖАНИЕ. Никаких авто-продаж — доход только руками.
+function tickHold(){
+  active.forEach(a=>{
+    if(a.phase!=='selling') { if(a.phase==='transit'){ a.age++; a.daysLeft-=30;
+        if(a.daysLeft<=0){ a.phase='selling'; toast('🚢 Пришла партия «'+a.p.nm+'» '+a.qLeft+' шт — легла мёртвым грузом. Пускай рекламу.'); } }
+      return; }
+    a.age++;
+    const hold = a.wh.rent + (a.m.rent||0);
+    if(hold>0){ cash -= hold; a.realized -= hold; a.holdBurn=hold; }
+  });
+}
+
+// ── Прогноз кампании (та же математика, что и при пуске, но детерминированно) ──
+function campProject(a, ch, budget){
+  const p=a.p, ps=priceScale(p), fit=FIT[p.niche][ch.id];
+  const cpl = ch.cpl * ps * (1.5 - fit*0.35) * (1.3 - skill/100*0.6);   // дешевле при скилле и фите
+  const leads = budget / cpl;
+  const priceAttr = clamp(1.2 - (p.sell/p.base.sell - 1)*0.9, 0.45, 1.35);
+  const conv = ch.conv * fit * priceAttr * a.m.convMult;
+  const grossPU = p.sell*(1-a.m.fee);
+  const expSold = Math.min(a.qLeft, leads*conv);
+  return {ps, fit, cpl, leads, priceAttr, conv, grossPU, expSold};
+}
+function luckRoll(){
+  let base = 0.45 + Math.random()*Math.random()*1.3;      // право-скошенный: чаще средне, редко высоко
+  if(Math.random()<0.06) base *= 1.8;                     // вирусный залёт
+  const floor = 0.4 + skill/100*0.45;                     // скилл поднимает дно провала
+  return Math.max(floor, base);
+}
+function fireCampaign(){
+  const a=active[campIdx]; if(!a||a.phase!=='selling') return;
+  const budget=curBudget();
+  if(budget>cash){ toast('Не хватает капитала на кампанию.'); return; }
+  const pr=campProject(a, cSel.ch, budget);
+  const luck=luckRoll();
+  let sold=Math.round(Math.min(a.qLeft, pr.leads*pr.conv*luck));
+  sold=Math.max(0,sold);
+  const grossPU=pr.grossPU;
+  const ffFee=a.wh.per*sold;
+  const revenue=sold*grossPU;
+  cash += revenue - budget - ffFee;                        // ← деньги руками: приход минус бюджет и отгрузка
+  const profit=sold*(grossPU - a.landed) - budget - ffFee;
+  a.qLeft-=sold; a.adSpent+=budget; a.realized+=profit; a.campN++;
+  a.lastCamp={ch:cSel.ch.nm, budget, sold, profit, luck};
+  // скилл от практики (затухает к потолку)
+  const gain = (0.9 + (profit>0?1.0:0.35) + Math.random()*0.7) * (1 - skill/130);
+  skill = clamp(skill + gain, 0, 100);
+  if(a.qLeft<=0){ a.phase='done'; }
+  renderList(); refreshHero(); closeCamp();
+  const hit = sold>0 && profit>0;
+  if(sold<=0) toast('💨 Кампания в «'+cSel.ch.nm.replace(/^..\s/,'')+'» слилась впустую — '+money(budget)+' сгорели, 0 продаж. Скилл +'+gain.toFixed(1)+'. Зеркало: канал мимо ниши?');
+  else if(hit) toast('🔥 Зашло! Продано '+sold+' шт · чистыми '+signed(profit)+' с кампании. Скилл +'+gain.toFixed(1)+' (таргет '+Math.round(skill)+').');
+  else toast('Продано '+sold+' шт, но в минус '+signed(profit)+' — бюджет съел маржу. Скилл +'+gain.toFixed(1)+'.');
+}
+
+// ── Слить остаток со скидкой ──
+function dumpBatch(i){
+  const a=active[i]; if(a.phase!=='selling') return;
+  const s=a.p.sell*0.55, revenue=a.qLeft*(s*(1-a.m.fee));
+  cash+=revenue; a.realized+=revenue - a.qLeft*a.landed;
+  toast('Слил остаток '+a.qLeft+' шт по −45% · вернул '+money(revenue)+' в кассу.');
+  a.qLeft=0; a.phase='done'; a.dumped=1;
+  renderList(); refreshHero();
+}
+function clearBatch(i){ active.splice(i,1); renderList(); refreshHero(); }
+
+// ── Горячее сейчас ──
+function renderStrip(){
+  const el=document.getElementById('strip'); el.innerHTML='';
+  const hot=[...PRODUCTS].sort((a,b)=>Math.abs(b.pchg)-Math.abs(a.pchg)).slice(0,8);
+  hot.forEach(p=>{
+    const up=p.pchg>=0, col=up?'var(--up)':'var(--down)';
+    const demR=p.dem/p.base.dem, heat=demR>1.25?'🔥 спрос растёт':demR<0.8?'спрос вниз':'спрос ровный';
+    const d=document.createElement('div'); d.className='hot';
+    d.innerHTML='<div class="e">'+p.e+'</div>'+
+      '<div class="nm">'+p.nm+'</div>'+
+      '<div class="pr" style="color:'+col+'">'+money(p.sell)+'</div>'+
+      '<div class="row"><span class="chg" style="color:'+col+'">'+(up?'▲':'▼')+' '+(Math.abs(p.pchg)*100).toFixed(1)+'%</span>'+
+        '<span class="dem">'+Math.round(p.dem)+'/мес</span></div>'+
+      '<div class="dem" style="margin-top:4px;color:'+(demR>1.25?'var(--up)':demR<0.8?'var(--down)':'var(--dim)')+'">'+heat+'</div>';
+    el.appendChild(d);
+  });
+}
+
+// ── Товары в работе ──
+function renderList(){
+  const el=document.getElementById('list'); el.innerHTML='';
+  active.forEach((a,i)=>{
+    let badge,prColor,prSign,prVal,sub,barColor,barW,dim='',acts='';
+    const soldTot=a.q-a.qLeft, prog=clamp(soldTot/a.q*100,0,100);
+
+    if(a.phase==='transit'){
+      badge='<div class="badge warn">в пути</div>';
+      prColor='var(--warn)'; prSign='🚢'; prVal=money(a.invest);
+      sub='Едет '+a.c.nm.replace(/^..\s/,'')+' → осталось <b>'+Math.max(0,a.daysLeft)+' дн</b> · '+a.qLeft+' шт · капитал заморожен';
+      barColor='var(--warn)'; barW=clamp(100-a.daysLeft/(a.c.days+a.l.days+30)*100, 8, 92);
+    } else if(a.phase==='scam'){
+      badge='<div class="badge bad">кинули</div>';
+      prColor='var(--down)'; prSign='▼'; prVal='−'+money(a.invest);
+      sub='Поставщик пропал с предоплатой · '+a.p.src; barColor='var(--down)'; barW=10; dim=' dim';
+      acts='<button class="actBtn clr" onclick="clearBatch('+i+')">убрать</button>';
+    } else if(a.phase==='done'){
+      badge='<div class="badge '+(a.realized>=0?'ok':'bad')+'">'+(a.dumped?'слито':'распродано')+'</div>';
+      prColor=a.realized>=0?'var(--up)':'var(--down)'; prSign=a.realized>=0?'▲':'▼'; prVal=signed(a.realized);
+      sub='Партия '+a.q+' шт закрыта · реклама '+money(a.adSpent)+' · итог по делу <b>'+signed(a.realized)+'</b>'; barColor='var(--up)'; barW=100; dim=' dim';
+      acts='<button class="actBtn clr" onclick="clearBatch('+i+')">убрать</button>';
+    } else { // selling — мёртвый груз, пока не толкнёшь
+      const dead = a.campN===0 && soldTot===0;
+      if(dead){
+        badge='<div class="badge dead">мёртвый груз</div>';
+        prColor='var(--dim)'; prSign='■'; prVal='0 продаж';
+        sub='<b>'+a.qLeft+' шт</b> лежат · '+a.m.nm.replace(/^..\s/,'')+' · склад ест <b>−'+money(a.wh.rent+(a.m.rent||0))+'/мес</b> · сам не продаётся — пускай рекламу';
+      }else{
+        badge='<div class="badge ok">в работе</div>';
+        prColor=a.realized>=0?'var(--up)':'var(--down)'; prSign=a.realized>=0?'▲':'▼'; prVal=signed(a.realized);
+        sub='Осталось <b>'+a.qLeft+'</b> из '+a.q+' шт · '+a.campN+' кампан. · реклама '+money(a.adSpent)+' · '+a.m.nm.replace(/^..\s/,'')+' · склад −'+money(a.wh.rent+(a.m.rent||0))+'/мес';
+      }
+      barColor=dead?'var(--dim)':'var(--up)'; barW=clamp(prog,3,100);
+      acts='<button class="actBtn push" onclick="openCamp('+i+')">📣 Запустить рекламу</button>'+
+           '<button class="actBtn dump" onclick="dumpBatch('+i+')">Слить</button>';
+    }
+
+    let lc='';
+    if(a.lastCamp && (a.phase==='selling'||a.phase==='done')){
+      const w=a.lastCamp.profit>=0;
+      lc='<div class="lastcamp">Последняя кампания · '+a.lastCamp.ch+' · бюджет '+money(a.lastCamp.budget)+
+         ' → продано <b>'+a.lastCamp.sold+' шт</b> · <span class="'+(w?'win':'los')+'">'+signed(a.lastCamp.profit)+'</span>'+
+         (a.lastCamp.luck>1.4?' · 🔥 попал в волну':a.lastCamp.luck<0.7?' · холодная аудитория':'')+'</div>';
+    }
+
+    const d=document.createElement('div'); d.className='card'+dim;
+    d.innerHTML=badge+
+      '<div class="top">'+
+        '<div class="ic">'+a.p.e+'</div>'+
+        '<div class="nm"><b>'+a.p.nm+'</b><span>'+sub+'</span></div>'+
+        '<div class="pr"><b style="color:'+prColor+'" class="mono">'+prSign+' '+prVal+'</b><span>'+a.p.niche+'</span></div>'+
+      '</div>'+
+      '<div class="grow"><i style="width:'+barW+'%;background:'+barColor+'"></i></div>'+
+      lc+
+      (acts?'<div class="cardacts">'+acts+'</div>':'');
+    el.appendChild(d);
+  });
+}
+function refreshHero(){
+  let transit=0, shelfU=0, shelfV=0, burn=0, realizedTot=0;
+  active.forEach(a=>{
+    realizedTot += a.realized||0;
+    if(a.phase==='transit') transit += a.invest;
+    if(a.phase==='selling'){ shelfU+=a.qLeft; shelfV+=a.qLeft*a.landed; burn += a.wh.rent+(a.m.rent||0); }
+  });
+  const hc=document.getElementById('hCap'); hc.textContent=money(cash);
+  hc.style.transition='none'; hc.style.color='var(--gold-br)';
+  requestAnimationFrame(()=>{ hc.style.transition='color 1s'; hc.style.color=''; });
+  const hp=document.getElementById('hProfit');
+  hp.style.color=realizedTot>=0?'var(--up)':'var(--down)';
+  hp.textContent=(realizedTot>=0?'▲ ':'▼ ')+signed(realizedTot)+' заработано всего';
+  document.getElementById('hBurn').textContent='−'+money(burn);
+  document.getElementById('hTransit').textContent=money(transit);
+  document.getElementById('hShelf').textContent=shelfU+' шт ('+money(shelfV)+')';
+  // скилл
+  document.getElementById('skVal').textContent=Math.round(skill);
+  document.getElementById('skFill').style.width=clamp(skill,2,100)+'%';
+  document.getElementById('skRank').textContent=skRank();
+}
+
+// ══════════ МАСТЕР: завести товар ══════════
+let sel={p:null, q:0, c:COUNTRY[0], l:LOG[0], m:MP[0], wh:WH[1]}, wizOpen=false;
+function selectProduct(o){
+  sel.p=o; sel.q=o.moq;
+  sel.wh = o.big ? WH[1] : (o.moq<=WH[0].cap ? WH[0] : WH[1]);
+  renderProds(); renderCountry(); renderWh(); syncQty(); recompute();
+}
+function renderProds(){
+  const g=document.getElementById('prodGrid'); g.innerHTML='';
+  PRODUCTS.forEach(o=>{
+    const up=o.pchg>=0,col=up?'var(--up)':'var(--down)';
+    const d=document.createElement('div');
+    d.className='prod'+(sel.p&&sel.p.id===o.id?' on':'');
+    d.innerHTML='<div class="e">'+o.e+'</div>'+
+      '<div class="t"><b>'+o.nm+'</b><span>'+o.niche+' · из '+o.src+' · от '+o.moq+' шт</span></div>'+
+      '<div class="pp"><b style="color:'+col+'">'+money(o.sell)+'</b><span style="color:'+col+'">'+(up?'▲':'▼')+(Math.abs(o.pchg)*100).toFixed(1)+'%</span></div>';
+    d.onclick=()=>selectProduct(o); g.appendChild(d);
+  });
+}
+function renderCountry(){
+  const el=document.getElementById('optCountry'); el.innerHTML='';
+  COUNTRY.forEach(o=>{
+    const d=document.createElement('div'); d.className='opt'+(sel.c.id===o.id?' on':'');
+    const priceLine = sel.p ? '<div class="price">закуп '+money(buyPrice(sel.p,o))+' /шт</div>' : '';
+    d.innerHTML='<b>'+o.nm+'</b>'+priceLine+'<span>'+o.note+'</span>';
+    d.onclick=()=>{ sel.c=o; renderCountry(); syncQty(); recompute(); };
+    el.appendChild(d);
+  });
+}
+function renderWh(){
+  const el=document.getElementById('optWh'); el.innerHTML='';
+  WH.forEach(o=>{
+    const bad = sel.p && !o.big && (sel.p.big || sel.q>o.cap);
+    const d=document.createElement('div'); d.className='opt'+(sel.wh.id===o.id?' on':'')+(bad?' bad':'');
+    const costLine = o.rent>0 ? '<div class="price">'+money(o.rent)+' /мес</div>' : (o.per>0?'<div class="price">'+money(o.per)+' /шт</div>':'<div class="price" style="color:var(--up)">бесплатно</div>');
+    d.innerHTML='<b>'+o.nm+'</b>'+costLine+'<span>'+(bad?'габарит/партия не влезет':o.note)+'</span>';
+    d.onclick=()=>{ sel.wh=o; renderWh(); recompute(); };
+    el.appendChild(d);
+  });
+}
+function renderMp(){
+  const el=document.getElementById('optMp'); el.innerHTML='';
+  MP.forEach(o=>{
+    const d=document.createElement('div'); d.className='opt'+(sel.m.id===o.id?' on':'');
+    const line = o.rent>0 ? '<div class="price">аренда '+money(o.rent)+'/мес</div>' : (o.fee>0?'<div class="price">комиссия '+(o.fee*100)+'%</div>':'<div class="price" style="color:var(--up)">без комиссии</div>');
+    d.innerHTML='<b>'+o.nm+'</b>'+line+'<span>'+o.note+'</span>';
+    d.onclick=()=>{ sel.m=o; renderMp(); recompute(); };
+    el.appendChild(d);
+  });
+}
+function landedNow(){ return sel.p ? landedOf(sel.p,sel.c,sel.l) : 0; }
+function syncQty(){ const inp=document.getElementById('qtyInput'); if(sel.p&&inp) inp.value=sel.q; updateQtyInfo(); }
+function onQty(){ if(!sel.p) return; const v=parseInt(document.getElementById('qtyInput').value,10)||0;
+  sel.q=Math.max(sel.p.moq, v||sel.p.moq); updateQtyInfo(); recompute(); }
+function setQty(mode){ if(!sel.p) return;
+  if(mode==='min') sel.q=sel.p.moq; else sel.q=Math.max(sel.p.moq, Math.floor(cash/landedNow()));
+  syncQty(); recompute(); }
+function updateQtyInfo(){
+  const el=document.getElementById('qtyInfo');
+  if(!sel.p){ el.textContent='—'; return; }
+  const invest=sel.q*landedNow();
+  const over = invest>cash ? ' <span style="color:var(--down)">— не хватает капитала (свободно '+money(cash)+')</span>' : '';
+  el.innerHTML='Партия <b>'+sel.q+' шт</b> · закуп '+money(landedNow())+'/шт · вложить <b>'+money(invest)+'</b> · мин. партия '+sel.p.moq+' шт'+over;
+}
+function renderOpts(cont,arr,key){
+  const el=document.getElementById(cont); el.innerHTML='';
+  arr.forEach(o=>{
+    const d=document.createElement('div'); d.className='opt'+(sel[key].id===o.id?' on':'');
+    d.innerHTML='<b>'+o.nm+'</b><span>'+o.note+'</span>';
+    d.onclick=()=>{ sel[key]=o; renderOpts(cont,arr,key); if(key==='l') syncQty(); recompute(); };
+    el.appendChild(d);
+  });
+}
+function recompute(){
+  const btn=document.getElementById('pBtn');
+  if(!sel.p){ document.getElementById('pInvest').textContent='—'; document.getElementById('pMargin').textContent='—';
+    document.getElementById('pMeta').textContent='Выбери товар, чтобы увидеть расклад.'; btn.disabled=true; return; }
+  const landed=landedNow(), perUnit=sel.p.sell*(1-sel.m.fee)-landed, invest=sel.q*landed;
+  const days=Math.max(3, sel.c.days+sel.l.days);
+  const valid = !( !sel.wh.big && (sel.p.big || sel.q>sel.wh.cap) );
+  const overCap=invest>cash;
+  document.getElementById('pInvest').innerHTML='<span style="color:'+(overCap?'var(--down)':'var(--ink)')+'">'+money(invest)+'</span>';
+  document.getElementById('pMargin').innerHTML='<span style="color:'+(perUnit<=0?'var(--down)':'var(--up)')+'">'+money(perUnit)+'</span>';
+  document.getElementById('pMeta').innerHTML=
+    'Партия <b>'+sel.q+' шт</b> из <b>'+sel.c.nm.replace(/^..\s/,'')+'</b> · закуп <b>'+money(landed)+'/шт</b>, продаём по <b>'+money(sel.p.sell)+'</b> · маржа <b>'+money(perUnit)+'</b> с шт после комиссии.<br>'+
+    'Придёт через <b>'+days+' дн.</b> · ляжет мёртвым грузом на <b>'+sel.wh.nm.replace(/^..\s/,'')+'</b> · склад −'+money(sel.wh.rent+(sel.m.rent||0))+'/мес · риск кидка <b>'+sel.c.scam+'%</b>. Продавать — рекламой, руками.'+
+    (!valid?'<br><span style="color:var(--down)">🏠 Дома не влезет габарит/большая партия — арендуй склад или фулфилмент.</span>':'')+
+    (perUnit<=0?'<br><span style="color:var(--down)">Маржа в минус ещё до рекламы — смени страну/площадку.</span>':'')+
+    (overCap?'<br><span style="color:var(--down)">Не хватает капитала: свободно '+money(cash)+'. Уменьши партию.</span>':'');
+  btn.disabled = !valid || overCap || perUnit<=0;
+}
+function openWiz(){
+  selectProduct(PRODUCTS[13]);
+  renderOpts('optLog',LOG,'l'); renderMp();
+  wizOpen=true; document.getElementById('sw').classList.add('open'); document.getElementById('shScroll').scrollTop=0;
+}
+function closeWiz(){ wizOpen=false; document.getElementById('sw').classList.remove('open'); }
+function launch(){
+  if(!sel.p) return;
+  const landed=landedNow(), invest=sel.q*landed, days=Math.max(3, sel.c.days+sel.l.days);
+  const valid = !( !sel.wh.big && (sel.p.big || sel.q>sel.wh.cap) );
+  if(!valid || invest>cash) return;
+  cash-=invest;
+  const b=mkBatch(sel.p,sel.q,sel.c,sel.l,sel.m,sel.wh);
+  const scammed=Math.random()*100<sel.c.scam;
+  if(scammed){ b.phase='scam'; b.realized=-invest; }
+  else { b.phase='transit'; b.daysLeft=days; }
+  active.unshift(b); renderList(); refreshHero(); closeWiz();
+  if(scammed) toast('⚠️ '+sel.c.nm.replace(/^..\s/,'')+': поставщик пропал с предоплатой '+money(invest)+'. Зеркало — жадный закуп без эскроу.');
+  else toast('✅ Заказал «'+sel.p.nm+'» '+sel.q+' шт · '+money(invest)+' ушло, едет '+days+' дн. Придёт — толкай рекламой.');
+}
+
+// ══════════ СЕРДЦЕ: кампания ══════════
+let campOpen=false, campIdx=-1, cSel={ch:null, bud:null};
+function curBudget(){ if(!cSel.bud||campIdx<0) return 0; const a=active[campIdx]; return Math.round(BUD_BASE*priceScale(a.p)*cSel.bud.mult); }
+function openCamp(i){
+  const a=active[i]; if(!a||a.phase!=='selling') return;
+  campIdx=i; campOpen=true;
+  cSel.ch = CHANNELS.reduce((best,c)=> FIT[a.p.niche][c.id]>FIT[a.p.niche][best.id]?c:best, CHANNELS[0]); // подсветить лучший фит
+  cSel.bud = BUDGETS[1];
+  document.getElementById('cTtlTxt').textContent='Запустить рекламу '+a.p.e;
+  document.getElementById('cSub').textContent=a.p.nm+' · осталось '+a.qLeft+' шт · '+a.m.nm.replace(/^..\s/,'')+' · продаём по '+money(a.p.sell);
+  renderChan(); renderBud(); recompute2();
+  document.getElementById('cw').classList.add('open'); document.getElementById('cScroll').scrollTop=0;
+}
+function closeCamp(){ campOpen=false; document.getElementById('cw').classList.remove('open'); }
+function renderChan(){
+  const el=document.getElementById('cChan'); el.innerHTML=''; const a=active[campIdx]; if(!a) return;
+  CHANNELS.forEach(o=>{
+    const fit=FIT[a.p.niche][o.id];
+    const fitTxt = fit>=1.2?'🎯 в точку под нишу':fit>=1.0?'ровно':fit>=0.9?'так себе':'мимо ниши';
+    const fitCol = fit>=1.2?'var(--up)':fit>=1.0?'var(--muted)':'var(--down)';
+    const d=document.createElement('div'); d.className='opt'+(cSel.ch&&cSel.ch.id===o.id?' on':'');
+    d.innerHTML='<b>'+o.nm+'</b><div class="fit" style="color:'+fitCol+'">'+fitTxt+'</div><span>'+o.note+'</span>';
+    d.onclick=()=>{ cSel.ch=o; renderChan(); recompute2(); };
+    el.appendChild(d);
+  });
+}
+function renderBud(){
+  const el=document.getElementById('cBud'); el.innerHTML=''; const a=active[campIdx]; if(!a) return;
+  BUDGETS.forEach(o=>{
+    const amt=Math.round(BUD_BASE*priceScale(a.p)*o.mult);
+    const over=amt>cash;
+    const d=document.createElement('div'); d.className='opt'+(cSel.bud&&cSel.bud.id===o.id?' on':'')+(over?' bad':'');
+    d.innerHTML='<b>'+o.nm+'</b><div class="price">'+money(amt)+'</div><span>'+(over?'не хватает кассы':o.note)+'</span>';
+    d.onclick=()=>{ cSel.bud=o; renderBud(); recompute2(); };
+    el.appendChild(d);
+  });
+}
+function recompute2(){
+  const btn=document.getElementById('cBtn'); const a=active[campIdx];
+  if(!a||!cSel.ch||!cSel.bud){ btn.disabled=true; return; }
+  const budget=curBudget(), over=budget>cash;
+  const pr=campProject(a, cSel.ch, budget);
+  const exp=pr.expSold;
+  const lo=Math.round(Math.min(a.qLeft, exp*(0.4+skill/100*0.45)));
+  const hi=Math.round(Math.min(a.qLeft, exp*1.7));
+  const midProfit = exp*(pr.grossPU - a.landed) - budget - a.wh.per*exp;
+  document.getElementById('cSpend').innerHTML='<span style="color:'+(over?'var(--down)':'var(--ink)')+'">'+money(budget)+'</span>';
+  document.getElementById('cSold').innerHTML='<span style="color:var(--gold-br)">≈'+lo+'–'+hi+' шт</span>';
+  document.getElementById('cMeta').innerHTML=
+    'Канал <b>'+cSel.ch.nm.replace(/^..\s/,'')+'</b> · фит под «'+a.p.niche+'» <b>×'+FIT[a.p.niche][cSel.ch.id].toFixed(2)+'</b> · твой таргет <b>'+Math.round(skill)+'/100</b>.<br>'+
+    'Прогноз <b>≈'+Math.round(exp)+' шт</b> (разброс от удачи) · чистыми с кампании <b style="color:'+(midProfit>=0?'var(--up)':'var(--down)')+'">'+signed(midProfit)+'</b> в среднем.<br>'+
+    '<span style="color:var(--dim)">Исход решают: попадание канала, цена товара сейчас, скилл и удача. Может залететь виралом, может слиться впустую.</span>'+
+    (over?'<br><span style="color:var(--down)">Бюджет больше свободной кассы '+money(cash)+'.</span>':'');
+  btn.disabled=over;
+}
+
+// ══════════ ℹ️ КАК ЭТО РАБОТАЕТ (как во всей игре) ══════════
+const TOVARKA_HOWTO = {
+  t:'📦 Как работает Товарка',
+  intro:'Тренажёр товарного бизнеса. Закупаешь партию — она приходит мёртвым грузом и сама не продаётся, а склад ест деньги. Продажи вытаскиваешь руками — рекламой.',
+  steps:[
+    ['🛒','Заводишь товар','Кнопка «＋ Завести новый товар»: выбираешь что везём (цена живая), СКОЛЬКО ШТУК берёшь сам, откуда закуп (страна: цена/пошлина/срок/риск кидка), логистику, склад и где продаём (Kaspi / свой профиль / точка).'],
+    ['📦','Партия = мёртвый груз','Пришла — лежит, продаж ноль, а склад отщипывает от кассы каждый месяц. Это давление: хочешь денег — иди раскручивай.'],
+    ['📣','Запусти рекламу','На карточке жми «Запустить рекламу»: канал (TikTok / YouTube / Instagram — у каждого своё попадание под нишу) × бюджет (Проба / Норма / Мощно, разовый) → ПУСК. Деньги ушли — получаешь исход.'],
+    ['🎲','Исход с разбросом','Решают четверо: попадание канала, цена товара сейчас, твой скилл и удача. Может залететь виралом, может слиться впустую. Прогноз даёт вилку — точное решает бросок.'],
+    ['🎯','Скилл от практики','Каждая кампания качает таргет-скилл: дешевле лиды, точнее попадание. Набивай руку — мастерство тут реальный перевес.'],
+    ['🧹','Завис — слей','Рынок повернулся, остаток лежит и ест склад? Кнопка «Слить» вернёт часть денег в кассу. Держать мёртвый груз — ошибка.'],
+  ],
+  foot:'Два закона: 🪞 Зеркало — как ведёшь дело, такова судьба (жадный закуп без страховки → кидок, промах каналом → минус). ⚖️ Внимание — пассив не бесплатный: не следишь, груз ест деньги.'
+};
+function openInfo(){
+  const g=TOVARKA_HOWTO;
+  document.getElementById('infoCard').innerHTML =
+    '<div class="ttl">'+g.t+'</div>'+
+    '<div class="intro">'+g.intro+'</div>'+
+    g.steps.map(s=>'<div class="step"><span class="ic">'+s[0]+'</span><div><div class="nm">'+s[1]+'</div><div class="tx">'+s[2]+'</div></div></div>').join('')+
+    (g.foot?'<div class="foot">'+g.foot+'</div>':'')+
+    '<button class="ok" onclick="closeInfo()">Понятно</button>';
+  document.getElementById('infoWrap').classList.add('open');
+}
+function closeInfo(){ document.getElementById('infoWrap').classList.remove('open'); }
+
+let tT; function toast(t){ const el=document.getElementById('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(tT); tT=setTimeout(()=>el.classList.remove('show'),3800); }
+
+// старт
+renderClock(); renderStrip(); renderList(); refreshHero();
+setInterval(stepMonth, 2800); // 1 шаг = +1 игровой месяц
+</script>
