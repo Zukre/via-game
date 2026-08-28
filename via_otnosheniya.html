@@ -1,0 +1,1609 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Отношения VIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap">
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root{
+    color-scheme:dark;
+    --bg:#0d0709; --bg2:#080405;
+    --surf:#1c1216; --surf2:#150d10; --line:#2b1d23;
+    --ink:#f4eaed; --muted:#b6a0a7; --dim:#7c626b;
+    --rose:#ff7d9c; --rose-br:#ff9db4; --rose-ln:rgba(255,125,156,.26);
+    --gold:#e8c877; --gold-br:#f4dd9c;
+    --warm:#ff9db4; --cold:#7e93ad; --good:#6ee0a6; --bad:#ff6b72;
+    --serif:"Cormorant Garamond",Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  html,body{ background:var(--bg2); }
+  body{ font-family:var(--sans); color:var(--ink);
+    background:radial-gradient(130% 55% at 50% -8%, rgba(255,125,156,.09), transparent 60%), linear-gradient(180deg,#100a0d,#070405);
+    min-height:100vh; padding:calc(14px + env(safe-area-inset-top)) 0 44px; }
+  .mono{ font-variant-numeric:tabular-nums; }
+  .wrap{ max-width:600px; margin:0 auto; padding:0 15px; }
+
+  .head{ display:flex; align-items:center; gap:9px; margin-bottom:14px; }
+  .mark{ width:34px; height:34px; border-radius:10px; flex:0 0 34px; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(120% 120% at 30% 20%, #ffb3c4, #ff7d9c 60%, #c94f6c); color:#2a0d14; font-weight:800; font-size:17px; }
+  .head h1{ font-size:19px; font-weight:800; letter-spacing:.01em; }
+  .head .info{ margin-left:auto; background:rgba(255,125,156,.1); border:1px solid var(--rose-ln); border-radius:9px;
+    color:var(--rose-br); font-size:14px; padding:3px 9px; cursor:pointer; font-weight:700; }
+
+  /* Герой: партнёр + тепло */
+  .hero{ border:1px solid var(--rose-ln); border-radius:20px; overflow:hidden; margin-bottom:14px;
+    background:radial-gradient(120% 90% at 100% 0, rgba(232,200,119,.06), transparent 55%), radial-gradient(120% 100% at 0 0, rgba(255,125,156,.10), transparent 50%), linear-gradient(180deg,#241820,#150d11); padding:16px 17px; }
+  .hero .top{ display:flex; align-items:center; gap:13px; }
+  .hero .ava{ width:52px; height:52px; border-radius:15px; flex:0 0 52px; display:flex; align-items:center; justify-content:center;
+    font-size:28px; background:linear-gradient(180deg,#33222a,#241820); border:1px solid var(--rose-ln); }
+  .hero .who b{ font-size:18px; font-weight:800; letter-spacing:-.01em; display:block; }
+  .hero .who span{ font-size:12.5px; color:var(--muted); }
+  .hero .stage{ margin-left:auto; text-align:right; }
+  .hero .stage .s{ font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); font-weight:800; }
+  .hero .stage .m{ font-size:11.5px; color:var(--dim); margin-top:2px; }
+
+  .warm{ margin-top:15px; }
+  .warm .lbl{ display:flex; justify-content:space-between; align-items:baseline; font-size:12px; }
+  .warm .lbl .t{ font-weight:800; color:#e9d3da; letter-spacing:.02em; }
+  .warm .lbl .t em{ font-style:normal; color:var(--rose-br); }
+  .warm .lbl .v{ font-weight:800; }
+  .wbar{ height:11px; border-radius:7px; background:rgba(255,255,255,.06); margin-top:8px; overflow:hidden; position:relative; }
+  .wbar i{ display:block; height:100%; border-radius:7px; transition:width .6s, background .6s; }
+  .warm .hint{ font-size:11px; color:var(--dim); margin-top:7px; }
+  .hero .cash{ display:flex; gap:14px; margin-top:13px; padding-top:12px; border-top:1px solid rgba(255,255,255,.06); font-size:12.5px; color:var(--muted); }
+  .hero .cash b{ color:#e9d3da; font-weight:700; }
+
+  .secttl{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.09em; color:var(--dim); margin:16px 3px 10px; }
+
+  /* Событие партнёра */
+  .event{ border:1px solid var(--rose-ln); border-radius:18px; overflow:hidden; margin-bottom:8px;
+    background:linear-gradient(180deg,#221620,#160e12); }
+  .event .said{ padding:16px 17px 4px; display:flex; gap:11px; }
+  .event .said .a{ font-size:24px; flex:0 0 auto; }
+  .event .said .q{ font-family:var(--serif); font-size:20px; line-height:1.32; font-style:italic; color:#ffe7ee; }
+  .event .kind{ font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--rose-br); font-weight:800; padding:2px 17px 0 44px; }
+  .opts{ padding:12px 14px 14px; display:grid; gap:8px; }
+  .opt{ text-align:left; border:1px solid var(--line); background:var(--surf2); border-radius:13px; padding:12px 14px; cursor:pointer;
+    color:#ecdfe3; font-size:14.5px; font-weight:600; font-family:inherit; transition:.13s; line-height:1.4; }
+  .opt:hover{ border-color:var(--rose-ln); background:#221620; }
+  .opt:active{ transform:scale(.99); }
+
+  /* Тихо — проактивные действия */
+  .idle{ border:1px solid var(--line); border-radius:18px; padding:15px 16px; margin-bottom:8px; background:linear-gradient(180deg,var(--surf),var(--surf2)); }
+  .idle .q{ font-family:var(--serif); font-style:italic; font-size:17px; color:var(--muted); text-align:center; }
+  .acts{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:13px; }
+  .act{ border:1px solid var(--line); background:var(--surf2); border-radius:13px; padding:11px 12px; cursor:pointer; font-family:inherit; transition:.13s; text-align:left; }
+  .act:hover{ border-color:var(--rose-ln); }
+  .act:active{ transform:scale(.98); }
+  .act b{ display:block; font-size:13.5px; font-weight:800; color:#f0e2e6; }
+  .act span{ font-size:11px; color:var(--dim); }
+
+  .live{ width:100%; border:none; border-radius:14px; padding:14px; font-size:15px; font-weight:800; cursor:pointer; margin:10px 0 4px;
+    font-family:inherit; background:linear-gradient(180deg,#ff9db4,#ff7d9c); color:#2a0d14; box-shadow:0 6px 20px -9px rgba(255,125,156,.6); }
+  .live:active{ transform:scale(.99); }
+  .live small{ display:block; font-size:11px; font-weight:600; color:#5c1826; margin-top:1px; }
+
+  /* Зеркало-портрет */
+  .mirror{ border:1px solid var(--gold-br); border-radius:18px; overflow:hidden; margin-top:16px;
+    background:radial-gradient(120% 90% at 50% 0,rgba(232,200,119,.07),transparent 60%), linear-gradient(180deg,#1c1720,#120d13); padding:16px 17px; }
+  .mirror .mh{ display:flex; align-items:center; gap:8px; }
+  .mirror .mh b{ font-family:var(--serif); font-style:italic; font-size:19px; color:var(--gold-br); font-weight:600; }
+  .mirror .mh span{ margin-left:auto; font-size:11px; color:var(--dim); }
+  .trait{ margin-top:12px; }
+  .trait .tl{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px; }
+  .trait .tl b{ font-weight:700; color:#e9dcc8; } .trait .tl span{ color:var(--dim); font-weight:700; }
+  .tbar{ height:6px; border-radius:4px; background:rgba(255,255,255,.06); overflow:hidden; }
+  .tbar i{ display:block; height:100%; border-radius:4px; transition:width .6s; background:linear-gradient(90deg,#d9b877,#f4dd9c); }
+  .verdict{ font-family:var(--serif); font-style:italic; font-size:15.5px; color:#e9dcc8; line-height:1.45; text-align:center; margin-top:15px; padding-top:13px; border-top:1px solid rgba(232,200,119,.16); }
+
+  .foot{ text-align:center; font-size:11px; color:var(--dim); margin-top:20px; line-height:1.6; }
+
+  /* инфо-окно */
+  .im{ position:fixed; inset:0; z-index:9700; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(4,3,3,.9); overflow:auto; }
+  .im.open{ display:flex; }
+  .im .c{ width:460px; max-width:100%; max-height:90vh; overflow:auto; border:1px solid var(--rose-br); border-radius:18px; padding:22px 20px; background:linear-gradient(180deg,#1e141a,#120b0e); }
+  .im .c .t{ text-align:center; font-family:var(--serif); font-size:21px; font-weight:600; color:var(--rose-br); }
+  .im .c .in{ text-align:center; font-size:12.5px; color:var(--muted); line-height:1.55; margin:8px 0 14px; }
+  .im .st{ display:flex; gap:11px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--line); }
+  .im .st .ic{ font-size:21px; } .im .st b{ display:block; font-size:14px; color:#f3e6ea; } .im .st span{ font-size:12px; color:var(--muted); line-height:1.5; }
+  .im .ok{ width:100%; margin-top:14px; border:none; border-radius:12px; padding:12px; font-weight:800; font-family:inherit; cursor:pointer; background:linear-gradient(180deg,#ff9db4,#ff7d9c); color:#2a0d14; }
+
+  #toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(28px); z-index:9600; opacity:0; pointer-events:none;
+    background:linear-gradient(180deg,#2a1a22,#1c1216); border:1px solid var(--rose-ln); color:var(--ink); padding:12px 17px; border-radius:14px;
+    font-size:13.5px; font-weight:600; max-width:90%; text-align:center; transition:.28s; box-shadow:0 12px 30px -10px rgba(0,0,0,.7); }
+  #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* Входящий ЗВОНОК от неё — критические моменты, забвение, уход (как в жизни) */
+  .call{ position:fixed; inset:0; z-index:9800; display:none; flex-direction:column; align-items:center; justify-content:center; padding:26px 22px calc(26px + env(safe-area-inset-bottom));
+    background:radial-gradient(120% 75% at 50% 12%, rgba(255,125,156,.17), transparent 62%), rgba(6,4,5,.95); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); text-align:center; }
+  .call.open{ display:flex; }
+  .call .rings{ font-size:11.5px; letter-spacing:.24em; text-transform:uppercase; font-weight:800; margin-bottom:20px; }
+  .call.incoming .rings{ color:var(--rose-br); } .call.bye .rings{ color:var(--cold); }
+  .call .ph{ width:148px; height:148px; border-radius:50%; overflow:hidden; flex:0 0 148px; display:flex; align-items:center; justify-content:center; font-size:70px;
+    background:linear-gradient(180deg,#33222a,#241820); border:3px solid var(--rose-br); }
+  .call.incoming .ph{ animation:ring 1.5s infinite; }
+  .call.bye .ph{ border-color:var(--cold); filter:grayscale(.55) brightness(.85); }
+  .call .ph img{ width:100%; height:100%; object-fit:cover; }
+  @keyframes ring{ 0%{ box-shadow:0 0 0 0 rgba(255,125,156,.55);} 70%{ box-shadow:0 0 0 24px rgba(255,125,156,0);} 100%{ box-shadow:0 0 0 0 rgba(255,125,156,0);} }
+  .call .nm{ font-size:27px; font-weight:800; margin-top:20px; letter-spacing:-.01em; }
+  .call .sub{ font-size:13px; color:var(--muted); margin-top:5px; }
+  .call .say{ font-family:var(--serif); font-style:italic; font-size:19px; color:#ffe7ee; line-height:1.42; margin:17px 4px 0; max-width:430px; }
+  .call.bye .say{ color:#d9c3ca; }
+  .call .btns{ display:flex; gap:46px; margin-top:32px; }
+  .call .cbtn{ display:flex; flex-direction:column; align-items:center; gap:9px; border:none; background:none; cursor:pointer; font-family:inherit; }
+  .call .cbtn .ic{ width:66px; height:66px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:29px; color:#fff; box-shadow:0 8px 22px -8px rgba(0,0,0,.7); }
+  .call .cbtn.dec .ic{ background:linear-gradient(180deg,#d94048,#b8242c); }
+  .call .cbtn.acc .ic{ background:linear-gradient(180deg,#39c47a,#2aa863); animation:acc 1.3s infinite; }
+  .call .cbtn.one .ic{ background:linear-gradient(180deg,#8f7bb0,#6d5a90); }
+  @keyframes acc{ 0%,100%{ transform:none;} 50%{ transform:scale(1.09);} }
+  .call .cbtn span{ font-size:12px; color:var(--muted); font-weight:600; }
+
+  @media (prefers-reduced-motion:reduce){ *{ transition:none !important; animation:none !important; } }
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <div class="mark">V</div>
+    <h1>Отношения</h1>
+    <button class="info" onclick="openInfo()">ℹ️</button>
+  </div>
+
+  <div id="bigPhoto" style="display:none"></div>
+
+  <div class="hero">
+    <div class="top">
+      <div class="ava" id="ava">👩</div>
+      <div class="who"><b id="pname">Аля</b><span id="pdesc">Тёплая, живая, хочет чувствовать, что нужна</span></div>
+      <div class="stage"><div class="s" id="stage">Встречаетесь</div><div class="m" id="clock">Вместе 8 мес</div></div>
+    </div>
+    <div class="warm">
+      <div class="lbl"><span class="t">❤️ <em>Тепло</em> связи</span><span class="v mono" id="wval">—</span></div>
+      <div class="wbar"><i id="wfill"></i></div>
+      <div class="hint" id="whint">Тепло тает само каждый месяц. Греешь — вниманием и временем, а не только деньгами.</div>
+    </div>
+    <div class="cash">
+      <span>💵 Касса: <b id="cash">$4 000</b></span>
+      <span>🪞 Портрет: <b id="pdone">собирается…</b></span>
+    </div>
+  </div>
+
+  <div class="secttl" id="evttl">Сейчас между вами</div>
+  <div id="stageArea"></div>
+
+  <div id="rivalWarn" style="display:none"></div>
+
+  <button class="live" id="liveBtn" onclick="toggleAuto()"><span id="livetop">▶ Начать жить</span> <small id="livesub">время пойдёт само — успевай добиваться</small></button>
+
+  <div id="insight" style="display:none"></div>
+
+  <div class="mirror">
+    <div class="mh"><span>🪞</span><b>Зеркало: какой ты в близости</b><span id="mtag">по твоим выборам</span></div>
+    <div id="traits"></div>
+    <div class="verdict" id="verdict">Сыграй пару ходов — и зеркало покажет тебя.</div>
+  </div>
+
+  <div class="foot">
+    Превью ветки «Отношения» · сердце = внимание и баланс.<br>
+    Партнёр живой: сам спрашивает и проверяет. Как отвечаешь — греет связь И собирает твой портрет. Забросил ради дела — тепло стынет, дальше кризис.
+  </div>
+</div>
+
+<!-- инфо -->
+<div class="im" id="im" onclick="if(event.target===this)closeInfo()">
+  <div class="c">
+    <div class="t">❤️ Как работают Отношения</div>
+    <div class="in">Живая история с партнёром. Держится на Законе Внимания: забросил — тает; и Законе Зеркала: как относишься — так и отзеркалит.</div>
+    <div class="st"><span class="ic">❤️</span><div><b>Тепло связи</b><span>Каждый месяц само тает. Поднимаешь вниманием: свидания, разговоры, время — они стоят денег и хода, потому и спорят с делом. В этом весь баланс.</span></div></div>
+    <div class="st"><span class="ic">💬</span><div><b>Партнёр живой</b><span>Сам спрашивает, ревнует, зовёт в будущее, испытывает. Как ответишь — греет/студит связь И выдаёт тебя.</span></div></div>
+    <div class="st"><span class="ic">🪜</span><div><b>Вехи</b><span>Тепло и время открывают: живёте вместе → свадьба → семья. Ставки растут — терять больнее.</span></div></div>
+    <div class="st"><span class="ic">🪞</span><div><b>Зеркало</b><span>Каждый выбор копит твой портрет: честный/врёшь, заботливый/эгоист, верный, человек выше дела. В конце ты видишь себя.</span></div></div>
+    <div class="st"><span class="ic">💔</span><div><b>Разрыв</b><span>Тепло в ноль → кризис → развод: раздел (удар по кассе) и алименты (месячный расход). Внимание не бесплатно.</span></div></div>
+    <button class="ok" onclick="closeInfo()">Понятно</button>
+  </div>
+</div>
+<div id="toast"></div>
+<div class="call" id="call"></div>
+
+<script>
+function money(n){ const a=Math.abs(n); if(a>=1000) return '$'+Math.round(n).toLocaleString('en-US').replace(/,/g,' '); return '$'+Math.round(n); }
+
+// ── ПОЛ ИНТЕРЕСА: 'm' = игрок выбирает девушек (партнёр — она), 'f' = выбирает парней (партнёр — он) ──
+function roster(){ return (typeof st!=='undefined' && st.sex==='f') ? GUYS : GIRLS; }
+function isF(){ return (typeof st!=='undefined' && st.sex==='f'); }
+// местоимения ПАРТНЁРА (он/она) и ИГРОКА (был/была) — переключаются по полу интереса
+function P(){ return isF()
+  ? {n:'он',N:'Он',a:'его',d:'ему',gone:'ушёл',tired:'устал',said:'сказал',put:'положил',made:'сделал',spouse:'муж',spouseA:'мужа',knew:'узнал',got:'загорелся',rivalWho:'другая',rivalTo:'к ней'}
+  : {n:'она',N:'Она',a:'её',d:'ей',gone:'ушла',tired:'устала',said:'сказала',put:'положила',made:'сделала',spouse:'жена',spouseA:'жену',knew:'узнала',got:'загорелась',rivalWho:'другой',rivalTo:'к нему'}; }
+function U(){ return isF()
+  ? {hid:'скрывала',what:'какая',chased:'добивалась',were:'была',gave:'дала',calmed:'успокоила'}
+  : {hid:'скрывал',what:'какой',chased:'добивался',were:'был',gave:'дал',calmed:'успокоил'}; }
+
+// ══ МОСТ С ИГРОЙ (когда модуль открыт в iframe единого бланка) ══
+// Касса модуля = savings игрока. Модуль шлёт rel_ready → игра отдаёт баланс+сохранёнку+игровой год.
+// На каждое движение модуль шлёт rel_state (cash + снимок). Алименты после развода уходят в месячный поток игры.
+const EMB = (function(){ try{ return window.parent && window.parent!==window; }catch(e){ return false; } })();
+let _relReady=false;
+function relSnapshot(){
+  return { sex:st.sex||'m', he:(st.sex==='f'), partnerId: st.partner?st.partner.id:null, phase:st.phase, stage:st.stage, months:st.months, warm:st.warm,
+    t:Object.assign({},st.t), moves:st.moves, over:st.over, overReason:st.overReason, rival:st.rival, pool:(st.pool||[]).slice(),
+    married:st.married, kids:st.kids, herBiz:st.herBiz, herBizMonths:st.herBizMonths, flat:st.flat, patience:st.patience, respect:st.respect,
+    betrayalShown:st.betrayalShown, settle:st.settle, lastYear:st.lastYear||1,
+    monthly: (st.over && st.settle && st.settle.alimony)?st.settle.alimony:0,   // алименты → в Доход-расход игры
+    // для перебивки поверх бланка: игре нужно знать, звонит ли она сейчас, и её лицо/реплику
+    name: st.partner?st.partner.name:'', face: st.partner?st.partner.face:'', ava: st.partner?st.partner.ava:'',
+    incoming: !!(st.event && st.incoming && !st.answered && !st.over),
+    callQ: st.event?st.event.q:'', callKind: st.event?st.event.kind:'', farewellSeen: !!st.farewellSeen,
+    cardGiven: !!st.cardGiven, spend: st.lastSpend };   // spend = последнее списание по карте → игра покажет отчёт
+}
+function relPost(){ if(!EMB || !_relReady) return; try{ window.parent.postMessage({type:'rel_state', cash:st.cash, state:relSnapshot()},'*'); }catch(e){} }
+function relHydrate(s){ if(!s) return; st.sex=(s.sex==='f')?'f':'m'; const g=roster().find(x=>x.id===s.partnerId);
+  st.partner=g||null; st.phase=s.phase||(g?'together':'choose'); st.stage=s.stage||'Встречаетесь'; st.months=s.months||0; st.warm=(s.warm==null?0:s.warm);
+  st.t=Object.assign({honesty:50,care:50,loyal:50,presence:50,priority:50}, s.t||{}); st.moves=s.moves||0;
+  st.over=!!s.over; st.overReason=s.overReason||null; st.rival=s.rival||0; if(s.pool&&s.pool.length) st.pool=s.pool.slice();
+  st.married=!!s.married; st.kids=s.kids||0; st.herBiz=!!s.herBiz; st.herBizMonths=s.herBizMonths||0; st.flat=!!s.flat;
+  st.patience=(s.patience==null?100:s.patience); st.respect=(s.respect==null?55:s.respect); st.betrayalShown=!!s.betrayalShown; st.settle=s.settle||null; st.lastYear=s.lastYear||1;
+  st.cardGiven=!!s.cardGiven; st.spendSeq=(s.spend&&s.spend.seq)||st.spendSeq||0; st.lastSpend=null;
+  st.event=null; st.incoming=false; st.answered=false; st.rings=0; st.farewellSeen=!!st.over; }
+function relCatchUp(gameYear){   // она прожила, пока тебя не было — по часам игры (как ферма навёрстывает годы)
+  gameYear=Number(gameYear)||1;
+  if(st.phase!=='together' || st.over){ st.lastYear=gameYear; return; }
+  const dy=Math.max(0, gameYear-(st.lastYear||gameYear)); st.lastYear=gameYear;
+  let m=Math.min(6, dy*3);   // ~3 её месяца за игровой год отсутствия, с потолком
+  while(m-->0 && !st.over){ liveMonth(); }
+}
+if(EMB){
+  window.addEventListener('message', function(e){ const d=e.data; if(!d) return;
+    if(d.type==='rel_init'){
+      if(typeof d.cash==='number' && isFinite(d.cash)) st.cash=d.cash;
+      if(d.state){ relHydrate(d.state); } else { st.lastYear=Number(d.year)||1; }
+      _relReady=true; relCatchUp(d.year); render(); relPost(); return;
+    }
+    if(d.type==='rel_tick'){   // фоновый ход времени по часам игры (даже когда окно закрыто)
+      if(st.phase!=='together' || st.over){ return; }
+      if(st.event && st.incoming && !st.answered){ missedCall(); }   // висит непринятый звонок — пропущенный, она делает выводы
+      else { liveMonth(); }
+      return;
+    }
+    if(d.type==='rel_decline'){ if(st.event && st.incoming) declineCall(); return; }   // сбросил поверх бланка
+    if(d.type==='rel_ackover'){ st.farewellSeen=true; render(); relPost(); return; }     // отпустил после ухода
+    if(d.type==='rel_takecard'){ if(st.cardGiven){ st.cardGiven=false;
+        const k=pkey(st.partner);
+        if(isF()){ if(k==='pretty'){ st.warm=clamp(st.warm-10); } else if(k==='talker'||k==='mama'){ st.warm=clamp(st.warm-5); } }
+        else { if(k==='trophy'||k==='siren'){ st.warm=clamp(st.warm-10); } else if(k==='storm'){ st.warm=clamp(st.warm-5); } }
+        render(); relPost(); } return; }   // забрал(а) карту из отчёта поверх бланка
+  });
+}
+
+// ── Черты характера (зеркало), 0..100 ──
+const TRAITS=[
+  ['honesty','Честность','🤍'],
+  ['care','Забота','🫶'],
+  ['loyal','Верность','💍'],
+  ['presence','Присутствие','🕯️'],
+  ['priority','Человек выше дела','⚖️'],
+];
+// ── 4 девушки-психотипа: КОГО выбрал — ту слабость в тебе и вскроет ──
+// likes = множитель тепла на действие; kinds = темы, что она поднимает чаще; decay = как быстро стынет;
+// pride = гордость (как остро бьёт неуважение); jealousy = ревность (как быстро растёт соперник); rival = уводят ли её.
+const GIRLS=[
+  {id:'dana', name:'Дана', ava:'🌸', face:'cat_imgs/partners/partner_dana.png', tag:'Хранительница · нежная и верная', nag:'почти не пилит, но ранится тихо',
+   desc:'Ей нужен ты, а не деньги: время, разговоры, присутствие. Верная и тёплая — но безразличие ранит её тихо и глубоко.',
+   likes:{date:1.3,talk:1.6,gift:0.6,trip:1.1,party:0.5,exp:1.3}, kinds:['Присутствие','Нежность','Опора','Будущее'],
+   decay:4, warm:62, pride:25, jealousy:20, rival:false},
+  {id:'miya', name:'Мия', ava:'💅', face:'cat_imgs/partners/partner_miya.png', tag:'Трофей · силикон и статус', nag:'выносит мозг из-за статуса',
+   desc:'Инстаграм, подарки, поездки — чтобы тобой хвастаться. Греется деньгами. Остынет мгновенно и уйдёт к тому, кто платит ярче.',
+   likes:{date:1.1,talk:0.5,gift:1.9,trip:1.6,party:1.3,exp:0.5}, kinds:['Деньги','Статус','Ревность'],
+   decay:7, warm:52, pride:85, jealousy:60, rival:true},
+  {id:'eva', name:'Ева', ava:'🌿', face:'cat_imgs/partners/partner_eva.png', tag:'Проводница · духовная веган', nag:'давит смыслом, не скандалом',
+   desc:'ЗОЖ, практики, познание мира — и ей важно, чтобы ты был рядом и рос с ней. Деньги на неё не действуют. Цинизм — её граница.',
+   likes:{date:1.1,talk:1.6,gift:0.4,trip:1.4,party:0.3,exp:1.9}, kinds:['Смысл','Присутствие','Будущее','Жертва'],
+   decay:4, warm:58, pride:55, jealousy:25, rival:false},
+  {id:'rin', name:'Рин', ava:'🔥', face:'cat_imgs/partners/partner_rin.png', tag:'Ураган · отмороженная тусовщица', nag:'пилит мозг каждую неделю',
+   desc:'Пьёт, тусит, требует драйва, цветов и внимания без остановки. Скучно ей — и она уже с другими. Заслуживай, а то заберут.',
+   likes:{date:0.9,talk:0.6,gift:1.3,trip:1.6,party:1.9,exp:0.7}, kinds:['Развлечение','Ревность','Деньги','Присутствие'],
+   decay:8, warm:50, pride:70, jealousy:80, rival:true},
+  {id:'vlada', name:'Влада', ava:'💋', face:'cat_imgs/partners/partner_vlada.png', tag:'Сирена · инста-дива, вся напоказ', nag:'ревность выест тебя изнутри',
+   desc:'Тело как капитал, тату, живёт на лайках и обожании толпы. За ней очередь поклонников. Удержишь ту, кого хотят все?',
+   likes:{date:1.2,talk:0.4,gift:1.5,trip:1.6,party:1.7,exp:0.3}, kinds:['Слава','Ревность','Деньги','Развлечение'],
+   decay:8, warm:50, pride:80, jealousy:95, rival:true},
+
+  // ── ХРАНИТЕЛЬНИЦЫ (нежные, верные) ──
+  {id:'aigul', name:'Айгуль', ava:'🌸', face:'cat_imgs/partners/partner_aigul.png', tag:'Хранительница · простая, из села', nag:'почти не пилит',
+   desc:'Без запросов, добрая, верная до конца. Ей нужны не деньги, а ты рядом.',
+   likes:{date:1.3,talk:1.6,gift:0.6,trip:1.1,party:0.5,exp:1.3}, kinds:['Присутствие','Нежность','Опора','Будущее'], decay:4, warm:62, pride:20, jealousy:20, rival:false},
+  {id:'oksana', name:'Оксана', ava:'🌸', face:'cat_imgs/partners/partner_oksana.png', tag:'Хранительница · мягкая и тёплая', nag:'ранится тихо',
+   desc:'Уютная, заботливая, живёт вашим теплом. Забудешь про неё — тихо погаснет.',
+   likes:{date:1.3,talk:1.6,gift:0.6,trip:1.1,party:0.5,exp:1.3}, kinds:['Присутствие','Нежность','Опора','Будущее'], decay:4, warm:62, pride:25, jealousy:25, rival:false},
+  {id:'meili', name:'Мэйли', ava:'🌸', face:'cat_imgs/partners/partner_meili.png', tag:'Хранительница · нежная', nag:'почти не пилит',
+   desc:'Тихая, ласковая, преданная. Ценит время и внимание больше подарков.',
+   likes:{date:1.3,talk:1.6,gift:0.6,trip:1.1,party:0.5,exp:1.3}, kinds:['Присутствие','Нежность','Опора','Будущее'], decay:4, warm:62, pride:22, jealousy:20, rival:false},
+  {id:'aruzhan', name:'Аружан', ava:'🌸', face:'cat_imgs/partners/partner_aruzhan.png', tag:'Хранительница · верная', nag:'ранится молча',
+   desc:'Спокойная, добрая, надёжная. Верность её — редкий дар, не разбей.',
+   likes:{date:1.3,talk:1.6,gift:0.6,trip:1.1,party:0.5,exp:1.3}, kinds:['Присутствие','Нежность','Опора','Будущее'], decay:4, warm:62, pride:25, jealousy:22, rival:false},
+
+  // ── ТРОФЕИ (статус, силикон, гламур) ──
+  {id:'nastya', name:'Настя', ava:'💅', face:'cat_imgs/partners/partner_nastya.png', tag:'Трофей · статус и блеск', nag:'выносит мозг из-за статуса',
+   desc:'Живёт витриной: бренды, поездки, фото. Греется деньгами, стынет мгновенно.',
+   likes:{date:1.1,talk:0.5,gift:1.9,trip:1.6,party:1.3,exp:0.5}, kinds:['Деньги','Статус','Ревность'], decay:7, warm:52, pride:85, jealousy:60, rival:true},
+  {id:'amira', name:'Амира', ava:'💅', face:'cat_imgs/partners/partner_amira.png', tag:'Трофей · роскошь', nag:'капризна на людях',
+   desc:'Хочет блистать и чтобы тобой хвасталась. Кончится блеск — кончится тепло.',
+   likes:{date:1.1,talk:0.5,gift:1.9,trip:1.6,party:1.3,exp:0.5}, kinds:['Деньги','Статус','Ревность'], decay:7, warm:52, pride:85, jealousy:55, rival:true},
+  {id:'dinara', name:'Динара', ava:'💅', face:'cat_imgs/partners/partner_dinara.png', tag:'Трофей · гламур', nag:'дорогая во всех смыслах',
+   desc:'Статус, лоск, подарки. Искренность под вопросом — зеркало покажет, купил ли ты её.',
+   likes:{date:1.1,talk:0.5,gift:1.9,trip:1.6,party:1.3,exp:0.5}, kinds:['Деньги','Статус','Ревность'], decay:7, warm:52, pride:88, jealousy:60, rival:true},
+
+  // ── ПРОВОДНИЦЫ (духовные, натуральные) ──
+  {id:'leya', name:'Лея', ava:'🌿', face:'cat_imgs/partners/partner_leya.png', tag:'Проводница · глубина', nag:'давит смыслом',
+   desc:'Ищет смысл и близость, не деньги. Важно, чтоб ты рос и был рядом душой.',
+   likes:{date:1.1,talk:1.6,gift:0.4,trip:1.4,party:0.3,exp:1.9}, kinds:['Смысл','Присутствие','Будущее','Жертва'], decay:4, warm:58, pride:55, jealousy:25, rival:false},
+  {id:'marta', name:'Марта', ava:'🌿', face:'cat_imgs/partners/partner_marta.png', tag:'Проводница · тихий свет', nag:'холодна к суете',
+   desc:'Спокойствие, природа, честный разговор. Цинизм и вечная гонка — её граница.',
+   likes:{date:1.1,talk:1.6,gift:0.4,trip:1.4,party:0.3,exp:1.9}, kinds:['Смысл','Присутствие','Будущее','Жертва'], decay:4, warm:58, pride:52, jealousy:22, rival:false},
+  {id:'saule', name:'Сауле', ava:'🌿', face:'cat_imgs/partners/partner_saule.png', tag:'Проводница · духовная', nag:'давит не скандалом, а правдой',
+   desc:'ЗОЖ, практики, путь. Деньги на неё не действуют — только присутствие и рост.',
+   likes:{date:1.1,talk:1.6,gift:0.4,trip:1.4,party:0.3,exp:1.9}, kinds:['Смысл','Присутствие','Будущее','Жертва'], decay:4, warm:58, pride:58, jealousy:25, rival:false},
+
+  // ── УРАГАНЫ (тусовщицы, резкие) ──
+  {id:'karina', name:'Карина', ava:'🔥', face:'cat_imgs/partners/partner_karina.png', tag:'Ураган · яркая и ревнивая', nag:'пилит мозг',
+   desc:'Драйв, ревность, проверки. С ней жарко, но заслуживай, а то уведут.',
+   likes:{date:0.9,talk:0.6,gift:1.3,trip:1.6,party:1.9,exp:0.7}, kinds:['Развлечение','Ревность','Деньги','Присутствие'], decay:8, warm:50, pride:70, jealousy:80, rival:true},
+  {id:'zhenya', name:'Женя', ava:'⚡', face:'cat_imgs/partners/partner_zhenya.png', tag:'Ураган · пацанка', nag:'дерзит и ревнует',
+   desc:'Своя в доску, гоняет на равных, но требует внимания и драйва без пауз.',
+   likes:{date:0.9,talk:0.6,gift:1.3,trip:1.6,party:1.9,exp:0.7}, kinds:['Развлечение','Ревность','Деньги','Присутствие'], decay:8, warm:50, pride:65, jealousy:75, rival:true},
+  {id:'zhanel', name:'Жанель', ava:'🔥', face:'cat_imgs/partners/partner_zhanel.png', tag:'Ураган · дерзкая', nag:'скучно ей — беда',
+   desc:'Тусовки, спонтанность, огонь. Заскучает — найдёт драйв на стороне.',
+   likes:{date:0.9,talk:0.6,gift:1.3,trip:1.6,party:1.9,exp:0.7}, kinds:['Развлечение','Ревность','Деньги','Присутствие'], decay:8, warm:50, pride:72, jealousy:82, rival:true},
+
+  // ── СИРЕНЫ (инста-дивы, тату, тело) ──
+  {id:'kristi', name:'Кристи', ava:'💋', face:'cat_imgs/partners/partner_kristi.png', tag:'Сирена · вся напоказ', nag:'ревность выест тебя',
+   desc:'Тату, тело, лайки. За ней очередь. Удержишь ту, кого хотят все?',
+   likes:{date:1.2,talk:0.4,gift:1.5,trip:1.6,party:1.7,exp:0.3}, kinds:['Слава','Ревность','Деньги','Развлечение'], decay:8, warm:50, pride:80, jealousy:95, rival:true},
+  {id:'ayana', name:'Аяна', ava:'💋', face:'cat_imgs/partners/partner_ayana.png', tag:'Сирена · огонь и тату', nag:'ревность до дрожи',
+   desc:'Живёт вниманием толпы, тело как оружие. Не удержишь — уведут мгновенно.',
+   likes:{date:1.2,talk:0.4,gift:1.5,trip:1.6,party:1.7,exp:0.3}, kinds:['Слава','Ревность','Деньги','Развлечение'], decay:8, warm:50, pride:82, jealousy:95, rival:true},
+
+  // ── МИЛФЫ 40+ (при деньгах, всё решают сами; богатство = власть, правила её). Флаги age/wealth — под будущий слой власти ──
+  {id:'saltanat', name:'Салтанат', ava:'👑', face:'cat_imgs/partners/partner_saltanat.png', age:44, wealth:true, tag:'Милфа 40+ · при деньгах, всё решает сама', nag:'привыкла, что слушают её',
+   desc:'Сделала себя сама, у неё капитал и правила. Спокойная власть: рядом с ней ты играешь по её условиям — или не играешь вовсе.',
+   likes:{date:1.2,talk:1.4,gift:0.5,trip:1.3,party:0.7,exp:1.3}, kinds:['Опора','Будущее','Присутствие'], decay:4, warm:55, pride:88, jealousy:30, rival:false},
+  {id:'irina', name:'Ирина', ava:'👑', face:'cat_imgs/partners/partner_irina.png', age:46, wealth:true, tag:'Милфа 40+ · знает себе цену', nag:'ценит статус и лоск',
+   desc:'Роскошь, лоск, знает себе цену до копейки. С ней красиво и дорого — но всё на её вкус и по её правилам.',
+   likes:{date:1.1,talk:0.7,gift:1.2,trip:1.6,party:1.3,exp:0.7}, kinds:['Статус','Ревность','Развлечение'], decay:6, warm:52, pride:85, jealousy:55, rival:true},
+  {id:'gauhar', name:'Гаухар', ava:'👑', face:'cat_imgs/partners/partner_gauhar.png', age:42, wealth:true, tag:'Милфа 40+ · мягкая власть', nag:'властна, но по-доброму',
+   desc:'Тёплая и мудрая, но за мягкостью — твёрдый стержень и деньги. Даёт опору, если ты растёшь; тянешь вниз — отпускает без драмы.',
+   likes:{date:1.2,talk:1.5,gift:0.5,trip:1.3,party:0.5,exp:1.6}, kinds:['Смысл','Присутствие','Опора'], decay:4, warm:58, pride:70, jealousy:25, rival:false},
+];
+// ══ 4 ПСИХОТИПА ПАРНЕЙ (авторская раскладка Рината) × 5 = 20. mtype = ключ типа ══
+// mama — маменькин сынок; talker — балабол; rock — настоящий мужик; pretty — полу-мальчик, красивый и пустой.
+// face:'' → пока эмодзи (фото — следующий шаг).
+const GUYS=[
+  // ── МАМЕНЬКИН СЫНОК (mama): инфантильный, живёт мамой, тянется к женщинам постарше, ждёт опеки ──
+  {id:'stepa',  name:'Тимур',  ava:'🧸', face:'cat_imgs/partners/partner_stepa.png', mtype:'mama', tag:'Маменькин сынок · тянется к старшим', nag:'обижается и бежит к маме',
+   desc:'Мягкий, ласковый, ищет в тебе заботу как у мамы. Но мама всегда третья в ваших отношениях — и её слово важнее твоего.',
+   likes:{date:1.2,talk:1.5,gift:0.7,trip:1.0,party:0.6,exp:1.1}, kinds:['Опора','Нежность','Присутствие'], decay:5, warm:55, pride:30, jealousy:40, rival:false},
+  {id:'gosha',  name:'Гоша',   ava:'🧸', face:'cat_imgs/partners/partner_gosha.png', mtype:'mama', tag:'Маменькин сынок · тебе решать за него', nag:'сам ничего не решит',
+   desc:'Не принимает решений сам, во всём оглядывается на маму. Хочет, чтобы ты его опекала и всё разрулила за него.',
+   likes:{date:1.2,talk:1.5,gift:0.7,trip:1.0,party:0.6,exp:1.1}, kinds:['Опора','Нежность','Присутствие'], decay:5, warm:55, pride:28, jealousy:42, rival:false},
+  {id:'venya',  name:'Санжар', ava:'🧸', face:'cat_imgs/partners/partner_venya.png', mtype:'mama', tag:'Маменькин сынок · любит постарше', nag:'сравнивает тебя с мамой',
+   desc:'Тянется к женщинам постарше — тем, кто заменит маму. Сравнивает твою готовку, заботу и любовь с маминой.',
+   likes:{date:1.2,talk:1.5,gift:0.7,trip:1.0,party:0.6,exp:1.1}, kinds:['Опора','Нежность','Присутствие'], decay:5, warm:55, pride:30, jealousy:45, rival:false},
+  {id:'slavik', name:'Славик', ava:'🧸', face:'cat_imgs/partners/partner_slavik.png', mtype:'mama', tag:'Маменькин сынок · вечный ребёнок', nag:'дуется как ребёнок',
+   desc:'Милый, но так и не повзрослел. Живёт на мамины (и твои) деньги, ждёт, что о нём будут заботиться вечно.',
+   likes:{date:1.2,talk:1.5,gift:0.7,trip:1.0,party:0.6,exp:1.1}, kinds:['Опора','Нежность','Присутствие'], decay:5, warm:55, pride:26, jealousy:38, rival:false},
+  {id:'yura',   name:'Айдос',  ava:'🧸', face:'cat_imgs/partners/partner_yura.png', mtype:'mama', tag:'Маменькин сынок · под маминым крылом', nag:'мама важнее тебя',
+   desc:'Добрый и привязчивый, но за спиной — мама, которая рулит его жизнью. Ты всегда будешь второй после неё.',
+   likes:{date:1.2,talk:1.5,gift:0.7,trip:1.0,party:0.6,exp:1.1}, kinds:['Опора','Нежность','Присутствие'], decay:5, warm:55, pride:30, jealousy:40, rival:false},
+
+  // ── БАЛАБОЛ (talker): много говорит, ничего не делает; пустые обещания, золотые горы на словах ──
+  {id:'ruslan', name:'Руслан', ava:'🗣️', face:'cat_imgs/partners/partner_ruslan.png', mtype:'talker', tag:'Балабол · золотые горы на словах', nag:'обещает и не делает',
+   desc:'Заговорит любого: планы, мечты, «вот-вот запущу». Влюбляет словами — а дел ты так и не увидишь.',
+   likes:{date:1.1,talk:1.3,gift:0.9,trip:1.2,party:1.4,exp:0.8}, kinds:['Развлечение','Присутствие','Деньги'], decay:6, warm:54, pride:62, jealousy:30, rival:false},
+  {id:'artyom', name:'Тамерлан', ava:'🗣️', face:'cat_imgs/partners/partner_artyom.png', mtype:'talker', tag:'Балабол · сплошные завтраки', nag:'кормит «завтраками»',
+   desc:'Каждый день новый грандиозный план, и ни один не сбудется. Годы уйдут на его «уже почти».',
+   likes:{date:1.1,talk:1.3,gift:0.9,trip:1.2,party:1.4,exp:0.8}, kinds:['Развлечение','Присутствие','Деньги'], decay:6, warm:54, pride:60, jealousy:28, rival:false},
+  {id:'maks',   name:'Максат', ava:'🗣️', face:'cat_imgs/partners/partner_maks.png', mtype:'talker', tag:'Балабол · языком мелет', nag:'болтовня вместо дел',
+   desc:'Красиво говорит о будущем, деньгах, вас двоих — но за словами пустота. Занимает «на проект» и растворяется.',
+   likes:{date:1.1,talk:1.3,gift:0.9,trip:1.2,party:1.4,exp:0.8}, kinds:['Развлечение','Присутствие','Деньги'], decay:6, warm:54, pride:64, jealousy:30, rival:false},
+  {id:'denis',  name:'Нурлан', ava:'🗣️', face:'cat_imgs/partners/partner_denis.png', mtype:'talker', tag:'Балабол · вечный мечтатель', nag:'слова, слова, слова',
+   desc:'Мечтатель без дела. Обещает свозить, купить, жениться — и всё остаётся словами на ветер.',
+   likes:{date:1.1,talk:1.3,gift:0.9,trip:1.2,party:1.4,exp:0.8}, kinds:['Развлечение','Присутствие','Деньги'], decay:6, warm:54, pride:58, jealousy:32, rival:false},
+  {id:'grisha', name:'Ерасыл', ava:'🗣️', face:'cat_imgs/partners/partner_grisha.png', mtype:'talker', tag:'Балабол · трепло обаятельное', nag:'много шума, ноль толку',
+   desc:'Душа компании, языком заговорит любого. Но как доходит до дела — его нет. Обаятельная пустышка.',
+   likes:{date:1.1,talk:1.3,gift:0.9,trip:1.2,party:1.4,exp:0.8}, kinds:['Развлечение','Присутствие','Деньги'], decay:6, warm:54, pride:62, jealousy:30, rival:false},
+
+  // ── НАСТОЯЩИЙ МУЖИК (rock): сказал — сделал, «как за каменной стеной», защищает и ОБЕСПЕЧИВАЕТ ──
+  {id:'arman',  name:'Арман',  ava:'🛡️', face:'cat_imgs/partners/partner_arman.png', mtype:'rock', tag:'Настоящий мужик · как за стеной', nag:'строг, но верен',
+   desc:'Не бросает слов на ветер: сказал — сделал. Решает, защищает, обеспечивает. С ним ты как за каменной стеной.',
+   likes:{date:1.3,talk:1.5,gift:0.6,trip:1.2,party:0.6,exp:1.3}, kinds:['Опора','Присутствие','Будущее','Жертва'], decay:3, warm:60, pride:55, jealousy:35, rival:false},
+  {id:'daniyar',name:'Данияр', ava:'🛡️', face:'cat_imgs/partners/partner_daniyar.png', mtype:'rock', tag:'Настоящий мужик · надёжный добытчик', nag:'немногословен',
+   desc:'Основательный, честный, тянет семью на себе. Слова беречёт, дела говорят за него. На таком держится дом.',
+   likes:{date:1.3,talk:1.5,gift:0.6,trip:1.2,party:0.6,exp:1.3}, kinds:['Опора','Присутствие','Будущее','Жертва'], decay:3, warm:60, pride:58, jealousy:34, rival:false},
+  {id:'marat',  name:'Марат',  ava:'🛡️', face:'cat_imgs/partners/partner_marat.png', mtype:'rock', tag:'Настоящий мужик · слово = дело', nag:'прямой и честный',
+   desc:'Прямой, сильный, ответственный. Обещал — выполнит. Защитит и обеспечит, не ждёт похвал за это.',
+   likes:{date:1.3,talk:1.5,gift:0.6,trip:1.2,party:0.6,exp:1.3}, kinds:['Опора','Присутствие','Будущее','Жертва'], decay:3, warm:60, pride:56, jealousy:35, rival:false},
+  {id:'erlan',  name:'Ерлан',  ava:'🛡️', face:'cat_imgs/partners/partner_erlan.png', mtype:'rock', tag:'Настоящий мужик · опора семьи', nag:'строгий хозяин',
+   desc:'Хозяин своего слова и дома. Строгий, но справедливый и верный до конца. За ним — как за бронёй.',
+   likes:{date:1.3,talk:1.5,gift:0.6,trip:1.2,party:0.6,exp:1.3}, kinds:['Опора','Присутствие','Будущее','Жертва'], decay:3, warm:60, pride:57, jealousy:36, rival:false},
+  {id:'askhat', name:'Карим',  ava:'🛡️', face:'cat_imgs/partners/partner_askhat.png', mtype:'rock', tag:'Настоящий мужик · верный и сильный', nag:'ранится молча',
+   desc:'Спокойная сила и надёжность. Делает, а не говорит; защищает и обеспечивает. Верность его — редкий дар.',
+   likes:{date:1.3,talk:1.5,gift:0.6,trip:1.2,party:0.6,exp:1.3}, kinds:['Опора','Присутствие','Будущее','Жертва'], decay:3, warm:60, pride:55, jealousy:35, rival:false},
+
+  // ── ПОЛУ-МАЛЬЧИК (pretty): красивый как с обложки, пустой внутри, выносит мозг, несёт фигню ──
+  {id:'emir',   name:'Эмир',   ava:'😎', face:'cat_imgs/partners/partner_emir.png', mtype:'pretty', tag:'Полу-мальчик · красивый и пустой', nag:'выносит мозг, несёт фигню',
+   desc:'Красив как с обложки — и ровно настолько же пуст внутри. Понты, лайки, болтовня ни о чём. Красивое фото — дорогая пустота.',
+   likes:{date:1.1,talk:0.4,gift:1.6,trip:1.6,party:1.8,exp:0.3}, kinds:['Слава','Развлечение','Деньги','Ревность'], decay:8, warm:50, pride:85, jealousy:80, rival:true},
+  {id:'nikita', name:'Никита', ava:'😎', face:'cat_imgs/partners/partner_nikita.png', mtype:'pretty', tag:'Полу-мальчик · с обложки', nag:'ноль опоры',
+   desc:'Модный, ухоженный, живёт на камеру. За внешностью — ноль стержня и опоры. Выносит мозг капризами.',
+   likes:{date:1.1,talk:0.4,gift:1.6,trip:1.6,party:1.8,exp:0.3}, kinds:['Слава','Развлечение','Деньги','Ревность'], decay:8, warm:50, pride:86, jealousy:82, rival:true},
+  {id:'artur',  name:'Артур',  ava:'😎', face:'cat_imgs/partners/partner_artur.png', mtype:'pretty', tag:'Полу-мальчик · инста-кукла', nag:'болтает фигню',
+   desc:'Идеальная картинка в инсте и полная пустота в жизни. Много о себе, ничего по делу. За ним бегают — он ветреный.',
+   likes:{date:1.1,talk:0.4,gift:1.6,trip:1.6,party:1.8,exp:0.3}, kinds:['Слава','Развлечение','Деньги','Ревность'], decay:8, warm:50, pride:84, jealousy:80, rival:true},
+  {id:'roma',   name:'Дамир',  ava:'😎', face:'cat_imgs/partners/partner_roma.png', mtype:'pretty', tag:'Полу-мальчик · смазливый пустышка', nag:'капризен и пуст',
+   desc:'Смазливый, самовлюблённый, живёт понтами. Разговор сводится к нему и его фото. Опоры в нём — ноль.',
+   likes:{date:1.1,talk:0.4,gift:1.6,trip:1.6,party:1.8,exp:0.3}, kinds:['Слава','Развлечение','Деньги','Ревность'], decay:8, warm:50, pride:85, jealousy:80, rival:true},
+  {id:'kostya', name:'Бекзат', ava:'😎', face:'cat_imgs/partners/partner_kostya.png', mtype:'pretty', tag:'Полу-мальчик · красавчик без стержня', nag:'сплошные понты',
+   desc:'Красавчик, за которым девчонки — а внутри ветер. Понты, тусовки, пустые слова. Красиво, дорого и бессмысленно.',
+   likes:{date:1.1,talk:0.4,gift:1.6,trip:1.6,party:1.8,exp:0.3}, kinds:['Слава','Развлечение','Деньги','Ревность'], decay:8, warm:50, pride:86, jealousy:82, rival:true},
+
+  // ── МУЖЧИНЫ 40+ (при деньгах, доминанты; слово закон, помогают деньгами). mtype:'rock' — зрелая опора; флаги age/wealth под будущий слой власти ──
+  {id:'bahyt', name:'Бахыт', ava:'👑', face:'cat_imgs/partners/partner_bahyt.png', mtype:'rock', age:46, wealth:true, tag:'Мужчина 40+ · магнат, слово закон', nag:'привык, что решает он',
+   desc:'Сделал состояние сам, спокойная сила и правила. Обеспечит и защитит — но в паре главный он, и это не обсуждается.',
+   likes:{date:1.3,talk:1.4,gift:0.5,trip:1.3,party:0.5,exp:1.3}, kinds:['Опора','Будущее','Присутствие','Жертва'], decay:3, warm:60, pride:85, jealousy:35, rival:false},
+  {id:'viktor', name:'Виктор', ava:'👑', face:'cat_imgs/partners/partner_viktor.png', mtype:'rock', age:48, wealth:true, tag:'Мужчина 40+ · холодная власть', nag:'привык, что ему подчиняются',
+   desc:'Распорядительный, собранный, при больших деньгах. Даёт статус и уверенность, но требует, чтобы всё было по его порядку.',
+   likes:{date:1.2,talk:1.3,gift:0.6,trip:1.4,party:0.6,exp:1.2}, kinds:['Опора','Будущее','Присутствие'], decay:3, warm:58, pride:88, jealousy:38, rival:false},
+  {id:'serik', name:'Серик', ava:'👑', face:'cat_imgs/partners/partner_serik.png', mtype:'rock', age:44, wealth:true, tag:'Мужчина 40+ · self-made, приземлённая власть', nag:'немногословен, но твёрд',
+   desc:'Тихие деньги, реальная сила, без понтов. Надёжен как скала и щедр к своим — но уважение и слово держать обязан ты.',
+   likes:{date:1.3,talk:1.5,gift:0.5,trip:1.2,party:0.5,exp:1.4}, kinds:['Опора','Присутствие','Будущее','Жертва'], decay:3, warm:60, pride:80, jealousy:34, rival:false},
+];
+// резолвер ключа психотипа: для парней — авторский mtype, для девушек — psyKey по kinds
+function pkey(g){ if(!g) return isF()?'rock':'guardian'; return isF() ? (g.mtype||'rock') : psyKey(g); }
+// ── Психомодель по типу (реальная психология: привязанность/язык любви/ядро) — раскрывается со временем ──
+const PSYCH={
+  guardian:{ att:'надёжная привязанность', reveal:[
+    'Она просто хочет быть рядом — без игр и расчёта.',
+    'Ей не нужны твои деньги. Её греют время, разговоры, присутствие.',
+    'Она прощает и терпит… но не бесконечно. Не заметишь её — тихо угаснет и уйдёт сама.']},
+  trophy:{ att:'избегающая · нарциссическая линия', reveal:[
+    'Ей важно, как вы смотритесь со стороны. Она любит блеск.',
+    'Её греют подарки и статус, а не разговоры по душам.',
+    'Похоже, тобой она украшает себя. Перестанешь платить ярко — уйдёт к тому, кто ярче.']},
+  muse:{ att:'идеалистка · ищет глубину и рост', reveal:[
+    'Ей нужен не кошелёк, а смысл и настоящая близость.',
+    'Она хочет расти — и чтобы ты рос рядом, а не только зарабатывал.',
+    'Цинизм и вечные дела — её граница. Не будешь рядом душой — тихо уйдёт.']},
+  storm:{ att:'тревожная · жажда стимуляции', reveal:[
+    'Ей быстро становится скучно — ей нужен драйв и новизна.',
+    'Под ревностью и качелями прячется страх, что её бросят.',
+    'Заскучает — импульсивно найдёт драйв на стороне. Её легко увести.']},
+  siren:{ att:'истероидная линия · внимание любой ценой', reveal:[
+    'Ей нужно быть в центре внимания — и не только твоего.',
+    'Твоя ревность для неё топливо, а не проблема.',
+    'За ней всегда очередь. Уведёт тот, кто даст больше сцены и восхищения.']},
+};
+// ── Психомодель ПАРНЕЙ (4 авторских типа) — раскрывается со временем ──
+const PSYCH_M={
+  mama:{ att:'тревожно-зависимая привязанность · сепарации от матери не случилось', reveal:[
+    'Он ищет в тебе не партнёршу, а заботу — как у мамы.',
+    'Его мама всегда на первом месте: её слово важнее твоего.',
+    'Он не повзрослеет рядом с тобой — будет ждать, что ты будешь опекать его вечно.']},
+  talker:{ att:'избегающе-нарциссическая линия · слова вместо дел', reveal:[
+    'Он говорит красиво и много — но за словами пусто.',
+    'Обещания сыплются рекой, а дел ты так и не видишь.',
+    'Он влюбляет словами и кормит завтраками. Годы уйдут на его «вот-вот».']},
+  rock:{ att:'надёжная привязанность · зрелый мужчина', reveal:[
+    'Он не бросает слов на ветер — сказал, сделал.',
+    'С ним ты как за каменной стеной: решает, защищает, обеспечивает.',
+    'Он строг и прям, но верен до конца. На таком держится дом.']},
+  pretty:{ att:'нарциссическая линия · красивая пустота', reveal:[
+    'Он красив как с обложки — и ровно настолько же пуст внутри.',
+    'За внешностью ноль опоры: одни понты, лайки и болтовня ни о чём.',
+    'Он выносит мозг и несёт фигню. Красивое фото — дорогая пустота.']},
+};
+function psyKey(g){ const k=g.kinds||[];
+  if(k.includes('Слава')) return 'siren';
+  if(k.includes('Смысл')) return 'muse';
+  if(k.includes('Статус')) return 'trophy';
+  if(k.includes('Развлечение')) return 'storm';
+  return 'guardian'; }
+
+let st={
+  sex:'m', phase:'choose', partner:null,
+  stage:'Встречаетесь', months:0, warm:0, cash:4000,
+  t:{honesty:50,care:50,loyal:50,presence:50,priority:50},
+  event:null, moves:0, over:false, overReason:null, rival:0, pool:[],
+  married:false, kids:0, herBiz:false, herBizMonths:0, flat:false,
+  patience:100, respect:55, auto:false, silence:0, betrayalShown:false, settle:null,
+  incoming:false, answered:false, rings:0, farewellSeen:false, lastYear:1,
+  cardGiven:false, spendSeq:0, lastSpend:null
+};
+// Судьба даёт 4 случайные из пула 16 (сейчас в пуле столько, сколько собрано психотипов)
+const POOL_SIZE=4;
+function rollPool(){ const ids=roster().map(g=>g.id);
+  for(let i=ids.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [ids[i],ids[j]]=[ids[j],ids[i]]; }
+  st.pool=ids.slice(0,Math.min(POOL_SIZE,ids.length)); }
+function rerollPool(){ rollPool(); render(); }
+function setSex(x){ x=(x==='f')?'f':'m'; if(st.sex===x) return; st.sex=x; st.partner=null; st.phase='choose'; rollPool(); render(); if(EMB) relPost(); }
+function chooseGirl(id){
+  const g=roster().find(x=>x.id===id); if(!g) return;
+  st.partner=g; st.phase='together'; st.warm=g.warm; st.months=1; st.event=null; st.moves=0; st.over=false; st.overReason=null; st.rival=0;
+  st.married=false; st.kids=0; st.herBiz=false; st.herBizMonths=0; st.silence=0;
+  st.flat=false; st.betrayalShown=false; st.settle=null;
+  st.incoming=false; st.answered=false; st.rings=0; st.farewellSeen=false;
+  st.cardGiven=false; st.spendSeq=st.spendSeq||0; st.lastSpend=null;
+  st.patience = g.rival ? 55 : 92;   // ветреные нетерпеливы, верные терпят долго
+  st.respect = 55;                    // уважение к его слову — стартовое (доминанту важно)
+  st.reflectDone=false; profPick(g);  // 🪞 сбор данных: какой типаж ты выбрал
+  st.t={honesty:50,care:50,loyal:50,presence:50,priority:50};
+  toast(isF() ? 'Ты сошлась с ним. Дальше — узнаешь, какой он. Не добьёшься — уйдёт.'
+              : 'Ты сошёлся с ней. Дальше — узнаешь, какая она. Не добьёшься — уйдёт.');
+  setAuto(true); render();
+}
+
+// ── События партнёра: партнёр сам к тебе лезет ──
+// tags двигают черты; warm двигает тепло; cost — деньги; note — тост.
+const EVENTS=[
+  { kind:'Присутствие', a:'😔', q:'«Ты опять неделю пропадаешь на работе. Тебе вообще есть до меня дело?»',
+    opts:[
+      {l:'Прости, ты права. Завтра — только ты, без телефона.', warm:+9, t:{care:+8,presence:+10,priority:+7}, note:'Ты выбрал её. Тепло вернулось.'},
+      {l:'Мне надо. Деньги сами не появятся.', warm:-7, t:{priority:-9,presence:-6}, note:'Честно, но холодно. Она сжалась.'},
+      {l:'Да отстань, я устал.', warm:-14, t:{care:-12,presence:-8}, note:'Она ушла в комнату. Тепло упало.'},
+    ]},
+  { kind:'Ревность', call:true, a:'🧐', q:'«Кто эта Марина, что лайкает все твои фото? Только честно.»',
+    opts:[
+      {l:'Коллега, ничего между нами. Спрашивай — я открыт.', warm:+5, t:{honesty:+9,loyal:+4}, note:'Прозрачность греет доверие.'},
+      {l:'Не знаю такую. (соврать)', warm:+3, t:{honesty:-13,loyal:-4}, note:'Тепло сейчас +, но зеркало запомнило ложь.'},
+      {l:'Ты меня контролируешь! Достала.', warm:-11, t:{care:-8,honesty:-3}, note:'Скандал на ровном месте.'},
+    ]},
+  { kind:'Будущее', call:true, a:'🥺', q:'«Мы уже больше года. Ты вообще видишь нас вместе через пять лет?»',
+    opts:[
+      {l:'Вижу. Хочу с тобой всё — и дом, и детей.', warm:+12, t:{priority:+9,care:+7}, note:'Она засветилась. Вы ближе к вехе.', milestone:true},
+      {l:'Давай не будем торопиться.', warm:-6, t:{priority:-4}, note:'Уклончиво. Тепло чуть просело.'},
+      {l:'Меняешь тему.', warm:-9, t:{honesty:-6,care:-4}, note:'Она поняла ответ без слов.'},
+    ]},
+  { kind:'Соблазн', call:true, a:'🍷', q:'«На корпоративе к тебе клеится коллега — зовёт «продолжить вечер». Она дома, ждёт тебя.»',
+    opts:[
+      {l:'Отказать и поехать домой к ней.', warm:+7, t:{loyal:+13,care:+6}, note:'Ты выбрал верность. Это видно.'},
+      {l:'«Просто выпьем, ничего такого».', warm:-5, t:{loyal:-9}, note:'Скользкая дорожка. Зеркало насторожилось.'},
+      {l:'Поддаться.', warm:-20, t:{loyal:-22,honesty:-8,care:-10}, note:'Ты изменил. Зеркало это не сотрёт.'},
+    ]},
+  { kind:'Нежность', a:'🥰', q:'«Я приготовила твоё любимое. Просто так. Соскучилась по тебе.»',
+    opts:[
+      {l:'Отложить телефон, обнять, поужинать вдвоём.', warm:+10, t:{care:+10,presence:+8}, note:'Тёплый вечер. Так и копится любовь.'},
+      {l:'«Спасибо», не отрываясь от дел.', warm:-8, t:{care:-9,presence:-9}, note:'Она старалась, а ты не заметил.'},
+    ]},
+  { kind:'Деньги', a:'😒', q:'«Ты купил себе новый телефон, а на нашу поездку денег «нет»?»',
+    opts:[
+      {l:'Ты права. Давай спланируем поездку прямо сейчас.', warm:+8, t:{care:+7,honesty:+5}, cost:-800, note:'Признал и исправил. −$800, но тепло +.'},
+      {l:'Оправдаться: «телефон для работы нужен».', warm:-6, t:{honesty:-4}, note:'Звучит как отговорка.'},
+      {l:'«Мои деньги — что хочу, то и делаю».', warm:-12, t:{care:-10,priority:-9}, note:'Больно. Между вами стена.'},
+    ]},
+  { kind:'Опора', a:'😢', q:'«У меня был жуткий день. Просто побудь рядом, ладно?»',
+    opts:[
+      {l:'Всё бросить, обнять, выслушать.', warm:+11, t:{care:+13,presence:+7}, note:'Ты был рядом, когда нужно. Это главное.'},
+      {l:'«У меня своих проблем хватает».', warm:-16, t:{care:-15,presence:-6}, note:'Она осталась одна со своей болью.'},
+    ]},
+  { kind:'Жертва', call:true, a:'✨', q:'«Мне предложили работу мечты в другом городе. Поедешь со мной?»',
+    opts:[
+      {l:'Поеду. Ты важнее любого дела.', warm:+14, t:{priority:+14,care:+8}, note:'Огромный выбор в её пользу.'},
+      {l:'А как же моё дело здесь? Давай ты откажешься.', warm:-10, t:{priority:-11,care:-6}, note:'Ты выбрал дело. Она — запомнила.'},
+      {l:'Уезжай, если надо. Я остаюсь.', warm:-15, t:{care:-9,priority:-7}, note:'Это уже почти прощание.'},
+    ]},
+  // ══ ДОСТОВЕРНЫЕ реплики психотипов (источник: VIA_ПСИХОЛОГИЯ_ПАРТНЁРШ.md) ══
+  // ── ХРАНИТЕЛЬНИЦА (guardian): тихая верность, язык любви = время и слова ──
+  { psy:'guardian', kind:'Присутствие', a:'🕯️', q:'«Ты сегодня какой-то тихий… всё правда хорошо? Мне с тобой можно всё, ты же знаешь.»',
+    opts:[
+      {l:'Обнять и рассказать, что на душе.', warm:+10, t:{presence:+9,honesty:+7,care:+6}, note:'Ты впустил её. Так и держится тихая любовь.'},
+      {l:'«Всё нормально», отвернуться к делам.', warm:-8, t:{presence:-7,honesty:-5}, note:'Она почувствовала стену. Ранится молча.'},
+      {l:'«Отстань, не начинай.»', warm:-13, t:{care:-11,presence:-6}, note:'Она замолчала. Терпит, но не бесконечно.'},
+    ]},
+  { psy:'guardian', kind:'Нежность', a:'🤍', q:'«Мне не нужны подарки, мне нужен ты. Просто побудь сегодня дома, ладно?»',
+    opts:[
+      {l:'Отменить всё, остаться с ней.', warm:+11, t:{presence:+10,priority:+8,care:+6}, note:'Ты выбрал её присутствием, а не деньгами. Это её язык.'},
+      {l:'Заказать ей дорогой подарок вместо вечера.', warm:-4, t:{care:+2,presence:-6}, cost:-500, note:'−$500, но ей нужны были не вещи, а ты. Мимо.'},
+      {l:'«У меня дела, потом побудем.»', warm:-10, t:{presence:-8,priority:-6}, note:'«Потом» она уже слышала. Тихо гаснет.'},
+    ]},
+  { psy:'guardian', kind:'Опора', call:true, a:'🫶', q:'«Я рядом, что бы ни случилось. А ты будешь рядом, когда трудно станет мне?»',
+    opts:[
+      {l:'«Всегда. Ты моя опора, и я твоя.»', warm:+12, t:{loyal:+9,care:+8,priority:+6}, note:'Она поверила. Надёжность — то, чего она ищет.'},
+      {l:'«Ну… посмотрим по ситуации.»', warm:-9, t:{loyal:-7,care:-5}, note:'Уклончивость её ранила. Она запомнила.'},
+    ]},
+  { psy:'guardian', kind:'Будущее', a:'🏡', q:'«Мы проведём эти выходные вместе? Просто мы вдвоём, дома. Я соскучилась.»',
+    opts:[
+      {l:'«Да. Никаких дел — только мы.»', warm:+10, t:{presence:+8,priority:+7}, note:'Простое счастье, которого она и хочет.', milestone:true},
+      {l:'«Может быть, если разгребу работу.»', warm:-7, t:{priority:-6,presence:-4}, note:'Работа снова впереди неё.'},
+    ]},
+
+  // ── ТРОФЕЙ (trophy): статус, витрина, язык любви = подарки и публичный блеск ──
+  { psy:'trophy', kind:'Статус', a:'📸', q:'«У всех подруг мужья дарят такое… а я на их фоне кто? Ты вообще меня любишь?»',
+    opts:[
+      {l:'Поехали, выберу тебе самую лучшую.', warm:+9, t:{care:+3}, cost:-1500, note:'Купил статус. −$1500, тепло +, но зеркало пишет: ты покупаешь любовь.'},
+      {l:'Счастье не в сумках. Давай просто побудем вдвоём.', warm:-8, t:{presence:+5,priority:+5}, note:'Ей не зашло — ей нужна витрина, а не ты.'},
+      {l:'«Ты вообще со мной ради денег?»', warm:-11, t:{honesty:+5}, note:'Прямой вопрос. Скандал, но правда всплыла.'},
+    ]},
+  { psy:'trophy', kind:'Статус', a:'💍', q:'«Ты вообще гордишься мной на людях? Или стесняешься показать друзьям?»',
+    opts:[
+      {l:'Вывести её в свет, хвалиться ею весь вечер.', warm:+8, t:{presence:+3}, cost:-700, note:'−$700. Она сияет: её показали. Это её топливо.'},
+      {l:'«Я горжусь тобой дома, а не напоказ.»', warm:-7, t:{honesty:+4,priority:+3}, note:'Ей мало «дома». Без сцены нет тепла.'},
+      {l:'«Мне неважно, что подумают другие.»', warm:-10, t:{care:-4}, note:'Для неё это и есть главное. Обесценил её мир.'},
+    ]},
+  { psy:'trophy', kind:'Деньги', a:'💳', q:'«Что ты сделал для меня в этом месяце? Только честно. Другие вон стараются.»',
+    opts:[
+      {l:'Молча организовать роскошный сюрприз.', warm:+9, t:{care:+3}, cost:-1200, note:'−$1200. Работает — но ты снова оплатил её тепло.'},
+      {l:'«Я рядом, разве этого мало?»', warm:-9, t:{presence:+4,priority:+4}, note:'Для неё «рядом» не считается. Считаются вложения.'},
+      {l:'«Любовь не измеряется чеками.»', warm:-8, t:{honesty:+5}, note:'Ты прав по жизни — но не по её шкале. Холод.'},
+    ]},
+
+  // ── ПРОВОДНИЦА (muse): смысл, глубина, рост; деньги не действуют ──
+  { psy:'muse', kind:'Смысл', a:'🌿', q:'«Что для тебя по-настоящему важно? Не деньги — по-настоящему. Я хочу знать тебя.»',
+    opts:[
+      {l:'Открыться, говорить с ней о главном по-честному.', warm:+11, t:{honesty:+9,presence:+7,priority:+6}, note:'Настоящая близость. Именно это её держит.'},
+      {l:'«Важно обеспечить нас, вот и всё.»', warm:-8, t:{presence:-5,priority:-6}, note:'Она искала глубину, а услышала прайс-лист.'},
+      {l:'Отшутиться, уйти от разговора.', warm:-9, t:{honesty:-6,care:-4}, note:'Ты закрылся. Для неё это расстояние.'},
+    ]},
+  { psy:'muse', kind:'Будущее', a:'🌱', q:'«Мы правда растём вместе — или просто стоим на месте рядом? Мне важно расти.»',
+    opts:[
+      {l:'«Давай расти вместе — учиться, ездить, узнавать.»', warm:+11, t:{priority:+8,presence:+7,care:+5}, cost:-300, note:'−$300 на совместный опыт. Она загорелась.', milestone:true},
+      {l:'«Мне некогда, я зарабатываю на нас.»', warm:-9, t:{presence:-6,priority:-7}, note:'Опять дело выше неё. Она тихо отдаляется.'},
+    ]},
+  { psy:'muse', kind:'Присутствие', a:'✨', q:'«Ты сейчас со мной — или опять где-то в своих делах? Я чувствую, когда тебя нет.»',
+    opts:[
+      {l:'Отложить всё и быть здесь, с ней.', warm:+10, t:{presence:+10,priority:+7}, note:'Ты вернулся в момент. Она это ценит выше всего.'},
+      {l:'«Я слушаю» (не отрываясь от экрана).', warm:-8, t:{presence:-8,honesty:-4}, note:'Она видит подделку присутствия насквозь.'},
+      {l:'«Дай доработаю, потом.»', warm:-7, t:{presence:-6,priority:-5}, note:'«Потом» — её граница. Она устала от гонки.'},
+    ]},
+  { psy:'muse', kind:'Смысл', a:'🌌', q:'«Когда мы в последний раз просто смотрели на звёзды и говорили о важном?»',
+    opts:[
+      {l:'Уехать вдвоём за город, без телефонов.', warm:+11, t:{presence:+9,priority:+7}, cost:-200, note:'Ты был рядом по-настоящему. Она расцвела.'},
+      {l:'«Звёзды подождут, у меня дедлайн.»', warm:-10, t:{presence:-7,priority:-8}, note:'Опять дело выше неё. Она замкнулась.'},
+      {l:'«О важном» — это вообще о чём?»', warm:-8, t:{care:-5}, note:'Цинизм задел её ценности. Это её красная линия.'},
+    ]},
+
+  // ── УРАГАН (storm): драйв и новизна, под ними страх скуки и быть покинутой ──
+  { psy:'storm', kind:'Развлечение', a:'🍸', q:'«Скука смертная! Погнали в клуб прямо сейчас, хватит дома киснуть!»',
+    opts:[
+      {l:'Погнали, оторвёмся сегодня.', warm:+10, t:{presence:+4}, cost:-400, note:'Драйв. −$400, ей огонь. Но так — каждую неделю…'},
+      {l:'«Я вымотан, давай тихий вечер дома.»', warm:-11, t:{presence:-4}, note:'Ей с тобой скучно — она уже ищет драйв на стороне.'},
+      {l:'«Иди одна, раз так приспичило.»', warm:-15, t:{loyal:-6,priority:-6}, note:'Отпустил её одну в клуб. Скользко.'},
+    ]},
+  { psy:'storm', kind:'Развлечение', a:'😤', q:'«Почему мы никуда не ходим?! Другие пары живут, а мы как соседи по квартире.»',
+    opts:[
+      {l:'Устроить ей спонтанный сюрприз-выезд.', warm:+11, t:{presence:+5,care:+4}, cost:-600, note:'−$600. Новизна — её кислород. Вспыхнула радостью.'},
+      {l:'«Мы вместе — этого разве мало?»', warm:-9, t:{priority:-4}, note:'Для неё «вместе» без драйва = скука. Растёт FOMO.'},
+      {l:'«Прекрати драму на пустом месте.»', warm:-13, t:{care:-9}, note:'Обесценил её чувства — качели раскачались сильнее.'},
+    ]},
+  { psy:'storm', kind:'Присутствие', call:true, a:'😢', q:'«Ты меня уже разлюбил, да? Ты какой-то не такой… докажи, что я тебе нужна.»',
+    opts:[
+      {l:'Обнять, успокоить, напомнить, что она — твоя.', warm:+10, t:{care:+8,presence:+7,loyal:+5}, note:'Под драмой — страх быть брошенной. Ты его унял.'},
+      {l:'«Опять двадцать пять, я устал от проверок.»', warm:-12, t:{care:-9,presence:-5}, note:'Её страх подтвердился в её же голове. Опасно.'},
+      {l:'Промолчать и уткнуться в телефон.', warm:-14, t:{presence:-8,care:-6}, note:'Молчание она читает как «конец». Побежит за драйвом.'},
+    ]},
+
+  // ── СИРЕНА (siren): внимание толпы, тело как капитал, твоя ревность = топливо ──
+  { psy:'siren', kind:'Слава', a:'📱', q:'«Мой пост взорвал ленту — сотни сообщений от мужиков. Ты же не ревнуешь, милый?»',
+    opts:[
+      {l:'«Горжусь тобой. Но помни, чья ты.»', warm:+7, t:{presence:+3,loyal:+3}, note:'Уверенность без сцен — ей это заводит.'},
+      {l:'«Удали. Мне это неприятно.»', warm:-9, t:{care:-4,priority:-3}, note:'Собственничество. Она вспыхнула: «ты меня не контролируешь».'},
+      {l:'Молча листаешь, кто эти мужики.', warm:-6, t:{honesty:-5}, note:'Ревность разъедает тебя изнутри, а её ты не удержал.'},
+    ]},
+  { psy:'siren', kind:'Ревность', call:true, a:'💋', q:'«Ты что, совсем не ревнуешь? Все парни весь вечер на меня смотрели.»',
+    opts:[
+      {l:'«Пусть смотрят. Домой ты идёшь со мной.»', warm:+8, t:{loyal:+4,presence:+3}, note:'Спокойная сила без сцены — её это по-настоящему заводит.'},
+      {l:'Вспылить: «Кто именно?! Покажи!»', warm:+4, t:{honesty:-3,care:-3}, note:'Дала тебе спектакль — а ты его сыграл. Твоя ревность = её топливо.'},
+      {l:'«Мне всё равно, делай что хочешь.»', warm:-10, t:{care:-6,priority:-4}, note:'Безразличие — худшее для неё. Она уже ищет, кто оценит.'},
+    ]},
+  { psy:'siren', kind:'Слава', a:'👑', q:'«Все на меня смотрели весь вечер. Тебе разве не приятно, что твоя — такая, которую хотят все?»',
+    opts:[
+      {l:'«Приятно. И приятнее всех — что выбрала меня.»', warm:+7, t:{presence:+3,loyal:+3}, note:'Ты дал ей сцену и остался королём. Идеально для неё.'},
+      {l:'«Хватит ловить чужие взгляды.»', warm:-9, t:{care:-4}, note:'Попытка спрятать её = гасить её кислород. Вспыхнула.'},
+      {l:'«За тобой очередь, я в ней устал стоять.»', warm:-8, t:{honesty:+4,loyal:-3}, note:'Честно и устало. Но она уже слышит: место освобождается.'},
+    ]},
+  { psy:'siren', kind:'Ревность', call:true, a:'✨', q:'«Хочешь, чтобы я была только твоей? Тогда заслужи это. Чем удивишь?»',
+    opts:[
+      {l:'Устроить ей вечер, где она — звезда сцены.', warm:+9, t:{care:+3,presence:+3}, cost:-900, note:'−$900. Сцена и восхищение — её валюта. Растаяла.'},
+      {l:'«Любовь не заслуживают напоказ.»', warm:-8, t:{honesty:+5,priority:+4}, note:'Взрослая позиция — но не её игра. Ей нужен спектакль.'},
+      {l:'«Тогда, может, ты не только моя?»', warm:-11, t:{loyal:-4}, note:'Поймал её на манипуляции — но и подтолкнул к двери.'},
+    ]},
+  // ── ИСПЫТАНИЕ ДОМИНАНТА (богатая/гордая женщина утверждает своё слово; фильтр domLevel в fireEvent) ──
+  { dom:true, kind:'Власть', call:true, a:'👑', q:'«Я привыкла, что в паре решаю я — я всего добилась сама. Ты примешь это?»',
+    opts:[
+      {l:'Приму. Ты сильная, я уважаю это.', warm:+11, resp:+16, t:{care:+4,priority:+6}, note:'Она смягчилась: ты признал её силу.'},
+      {l:'Давай на равных, вместе.', warm:-2, resp:-6, t:{honesty:+4}, note:'Она усмехнулась — «на равных» ей непривычно.'},
+      {l:'«Я мужчина, решать буду я.»', warm:-13, resp:-20, t:{priority:-6}, note:'Она похолодела: уважения к её слову ты не показал.'},
+    ]},
+];
+// ══ СОБЫТИЯ ПАРНЕЙ (для женщины-игрока) — зеркало EVENTS ══
+const EVENTS_M=[
+  { kind:'Присутствие', a:'😔', q:'«Ты опять пропадаешь целыми днями. Тебе вообще есть до меня дело?»',
+    opts:[
+      {l:'Прости, ты прав. Завтра — только ты, без телефона.', warm:+9, t:{care:+8,presence:+10,priority:+7}, note:'Ты выбрала его. Тепло вернулось.'},
+      {l:'Мне надо. Дела сами себя не сделают.', warm:-7, t:{priority:-9,presence:-6}, note:'Честно, но холодно. Он замкнулся.'},
+      {l:'Да отстань, я устала.', warm:-14, t:{care:-12,presence:-8}, note:'Он ушёл в себя. Тепло упало.'},
+    ]},
+  { kind:'Ревность', call:true, a:'🧐', q:'«Кто этот Максим, что лайкает все твои фото? Только честно.»',
+    opts:[
+      {l:'Коллега, ничего между нами. Спрашивай — я открыта.', warm:+5, t:{honesty:+9,loyal:+4}, note:'Прозрачность греет доверие.'},
+      {l:'Не знаю такого. (соврать)', warm:+3, t:{honesty:-13,loyal:-4}, note:'Тепло сейчас +, но зеркало запомнило ложь.'},
+      {l:'Ты меня контролируешь! Достал.', warm:-11, t:{care:-8,honesty:-3}, note:'Скандал на ровном месте.'},
+    ]},
+  { kind:'Будущее', call:true, a:'🥺', q:'«Мы уже больше года. Ты вообще видишь нас вместе через пять лет?»',
+    opts:[
+      {l:'Вижу. Хочу с тобой всё — и дом, и детей.', warm:+12, t:{priority:+9,care:+7}, note:'Он засветился. Вы ближе к вехе.', milestone:true},
+      {l:'Давай не будем торопиться.', warm:-6, t:{priority:-4}, note:'Уклончиво. Тепло чуть просело.'},
+      {l:'Меняешь тему.', warm:-9, t:{honesty:-6,care:-4}, note:'Он понял ответ без слов.'},
+    ]},
+  { kind:'Соблазн', call:true, a:'🍷', q:'«На вечеринке к тебе клеится парень — зовёт «продолжить вечер». Он дома, ждёт тебя.»',
+    opts:[
+      {l:'Отказать и поехать домой к нему.', warm:+7, t:{loyal:+13,care:+6}, note:'Ты выбрала верность. Это видно.'},
+      {l:'«Просто выпьем, ничего такого».', warm:-5, t:{loyal:-9}, note:'Скользкая дорожка. Зеркало насторожилось.'},
+      {l:'Поддаться.', warm:-20, t:{loyal:-22,honesty:-8,care:-10}, note:'Ты изменила. Зеркало это не сотрёт.'},
+    ]},
+  { kind:'Нежность', a:'🥰', q:'«Я приготовил твоё любимое. Просто так. Соскучился по тебе.»',
+    opts:[
+      {l:'Отложить телефон, обнять, поужинать вдвоём.', warm:+10, t:{care:+10,presence:+8}, note:'Тёплый вечер. Так и копится любовь.'},
+      {l:'«Спасибо», не отрываясь от дел.', warm:-8, t:{care:-9,presence:-9}, note:'Он старался, а ты не заметила.'},
+    ]},
+  { kind:'Деньги', a:'😒', q:'«Ты купила себе новую сумку, а на нашу поездку денег «нет»?»',
+    opts:[
+      {l:'Ты прав. Давай спланируем поездку прямо сейчас.', warm:+8, t:{care:+7,honesty:+5}, cost:-800, note:'Признала и исправила. −$800, но тепло +.'},
+      {l:'Оправдаться: «она нужна была для работы».', warm:-6, t:{honesty:-4}, note:'Звучит как отговорка.'},
+      {l:'«Мои деньги — что хочу, то и делаю».', warm:-12, t:{care:-10,priority:-9}, note:'Больно. Между вами стена.'},
+    ]},
+  { kind:'Опора', a:'😢', q:'«У меня был жуткий день. Просто побудь рядом, ладно?»',
+    opts:[
+      {l:'Всё бросить, обнять, выслушать.', warm:+11, t:{care:+13,presence:+7}, note:'Ты была рядом, когда нужно. Это главное.'},
+      {l:'«У меня своих проблем хватает».', warm:-16, t:{care:-15,presence:-6}, note:'Он остался один со своей болью.'},
+    ]},
+  { kind:'Жертва', call:true, a:'✨', q:'«Мне предложили работу мечты в другом городе. Поедешь со мной?»',
+    opts:[
+      {l:'Поеду. Ты важнее любого дела.', warm:+14, t:{priority:+14,care:+8}, note:'Огромный выбор в его пользу.'},
+      {l:'А как же моё здесь? Давай ты откажешься.', warm:-10, t:{priority:-11,care:-6}, note:'Ты выбрала дело. Он — запомнил.'},
+      {l:'Езжай, если надо. Я остаюсь.', warm:-15, t:{care:-9,priority:-7}, note:'Это уже почти прощание.'},
+    ]},
+
+  // ── МАМЕНЬКИН СЫНОК (mama): ищет мать, мама всегда третья, не взрослеет ──
+  { psy:'mama', kind:'Нежность', a:'🧸', q:'«А ты приготовишь как моя мама? Она вот всегда борщ по четвергам… у тебя вкусно, но по-другому.»',
+    opts:[
+      {l:'С теплом: «Я не мама, но люблю тебя по-своему.»', warm:+8, t:{honesty:+6,presence:+5}, note:'Мягко обозначила границу. Он притих, но задумался.'},
+      {l:'Стараться готовить как мама, лишь бы был доволен.', warm:+4, t:{care:+4,priority:-6}, note:'Ты подстроилась под маму. Так станешь второй мамой, а не любимой.'},
+      {l:'«Иди к маме, раз у неё лучше.»', warm:-12, t:{care:-8}, note:'Обиделся как ребёнок и правда позвонил маме.'},
+    ]},
+  { psy:'mama', kind:'Ревность', call:true, a:'📞', q:'«Мама сказала, тебе не стоит столько работать — она плохого не посоветует.»',
+    opts:[
+      {l:'«Решения о нас принимаем мы вдвоём, не мама.»', warm:+7, t:{honesty:+7,priority:+6}, note:'Ты отстояла пару. Ему непривычно — но это взросление.'},
+      {l:'Согласиться, лишь бы не спорил.', warm:-5, t:{priority:-7}, note:'Мама снова порулила вашей жизнью. Ты уступила ей место.'},
+      {l:'Скандал: «Твоя мама лезет во всё!»', warm:-11, t:{care:-6}, note:'Он кинулся защищать маму от тебя. Показательно.'},
+    ]},
+  { psy:'mama', kind:'Опора', call:true, a:'🍼', q:'«Я не знаю, что выбрать… а реши за меня, а? Ты же умнее и сильнее.»',
+    opts:[
+      {l:'Мягко подтолкнуть решать самому.', warm:+6, t:{honesty:+6,priority:+5}, note:'Ты не стала его мамой. Он растерян, но растёт.'},
+      {l:'Решить всё за него, как обычно.', warm:+3, t:{care:+3,priority:-6}, note:'Удобно ему — а ты снова взвалила на себя роль родителя.'},
+    ]},
+  { psy:'mama', kind:'Будущее', a:'👶', q:'«Мама говорит, нам рано съезжаться — у неё мне и так хорошо. Поживём при ней, а?»',
+    opts:[
+      {l:'«Взрослая пара живёт своим домом. Пора.»', warm:+7, t:{priority:+7,presence:+5}, note:'Ты позвала его во взрослую жизнь.', milestone:true},
+      {l:'Остаться жить с его мамой.', warm:-8, t:{priority:-8}, note:'Теперь мама рядом каждый день. Вас — трое.'},
+    ]},
+
+  // ── БАЛАБОЛ (talker): слова вместо дел, золотые горы, пустые обещания ──
+  { psy:'talker', kind:'Деньги', a:'🗣️', q:'«Малыш, у меня гениальная тема, поднимем миллионы! Вложись чуть-чуть, остальное на мне.»',
+    opts:[
+      {l:'«Покажи хоть один готовый шаг — тогда поговорим.»', warm:-3, t:{honesty:+7,priority:+5}, note:'Попросила дела вместо слов. Он замялся — доказать нечем.'},
+      {l:'Дать денег под красивую речь.', warm:+5, t:{care:+3,priority:-6}, cost:-1500, note:'−$1500. Речь была шикарная. Результата не будет.'},
+      {l:'«Ты это говоришь третий месяц.»', warm:-6, t:{honesty:+5}, note:'Правда кольнула. Он ушёл в новую пылкую речь.'},
+    ]},
+  { psy:'talker', kind:'Будущее', call:true, a:'💍', q:'«Вот раскручусь — свозлю тебя на Мальдивы, куплю кольцо, поженимся. Обещаю!»',
+    opts:[
+      {l:'«Слова красивые. Поверю по делам.»', warm:-2, t:{honesty:+6}, note:'Ты перестала покупаться на обещания. Взросло.'},
+      {l:'Растаять от обещаний.', warm:+6, t:{priority:-4}, note:'Тепло +, но это всё те же завтраки. Года идут.'},
+      {l:'«Ты обещаешь это каждый праздник.»', warm:-7, t:{honesty:+5,care:-3}, note:'Он обиделся, что ему не верят на слово.'},
+    ]},
+  { psy:'talker', kind:'Присутствие', a:'🗣️', q:'«Я весь вечер рассказывал тебе про свои планы — а ты какая-то не в восторге?»',
+    opts:[
+      {l:'«Я хочу не рассказов, а чтобы мы что-то сделали.»', warm:-3, t:{honesty:+6,presence:+4}, note:'Ты попросила действий. Ему нечем ответить.'},
+      {l:'Восхищаться его планами.', warm:+5, t:{presence:+3,honesty:-4}, note:'Он расцвёл от аплодисментов. Дел как не было, так и нет.'},
+      {l:'Молча слушать в сотый раз.', warm:-4, t:{presence:-4}, note:'Поток слов льётся, а вечер утекает впустую.'},
+    ]},
+
+  // ── НАСТОЯЩИЙ МУЖИК (rock): сказал — сделал, защищает и обеспечивает; ценит глубину и верность ──
+  { psy:'rock', kind:'Опора', a:'🛡️', q:'«Не переживай, я всё решил: аренду закрыл, машину починил. Твоё дело — просто быть счастливой.»',
+    opts:[
+      {l:'Обнять и поблагодарить искренне.', warm:+11, t:{care:+8,presence:+7,loyal:+5}, note:'Ты приняла его заботу с теплом. Так и держится крепкий мужчина.'},
+      {l:'«Я и сама справилась бы.»', warm:-6, t:{priority:-4}, note:'Он не обиделся, но чуть отдалился: его опору не приняли.'},
+    ]},
+  { psy:'rock', kind:'Будущее', call:true, a:'🏡', q:'«Я хочу серьёзно: дом, семья, дети. Я не игрок — я строю на всю жизнь. Ты со мной?»',
+    opts:[
+      {l:'«Да. С тобой — хоть на всю жизнь.»', warm:+13, t:{priority:+9,loyal:+9,care:+6}, note:'Он не бросает таких слов зря. Это фундамент.', milestone:true},
+      {l:'«Давай не будем спешить.»', warm:-7, t:{priority:-5}, note:'Он серьёзен, а ты медлишь. Он кивнул — но запомнил.'},
+    ]},
+  { psy:'rock', kind:'Жертва', call:true, a:'⚒️', q:'«На работе завал, но ты просила побыть вместе — я всё переставил. Обещал же.»',
+    opts:[
+      {l:'Оценить, что он держит слово.', warm:+11, t:{loyal:+8,care:+6,presence:+6}, note:'Сказал — сделал. На этом и строится доверие к нему.'},
+      {l:'Принять как должное, уткнуться в телефон.', warm:-8, t:{care:-6,presence:-6}, note:'Он старался и сдержал слово, а ты не заметила.'},
+    ]},
+  { psy:'rock', kind:'Присутствие', a:'🤝', q:'«Если что случится — я рядом. Всегда. Просто знай это.»',
+    opts:[
+      {l:'«Знаю. И я — твоя опора тоже.»', warm:+10, t:{loyal:+7,care:+6}, note:'Взаимная надёжность. Редкая и крепкая вещь.'},
+      {l:'«Все так говорят сначала.»', warm:-7, t:{honesty:-3,loyal:-4}, note:'Цинизм задел его. Он верен делом, а не языком.'},
+    ]},
+
+  // ── ПОЛУ-МАЛЬЧИК (pretty): красивый и пустой, брейн-дрейн, твоя ревность = топливо, тратит на себя ──
+  { psy:'pretty', kind:'Слава', a:'😎', q:'«Зацени мой новый лук для съёмки. Как думаешь, лайков наберёт больше тыщи?»',
+    opts:[
+      {l:'«Красиво. А о чём-нибудь важном поговорить можно?»', warm:-4, t:{honesty:+5,presence:+4}, note:'Попыталась в глубину — а там пусто. Он не понял вопроса.'},
+      {l:'Восхищаться его внешностью.', warm:+6, t:{presence:+3,honesty:-3}, note:'Он расцвёл. Разговор снова только о нём.'},
+      {l:'«Ты хоть раз спросил, как мой день?»', warm:-8, t:{care:-4}, note:'Он честно завис: о тебе он не думал.'},
+    ]},
+  { psy:'pretty', kind:'Ревность', call:true, a:'💋', q:'«Мне пишут модели из инсты. Ревнуешь? Так тебе и надо — цени, кто рядом.»',
+    opts:[
+      {l:'«Пусть пишут. Только я знаю, какой ты пустой.»', warm:+3, t:{honesty:+5,loyal:+3}, note:'Кольнула по больному. Он занервничал — правда близко.'},
+      {l:'Ревновать и устраивать сцену.', warm:+4, t:{care:-3,honesty:-3}, note:'Твоя ревность — его топливо. Он самоутвердился за твой счёт.'},
+      {l:'«Иди к своим моделям.»', warm:-10, t:{care:-5,priority:-4}, note:'Безразличие бьёт его больнее всего. Побежал за лайками.'},
+    ]},
+  { psy:'pretty', kind:'Деньги', a:'💅', q:'«Скинь на новые кроссы и барбершоп, а? Мне ж на съёмку, я должен выглядеть.»',
+    opts:[
+      {l:'«Заработай сам — ты взрослый парень.»', warm:-6, t:{honesty:+5,priority:+4}, note:'Ему это чуждо: работать ради шмота? Надулся.'},
+      {l:'Оплатить его образ.', warm:+5, t:{care:+2,priority:-5}, cost:-800, note:'−$800 на его понты. Он даже спасибо толком не сказал.'},
+      {l:'«Ты вообще на что живёшь?»', warm:-7, t:{honesty:+4}, note:'Вопрос повис. Ответа, как и стержня, у него нет.'},
+    ]},
+  { psy:'pretty', kind:'Присутствие', a:'😮‍💨', q:'«Ну ты чего кислая? Давай расскажу про свои тренировки, настроение поднимется.»',
+    opts:[
+      {l:'«Мне нужен разговор по душам, а не про твой зал.»', warm:-4, t:{presence:+4,honesty:+5}, note:'Душевного разговора он не тянет. Пустота под красотой.'},
+      {l:'Слушать про его тренировки.', warm:+3, t:{presence:-3}, note:'Ещё вечер утёк на его монолог о себе.'},
+    ]},
+  // ── ИСПЫТАНИЕ ДОМИНАНТА (богатый/гордый мужчина утверждает своё слово; фильтр domLevel в fireEvent) ──
+  { dom:true, kind:'Власть', call:true, a:'👑', q:'«В этом доме решаю я — так было и так будет. Ты со мной, значит по-моему. Примешь?»',
+    opts:[
+      {l:'Приму. Я доверяю тебе, веди.', warm:+11, resp:+16, t:{care:+4,priority:+6}, note:'Он признал в тебе свою. Стал ближе и мягче.'},
+      {l:'Давай решать вместе, на равных.', warm:-2, resp:-6, t:{honesty:+4}, note:'Он хмыкнул — к «на равных» он не привык.'},
+      {l:'«Никто мне не указ, я сама по себе.»', warm:-13, resp:-20, t:{priority:-8}, note:'Он похолодел: уважения к его слову он не почувствовал.'},
+    ]},
+];
+// ── события её бизнеса («куча проблем», всплывают только если herBiz) ──
+const BIZ_EVENTS=[
+  { kind:'Бизнес', a:'📉', q:'«Бизнес просел, нужны деньги на аренду и зарплаты. Вложишься ещё?»',
+    opts:[
+      {l:'Дам ещё $3000, вы справитесь.', warm:+6, t:{care:+5}, cost:-3000, note:'−$3000. Она благодарна, но дыра растёт.'},
+      {l:'Давай сама выкручивайся, это твоё дело.', warm:-9, t:{care:-6,priority:-5}, note:'Ей одиноко в её же деле. Обида.'},
+      {l:'Может, закроем этот бизнес?', warm:-7, t:{priority:-4}, note:'Её мечту рубишь — ей больно.'},
+    ]},
+  { kind:'Бизнес', a:'🧔', q:'«Мой бизнес-партнёр очень внимательный… всё время помогает, зовёт на встречи вечером.»',
+    opts:[
+      {l:'Доверяю тебе. Но держи дистанцию.', warm:+5, t:{loyal:+4,honesty:+4}, note:'Спокойная опора без сцен.'},
+      {l:'Запрещаю с ним работать!', warm:-10, t:{care:-6}, note:'Контроль взбесил её. Скандал.'},
+      {l:'Следишь за её перепиской.', warm:-8, t:{honesty:-6}, note:'Ревность к бизнес-партнёру ест тебя.'},
+    ]},
+  { kind:'Бизнес', a:'🔥', q:'«Дело пошло! Прибыль есть — но я теперь вечно на работе, нам некогда видеться.»',
+    opts:[
+      {l:'Горжусь тобой, найдём время друг для друга.', warm:+8, t:{presence:+5,priority:+5}, note:'Поддержал — и связь, и её успех.'},
+      {l:'Ты выбрала бизнес вместо меня.', warm:-8, t:{priority:-6}, note:'Ревность к её успеху. Стена растёт.'},
+    ]},
+];
+// ── события ЕГО дела (зеркало BIZ_EVENTS; всплывают, если вложилась в его дело) ──
+const BIZ_EVENTS_M=[
+  { kind:'Бизнес', a:'📉', q:'«Дело просело, нужны деньги на аренду и зарплаты. Вложишься ещё?»',
+    opts:[
+      {l:'Дам ещё $3000, вы справитесь.', warm:+6, t:{care:+5}, cost:-3000, note:'−$3000. Он благодарен, но дыра растёт.'},
+      {l:'Давай сам выкручивайся, это твоё дело.', warm:-9, t:{care:-6,priority:-5}, note:'Ему одиноко в его же деле. Обида.'},
+      {l:'Может, закроем это?', warm:-7, t:{priority:-4}, note:'Его мечту рубишь — ему больно.'},
+    ]},
+  { kind:'Бизнес', a:'👩', q:'«Моя новая ассистентка такая толковая… всё время рядом, задерживаемся допоздна.»',
+    opts:[
+      {l:'Доверяю тебе. Но держи дистанцию.', warm:+5, t:{loyal:+4,honesty:+4}, note:'Спокойная опора без сцен.'},
+      {l:'Запрещаю с ней работать!', warm:-10, t:{care:-6}, note:'Контроль его взбесил. Скандал.'},
+      {l:'Следишь за его перепиской.', warm:-8, t:{honesty:-6}, note:'Ревность к ассистентке ест тебя.'},
+    ]},
+  { kind:'Бизнес', a:'🔥', q:'«Дело пошло! Прибыль есть — но я теперь вечно на работе, нам некогда видеться.»',
+    opts:[
+      {l:'Горжусь тобой, найдём время друг для друга.', warm:+8, t:{presence:+5,priority:+5}, note:'Поддержала — и связь, и его успех.'},
+      {l:'Ты выбрал работу вместо меня.', warm:-8, t:{priority:-6}, note:'Ревность к его успеху. Стена растёт.'},
+    ]},
+];
+
+// ── Проактивные действия: греешь сам (стоят кассы) ──
+const ACTS=[
+  {id:'date', ic:'🌹', nm:'Свидание', d:'−$150 · тепло +', cost:-150, warm:+7, t:{care:+4,presence:+5}},
+  {id:'dinner', ic:'🍷', nm:'Романтический ужин', d:'−$600 · тепло ++', cost:-600, warm:+13, t:{care:+6,presence:+6}},
+  {id:'talk', ic:'💬', nm:'По душам', d:'ход · тепло +', cost:0, warm:+6, t:{honesty:+4,presence:+5}},
+  {id:'gift', ic:'🎁', nm:'Подарок', d:'−$400 · тепло +', cost:-400, warm:+8, t:{care:+3}},
+  {id:'salon', ic:'💇', nm:'Салон и наряды', d:'−$500 · тепло +', cost:-500, warm:+8, t:{care:+4}},
+  {id:'trip', ic:'✈️', nm:'Уехать вдвоём', d:'−$1200 · тепло ++', cost:-1200, warm:+15, t:{care:+7,presence:+8,priority:+5}},
+  {id:'party', ic:'🍸', nm:'Тусить / гулять', d:'−$300 · драйв +', cost:-300, warm:+8, t:{presence:+4}},
+  {id:'exp', ic:'🌿', nm:'Постигать мир', d:'−$100 · глубина +', cost:-100, warm:+7, t:{presence:+6,priority:+4}},
+];
+// ── ДЕЙСТВИЯ ЖЕНЩИНЫ (партнёр — парень): её вклад = ВРЕМЯ и ПОДДЕРЖКА (бесплатно, сильно),
+//    а деньги — «по желанию · жест». Материальный поток в паре больше на нём. `like` = ключ множителя психотипа.
+const ACTS_F=[
+  {id:'talkF',     ic:'💬', nm:'По душам',                 d:'ход · тепло +',   cost:0,    warm:+6,  like:'talk', t:{honesty:+4,presence:+5}},
+  {id:'beThere',   ic:'🫂', nm:'Быть рядом, поддержать',   d:'ход · тепло ++',  cost:0,    warm:+9,  like:'talk', t:{care:+7,presence:+7}},
+  {id:'timeF',     ic:'🚶', nm:'Время вместе',             d:'ход · тепло +',   cost:0,    warm:+7,  like:'date', t:{presence:+6,care:+3}},
+  {id:'believe',   ic:'⭐', nm:'Поверить в него, вдохновить', d:'ход · тепло +', cost:0,    warm:+7,  like:'exp',  t:{priority:+6,presence:+3}},
+  {id:'homeWarm',  ic:'🍲', nm:'Встретить теплом дома',    d:'ход · тепло +',   cost:0,    warm:+7,  like:'talk', t:{care:+7}},
+  // ── по желанию · жесты (деньги её, по выбору) ──
+  {id:'giftHim',   ic:'🎁', nm:'Подарок ему',              d:'−$300 · жест',    cost:-300, warm:+7,  like:'gift', gesture:true, t:{care:+5}},
+  {id:'tripHim',   ic:'✈️', nm:'Свозить вдвоём',           d:'−$1000 · жест ++',cost:-1000,warm:+12, like:'trip', gesture:true, t:{care:+6,presence:+7,priority:+5}},
+  {id:'nightHim',  ic:'🍸', nm:'Устроить ему вечер',       d:'−$300 · драйв',   cost:-300, warm:+7,  like:'party',gesture:true, t:{presence:+4}},
+];
+// ══ СЛОЙ ВЛАСТИ 1: ДЕНЕЖНЫЕ УСЛОВИЯ + БОГАТСТВО→ДОМИНИРОВАНИЕ ══
+// Богатство партнёра 0..1: богатый — правила и оплата на нём; бедный — уступки, но денег мало.
+function partnerWealth(g){
+  if(!g) return 0.4;
+  if(g.wealth) return 0.9;
+  const k=pkey(g);
+  if(isF()){ if(k==='rock') return 0.6; if(k==='talker') return 0.35; if(k==='pretty') return 0.3; return 0.35; }  // парни
+  return 0.4;                                                                                                        // молодые девушки — средне
+}
+// Совместные траты, счёт за которые партнёр может взять на себя (подарки/салон — личное, не покрываются).
+const SHARED_ACTS = ['date','dinner','trip','party','exp','tripHim','nightHim'];
+// Условие оплаты совместного: 'pay' — партнёр оплатит (ты не платишь), 'half' — пополам, 'full' — платишь ты.
+function moneyTerm(g){
+  const w=partnerWealth(g), r=Math.random();
+  if(w>=0.75) return r<0.82?'pay':'half';
+  if(w>=0.55) return r<0.5 ?'pay':(r<0.85?'half':'full');
+  if(w>=0.40) return r<0.28?'half':'full';
+  return 'full';
+}
+// Доминирование 0..1 (богатство + гордость). ≥0.7 — доминант: у него правила, ему нужно уважение/подчинение.
+function domLevel(g){ if(!g) return 0.3; return Math.max(0,Math.min(1, partnerWealth(g)*0.6 + ((Number(g.pride)||50)/100)*0.4)); }
+
+// ══ СЕВЕРНАЯ ЗВЕЗДА: СБОР ДАННЫХ ОБ ИГРОКЕ → ЕГО ПСИХОТИП (зеркало классифицирует ТЕБЯ, не партнёра) ══
+let PROFILE = { picks:[], submit:0, defy:0, attend:0, neglect:0, lies:0, honest:0, leaned:0, gifts:0, breakups:0, motive:{} };
+function profPick(g){ if(!g) return; PROFILE.picks.push({psy:pkey(g), rival:!!g.rival, wealth:partnerWealth(g)}); }
+function _pct(a,b){ const t=a+b; return t? a/t : 0.5; }
+function computePlayerType(){
+  const P=PROFILE, t=st.t||{}, n=P.picks.length||1;
+  const rivalLean = P.picks.filter(x=>x.rival).length/n;
+  const wealthLean= P.picks.reduce((s,x)=>s+(x.wealth||0.4),0)/n;
+  const psyC = k=>P.picks.filter(x=>x.psy===k).length/n;
+  const care=t.care||50, pres=t.presence||50, loy=t.loyal||50, prio=t.priority||50;
+  const submitLean=_pct(P.submit,P.defy), attendLean=_pct(P.attend,P.neglect), honLean=_pct(P.honest,P.lies);
+  const S={};
+  S['Опора']     = (care+pres+loy)/300 + attendLean*0.6 + honLean*0.3;
+  S['Спасатель'] = (psyC('mama')+psyC('talker')+psyC('storm'))*0.9 + care/100*0.4;
+  S['Мотылёк']   = rivalLean*1.2 + (100-loy)/100*0.2 + (psyC('siren')+psyC('pretty'))*0.5;
+  S['Ведомый']   = submitLean*0.9 + wealthLean*0.7 + P.leaned/n*0.3;
+  S['Ловчий']    = (1-honLean)*0.9 + (100-loy)/100*0.5 + (1-attendLean)*0.4;
+  S['Статусник'] = (psyC('trophy')+psyC('siren'))*0.8 + wealthLean*0.4 + P.gifts/n*0.2;
+  const mm={security:'Опора',rescue:'Спасатель',passion:'Мотылёк',led:'Ведомый',status:'Статусник',free:'Ловчий',fear:'Ведомый'};
+  for(const m in P.motive){ if(mm[m]) S[mm[m]]+=P.motive[m]*0.35; }
+  let best='Опора',bv=-1; for(const k in S){ if(S[k]>bv){bv=S[k];best=k;} }
+  return best;
+}
+const PTYPE_DESC={
+ 'Опора':{ic:'🫂',line:'Надёжный дающий — ты вкладываешься и держишь тепло. Береги себя, чтобы твоей заботой не пользовались.'},
+ 'Спасатель':{ic:'🛟',line:'Ты выбираешь тех, кого надо «спасти» и переделать. Спроси себя: почему рядом нужен слабый?'},
+ 'Мотылёк':{ic:'🔥',line:'Тебя тянет к недоступным и ревнивым — где тревожно, там кажется «любовь». Это твоя привязанность, не судьба.'},
+ 'Ведомый':{ic:'🙇',line:'Ты ищешь того, кто поведёт и обеспечит, и подчиняешься сильному. А где во всём этом ты сам(а)?'},
+ 'Ловчий':{ic:'🎭',line:'Ты держишь дистанцию, недоговариваешь, оставляешь путь к отходу. От чего ты убегаешь?'},
+ 'Статусник':{ic:'💎',line:'Ты выбираешь витрину — статус, деньги, «чтоб было кем гордиться». А что под витриной?'},
+};
+function reflectBlock(){
+  if(st.reflectDone) return playerTypeBlock();
+  const q='Пока не начал(а) новую — ответь себе честно: чем '+P().n+' зацепил'+(isF()?'':'а')+' тебя вначале, что ты почувствовал'+(isF()?'':'а')+', когда впервые увидел'+(isF()?'':'а')+' '+P().a+'?';
+  const opts=[
+    ['security','С '+(isF()?'ним':'ней')+' было спокойно и надёжно — как за стеной.'],
+    ['passion','Искра, азарт, дрожь — было остро и опасно.'],
+    ['status',P().N+' классно выглядел'+(isF()?'':'а')+' — было кем гордиться, что показать.'],
+    ['rescue',P().d+' будто нужна была помощь — захотелось спасти, согреть.'],
+    ['led','Сильнее меня — хотелось, чтобы вёл'+(isF()?'':'а')+' и решал'+(isF()?'':'а')+' за меня.'],
+    ['fear','Просто не хотелось быть одному — лишь бы рядом кто-то.'],
+  ];
+  return '<div class="event" style="border-color:#6a6cff;"><div class="kind" style="color:#b9baff;">🪞 Зеркало · почему '+P().n+'</div>'+
+    '<div class="said"><span class="a">💭</span><span class="q">'+q+'</span></div>'+
+    '<div class="opts">'+opts.map(o=>'<button class="opt" onclick="reflectAns(\''+o[0]+'\')">'+o[1]+'</button>').join('')+'</div></div>';
+}
+function reflectAns(m){ PROFILE.motive[m]=(PROFILE.motive[m]||0)+1; st.reflectDone=true; render(); }
+function playerTypeBlock(){
+  const ty=computePlayerType(), d=PTYPE_DESC[ty]||{ic:'🪞',line:''}, n=PROFILE.picks.length;
+  return '<div style="border:1px solid #6a6cff;border-radius:14px;padding:14px 15px;margin-top:2px;background:rgba(106,108,255,.08);">'+
+    '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#b9baff;margin-bottom:5px;">🪞 Твой психотип в любви</div>'+
+    '<div style="font-size:19px;font-weight:800;color:#fff;">'+d.ic+' '+ty+'</div>'+
+    '<div style="font-size:12.5px;color:#d7d8ff;margin-top:5px;line-height:1.5;">'+d.line+'</div>'+
+    '<div style="font-size:11px;color:var(--dim);margin-top:7px;">Собрано по '+n+' выбор'+(n===1?'у':(n<5?'ам':'ам'))+' и тому, как ты вёл(а) себя рядом. Чем дальше играешь — тем точнее зеркало.</div></div>';
+}
+// ── 💳 ЕЁ ТРАТЫ ПО ТВОЕЙ КАРТЕ (дал доступ к кассе — некоторые дивы тратят сами; зеркало выбора) ──
+// chance = шанс траты в месяц; big = шанс крупного шопинга; суммы масштабируются психотипом.
+const SPEND={
+  guardian:{ chance:0.10, min:20,  max:120,  big:0,    bigMin:0,   bigMax:0,   warm:0,  items:[
+    'продукты и мелочи домой','лекарства для мамы','маленький подарок ТЕБЕ','книги и цветы'] },
+  muse:{     chance:0.08, min:15,  max:110,  big:0,    bigMin:0,   bigMax:0,   warm:0,  items:[
+    'йогу и ретрит','краски и холсты','пожертвование в приют','саженцы и травы для дома'] },
+  storm:{    chance:0.48, min:150, max:900,  big:0.15, bigMin:1200,bigMax:2600, warm:+2, items:[
+    'вечеринку с подругами','такси и бары до утра','спонтанные билеты на концерт','новые кроссовки и худи','кальянную всю ночь'] },
+  trophy:{   chance:0.6,  min:400, max:1800, big:0.28, bigMin:2500,bigMax:6000, warm:+3, items:[
+    'сумку Chanel','сапоги Louis Vuitton','шубу','ботокс и филлеры','набор украшений','шопинг в бутиках','новый iPhone','СПА-выходные в отеле'] },
+  siren:{    chance:0.6,  min:400, max:2000, big:0.3,  bigMin:3000,bigMax:6500, warm:+3, items:[
+    'наращивание волос и ресниц','увеличение губ','коррекцию фигуры у хирурга','фотосессию для инсты','абонемент в элитный фитнес','новый гардероб','тур в Дубай','салон красоты на весь день'] },
+};
+// ── 💳 ДЕНЬГИ ПАРНЕЙ (4 типа). dir:+1 — он ДАЁТ/обеспечивает (касса растёт), dir:−1 — тратит/сливает ТВОЮ карту ──
+// Настоящий мужик обеспечивает сам (без карты). Балабол/Полу-мальчик/сынок сливают — только если дала карту.
+const SPEND_M={
+  mama:{   dir:-1, chance:0.28, min:50,  max:400,  big:0,    bigMin:0,   bigMax:0,   warm:0,  items:[
+    'приставку и игры','маму сводил в ресторан на ТВОИ','всякие мелочи для себя','такси к маме и обратно'] },
+  talker:{ dir:-1, chance:0.3,  min:200, max:1200, big:0.15, bigMin:1500,bigMax:3000, warm:0,  items:[
+    'вложил в «верную тему»','курс «как поднять миллион»','занял «на проект» и пропал','презентацию для инвесторов (себе)'] },
+  rock:{   dir:+1, chance:0.5,  min:300, max:1500, big:0.2,  bigMin:2000,bigMax:5000, warm:+2, items:[
+    'закрыл ваши счета','пополнил семейный бюджет','починил и заправил твою машину','отложил на ваш дом','купил продуктов на месяц'] },
+  pretty:{ dir:-1, chance:0.55, min:300, max:1600, big:0.28, bigMin:2000,bigMax:5000, warm:0,  items:[
+    'барбершоп и уходы за собой','новые кроссы для съёмки','шмот напоказ','абонемент в элитный зал','парфюм и часы для фото','вечер в клубе с «пацанами»'] },
+};
+function wealthyGiveTick(){
+  // богатый партнёр обеспечивает: периодически берёт расходы на себя / кладёт тебе на жизнь
+  if(Math.random()>0.5) return;
+  const big=Math.random()<0.2;
+  const amt=big?(2000+((Math.random()*4000)|0)):(500+((Math.random()*1500)|0));
+  st.cash+=amt; st.spendSeq=(st.spendSeq||0)+1;
+  const items=isF()?['закрыл ваши счета','оплатил вашу поездку','положил тебе на расходы','взял быт на себя']
+                   :['закрыла ваши счета','оплатила вашу поездку','положила тебе на расходы','взяла быт на себя'];
+  const item=items[(Math.random()*items.length)|0];
+  st.lastSpend={ seq:st.spendSeq, amount:amt, item:item, big:big, name:st.partner.name, dir:+1, he:isF() };
+  if(!((typeof EMB!=='undefined')&&EMB)) toast('💳 '+st.partner.name+' '+item+' +'+money(amt)+(big?' 💸':''));
+}
+function cardSpendTick(){
+  if(!st.partner || st.over) return;
+  if(st.partner.wealth){ return wealthyGiveTick(); }   // богатый — обеспечивает, а не тянет с тебя
+  if(isF()){ return maleMoneyTick(); }
+  if(!st.cardGiven) return;
+  const pr=SPEND[psyKey(st.partner)]; if(!pr) return;
+  if(Math.random()>pr.chance) return;
+  const big = pr.big>0 && Math.random()<pr.big;
+  let amt = big ? (pr.bigMin+Math.round(Math.random()*(pr.bigMax-pr.bigMin))) : (pr.min+Math.round(Math.random()*(pr.max-pr.min)));
+  if(st.cash-amt < -2000) amt = Math.max(0, Math.round(st.cash+2000));   // не уводит в бездонный минус — тратит по средствам
+  if(amt<=0) return;
+  const item = pr.items[(Math.random()*pr.items.length)|0];
+  st.cash -= amt;
+  if(pr.warm) st.warm=clamp(st.warm+pr.warm);   // Трофею/Сирене шопинг в радость — но платишь ты
+  st.spendSeq=(st.spendSeq||0)+1;
+  st.lastSpend={ seq:st.spendSeq, amount:amt, item:item, big:big, name:st.partner.name, dir:-1, he:false };
+  if(!((typeof EMB!=='undefined')&&EMB)) toast('💳 '+st.partner.name+' потратила '+money(amt)+' по твоей карте: '+item+(big?' 😳':''));
+}
+// ── Деньги ПАРНЕЙ: Добытчик даёт (без карты), Бунтарь/Ловелас сливают ТВОЮ карту (нужна карта) ──
+function maleMoneyTick(){
+  const pr=SPEND_M[pkey(st.partner)]; if(!pr) return;
+  if(pr.dir<0 && !st.cardGiven) return;          // тратят твою карту — только если дала
+  if(Math.random()>pr.chance) return;
+  const big = pr.big>0 && Math.random()<pr.big;
+  let amt = big ? (pr.bigMin+Math.round(Math.random()*(pr.bigMax-pr.bigMin))) : (pr.min+Math.round(Math.random()*(pr.max-pr.min)));
+  if(pr.dir<0 && st.cash-amt < -2000) amt = Math.max(0, Math.round(st.cash+2000));
+  if(amt<=0) return;
+  const item = pr.items[(Math.random()*pr.items.length)|0];
+  st.cash += pr.dir*amt;                          // +он дал / −он слил
+  if(pr.warm) st.warm=clamp(st.warm+pr.warm);
+  st.spendSeq=(st.spendSeq||0)+1;
+  st.lastSpend={ seq:st.spendSeq, amount:amt, item:item, big:big, name:st.partner.name, dir:pr.dir, he:true };
+  if(!((typeof EMB!=='undefined')&&EMB)){
+    if(pr.dir>0) toast('💳 '+st.partner.name+' пополнил тебе '+money(amt)+': '+item+(big?' 💸':''));
+    else toast('💳 '+st.partner.name+' потратил '+money(amt)+' по твоей карте: '+item+(big?' 😳':''));
+  }
+}
+// ── Крупные шаги жизни (появляются по условию): предложение → жена → дети; и вложить в неё ──
+function bigSteps(){
+  const s=[];
+  if(!st.flat && st.warm>=48) s.push({id:'flat', ic:'🏡', nm:'Снять общее жильё', sub:'−$3000 обустройство · дом на двоих, но и общий быт (−$400/мес)', cost:-3000});
+  if(!st.married && st.warm>=60) s.push({id:'ring', ic:'💍', nm:'Сделать предложение', sub:'бриллиант −$8000 · '+(isF()?'он станет мужем':'она станет женой'), cost:-8000});
+  if(st.married && !st.kids && st.warm>=55) s.push({id:'kids', ic:'👶', nm:'Завести детей', sub:'на клетке появятся дети · ставки растут', cost:-2000});
+  if(!st.herBiz && st.warm>=50) s.push({id:'herbiz', ic:'💼', nm:(isF()?'Вложиться в его дело':'Открыть ей бизнес'), sub:'−$5000 · как в жизни — куча проблем', cost:-5000});
+  if(!st.cardGiven && st.warm>=45) s.push({id:'card', ic:'💳', nm:'Дать '+P().d+' свою карту', sub:'жест доверия · движения по карте придут отчётом', cost:0});
+  if(st.cardGiven) s.push({id:'takecard', ic:'🚫', nm:'Забрать карту', sub:'перекрыть доступ к кассе', cost:0});
+  return s;
+}
+
+const clamp=(v,a=0,b=100)=>Math.max(a,Math.min(b,v));
+function warmColor(w){ if(w>=66) return 'linear-gradient(90deg,#ff7d9c,#ffd08a)'; if(w>=33) return 'linear-gradient(90deg,#c98aa0,#e0b48a)'; return 'linear-gradient(90deg,#5f7794,#7e93ad)'; }
+function warmWord(w){ return w>=80?'горит':w>=60?'тёплая':w>=38?'прохладнее':w>=18?'стынет':'на грани'; }
+
+function applyTags(t){ if(!t) return; for(const k in t){ st.t[k]=clamp((st.t[k]||50)+t[k]); } }
+
+// КАК В ЖИЗНИ: бесячие (ревнивые/гордые) тянутся к тебе ~4-5 раз в год, спокойные — раз в год.
+// Частота = характер партнёра (ревность+гордость уже заданы). Возвращает МЕСЯЧНЫЙ шанс поднять тему.
+function callinessOf(g){
+  if(!g) return 0.14;
+  const c=((Number(g.jealousy)||40)+(Number(g.pride)||40))/2;   // 0..~90
+  const perYear = 0.8 + (c/100)*4.2;                            // бесячие ~4.5/год, спокойные ~1.5/год
+  return perYear/12;
+}
+function fireEvent(){
+  // ДОСТОВЕРНОСТЬ: девушке чаще всего выпадают ЕЁ типичные вопросы (её психотип), а не общие
+  const key = st.partner ? pkey(st.partner) : null;
+  const SRC = isF()?EVENTS_M:EVENTS;                       // мужские / женские реплики
+  const BIZ = isF()?BIZ_EVENTS_M:BIZ_EVENTS;
+  let pool=SRC.filter(e=>!e.psy && !e.dom);               // общие жизненные — всем (кроме psy и тестов доминанта)
+  const mine=SRC.filter(e=>e.psy===key);                  // достоверные реплики его/её типа
+  pool=pool.concat(mine, mine, mine);                     // его/её вопросы — тройным весом
+  if(domLevel(st.partner)>=0.7) pool=pool.concat(SRC.filter(e=>e.dom), SRC.filter(e=>e.dom));  // доминанту — тест на уважение
+  if(st.warm<40) pool=pool.concat(SRC.filter(e=>['Присутствие','Деньги','Опора'].includes(e.kind) && !e.dom));
+  if(st.herBiz) pool=pool.concat(BIZ, BIZ);                // его/её дело = свои проблемы, лезут чаще
+  st.event = pool[(Math.random()*pool.length)|0];
+  // ЗВОНОК: критический вопрос ИЛИ ты её забросил (холод/терпение на исходе) — телефон звонит
+  st.answered=false; st.rings=0;
+  // ЗВОНИТ: настоящий звонок-событие, кризис, ИЛИ назойливый тип (бесячие звонят чаще, спокойные — тихо в бланке)
+  const cl=((Number(st.partner&&st.partner.jealousy)||40)+(Number(st.partner&&st.partner.pride)||40))/2; // 0..~90
+  st.incoming = !!(st.event && (st.event.call || st.warm<25 || Math.random() < Math.max(0,(cl-30)/60)*0.85));
+  st.eventCool = 1 + (Math.random()*2|0);   // короткая пауза, чтоб не две подряд
+}
+
+function respond(i){
+  if(!st.event) return; const o=st.event.opts[i];
+  st.warm=clamp(st.warm+(o.warm||0)); if(o.cost) st.cash+=o.cost; applyTags(o.t);
+  if(o.resp!=null) st.respect=clamp((st.respect==null?55:st.respect)+o.resp,0,100);   // уважение к его слову
+  if(st.event && st.event.dom){ if((o.resp||0)>0) PROFILE.submit++; else if((o.resp||0)<0) PROFILE.defy++; }   // 🪞 подчиняешься/дерзишь
+  if(o.t){ if(o.t.honesty<0) PROFILE.lies++; else if(o.t.honesty>0) PROFILE.honest++; }                        // 🪞 честен/лукавишь
+  if((o.warm||0)>0) st.patience=clamp(st.patience+4,0,100);
+  if(o.milestone) st.pendingMilestone=true;
+  st.moves++; st.event=null; st.silence=0; st.incoming=false; st.answered=false; st.rings=0;
+  toast(o.note||''); render(); checkState();
+}
+// ── ЗВОНОК: взять трубку / сбросить / пропустить ──
+function answerCall(){ if(!st.event) return; st.answered=true; render(); }   // трубку взял — открывается разговор (варианты ответа)
+function declineCall(){ if(!st.event) return;
+  st.warm=clamp(st.warm-12); st.patience=clamp(st.patience-12,0,100);
+  const nm=st.partner?st.partner.name:P().N; const p=P(); st.event=null; st.incoming=false; st.answered=false; st.rings=0;
+  toast('📵 Ты '+(isF()?'сбросила':'сбросил')+' звонок. '+nm+' молча '+p.put+' трубку.'); render(); checkState();
+}
+function missedCall(){ if(!st.event) return;
+  st.warm=clamp(st.warm-12); st.patience=clamp(st.patience-12,0,100);
+  const nm=st.partner?st.partner.name:P().N; const p=P(); st.event=null; st.incoming=false; st.answered=false; st.rings=0;
+  toast('📵 Пропущенный звонок от '+nm+'. '+p.N+' '+(isF()?'звонил':'звонила')+' — а тебя не было рядом.'); render(); checkState();
+}
+function closeFarewell(){ st.farewellSeen=true; render(); }
+function doAct(id){
+  const a=(isF()?ACTS_F:ACTS).find(x=>x.id===id) || ACTS.find(x=>x.id===id) || ACTS_F.find(x=>x.id===id); if(!a) return;
+  // денежные условия: за СОВМЕСТНОЕ партнёр по богатству может взять счёт на себя или предложить пополам
+  let cost=a.cost||0, payNote='';
+  if(cost<0 && SHARED_ACTS.indexOf(a.id)>=0 && st.partner){
+    const term=moneyTerm(st.partner);
+    if(term==='pay'){ cost=0; payNote=' · '+P().N+' '+P().said+': «убери карту, я оплачу»'; PROFILE.leaned++; }
+    else if(term==='half'){ cost=Math.round(cost/2); payNote=' · пополам'; }
+  }
+  if(cost && st.cash+cost<0){ toast('Не хватает кассы на это.'); return; }
+  const lk = a.like||a.id;
+  const mult = (st.partner && st.partner.likes && st.partner.likes[lk]) ? st.partner.likes[lk] : 1;   // психотип решает, что греет
+  const gain = Math.round(a.warm*mult);
+  st.warm=clamp(st.warm+gain); if(cost) st.cash+=cost; applyTags(a.t); st.moves++;
+  if(gain>0) PROFILE.attend++; if(a.id==='gift'||a.id==='giftHim') PROFILE.gifts++;   // 🪞 вкладываешься вниманием/даришь
+  if(st.rival>0 && gain>0) st.rival=clamp(st.rival-8,0,100);   // внимание отгоняет соперника сразу
+  if(gain>0) st.patience=clamp(st.patience+5,0,100);           // ты добиваешься — партнёр оттаивает
+  const flav = mult>=1.4?' — '+P().d+' это особенно дорого':mult<=0.7?' — '+P().d+' это не так важно':'';
+  let tail = cost ? (' · '+money(cost)+payNote) : (payNote||'');
+  toast(a.nm+' — тепло +'+gain+flav+tail);
+  render(); checkState();
+}
+function liveMonth(){
+  if(st.phase==='choose'){ toast('Сначала выбери, с кем начать историю.'); return; }
+  if(st.over){ resetGame(); return; }
+  st.months++;
+  // Закон Внимания: тепло тает — у каждой девушки свой темп
+  st.warm=clamp(st.warm-(st.partner?st.partner.decay:5));
+  if(st.warm<35) PROFILE.neglect++;   // 🪞 забрасываешь
+  // Дети = радость, но и расход (алименты жизни): держат тепло, но едят кассу
+  if(st.kids>0) st.cash-=300*st.kids;
+  // Общий быт: жильё на двоих греет, но ест кассу каждый месяц
+  if(st.flat) st.cash-=400;
+  // 💳 Дал ей карту — некоторые дивы тратят сами (отчёт придёт)
+  cardSpendTick();
+  // ── ИЗМЕНА ВСПЛЫВАЕТ: был неверен (верность низкая) — правда однажды выходит наружу ──
+  if(st.partner && !st.over && st.t.loyal<=32 && !st.betrayalShown && Math.random()<0.18){
+    st.betrayalShown=true; applyTags({honesty:-6,care:-4});
+    if(st.t.loyal<=20){ st.warm=clamp(st.warm-30); st.patience=0; st.over=true; st.overReason='betrayal'; }
+    else { st.warm=clamp(st.warm-22); st.patience=clamp(st.patience-25,0,100);
+      toast('💔 '+P().N+' '+P().knew+' то, что ты '+U().hid+'. «Значит, вот ты '+U().what+'.» Доверие треснуло — тепло рухнуло.'); }
+  }
+  // Её бизнес: первые месяцы в минус (раскрутка), потом качели доход/убыток — как в жизни
+  if(st.herBiz){ st.herBizMonths++;
+    const young = st.herBizMonths<4;
+    const roll = Math.random();
+    let d = young ? -(400+((Math.random()*400)|0)) : (roll<0.45 ? -(300+((Math.random()*700)|0)) : (500+((Math.random()*1500)|0)));
+    st.cash+=d;
+    if(!young && st.months%3===0){ const bn=isF()?'Его дело':'Её бизнес'; toast(d>=0?('💼 '+bn+' принесло +'+money(d)+' в этом месяце.'):('💼 '+bn+' ушло в минус '+money(d)+' — хлопоты.')); }
+  }
+  // Соперник: у кого rival=true — при холодном тепле рядом появляется другой (быстрее у ревнивых)
+  if(st.partner && st.partner.rival){
+    const jr=(st.partner.jealousy||50)/50;
+    if(st.warm<42){ st.rival=clamp(st.rival+11*jr,0,100);
+      if(st.rival>=30 && st.rival<30+11*jr) toast('👀 '+st.partner.name+' скучает без внимания. '+(isF()?'Рядом закрутилась другая.':'Рядом закрутился другой.'));
+    } else { st.rival=clamp(st.rival-16,0,100); }
+    if(st.rival>=100 && !st.over){ st.over=true; st.overReason='rival'; st.event=null; }
+  }
+  // ── ЕЁ СОБСТВЕННОЕ МЫШЛЕНИЕ (агент): терпение точится холодом, лечится теплом ──
+  if(st.partner && !st.over){
+    const dom=partnerWealth(st.partner);   // богатый — правила и мало терпения к небрежности; бедный — уступки
+    if(st.warm<28) st.patience=clamp(st.patience-(7+dom*7),0,100);
+    else if(st.warm<46) st.patience=clamp(st.patience-(3.5+dom*3.5),0,100);
+    else if(st.warm>=62) st.patience=clamp(st.patience+5,0,100);
+    // ПОДЧИНЕНИЕ: ставишь его выше дела — уважение к его слову растёт; доминант без уважения стынет и уходит
+    const dl=domLevel(st.partner);
+    st.respect = clamp((st.respect==null?55:st.respect) + (st.t.priority-50)*0.05, 0, 100);
+    if(dl>=0.7){
+      if(st.respect<40){ st.warm=clamp(st.warm-(3+(40-st.respect)*0.12)); st.patience=clamp(st.patience-4,0,100); }
+      if(st.respect<=15 && !st.over){ st.over=true; st.overReason='disrespect'; st.event=null; }
+    }
+    // предупреждает, когда терпение на исходе (сама поднимает голос)
+    if(st.patience<=30 && st.patience>0 && Math.random()<0.5 && !st.event)
+      toast('💭 '+st.partner.name+' всё чаще молчит и смотрит в сторону. '+(isF()?'Он устаёт быть незамеченным.':'Она устаёт быть незамеченной.'));
+    // терпение кончилось — она решает сама: верная уходит тихо, ветреную уводит соперник
+    if(st.patience<=0 && !st.over){
+      st.event=null;
+      if(st.partner.rival && st.rival>=50){ st.over=true; st.overReason='rival'; }
+      else { st.over=true; st.overReason='left'; }
+    }
+  }
+  // веха при высоком тепле
+  if(st.pendingMilestone && st.warm>=60){ advanceStage(); st.pendingMilestone=false; }
+  // партнёр сам поднимает тему — КАК В ЖИЗНИ: редко, по характеру, с паузой (не каждый ход)
+  if((st.eventCool||0)>0) st.eventCool=(st.eventCool||0)-1;
+  if(!st.event && (st.eventCool||0)<=0 && st.partner){
+    let ch = callinessOf(st.partner);
+    if(st.warm<30) ch*=1.6;              // на грани — тянется чаще (тревога)
+    else if(st.warm<48) ch*=1.2;
+    if(Math.random()<ch) fireEvent();
+  }
+  render(); checkState();
+}
+function advanceStage(){
+  // авто-веха ведёт только до совместной жизни; свадьба и дети — вручную (кольцо/дети)
+  if(st.stage==='Встречаетесь'){ st.stage='Живём вместе'; toast('🌸 Новая веха: Живём вместе. Дальше — только если сделаешь предложение.'); }
+}
+// Развод как в жизни: раздел кассы (жена — пополам, сожительство — треть) + алименты в месячный поток
+function computeSettlement(){
+  if(st.settle) return;
+  if(!(st.married || st.flat || st.kids>0)) return;   // нечего делить — просто разошлись
+  let split=0;
+  if(st.married) split=Math.max(0,Math.round(st.cash*0.5));
+  else if(st.flat) split=Math.max(0,Math.round(st.cash*0.3));
+  const alimony = st.kids>0 ? 250*st.kids : 0;
+  if(split>0) st.cash-=split;
+  st.settle={split,alimony};
+}
+function checkState(){
+  if(st.warm<=0 && !st.over){ st.over=true; st.overReason='cold'; st.event=null; }
+  if(st.over){ setAuto(false); st.event=null; computeSettlement();
+    const s=st.settle;
+    const tail = s ? (' Развод: '+(s.split>0?('раздел −'+money(s.split)):'делить нечего')+(s.alimony>0?(', алименты '+money(s.alimony)+'/мес в твой поток.'):'.')) : '';
+    const p=P();
+    if(st.overReason==='rival') toast('💔 Пока ты '+(isF()?'была занята':'был занят')+' собой, '+p.a+' '+(isF()?'увела другая':'увёл другой')+'. Внимание надо было заслуживать.'+tail);
+    else if(st.overReason==='left') toast('💔 '+p.N+' '+p.tired+' ждать и '+p.gone+' '+(isF()?'сам':'сама')+'. Ты '+p.a+' не '+(isF()?'добивалась':'добивался')+' — а '+p.n+' живой человек.'+tail);
+    else if(st.overReason==='betrayal') toast('💔 Измена всплыла — '+p.n+' '+(isF()?'собрал':'собрала')+' вещи и '+p.gone+'.'+tail);
+    else toast('💔 Тепло догорело. Кризис → расставание.'+tail);
+    render();
+  }
+}
+function resetGame(){ setAuto(false); const _kc=EMB?st.cash:4000, _ky=EMB?(st.lastYear||1):1, _sx=st.sex||'m'; st={sex:_sx,phase:'choose',partner:null,stage:'Встречаетесь',months:0,warm:0,cash:_kc,t:{honesty:50,care:50,loyal:50,presence:50,priority:50},event:null,moves:0,over:false,overReason:null,rival:0,pool:[],married:false,kids:0,herBiz:false,herBizMonths:0,flat:false,patience:100,auto:false,silence:0,betrayalShown:false,settle:null,incoming:false,answered:false,rings:0,farewellSeen:false,cardGiven:false,spendSeq:0,lastSpend:null}; st.lastYear=_ky; rollPool(); toast('Новая история — судьба свела с новыми.'); render(); }
+
+// ── АВТО-ЖИЗНЬ: время идёт само, она живёт своим умом (агент) ──
+const TICK_MS=7000;   // один месяц проходит сам за ~7 сек
+let autoTimer=null;
+function setAuto(on){
+  if(EMB){ st.auto=false; return; }   // в игре реального 7-сек таймера нет — время идёт по ходам игры
+  st.auto=on;
+  if(on){ if(!autoTimer) autoTimer=setInterval(autoTick, TICK_MS); }
+  else { if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } }
+}
+function toggleAuto(){ if(st.phase!=='together'){ toast('Сначала выбери, с кем начать.'); return; } if(st.over){ resetGame(); return; }
+  if(EMB){ liveMonth(); return; }   // в игре кнопка = прожить один месяц вручную
+  setAuto(!st.auto); render(); }
+function autoTick(){
+  if(st.phase!=='together' || st.over){ setAuto(false); return; }
+  if(st.event){
+    if(st.incoming && !st.answered){        // телефон звонит, а ты не берёшь трубку
+      st.rings=(st.rings||0)+1;
+      if(st.rings>=2){ st.rings=0; missedCall(); }
+      return;
+    }
+    // обычный вопрос висит, а ты молчишь — она делает вывод сама
+    st.silence=(st.silence||0)+1;
+    if(st.silence>=2){ st.silence=0; ignoreEvent(); }
+    return;
+  }
+  liveMonth();
+}
+function ignoreEvent(){
+  if(!st.event) return;
+  st.warm=clamp(st.warm-8); st.patience=clamp(st.patience-7,0,100); st.event=null; st.incoming=false; st.answered=false; st.rings=0;
+  toast('… ты '+(isF()?'промолчала':'промолчал')+'. '+st.partner.name+' '+P().made+' вывод '+(isF()?'сам':'сама')+'.');
+  render(); checkState();
+}
+
+// ── Крупные шаги: предложение / дети / её бизнес ──
+function doBigStep(id){
+  if(id==='flat'){
+    if(st.cash+(-3000)<0){ toast('На обустройство общего жилья нужно $3 000.'); return; }
+    st.cash-=3000; st.flat=true; if(st.stage==='Встречаетесь') st.stage='Живём вместе';
+    st.warm=clamp(st.warm+8); applyTags({care:+5,priority:+6,presence:+4}); st.moves++;
+    toast('🏡 Вы сняли общее жильё. Дом на двоих греет — но теперь быт, счета и меньше воздуха порознь.');
+    render(); checkState(); return;
+  }
+  if(id==='ring'){
+    if(st.cash+(-8000)<0){ toast('На кольцо и свадьбу нужно $8 000 — не хватает кассы.'); return; }
+    st.cash-=8000; st.married=true; st.stage='Свадьба 💍'; st.warm=clamp(st.warm+10); applyTags({care:+8,loyal:+10,priority:+8}); st.moves++;
+    toast(isF() ? '💍 Вы решили пожениться. '+st.partner.name+' сказал «да» — теперь он твой муж. Ставки выросли.'
+                : '💍 Ты сделал предложение. '+st.partner.name+' сказала «да» — теперь она твоя жена. Ставки выросли.');
+    render(); checkState(); return;
+  }
+  if(id==='kids'){
+    if(st.cash+(-2000)<0){ toast('На детей нужен запас хотя бы $2 000.'); return; }
+    st.cash-=2000; st.kids=(st.kids||0)+1; st.stage='Семья 👶'; st.warm=clamp(st.warm+6); applyTags({care:+6,priority:+6}); st.moves++;
+    toast('👶 У вас родился ребёнок! На клетке появилась семья. Теперь терять — больнее всего.');
+    render(); checkState(); return;
+  }
+  if(id==='herbiz'){
+    if(st.cash+(-5000)<0){ toast('На запуск её бизнеса нужно $5 000.'); return; }
+    st.cash-=5000; st.herBiz=true; st.herBizMonths=0; st.warm=clamp(st.warm+7); applyTags({care:+5,priority:+4}); st.moves++;
+    toast(isF() ? '💼 Ты вложилась в его дело. Он загорелся. Но как в жизни — теперь начнутся хлопоты…'
+                : '💼 Ты открыл ей бизнес. Она загорелась. Но как в жизни — теперь начнутся хлопоты…');
+    render(); checkState(); return;
+  }
+  if(id==='card'){
+    st.cardGiven=true; st.moves++;
+    const k=pkey(st.partner); const p=P(); const gave='Ты '+(isF()?'дала':'дал');
+    if(isF()){
+      if(k==='rock'){ st.warm=clamp(st.warm+3); applyTags({care:+3}); toast('💳 '+gave+' ему карту. «Мне ни к чему — я сам обеспечу.» Но доверие оценил.'); }
+      else if(k==='mama'){ st.warm=clamp(st.warm+4); toast('💳 '+gave+' ему карту. «Ой, спасибо!» — как ребёнок в магазине игрушек.'); }
+      else { st.warm=clamp(st.warm+6); applyTags({care:+2}); toast('💳 '+gave+' ему карту. Глаза загорелись… Береги кассу.'); }
+    } else {
+      if(k==='trophy'||k==='siren'){ st.warm=clamp(st.warm+6); applyTags({care:+2}); toast('💳 '+gave+' '+p.d+' свою карту. Глаза загорелись… Береги кассу.'); }
+      else if(k==='storm'){ st.warm=clamp(st.warm+4); toast('💳 '+gave+' '+p.d+' карту. «О, спасибо!» — держись.'); }
+      else { st.warm=clamp(st.warm+3); applyTags({care:+3}); toast('💳 '+gave+' '+p.d+' карту. '+p.N+' тронута доверием — тратить попусту не станет.'); }
+    }
+    render(); checkState(); return;
+  }
+  if(id==='takecard'){
+    st.cardGiven=false; st.moves++;
+    const k=pkey(st.partner); const p=P(); const took='Ты '+(isF()?'забрала':'забрал');
+    if(isF()){
+      if(k==='pretty'){ st.warm=clamp(st.warm-10); applyTags({care:-3}); toast('🚫 '+took+' карту. Скандал: «Ты мне не доверяешь?!»'); }
+      else if(k==='talker'||k==='mama'){ st.warm=clamp(st.warm-5); toast('🚫 '+took+' карту. Он надулся.'); }
+      else { toast('🚫 '+took+' карту. Он и не против — ему это было не нужно.'); }
+    } else {
+      if(k==='trophy'||k==='siren'){ st.warm=clamp(st.warm-10); applyTags({care:-3}); toast('🚫 '+took+' карту. Скандал: «Ты мне не доверяешь?!»'); }
+      else if(k==='storm'){ st.warm=clamp(st.warm-5); toast('🚫 '+took+' карту. '+p.N+' надулась.'); }
+      else { toast('🚫 '+took+' карту. '+p.N+' и не против — '+p.d+' это было не нужно.'); }
+    }
+    render(); checkState(); return;
+  }
+}
+
+// ── Зеркало-вердикт из черт ──
+function verdict(){
+  const t=st.t; const hi=[],lo=[];
+  const label = isF()
+    ? {honesty:['честная','лукавая'],care:['заботливая','холодноватая'],loyal:['верная','ненадёжная'],presence:['рядом','вечно занята'],priority:['ставишь человека выше дела','ставишь дело выше человека']}
+    : {honesty:['честный','лукавый'],care:['заботливый','холодноватый'],loyal:['верный','ненадёжный'],presence:['рядом','вечно занят'],priority:['ставишь человека выше дела','ставишь дело выше человека']};
+  for(const k in t){ if(t[k]>=64) hi.push(label[k][0]); if(t[k]<=37) lo.push(label[k][1]); }
+  if(st.moves<3) return 'Сыграй ещё пару ходов — и зеркало покажет тебя.';
+  let s='Пока зеркало видит: ты ';
+  if(hi.length) s+=hi.slice(0,3).join(', ');
+  if(hi.length&&lo.length) s+=' — но ';
+  if(lo.length) s+=lo.slice(0,2).join(', ');
+  if(!hi.length&&!lo.length) s+='ещё ровный, без резких граней';
+  return s+'.';
+}
+
+// ── Рендер ──
+function renderChoose(){
+  document.getElementById('pname').textContent='С кем начать?';
+  document.getElementById('pdesc').textContent='От того, кого выберешь, зависит вся история.';
+  document.getElementById('ava').textContent='❔';
+  document.getElementById('stage').textContent='Выбор';
+  document.getElementById('clock').textContent='начало';
+  document.getElementById('wval').textContent='—';
+  document.getElementById('wfill').style.width='0%';
+  document.getElementById('cash').textContent=money(st.cash);
+  document.getElementById('pdone').textContent='с выбора';
+  document.getElementById('livesub').textContent='сначала выбери';
+  const bp0=document.getElementById('bigPhoto'); if(bp0){ bp0.style.display='none'; bp0.innerHTML=''; }
+  if(!st.pool || !st.pool.length) rollPool();
+  const shown=roster().filter(g=>st.pool.includes(g.id));
+  document.getElementById('evttl').textContent='Выбери сердцем — по лицу';
+  const sexTgl='<div style="display:flex;gap:8px;margin:0 3px 12px;">'+
+    '<button class="act" style="flex:1;text-align:center;padding:10px;'+(!isF()?'border-color:var(--rose-br);background:#2a1620;':'opacity:.6;')+'" onclick="setSex(\'m\')"><b style="font-size:13.5px;color:#f0e2e6;">👩 Девушки</b></button>'+
+    '<button class="act" style="flex:1;text-align:center;padding:10px;'+(isF()?'border-color:var(--rose-br);background:#2a1620;':'opacity:.6;')+'" onclick="setSex(\'f\')"><b style="font-size:13.5px;color:#f0e2e6;">🧔 Парни</b></button>'+
+    '</div>';
+  document.getElementById('stageArea').innerHTML=
+    sexTgl+
+    '<div style="text-align:center;font-size:12px;color:var(--dim);margin:-2px 3px 12px;line-height:1.55;">Как в жизни: ты видишь только лицо. '+(isF()?'Какой он, что любит и что ему нужно':'Какая она, что любит и что ей нужно')+' — узнаёшь со временем.</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;">'+
+    shown.map(g=>'<button class="act" style="padding:0;overflow:hidden;border-radius:16px;" onclick="chooseGirl(\''+g.id+'\')">'+
+      (g.face?'<img src="'+g.face+'" alt="" style="width:100%;aspect-ratio:2/3;object-fit:cover;display:block;">':'<div style="aspect-ratio:2/3;display:flex;align-items:center;justify-content:center;font-size:60px;background:var(--surf2);">'+g.ava+'</div>')+
+      '<div style="padding:10px 11px;font-size:15px;font-weight:800;color:#f0e2e6;">'+g.name+'</div>'+
+      '</button>').join('')+
+    '</div>'+
+    '<button class="act" style="width:100%;margin-top:10px;padding:10px;text-align:center;opacity:.7;" onclick="rerollPool()"><b style="font-size:12.5px;">🎲 Другие лица (тест)</b><span style="display:block;font-size:10.5px;">в игре судьба даёт один расклад из 23</span></button>';
+  document.getElementById('traits').innerHTML='';
+  const ins0=document.getElementById('insight'); if(ins0){ ins0.style.display='none'; ins0.innerHTML=''; }
+  document.getElementById('verdict').textContent='Выбери — и зеркало начнёт собирать тебя.';
+}
+function renderCall(){
+  const c=document.getElementById('call'); if(!c) return;
+  const p=st.partner;
+  const faceHtml = p ? (p.face?'<img src="'+p.face+'" alt="">':('<span>'+p.ava+'</span>')) : '';
+  // ПРОЩАЛЬНЫЙ звонок / сообщение — когда партнёр уходит (как в жизни)
+  if(p && st.over && !st.farewellSeen){
+    const bye = isF()
+      ? ( st.overReason==='rival' ? 'Прости. Пока ты была занята собой, рядом оказалась та, кто была со мной. Я ухожу к ней.'
+        : st.overReason==='left' ? 'Я так долго ждал, что ты меня заметишь… Больше не могу. Прощай.'
+        : st.overReason==='betrayal' ? 'Я всё знаю о том, что ты скрывала. Не звони мне больше. Никогда.'
+        : st.overReason==='disrespect' ? 'Мне нужна женщина, которая уважает моё слово. В тебе я этого не чувствую. Прощай.'
+        : 'Нас больше нет. Ты теряла меня по капле — и не заметила, как потеряла совсем.' )
+      : ( st.overReason==='rival' ? 'Прости. Пока ты был занят собой, рядом оказался тот, кто был со мной. Я ухожу к нему.'
+        : st.overReason==='left' ? 'Я так долго ждала, что ты меня заметишь… Больше не могу. Прощай.'
+        : st.overReason==='betrayal' ? 'Я всё знаю о том, что ты скрывал. Не звони мне больше. Никогда.'
+        : st.overReason==='disrespect' ? 'Мне нужен мужчина, который ценит меня и моё слово. Ты так и не показал этого. Прощай.'
+        : 'Нас больше нет. Ты терял меня по капле — и не заметил, как потерял совсем.' );
+    c.className='call bye open';
+    c.innerHTML='<div class="rings">'+(st.overReason==='betrayal'?'последнее сообщение':'прощальный звонок')+'</div>'+
+      '<div class="ph">'+faceHtml+'</div><div class="nm">'+p.name+'</div>'+
+      '<div class="say">«'+bye+'»</div>'+
+      '<div class="btns"><button class="cbtn one" onclick="closeFarewell()"><span class="ic">🕊️</span><span>Отпустить</span></button></div>';
+    return;
+  }
+  // ВХОДЯЩИЙ звонок — критический вопрос или тебя нет рядом
+  if(p && st.event && st.incoming && !st.answered && !st.over){
+    c.className='call incoming open';
+    c.innerHTML='<div class="rings">входящий звонок…</div>'+
+      '<div class="ph">'+faceHtml+'</div><div class="nm">'+p.name+'</div>'+
+      '<div class="sub">'+(st.warm<38?('ты давно не '+(isF()?'была':'был')+' рядом'):(st.event.kind||'хочет поговорить'))+'</div>'+
+      '<div class="say">'+st.event.q+'</div>'+
+      '<div class="btns">'+
+        '<button class="cbtn dec" onclick="declineCall()"><span class="ic">✕</span><span>Сбросить</span></button>'+
+        '<button class="cbtn acc" onclick="answerCall()"><span class="ic">✓</span><span>Ответить</span></button>'+
+      '</div>';
+    return;
+  }
+  c.className='call'; c.innerHTML='';
+}
+function render(){
+  renderCall();
+  if(st.phase==='choose'){ renderChoose(); if(EMB) relPost(); return; }
+  document.getElementById('pname').textContent=st.partner.name;
+  document.getElementById('pdesc').textContent = isF()
+    ? ( st.moves<2?'Вы только познакомились. Кто он — узнаешь со временем.'
+      : st.moves<6?'Ты начинаешь понимать, какой он.'
+      : st.moves<12?'Ты уже неплохо его знаешь.' : 'Ты знаешь его как облупленного.' )
+    : ( st.moves<2?'Вы только познакомились. Кто она — узнаешь со временем.'
+      : st.moves<6?'Ты начинаешь понимать, какая она.'
+      : st.moves<12?'Ты уже неплохо её знаешь.' : 'Ты знаешь её как облупленную.' );
+  const av=document.getElementById('ava');
+  if(st.partner.face){ av.innerHTML='<img src="'+st.partner.face+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">'; av.style.padding='0'; }
+  else av.textContent=st.partner.ava;
+  // ── КРУПНЫЙ ПОРТРЕТ ПАРТНЁРА: видишь, с кем живёшь. Полный кадр 2/3, имя+стадия снизу ──
+  const bp=document.getElementById('bigPhoto');
+  if(bp){
+    const dim = st.over ? 'filter:grayscale(.6) brightness(.7);' : '';
+    const inner = st.partner.face
+      ? '<img src="'+st.partner.face+'" alt="" style="width:100%;aspect-ratio:2/3;object-fit:cover;display:block;'+dim+'">'
+      : '<div style="width:100%;aspect-ratio:2/3;display:flex;align-items:center;justify-content:center;font-size:96px;background:var(--surf2);'+dim+'">'+st.partner.ava+'</div>';
+    const wl=partnerWealth(st.partner);
+    let stance = wl>=0.75 ? '<div style="font-size:11.5px;color:#f2d98a;margin-top:5px;">💼 При деньгах · правила его, чаще берёт счёт на себя</div>'
+                 : wl<=0.40 ? '<div style="font-size:11.5px;color:#a9c7e0;margin-top:5px;">🤲 Небогат · идёт на уступки, но денег мало</div>'
+                 : '';
+    if(!st.over && domLevel(st.partner)>=0.7){
+      const rs=(st.respect==null?55:st.respect);
+      const rc=rs>=60?'#7fd3ad':rs>=40?'#e7d9c4':'#ff9a8f';
+      const rw=rs>=60?'чувствует уважение':rs>=40?'приглядывается к тебе':'уважения не чувствует';
+      stance += '<div style="font-size:11.5px;color:'+rc+';margin-top:3px;">🙇 Уважение к его слову: '+Math.round(rs)+' · '+rw+'</div>';
+    }
+    bp.innerHTML='<div style="position:relative;max-width:300px;margin:0 auto 14px;border-radius:20px;overflow:hidden;border:1px solid var(--gold-br);box-shadow:0 10px 30px rgba(0,0,0,.45);">'+
+      inner+
+      '<div style="position:absolute;left:0;right:0;bottom:0;padding:26px 16px 12px;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.78));">'+
+        '<div style="font-size:21px;font-weight:800;color:#fff;line-height:1.1;">'+st.partner.name+(st.over?' 💔':'')+'</div>'+
+        '<div style="font-size:12.5px;color:#e7d9c4;margin-top:3px;">'+st.stage+' · '+st.months+' мес'+'</div>'+
+        stance+
+      '</div></div>';
+    bp.style.display='block';
+  }
+  document.getElementById('stage').textContent=st.stage;
+  let fam='';
+  if(st.flat) fam+=' · 🏡';
+  if(st.married) fam+=' · 💍';
+  if(st.kids>0) fam+=' · 👶×'+st.kids;
+  if(st.herBiz) fam+=' · 💼';
+  document.getElementById('clock').textContent='Вместе '+st.months+' мес'+fam;
+  document.getElementById('wval').innerHTML='<span style="color:'+(st.warm>=50?'var(--warm)':'var(--cold)')+'">'+Math.round(st.warm)+' · '+warmWord(st.warm)+'</span>';
+  const wf=document.getElementById('wfill'); wf.style.width=clamp(st.warm,2,100)+'%'; wf.style.background=warmColor(st.warm);
+  document.getElementById('cash').textContent=money(st.cash);
+  const done=st.moves; document.getElementById('pdone').textContent = done<3?'собирается…':(done+' штрихов');
+  const lt=document.getElementById('livetop'), ls=document.getElementById('livesub');
+  if(st.over){ lt.textContent='↻ Новая история'; ls.textContent='эта закончилась'; }
+  else if(st.auto){ lt.textContent='⏸ Пауза'; ls.textContent='жизнь идёт сама · '+(isF()?'он живёт своим умом':'она живёт своим умом'); }
+  else { lt.textContent='▶ Начать жить'; ls.textContent='время пойдёт само — успевай добиваться'; }
+  if(EMB && !st.over){ lt.textContent='▶ Прожить месяц'; ls.textContent='время идёт по ходам игры · жми, чтобы прожить месяц '+(isF()?'с ним':'с ней'); }
+
+  // область события / тихо
+  const area=document.getElementById('stageArea');
+  document.getElementById('evttl').textContent = st.over?'Итог' : (st.event?'Сейчас между вами':(st.auto?'Жизнь идёт — сделай шаг, пока не поздно':'Сейчас тихо — сам(а) сделай шаг'));
+  if(st.over){
+    const otxt = isF()
+      ? ( st.overReason==='rival'
+          ? '💔 Его увела другая, пока ты была занята собой. Внимание нельзя было откладывать.'
+          : st.overReason==='left'
+          ? '💔 Он устал быть незамеченным и ушёл сам. Ты его не добивалась — а он живой человек со своим умом.'
+          : st.overReason==='betrayal'
+          ? '💔 Твоя измена всплыла наружу. Он собрал вещи в тот же вечер. Верность нельзя было предавать.'
+          : st.overReason==='disrespect'
+          ? '💔 Он охладел: доминанту нужно чувствовать уважение к своему слову, а ты держала себя выше него. Не с этим типом.'
+          : '💔 Вы расстались. Тепло не терпит заброшенности.' )
+      : ( st.overReason==='rival'
+          ? '💔 Её увёл другой, пока ты был занят собой. Внимание нельзя было откладывать.'
+          : st.overReason==='left'
+          ? '💔 Она устала быть незамеченной и ушла сама. Ты её не добивался — а она живой человек со своим умом.'
+          : st.overReason==='betrayal'
+          ? '💔 Твоя измена всплыла наружу. Она собрала вещи в тот же вечер. Верность нельзя было предавать.'
+          : st.overReason==='disrespect'
+          ? '💔 Она остыла: сильной женщине нужно, чтобы ценили её слово, а ты этого не показал. Не с этим типом.'
+          : '💔 Вы расстались. Тепло не терпит заброшенности.' );
+    let setl='';
+    if(st.settle){ const s=st.settle;
+      const rows=[];
+      if(s.split>0) rows.push('<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>'+(st.married?'Раздел имущества (пополам)':'Раздел совместно нажитого')+'</span><b style="color:var(--bad)">−'+money(s.split)+'</b></div>');
+      if(s.alimony>0) rows.push('<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>Алименты на '+st.kids+(st.kids>1?' детей':' ребёнка')+'</span><b style="color:var(--bad)">'+money(s.alimony)+' / мес</b></div>');
+      if(rows.length) setl='<div style="border:1px solid var(--bad);border-radius:13px;padding:12px 14px;margin-top:11px;background:rgba(255,107,114,.08);font-size:12.5px;color:#ffd7da;">'+
+        '<div style="font-weight:800;letter-spacing:.05em;text-transform:uppercase;font-size:11px;margin-bottom:5px;color:#ffb3b8;">⚖️ Развод — цена в игре</div>'+rows.join('')+
+        '<div style="font-size:11px;color:var(--dim);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,107,114,.2);">Каса: '+money(st.cash)+' после раздела'+(s.alimony>0?' · алименты лягут в месячный поток':'')+'.</div></div>';
+    }
+    area.innerHTML='<div class="idle"><div class="q">'+otxt+'</div>'+reflectBlock()+setl+'<div style="font-size:13px;color:var(--dim);margin-top:11px;text-align:center;">Нажми «Новая история», чтобы попробовать иначе.</div></div>';
+  } else if(st.event){
+    const e=st.event;
+    area.innerHTML='<div class="event"><div class="kind">'+e.kind+'</div><div class="said"><span class="a">'+e.a+'</span><span class="q">'+e.q+'</span></div>'+
+      '<div class="opts">'+e.opts.map((o,i)=>'<button class="opt" onclick="respond('+i+')">'+o.l+'</button>').join('')+'</div></div>';
+  } else {
+    const big=bigSteps();
+    const bigHtml = big.length ? '<div style="display:grid;gap:8px;margin-top:10px;">'+
+      big.map(b=>'<button class="act" style="padding:12px 14px;border-color:var(--gold-br);background:linear-gradient(180deg,#241d16,#1a140f);" onclick="doBigStep(\''+b.id+'\')">'+
+        '<b style="color:var(--gold-br);font-size:14px;">'+b.ic+' '+b.nm+'</b><span style="color:#c9b48a;">'+b.sub+'</span></button>').join('')+'</div>' : '';
+    const btnAct = a=>'<button class="act" onclick="doAct(\''+a.id+'\')"><b>'+a.ic+' '+a.nm+'</b><span>'+a.d+'</span></button>';
+    let actsHtml;
+    if(isF()){
+      const free=ACTS_F.filter(a=>!a.gesture), gest=ACTS_F.filter(a=>a.gesture);
+      actsHtml='<div style="font-size:11.5px;color:var(--dim);margin:2px 3px 9px;line-height:1.5;">🫶 Твой вклад — <b style="color:#f0d9df;">время и поддержка</b>. Деньги в паре больше на нём. Хочешь — сделай жест, но рядом быть важнее денег.</div>'+
+        '<div class="acts">'+free.map(btnAct).join('')+'</div>'+
+        '<div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--gold-br);margin:13px 3px 6px;">✨ По желанию · жесты</div>'+
+        '<div class="acts">'+gest.map(btnAct).join('')+'</div>';
+    } else {
+      actsHtml='<div class="acts">'+ACTS.map(btnAct).join('')+'</div>';
+    }
+    area.innerHTML='<div class="idle"><div class="q">«'+(st.warm>=60?'С тобой так хорошо…':st.warm>=35?'Ты как будто далеко в последнее время.':'Мы стали чужими, да?')+'»</div>'+
+      actsHtml+bigHtml+'</div>';
+  }
+
+  // угроза соперника
+  const rw=document.getElementById('rivalWarn');
+  if(st.partner && st.partner.rival && st.rival>0 && !st.over){
+    rw.style.display='block';
+    rw.innerHTML='<div style="border:1px solid var(--bad);border-radius:14px;padding:11px 14px;margin:8px 0 2px;background:rgba(255,107,114,.09);font-size:12.5px;color:#ffc4c8;line-height:1.5;">'+
+      '⚠️ <b>'+(isF()?'Рядом другая.':'Рядом другой.')+'</b> '+st.partner.name+' скучает без внимания — '+(isF()?'соперница уже крутится вокруг него ':'соперник уже крутится вокруг неё ')+
+      '(<span class="mono" style="color:var(--bad)">'+Math.round(st.rival)+'%</span>). Согрей связь, или потеряешь '+P().a+'.'+
+      '<div style="height:5px;border-radius:4px;background:rgba(255,255,255,.07);margin-top:7px;overflow:hidden;"><i style="display:block;height:100%;width:'+Math.round(st.rival)+'%;background:linear-gradient(90deg,#ff6b72,#ff9db4);"></i></div></div>';
+  } else { rw.style.display='none'; rw.innerHTML=''; }
+
+  // что ты понял(а) о партнёре — реальная психология раскрывается со временем
+  const ins=document.getElementById('insight');
+  if(st.partner && !st.over && st.moves>=3){
+    const PS=(isF()?PSYCH_M:PSYCH)[pkey(st.partner)];
+    const n = st.moves>=12?3 : st.moves>=7?2 : 1;
+    ins.style.display='block';
+    ins.innerHTML='<div style="border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-top:14px;background:linear-gradient(180deg,var(--surf),var(--surf2));">'+
+      '<div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--rose-br);margin-bottom:10px;">🧠 '+(isF()?'Что ты поняла о нём':'Что ты понял о ней')+'</div>'+
+      PS.reveal.slice(0,n).map(l=>'<div style="font-size:13px;color:#e9dce0;line-height:1.5;margin-bottom:7px;">• '+l+'</div>').join('')+
+      (n>=3?'<div style="font-size:11px;color:var(--dim);margin-top:9px;padding-top:9px;border-top:1px solid var(--line);">'+(isF()?'Его психотип: ':'Её психотип: ')+PS.att+'</div>':'')+
+      '</div>';
+  } else { ins.style.display='none'; ins.innerHTML=''; }
+
+  // зеркало
+  document.getElementById('traits').innerHTML=TRAITS.map(([k,nm,ic])=>{
+    const v=Math.round(st.t[k]);
+    return '<div class="trait"><div class="tl"><b>'+ic+' '+nm+'</b><span>'+v+'</span></div><div class="tbar"><i style="width:'+v+'%"></i></div></div>';
+  }).join('');
+  document.getElementById('verdict').textContent=verdict();
+  if(EMB) relPost();
+}
+
+function openInfo(){ document.getElementById('im').classList.add('open'); }
+function closeInfo(){ document.getElementById('im').classList.remove('open'); }
+let tT; function toast(t){ if(!t) return; const el=document.getElementById('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(tT); tT=setTimeout(()=>el.classList.remove('show'),3600); }
+
+rollPool();
+render();
+// сообщаем игре, что модуль готов принять баланс/сохранёнку/игровой год
+if(EMB){ try{ window.parent.postMessage({type:'rel_ready'},'*'); }catch(e){} }
+</script>

@@ -11211,6 +11211,71 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // (sync между ВСЕМИ браузерами). file:// → fallback на localStorage (только Chrome).
         const SERVER_MODE = location.protocol === 'http:' || location.protocol === 'https:';
 
+        // ═══════════ 🔄 ЖИВЫЕ ОБНОВЛЕНИЯ: версия сейва + миграции ═══════════
+        // ДВИЖОК (этот код: карты/клетки/логика/арт) обновляем свободно.
+        // СЕЙВ (localStorage: v0_players/deals/world — деньги, очки, прогресс) — священен.
+        // При обновлении игры сейв НЕ пересоздаётся: runMigrations() дорисовывает
+        // новые поля по умолчанию, переводя старый сейв к текущей форме. НИКОГДА не обнуляет партию.
+        // Профиль (v0_profile) владеет своей версией сам (PROFILE_VERSION ниже) — тут не трогаем.
+        // Как обновлять форму сейва: (1) добавь поле в ensurePlayerDefaults; (2) ↑ SAVE_VERSION;
+        // (3) добавь миграцию в массив migrations, зовущую ensurePlayerDefaults. Деньги не трогай.
+        // Док: 03 ДИЗАЙН-ДОКУМЕНТ/VIA_ПСИХОЛОГИЯ_ГРУНТ_ЯДРО_ОБНОВЛЕНИЯ.md, раздел 5.
+        const SAVE_VERSION = 1;                 // текущая форма локального сейва
+        const SAVE_SCHEMA_KEY = 'v0_schema';
+        function _mGet(k, def){ try { const r = localStorage.getItem(k); return (r==null) ? def : JSON.parse(r); } catch(e){ return def; } }
+        function _mSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){ console.warn('[VIA migrate] запись', k, e); } }
+        // Единственное место, где живут дефолты полей игрока. Дополняет НЕДОСТАЮЩЕЕ,
+        // существующее (деньги/прогресс) не трогает. Форма — как в state.players.push(...).
+        function ensurePlayerDefaults(p){
+            if (!p || typeof p !== 'object') return p;
+            const D = {
+                holdings:{}, children:0, bankLoan:0,
+                isM:false, isE:false, isA:false, isCC:false, isR:false,
+                mLeft:0, eLeft:0, aLeft:0, ccLeft:0, rLeft:0,
+                assets:[], skills:[], lifeSkills:{}, skillPts:0, taxMod:0, jail:0, jailCount:0, allow:null, farm:null,
+                otherExpPct:0, taxDiscPct:0, jailPress:0, jailPending:null, ownedCards:[], skillTries:0,
+                trades:[], soulCard:null, soulSeen:{}, soulPoison:0, shadow:0, lastCell:0, joinYear:null,
+                soul5:[], doorsDone:{}, doorOpen:null, soulNew:null, soulBurn:null, cursed:false, briefSeen:false,
+                cheatPick:false, cheatOn:null, charity:0, charityLast:null
+            };
+            for (const k in D){ if (p[k] === undefined) p[k] = D[k]; }
+            if (!p.branches || typeof p.branches !== 'object') p.branches = {work:[],free:[],spirit:[]};
+            else { if(!Array.isArray(p.branches.work)) p.branches.work=[]; if(!Array.isArray(p.branches.free)) p.branches.free=[]; if(!Array.isArray(p.branches.spirit)) p.branches.spirit=[]; }
+            const st = { casinoPlays:0, casinoWins:0, casinoLosses:0, casinoWon:0, casinoLost:0, buys:0, buyAmt:0, sells:0, sellAmt:0, salaryCount:0, salaryTotal:0, feePaid:0 };
+            if (!p.stats || typeof p.stats !== 'object') p.stats = Object.assign({}, st);
+            else { for (const k in st){ if (p.stats[k] === undefined) p.stats[k] = st[k]; } }
+            return p;
+        }
+        // Миграции: индекс = переход ИЗ версии (0→1 это migrations[0]). Получает весь
+        // локальный сейв, возвращает его же. Пиши идемпотентно, только добавляй — не удаляй.
+        const migrations = [
+            // 0 → 1: базовая версия. Разметить сейв, укрепить старых игроков дефолтами. Деньги не трогаем.
+            function(save){ (save.players || []).forEach(ensurePlayerDefaults); return save; }
+        ];
+        (function runMigrations(){
+            try {
+                let cur = (+_mGet(SAVE_SCHEMA_KEY, 0)) || 0;
+                if (cur >= SAVE_VERSION) return;                 // сейв уже актуален
+                // Страховка: одноразовый бэкап сейва в localStorage перед первым переходом.
+                if (!localStorage.getItem('v0_backup_v'+cur)) {
+                    _mSet('v0_backup_v'+cur, { players:_mGet('v0_players',[]), deals:_mGet('v0_deals',[]), world:_mGet('v0_world',null), at:Date.now() });
+                }
+                let save = { players:_mGet('v0_players',[]), deals:_mGet('v0_deals',[]), world:_mGet('v0_world',null) };
+                while (cur < SAVE_VERSION) {
+                    const step = migrations[cur];
+                    if (typeof step === 'function') { try { save = step(save) || save; } catch(e){ console.error('[VIA migrate] '+cur+'→'+(cur+1)+' ошибка', e); break; } }
+                    cur++;
+                }
+                if (!SERVER_MODE) {                              // в server-режиме players/deals/world владеет сервер
+                    _mSet('v0_players', save.players || []);
+                    _mSet('v0_deals',   save.deals   || []);
+                    _mSet('v0_world',   save.world   || null);
+                }
+                _mSet(SAVE_SCHEMA_KEY, cur);
+                console.log('[VIA] сейв мигрирован до версии', cur);
+            } catch(e){ console.error('[VIA migrate] сбой', e); }
+        })();
+
         let state = {
             view: 'lobby',
             board: null,   // состояние поля (движок хода) — всегда свежее с сервера
@@ -11232,8 +11297,471 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             sdelkaModal: null,
             medModal: null,
             childModal: null,
-            casinoUnlocked: false
+            casinoUnlocked: false,
+            mirrorModal: false
         };
+
+        // ═══════════ 🏛️ ФУНДАМЕНТ ДАННЫХ: вечный профиль игрока ═══════════
+        // Один объект на человека НАВСЕГДА (localStorage 'v0_profile'), НЕ сбрасывается между партиями.
+        // Сюда стекаются сигналы со ВСЕХ сфер через ОДИН вход logSignal(sphere,key,value).
+        // Ядро следа (soulWeight/archetypeOf) уже читает поля партии; тут копится вечный агрегат для Зеркала.
+        // Ничего из существующей игры не трогает — только добавляет. Дизайн: VIA_ФУНДАМЕНТ_СТРУКТУРА_ДАННЫХ.md
+        const PROFILE_VERSION = 1;
+        const PROFILE = (function(){
+            let base = { v: PROFILE_VERSION, created: Date.now(), updated: Date.now(), games: 0, signals: {} };
+            try {
+                const raw = localStorage.getItem('v0_profile');
+                if (raw) { const p = JSON.parse(raw); if (p && typeof p === 'object') base = Object.assign(base, p); }
+            } catch(e) { console.warn('PROFILE load fail', e); }
+            if (!base.signals || typeof base.signals !== 'object') base.signals = {};
+            return base;
+        })();
+        function saveProfile() {
+            try { PROFILE.updated = Date.now(); localStorage.setItem('v0_profile', JSON.stringify(PROFILE)); }
+            catch(e) { console.warn('PROFILE save fail', e); }
+        }
+        // ЕДИНЫЙ ВХОД. Любая сфера зовёт это, а не пишет в профиль напрямую.
+        // Копит: count (сколько раз), sum/avg/max/min (если value число), last, first, ts.
+        function logSignal(sphere, key, value) {
+            if (!sphere || !key) return;
+            const S = PROFILE.signals;
+            if (!S[sphere]) S[sphere] = {};
+            const cur = S[sphere][key] || { count: 0, first: Date.now() };
+            cur.count++; cur.last = value; cur.ts = Date.now();
+            if (typeof value === 'number' && isFinite(value)) {
+                cur.sum = (cur.sum || 0) + value; cur.avg = cur.sum / cur.count;
+                cur.max = (cur.max === undefined) ? value : Math.max(cur.max, value);
+                cur.min = (cur.min === undefined) ? value : Math.min(cur.min, value);
+            }
+            S[sphere][key] = cur; saveProfile(); return cur;
+        }
+        // Чтение накопленного: profileStat('casino','play') → {count,sum,avg,...} или null.
+        function profileStat(sphere, key) {
+            return (PROFILE.signals[sphere] && PROFILE.signals[sphere][key]) || null;
+        }
+        // ПОРОГИ — данные, а не код: границы «норма/флаг» балансируются как цифры (из карты данных).
+        const THRESHOLDS = {
+            'casino.play': { flagCount: 5,  note: 'частые заходы + рост ставок = азартность' },
+            'health.skip': { flagCount: 4,  note: 'регулярно забивает на тело = выгорание' }
+        };
+        function signalFlagged(sphere, key) {
+            const t = THRESHOLDS[sphere + '.' + key], s = profileStat(sphere, key);
+            return !!(t && s && t.flagCount && s.count >= t.flagCount);
+        }
+        window.PROFILE = PROFILE; // для отладочного индикатора данных
+        // ═══════════ конец фундамента данных ═══════════
+
+        // ═══════════ 🏡 ОБРАЗ ЖИЗНИ — шаг 1: дом и машина из бланка становятся видимыми ═══════════
+        // Дом и машина УЖЕ живут в professionsDB (initMortgage/mortgagePay, initAuto/autoPay).
+        // Здесь мы НЕ трогаем экономику — только даём этой «невидимой» квартире и машине
+        //   имя, картинку по уровню и лицо в бланке. Апгрейд/выкуп — следующими шагами.
+        // Дизайн: 03 ДИЗАЙН-ДОКУМЕНТ\VIA_ОБРАЗ_ЖИЗНИ_ПОКУПКИ_ЭКОНОМИКА.md (пошаговый план, шаг 1).
+        // body — тело/стоимость жилья, down — аванс (вход из кассы при кредите), pay — месячный платёж в поток.
+        //   Цифры земные (закон «не космос»), в масштабе бланка — из дизайн-дока (таблица 6 уровней).
+        // pay = месячный платёж (аренда/ипотека). upkeep = СОДЕРЖАНИЕ (коммуналка/обслуживание) — остаётся ВСЕГДА,
+        //   даже после полного выкупа (Ринат 27авг: «на содержание дома всегда есть расход»). upkeep — часть pay,
+        //   не сверху: пока платишь ипотеку, pay уже включает содержание; выкупил — уходит только тело кредита, upkeep остаётся.
+        const LIFESTYLE_HOMES = [
+            { name: 'Каморка на съёме',    img: 'home_lvl0_a', body: 0,      down: 0,      pay: 700,  upkeep: 0,    note: 'Аренда-дно. Не владеешь — чистый слив в поток.' },
+            { name: 'Скромная квартира',   img: 'home_lvl1_a', body: 30000,  down: 6000,   pay: 1000, upkeep: 300,  note: 'Своё жильё, панелька. С этого начинают почти все.' },
+            { name: 'Квартира с ремонтом', img: 'home_lvl2_a', body: 90000,  down: 18000,  pay: 1500, upkeep: 450,  note: 'Обжитая, с хорошим ремонтом.' },
+            { name: 'Пентхаус с видом',    img: 'home_lvl3_a', body: 180000, down: 36000,  pay: 2300, upkeep: 700,  note: 'Люкс на верхних этажах.' },
+            { name: 'Свой дом',            img: 'home_lvl4_a', body: 260000, down: 52000,  pay: 2800, upkeep: 900,  note: 'Частный коттедж за городом.' },
+            { name: 'Особняк с бассейном', img: 'home_lvl5_a', body: 500000, down: 100000, pay: 4800, upkeep: 1600, note: 'Вилла — верх статуса.' }
+        ];
+        // 🚗 Лестница машин — body/тело (цена), down/аванс при кредите (~20%), pay/месячный платёж в поток.
+        //   Цифры земные (закон «не космос»), в масштабе бланка. Стартовые профессии (initAuto 25–60к) через
+        //   carLevel() ложатся на уровни 0–3; Zeekr/Спорткар/Bentley — цель-апгрейд, не старт. Все с реальным артом.
+        const LIFESTYLE_CARS = [
+            { name: 'Развалюха',     img: 'car_lvl0',    body: 6000,   down: 1200,  pay: 250,  note: 'Ездит — и на том спасибо.' },
+            { name: 'Бюджетная',     img: 'car_lvl1',    body: 15000,  down: 3000,  pay: 450,  note: 'Надёжный рабочий вариант.' },
+            { name: 'Средний класс', img: 'car_lvl2',    body: 30000,  down: 6000,  pay: 700,  note: 'Комфорт без понтов.' },
+            { name: 'Премиум',       img: 'car_lvl3',    body: 55000,  down: 11000, pay: 1050, note: 'Статусная, дорогая в содержании.' },
+            { name: 'Zeekr',         img: 'car_zeekr',   body: 80000,  down: 16000, pay: 1400, note: 'Китайский премиум-электрокар. Тихо и статусно.' },
+            { name: 'Спорткар',      img: 'car_lvl5',    body: 120000, down: 24000, pay: 2000, note: 'Скорость и внимание.' },
+            { name: 'Bentley',       img: 'car_bentley', body: 190000, down: 38000, pay: 2400, note: 'Британский люкс. Верх статуса на колёсах.' }
+        ];
+        // ⌚📱 СТАТУСНЫЕ ВЕЩИ — разовые покупки из кассы. НЕ месячная строка, поток бланка не трогают.
+        //   Часы обслуживания не несут (чистый статус). Телефон — связь опционально (пока разовый). Цифры из дизайн-дока.
+        //   Каждый уровень замещает предыдущий (апгрейд). lvl0 — базовое, есть у всех со старта.
+        const LIFESTYLE_WATCHES = [
+            { name: 'Обычные часы',   img: 'watch_lvl0', price: 0,     note: 'Просто показывают время.' },
+            { name: 'Статусные часы', img: 'watch_lvl1', price: 8000,  note: 'Их замечают. Первый серьёзный аксессуар.' },
+            { name: 'Часы-люкс',      img: 'watch_lvl2', price: 40000, note: 'Швейцарская механика. Разговор без слов.' },
+            { name: 'Rolex',          img: 'watch_lvl3', price: 90000, note: 'Корона на запястье. Понимают с одного взгляда.' }
+        ];
+        const LIFESTYLE_PHONES = [
+            { name: 'Простой телефон', img: 'phone_lvl0', price: 0,    note: 'Звонит и пишет — и хватит.' },
+            { name: 'Флагман',         img: 'phone_lvl1', price: 1500, note: 'Топовая модель этого года.' },
+            { name: 'Премиум-телефон', img: 'phone_lvl2', price: 4000, note: 'Титан и керамика. Статус в кармане.' },
+            { name: 'Android-флагман', img: 'phone_lvl3', price: 5000, note: 'Складной гигант на Android. Экран во всю ладонь.' }
+        ];
+        // Уровень жилья по телу долга (initMortgage). Пороги = данные, тюнятся как цифры.
+        //   Стартовые профессии (25–240к) раскладываются на скромные-средние уровни; вилла/дом — цель, не старт.
+        function homeLevel(initMortgage) {
+            const m = Number(initMortgage) || 0;
+            if (m <= 0)      return 0;   // аренда: телом не владеешь
+            if (m < 90000)   return 1;   // 25/35/40/60к → скромная квартира
+            if (m < 180000)  return 2;   // 100/110/120/140к → с ремонтом
+            if (m < 260000)  return 3;   // 240к → пентхаус
+            if (m < 500000)  return 4;
+            return 5;
+        }
+        // Уровень машины по её стоимости (initAuto). autoPay/initAuto 0 = машины нет вовсе.
+        function carLevel(initAuto) {
+            const a = Number(initAuto) || 0;
+            if (a < 28000)  return 0;   // 25к → развалюха/бюджет
+            if (a < 35000)  return 1;   // 28/30к
+            if (a < 45000)  return 2;   // 35к
+            return 3;                    // 45/60к → премиум (спорткар/гиперкар пока не старт)
+        }
+        function hasCar(p) {
+            return (Number(p.prof && p.prof.autoPay) || 0) > 0 || (Number(p.prof && p.prof.initAuto) || 0) > 0;
+        }
+        // ── Текущее жильё игрока: override на самом игроке (после апгрейда) ИЛИ выведенное из профессии.
+        //    НИКОГДА не меняем p.prof (он общий/копия) — все изменения живут на игроке и переживают перезагрузку.
+        function curHomeLvl(p) {
+            return (p && p.homeLvl != null) ? p.homeLvl : homeLevel(p && p.prof && p.prof.initMortgage);
+        }
+        function curHomeUpkeep(p) {  // 🏠 СОДЕРЖАНИЕ текущего жилья — коммуналка/обслуживание, остаётся ВСЕГДА (даже после выкупа)
+            const H = LIFESTYLE_HOMES[curHomeLvl(p)];
+            return (H && Number(H.upkeep)) || 0;
+        }
+        function curHomePay(p) {   // месячный платёж за жильё; выкуплено → в потоке остаётся только содержание
+            if (p && p.isM) return curHomeUpkeep(p);   // выкуплено: тела/ипотеки нет, но содержание платишь всегда
+            if (p && p.homePay != null) return Number(p.homePay) || 0;
+            return Number(p && p.prof && p.prof.mortgagePay) || 0;
+        }
+        function curHomeBody(p) {  // тело/остаток по жилью
+            if (p && p.homeBody != null) return Number(p.homeBody) || 0;
+            if (p && isFinite(Number(p.mLeft))) return Number(p.mLeft) || 0;
+            return Number(p && p.prof && p.prof.initMortgage) || 0;
+        }
+        // ── Текущая машина игрока: override на игроке (после апгрейда) ИЛИ выведенная из профессии.
+        //    НИКОГДА не меняем p.prof. Не-апгрейдивший игрок → бланк считается ровно как раньше (fallback на p.prof).
+        function curCarLvl(p) {
+            return (p && p.carLvl != null) ? p.carLvl : carLevel(p && p.prof && p.prof.initAuto);
+        }
+        function curCarPay(p) {   // месячный платёж за авто (0 если выкуплено/нет машины)
+            if (p && p.isA) return 0;
+            if (p && p.carPay != null) return Number(p.carPay) || 0;
+            return Number(p && p.prof && p.prof.autoPay) || 0;
+        }
+        function curCarBody(p) {  // стоимость/остаток по авто
+            if (p && p.carBody != null) return Number(p.carBody) || 0;
+            if (p && isFinite(Number(p.aLeft))) return Number(p.aLeft) || 0;
+            return Number(p && p.prof && p.prof.initAuto) || 0;
+        }
+        // Статусные вещи: уровень часов/телефона (0 по умолчанию — базовое есть у всех).
+        function curWatchLvl(p) { return (p && p.watchLvl != null) ? p.watchLvl : 0; }
+        function curPhoneLvl(p) { return (p && p.phoneLvl != null) ? p.phoneLvl : 0; }
+        // Панель «Образ жизни» — ШАГ 1: только показать текущий дом и машину (картинка+имя+платёж).
+        //   Ничего не покупает и не меняет в бланке. Кнопки апгрейда/выкупа придут шагами 3–4.
+        function renderLifestylePanel(p) {
+            const hl = curHomeLvl(p), home = LIFESTYLE_HOMES[hl] || LIFESTYLE_HOMES[0];
+            const homePaidOff = !!p.isM;
+            const homePay = curHomePay(p);
+            const homeLeft = curHomeBody(p);
+            const rent = hl === 0;
+
+            const homeCard = `
+                <div class="card" style="padding:0;overflow:hidden;">
+                  <div style="height:170px;position:relative;background:#0a0806;">
+                    <img src="cat_imgs/lifestyle/homes/${home.img}.webp" alt="${home.name}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/lifestyle/homes/${home.img}.png';">
+                    <div style="position:absolute;top:8px;left:8px;background:rgba(11,14,20,.82);border:1px solid var(--lx-gold-ln);border-radius:8px;color:var(--lx-gold-br);font-size:11px;font-weight:800;padding:3px 9px;">🏠 Жильё · ур. ${hl}/5</div>
+                    ${rent ? `<div style="position:absolute;top:8px;right:8px;background:rgba(80,20,20,.85);border:1px solid #7f1d1d;border-radius:8px;color:#fca5a5;font-size:11px;font-weight:800;padding:3px 9px;">АРЕНДА</div>` : ''}
+                  </div>
+                  <div style="padding:11px 13px 13px;">
+                    <div style="font-family:Georgia,serif;font-size:16px;font-weight:700;color:#f3efe6;">${home.name}</div>
+                    <div style="font-size:12px;color:var(--lx-muted);margin:3px 0 10px;line-height:1.4;">${home.note}</div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-top:1px solid var(--lx-line);">
+                        <span style="color:#9c988e;">${homePaidOff ? 'Содержание (выкуплено)' : 'Платёж в месяц'}</span>
+                        <b style="color:${homePaidOff ? '#8fb89e' : (homePay>0?'#cf9a9a':'#5cb08b')};">${homePay>0 ? homePay+' $/мес' : 'нет'}</b>
+                    </div>
+                    ${!rent ? `<div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-top:1px solid var(--lx-line);">
+                        <span style="color:#9c988e;">${homePaidOff?'Тело жилья':'Остаток долга'}</span>
+                        <b style="color:#efd8a3;">${fmtN(homeLeft)} $</b>
+                    </div>` : ''}
+                    <button onclick="openHomeUpgrade(${p.id})" class="btn" style="width:100%;margin-top:10px;background:linear-gradient(180deg,#f4dd9c,#d9b877);color:#20180a;font-weight:800;padding:10px;border-radius:11px;font-size:13px;">🏠 Обновить жильё</button>
+                  </div>
+                </div>`;
+
+            let carCard;
+            if (!hasCar(p)) {
+                carCard = `
+                <div class="card" style="padding:13px;">
+                    <div style="font-family:Georgia,serif;font-size:16px;font-weight:700;color:#f3efe6;">🚗 Пока без машины</div>
+                    <div style="font-size:12px;color:var(--lx-muted);margin-top:5px;line-height:1.4;">У твоей профессии нет машины. Первую можно будет купить — появится здесь.</div>
+                </div>`;
+            } else {
+                const cl = curCarLvl(p), car = LIFESTYLE_CARS[cl] || LIFESTYLE_CARS[0];
+                const carPaidOff = !!p.isA;
+                const carPay = curCarPay(p);
+                const carLeft = curCarBody(p);
+                carCard = `
+                <div class="card" style="padding:0;overflow:hidden;">
+                  <div style="height:170px;position:relative;background:#0a0806;">
+                    <img src="cat_imgs/lifestyle/cars/${car.img}.webp" alt="${car.name}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/lifestyle/cars/${car.img}.png';">
+                    <div style="position:absolute;top:8px;left:8px;background:rgba(11,14,20,.82);border:1px solid var(--lx-gold-ln);border-radius:8px;color:var(--lx-gold-br);font-size:11px;font-weight:800;padding:3px 9px;">🚗 Машина · ур. ${cl}/6</div>
+                  </div>
+                  <div style="padding:11px 13px 13px;">
+                    <div style="font-family:Georgia,serif;font-size:16px;font-weight:700;color:#f3efe6;">${car.name}</div>
+                    <div style="font-size:12px;color:var(--lx-muted);margin:3px 0 10px;line-height:1.4;">${car.note}</div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-top:1px solid var(--lx-line);">
+                        <span style="color:#9c988e;">Платёж в месяц</span>
+                        <b style="color:${carPay>0?'#cf9a9a':'#5cb08b'};">${carPay>0 ? carPay+' $/мес' : 'нет · выкуплено'}</b>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-top:1px solid var(--lx-line);">
+                        <span style="color:#9c988e;">${carPaidOff?'Стоимость':'Остаток долга'}</span>
+                        <b style="color:#efd8a3;">${isFinite(carLeft)?fmtN(carLeft):fmtN(Number(p.prof.initAuto)||0)} $</b>
+                    </div>
+                    <button onclick="openCarUpgrade(${p.id})" class="btn" style="width:100%;margin-top:10px;background:linear-gradient(180deg,#f4dd9c,#d9b877);color:#20180a;font-weight:800;padding:10px;border-radius:11px;font-size:13px;">🚗 Обновить машину</button>
+                  </div>
+                </div>`;
+            }
+
+            return `
+                <div style="background:linear-gradient(135deg,rgba(217,184,119,.10),rgba(90,60,25,.04));border:1px solid var(--lx-gold-ln);border-radius:12px;padding:12px 14px;margin-bottom:14px;">
+                    <div style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:var(--lx-gold-br);margin-bottom:6px;">🏡 Зачем эта ветка</div>
+                    <p style="font-size:13px;color:#d8cdb8;line-height:1.6;margin:0;">Это твоя жизнь для себя — как ты живёшь, на чём ездишь, чем себя окружаешь. Здесь ты решаешь: жить скромно и копить или обновлять дом и машину под свой статус. Каждый такой выбор честно бьёт по твоему бланку — платёж, содержание, налоги — и ничего не бесплатно. А ещё каждая покупка запоминается: в финале <b style="color:#efd8a3;">Зеркало</b> покажет твои настоящие отношения с деньгами и статусом — берёшь по средствам или понтуешься в долг. Это не украшение бланка, это часть тебя.</p>
+                </div>
+                <p style="font-size:13px;color:#9c988e;line-height:1.55;margin:0 0 12px;">Вот как ты живёшь прямо сейчас — твой дом и твоя машина. За них ты уже платишь в бланке каждый месяц. Дальше ты сам решишь: обновить, выкупить или жить как есть.</p>
+                <div class="grid-2" style="margin:0;gap:12px;">
+                    ${homeCard}
+                    ${carCard}
+                </div>
+                ${renderStatusThings(p)}
+                <div style="font-size:11px;color:#6b7280;margin-top:14px;text-align:center;">Апгрейд машины, отдых и шкалы (выгорание/здоровье) — следующими шагами.</div>`;
+        }
+        // ── ШАГ 3: апгрейд / выкуп жилья. Меняем ТОЛЬКО поля игрока (homeLvl/homeBody/homePay/mLeft/isM),
+        //    никогда p.prof. Честно бьёт по кассе (аванс/выкуп) и по месячному потоку (через calc→curHomePay).
+        function openHomeUpgrade(id){
+            const p = state.players.find(x=>x.id==id); if(!p) return;
+            state.homeUpModal = { pId: id };
+            render();
+        }
+        function lifestyleSetHome(pid, lvl, mode){
+            const p = state.players.find(x=>x.id==pid); if(!p) return;
+            const H = LIFESTYLE_HOMES[lvl]; if(!H) return;
+            const cash = Number(p.savings) || 0;
+            const curLvl = curHomeLvl(p);
+            if (lvl === 0) {
+                // Съезд на аренду: не владеешь телом, платишь только аренду в поток.
+                p.homeLvl = 0; p.homeBody = 0; p.homePay = H.pay; p.mLeft = 0; p.isM = false;
+                logSignal('lifestyle', 'home_downgrade', 0);
+                p.notify = '🏠 Ты переехал на съём: аренда ' + fmtN(H.pay) + '$/мес, жильём не владеешь.';
+            } else if (mode === 'buyout') {
+                if (cash < H.body) { alert('Выкупить «' + H.name + '» стоит ' + fmtN(H.body) + '$ — не хватает кассы.'); return; }
+                p.savings = cash - H.body;
+                p.homeLvl = lvl; p.homeBody = H.body; p.homePay = H.upkeep; p.mLeft = 0; p.isM = true;
+                logSignal('lifestyle', 'home_buyout', lvl);
+                p.notify = '🏠 «' + H.name + '» выкуплен целиком за ' + fmtN(H.body) + '$. Ипотеки нет — остаётся только содержание ' + fmtN(H.upkeep) + '$/мес.';
+            } else if (mode === 'move') {
+                // Переезд в жильё ПОПРОЩЕ: без доплаты и пока без возврата (продажа с возвратом — позже).
+                p.homeLvl = lvl; p.homeBody = H.body; p.homePay = H.pay; p.mLeft = H.body; p.isM = false;
+                logSignal('lifestyle', 'home_downgrade', lvl);
+                p.notify = '🏠 Переехал в «' + H.name + '»: платёж ' + fmtN(H.pay) + '$/мес.';
+            } else { // credit — апгрейд в кредит: аванс из кассы, месячный платёж замещает старый
+                if (cash < H.down) { alert('Аванс за «' + H.name + '» — ' + fmtN(H.down) + '$ — не хватает кассы.'); return; }
+                p.savings = cash - H.down;
+                p.homeLvl = lvl; p.homeBody = H.body; p.homePay = H.pay; p.mLeft = H.body; p.isM = false;
+                logSignal('lifestyle', 'home_upgrade', lvl);
+                p.notify = '🏠 Новое жильё «' + H.name + '»: аванс ' + fmtN(H.down) + '$, платёж ' + fmtN(H.pay) + '$/мес.';
+            }
+            state.homeUpModal = null;
+            save(p.id); render();
+        }
+        // Окно выбора жилья — 6 уровней с телом/авансом/месяцем и кнопками «В кредит»/«Выкупить»/«Переехать».
+        function renderHomeUpgradeModal(){
+            const m = state.homeUpModal; if(!m) return '';
+            const p = state.players.find(x=>x.id==m.pId); if(!p) return '';
+            const cash = Number(p.savings) || 0;
+            const curLvl = curHomeLvl(p);
+            const owned = !!p.isM;
+            const btn = (label, on, extra) => `<button onclick="${on}" ${extra||''} class="btn" style="flex:1;padding:9px;font-size:12px;font-weight:800;border-radius:10px;${extra&&extra.indexOf('disabled')>=0?'opacity:.4;':''}">${label}</button>`;
+            const rows = LIFESTYLE_HOMES.map((H, lvl) => {
+                const isCur = lvl === curLvl, up = lvl > curLvl, down = lvl < curLvl;
+                let buttons = '';
+                if (lvl === 0) {
+                    buttons = isCur
+                        ? `<div style="font-size:12px;color:#5cb08b;font-weight:700;padding:6px 0;">✓ ты здесь · аренда ${fmtN(H.pay)}$/мес</div>`
+                        : `<div style="display:flex;gap:8px;">${btn('Съехать на аренду · ' + fmtN(H.pay) + '$/мес', `lifestyleSetHome(${p.id},0,'rent')`)}</div>`;
+                } else if (isCur) {
+                    buttons = owned
+                        ? `<div style="font-size:12px;color:#5cb08b;font-weight:700;padding:6px 0;">✓ выкуплено — жильё твоё, остаётся содержание ${fmtN(H.upkeep)}$/мес</div>`
+                        : `<div style="display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:#efd8a3;font-weight:700;flex:0 0 auto;">Ты здесь</span>${btn('Выкупить целиком · ' + fmtN(H.body) + '$', `lifestyleSetHome(${p.id},${lvl},'buyout')`, cash < H.body ? 'disabled' : '')}</div>`;
+                } else if (up) {
+                    buttons = `<div style="display:flex;gap:8px;">${btn('В кредит · аванс ' + fmtN(H.down) + '$', `lifestyleSetHome(${p.id},${lvl},'credit')`, cash < H.down ? 'disabled' : '')}${btn('Выкупить · ' + fmtN(H.body) + '$', `lifestyleSetHome(${p.id},${lvl},'buyout')`, cash < H.body ? 'disabled' : '')}</div>`;
+                } else {
+                    buttons = `<div style="display:flex;gap:8px;">${btn('Переехать сюда · ' + fmtN(H.pay) + '$/мес', `lifestyleSetHome(${p.id},${lvl},'move')`)}</div>`;
+                }
+                const meta = lvl === 0
+                    ? `<span style="color:#9c988e;">Аренда · <b style="color:#cf9a9a;">${fmtN(H.pay)}$/мес</b> · не владеешь</span>`
+                    : `<span style="color:#9c988e;">Тело <b style="color:#efd8a3;">${fmtN(H.body)}$</b> · аванс <b style="color:#efd8a3;">${fmtN(H.down)}$</b> · <b style="color:#cf9a9a;">${fmtN(H.pay)}$/мес</b> · содержание <b style="color:#8fb89e;">${fmtN(H.upkeep)}$</b></span>`;
+                return `
+                    <div class="card" style="padding:0;overflow:hidden;border-color:${isCur ? 'var(--lx-gold-ln)' : 'var(--lx-line)'};margin-bottom:10px;">
+                      <div style="display:flex;gap:0;">
+                        <div style="width:120px;flex:0 0 120px;background:#0a0806;">
+                            <img src="cat_imgs/lifestyle/homes/${H.img}.webp" alt="${H.name}" style="width:100%;height:100%;min-height:96px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/lifestyle/homes/${H.img}.png';">
+                        </div>
+                        <div style="flex:1;padding:9px 11px 11px;min-width:0;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+                                <b style="font-size:14px;color:#f3efe6;">${H.name}</b>
+                                ${isCur ? `<span style="flex:0 0 auto;background:rgba(217,184,119,.16);border:1px solid var(--lx-gold-ln);border-radius:7px;color:var(--lx-gold-br);font-size:10px;font-weight:800;padding:2px 7px;">СЕЙЧАС</span>` : ''}
+                            </div>
+                            <div style="font-size:11px;color:var(--lx-muted);margin:3px 0 6px;line-height:1.35;">${H.note}</div>
+                            <div style="font-size:11px;margin-bottom:8px;">${meta}</div>
+                            ${buttons}
+                        </div>
+                      </div>
+                    </div>`;
+            }).join('');
+            return `
+                <div style="position:fixed;inset:0;z-index:5400;background:rgba(4,5,8,.82);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;" onclick="state.homeUpModal=null;render();">
+                    <div onclick="event.stopPropagation()" style="position:relative;background:linear-gradient(180deg,#1a1f2b,#12151d);border:1px solid var(--lx-gold);border-radius:18px;padding:20px 16px;max-width:540px;width:100%;box-shadow:0 20px 60px -20px rgba(0,0,0,.85);margin:auto;">
+                        <button onclick="state.homeUpModal=null;render();" style="position:absolute;top:10px;right:12px;background:none;border:none;color:#9c988e;font-size:26px;line-height:1;cursor:pointer;">×</button>
+                        <div style="font-family:Georgia,serif;font-size:20px;font-weight:800;color:var(--lx-gold-br);margin-bottom:5px;">🏠 Обновить жильё</div>
+                        <div style="font-size:12px;color:#cdc8bd;line-height:1.5;margin-bottom:6px;">Касса: <b style="color:#efd8a3;">${fmtN(cash)}$</b>. <b>В кредит</b> — платишь аванс, дальше месячный платёж в бланк. <b>Выкупить</b> — платишь всё тело сразу, ипотеки нет — но содержание жилья остаётся всегда.</div>
+                        <div style="font-size:11px;color:#6b7280;margin-bottom:14px;">Содержание (коммуналка/обслуживание) платишь, даже когда квартира выкуплена. Переезд в жильё попроще пока без возврата денег — добавим позже.</div>
+                        ${rows}
+                    </div>
+                </div>`;
+        }
+        // ── ШАГ 4: апгрейд / выкуп машины. Зеркало жилья: меняем ТОЛЬКО поля игрока (carLvl/carBody/carPay/aLeft/isA),
+        //    никогда p.prof. Честно бьёт по кассе (аванс/выкуп) и по месячному потоку (через calc→curCarPay).
+        //    В отличие от жилья аренды нет: уровень 0 (Развалюха) — это уже машина, а не съём.
+        function openCarUpgrade(id){
+            const p = state.players.find(x=>x.id==id); if(!p) return;
+            state.carUpModal = { pId: id };
+            render();
+        }
+        function lifestyleSetCar(pid, lvl, mode){
+            const p = state.players.find(x=>x.id==pid); if(!p) return;
+            const C = LIFESTYLE_CARS[lvl]; if(!C) return;
+            const cash = Number(p.savings) || 0;
+            if (mode === 'buyout') {
+                if (cash < C.body) { alert('Выкупить «' + C.name + '» стоит ' + fmtN(C.body) + '$ — не хватает кассы.'); return; }
+                p.savings = cash - C.body;
+                p.carLvl = lvl; p.carBody = C.body; p.carPay = 0; p.aLeft = 0; p.isA = true;
+                logSignal('lifestyle', 'car_buyout', lvl);
+                p.notify = '🚗 «' + C.name + '» выкуплен целиком за ' + fmtN(C.body) + '$. Платежа по авто больше нет.';
+            } else if (mode === 'move') {
+                // Пересесть на машину ПОПРОЩЕ: без доплаты и пока без возврата (продажа с возвратом — позже).
+                p.carLvl = lvl; p.carBody = C.body; p.carPay = C.pay; p.aLeft = C.body; p.isA = false;
+                logSignal('lifestyle', 'car_downgrade', lvl);
+                p.notify = '🚗 Пересел на «' + C.name + '»: платёж ' + fmtN(C.pay) + '$/мес.';
+            } else { // credit — апгрейд в кредит: аванс из кассы, месячный платёж замещает старый
+                if (cash < C.down) { alert('Аванс за «' + C.name + '» — ' + fmtN(C.down) + '$ — не хватает кассы.'); return; }
+                p.savings = cash - C.down;
+                p.carLvl = lvl; p.carBody = C.body; p.carPay = C.pay; p.aLeft = C.body; p.isA = false;
+                logSignal('lifestyle', 'car_upgrade', lvl);
+                p.notify = '🚗 Новая машина «' + C.name + '»: аванс ' + fmtN(C.down) + '$, платёж ' + fmtN(C.pay) + '$/мес.';
+            }
+            state.carUpModal = null;
+            save(p.id); render();
+        }
+        // Окно выбора машины — 7 уровней с телом/авансом/месяцем и кнопками «В кредит»/«Выкупить»/«Пересесть».
+        function renderCarUpgradeModal(){
+            const m = state.carUpModal; if(!m) return '';
+            const p = state.players.find(x=>x.id==m.pId); if(!p) return '';
+            const cash = Number(p.savings) || 0;
+            const curLvl = curCarLvl(p);
+            const owned = !!p.isA;
+            const btn = (label, on, extra) => `<button onclick="${on}" ${extra||''} class="btn" style="flex:1;padding:9px;font-size:12px;font-weight:800;border-radius:10px;${extra&&extra.indexOf('disabled')>=0?'opacity:.4;':''}">${label}</button>`;
+            const rows = LIFESTYLE_CARS.map((C, lvl) => {
+                const isCur = lvl === curLvl, up = lvl > curLvl;
+                let buttons = '';
+                if (isCur) {
+                    buttons = owned
+                        ? `<div style="font-size:12px;color:#5cb08b;font-weight:700;padding:6px 0;">✓ выкуплено — машина твоя, платежа нет</div>`
+                        : `<div style="display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:#efd8a3;font-weight:700;flex:0 0 auto;">Ты здесь</span>${btn('Выкупить целиком · ' + fmtN(C.body) + '$', `lifestyleSetCar(${p.id},${lvl},'buyout')`, cash < C.body ? 'disabled' : '')}</div>`;
+                } else if (up) {
+                    buttons = `<div style="display:flex;gap:8px;">${btn('В кредит · аванс ' + fmtN(C.down) + '$', `lifestyleSetCar(${p.id},${lvl},'credit')`, cash < C.down ? 'disabled' : '')}${btn('Выкупить · ' + fmtN(C.body) + '$', `lifestyleSetCar(${p.id},${lvl},'buyout')`, cash < C.body ? 'disabled' : '')}</div>`;
+                } else {
+                    buttons = `<div style="display:flex;gap:8px;">${btn('Пересесть сюда · ' + fmtN(C.pay) + '$/мес', `lifestyleSetCar(${p.id},${lvl},'move')`)}</div>`;
+                }
+                const meta = `<span style="color:#9c988e;">Цена <b style="color:#efd8a3;">${fmtN(C.body)}$</b> · аванс <b style="color:#efd8a3;">${fmtN(C.down)}$</b> · <b style="color:#cf9a9a;">${fmtN(C.pay)}$/мес</b></span>`;
+                return `
+                    <div class="card" style="padding:0;overflow:hidden;border-color:${isCur ? 'var(--lx-gold-ln)' : 'var(--lx-line)'};margin-bottom:10px;">
+                      <div style="display:flex;gap:0;">
+                        <div style="width:120px;flex:0 0 120px;background:#0a0806;">
+                            <img src="cat_imgs/lifestyle/cars/${C.img}.webp" alt="${C.name}" style="width:100%;height:100%;min-height:96px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/lifestyle/cars/${C.img}.png';">
+                        </div>
+                        <div style="flex:1;padding:9px 11px 11px;min-width:0;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+                                <b style="font-size:14px;color:#f3efe6;">${C.name}</b>
+                                ${isCur ? `<span style="flex:0 0 auto;background:rgba(217,184,119,.16);border:1px solid var(--lx-gold-ln);border-radius:7px;color:var(--lx-gold-br);font-size:10px;font-weight:800;padding:2px 7px;">СЕЙЧАС</span>` : ''}
+                            </div>
+                            <div style="font-size:11px;color:var(--lx-muted);margin:3px 0 6px;line-height:1.35;">${C.note}</div>
+                            <div style="font-size:11px;margin-bottom:8px;">${meta}</div>
+                            ${buttons}
+                        </div>
+                      </div>
+                    </div>`;
+            }).join('');
+            return `
+                <div style="position:fixed;inset:0;z-index:5400;background:rgba(4,5,8,.82);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;" onclick="state.carUpModal=null;render();">
+                    <div onclick="event.stopPropagation()" style="position:relative;background:linear-gradient(180deg,#1a1f2b,#12151d);border:1px solid var(--lx-gold);border-radius:18px;padding:20px 16px;max-width:540px;width:100%;box-shadow:0 20px 60px -20px rgba(0,0,0,.85);margin:auto;">
+                        <button onclick="state.carUpModal=null;render();" style="position:absolute;top:10px;right:12px;background:none;border:none;color:#9c988e;font-size:26px;line-height:1;cursor:pointer;">×</button>
+                        <div style="font-family:Georgia,serif;font-size:20px;font-weight:800;color:var(--lx-gold-br);margin-bottom:5px;">🚗 Обновить машину</div>
+                        <div style="font-size:12px;color:#cdc8bd;line-height:1.5;margin-bottom:6px;">Касса: <b style="color:#efd8a3;">${fmtN(cash)}$</b>. <b>В кредит</b> — платишь аванс, дальше месячный платёж в бланк. <b>Выкупить</b> — платишь всё сразу, месячного платежа нет.</div>
+                        <div style="font-size:11px;color:#6b7280;margin-bottom:14px;">Пересадка на машину попроще пока без возврата денег — продажу с возвратом добавим позже.</div>
+                        ${rows}
+                    </div>
+                </div>`;
+        }
+        // ── ШАГ 8: статусные вещи (часы/телефон) — разовая покупка из кассы, БЕЗ месячной строки.
+        //    Меняем только поля игрока (watchLvl/phoneLvl) и кассу. Пишем сигнал для Зеркала (ось «деньги»).
+        function buyStatusThing(pid, kind, lvl){
+            const p = state.players.find(x=>x.id==pid); if(!p) return;
+            const arr = (kind === 'watch') ? LIFESTYLE_WATCHES : LIFESTYLE_PHONES;
+            const item = arr[lvl]; if(!item) return;
+            const cur = (kind === 'watch') ? curWatchLvl(p) : curPhoneLvl(p);
+            if (lvl <= cur) return;   // статус только вверх — назад не «продаём»
+            const cash = Number(p.savings) || 0;
+            if (cash < item.price) { alert('«' + item.name + '» стоит ' + fmtN(item.price) + '$ — не хватает кассы.'); return; }
+            p.savings = cash - item.price;
+            if (kind === 'watch') p.watchLvl = lvl; else p.phoneLvl = lvl;
+            logSignal('lifestyle', kind === 'watch' ? 'buy_watch' : 'buy_phone', lvl);
+            // Флаг «понты, которых ещё не заработал»: покупка люкса при непогашенном кредите банка.
+            if ((Number(p.bankLoan) || 0) > 0) logSignal('lifestyle', 'status_on_debt', lvl);
+            p.notify = (kind === 'watch' ? '⌚ ' : '📱 ') + 'Теперь у тебя «' + item.name + '». −' + fmtN(item.price) + '$ из кассы.';
+            save(p.id); render();
+        }
+        // Блок статусных вещей внутри панели «Образ жизни».
+        function renderStatusThings(p){
+            const cash = Number(p.savings) || 0;
+            const strip = (kind, arr, cur, folder, prefix) => arr.map((item, lvl) => {
+                const owned = lvl === cur, passed = lvl < cur, canBuy = lvl > cur && cash >= item.price, tooDear = lvl > cur && cash < item.price;
+                const border = owned ? 'var(--lx-gold-ln)' : 'var(--lx-line)';
+                let action;
+                if (owned) action = `<div style="font-size:11px;color:#5cb08b;font-weight:800;text-align:center;padding:7px 0;">✓ у тебя</div>`;
+                else if (passed) action = `<div style="font-size:11px;color:#6b7280;text-align:center;padding:7px 0;">пройдено</div>`;
+                else action = `<button onclick="buyStatusThing(${p.id},'${kind}',${lvl})" ${tooDear?'disabled':''} class="btn" style="width:100%;padding:7px;font-size:11px;font-weight:800;border-radius:9px;${tooDear?'opacity:.4;':''}">${tooDear?'не хватает':'Купить'} · ${fmtN(item.price)}$</button>`;
+                return `
+                    <div class="card" style="padding:0;overflow:hidden;border-color:${border};">
+                      <div style="aspect-ratio:16/9;background:#0a0806;position:relative;">
+                        <img src="cat_imgs/lifestyle/${folder}/${item.img}.webp" alt="${item.name}" style="width:100%;height:100%;object-fit:contain;display:block;${lvl>cur?'filter:grayscale(.55) brightness(.8);':''}" onerror="this.onerror=function(){this.replaceWith(Object.assign(document.createElement('div'),{style:'width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8a7f6a;font-size:11px;letter-spacing:.02em;background:#0a0806;',textContent:'📷 фото скоро'}))};this.src=this.src.replace('.webp','.png');">
+                        ${owned?`<div style="position:absolute;top:5px;right:5px;background:rgba(11,14,20,.85);border:1px solid var(--lx-gold-ln);border-radius:6px;color:var(--lx-gold-br);font-size:9px;font-weight:800;padding:2px 6px;">СЕЙЧАС</div>`:''}
+                      </div>
+                      <div style="padding:7px 8px 8px;">
+                        <div style="font-size:12px;font-weight:700;color:#f3efe6;">${item.name}</div>
+                        <div style="font-size:10px;color:var(--lx-muted);margin:2px 0 7px;line-height:1.3;min-height:26px;">${item.note}</div>
+                        ${action}
+                      </div>
+                    </div>`;
+            }).join('');
+            return `
+                <div style="margin-top:16px;">
+                    <div style="font-family:Georgia,serif;font-size:15px;font-weight:700;color:var(--lx-gold-br);margin-bottom:4px;">⌚ Статус — часы и телефон</div>
+                    <p style="font-size:12px;color:#9c988e;line-height:1.5;margin:0 0 10px;">Разовые покупки из кассы — месячных платежей не добавляют. Чистый сигнал: берёшь по средствам или тянешься за понтами. Часы обслуживания не требуют.</p>
+                    <div style="font-size:12px;color:#cdc8bd;font-weight:700;margin:0 0 6px;">Часы</div>
+                    <div style="display:grid;grid-template-columns:repeat(2,1fr);margin:0 0 12px;gap:8px;">${strip('watch', LIFESTYLE_WATCHES, curWatchLvl(p), 'watches', 'watch')}</div>
+                    <div style="font-size:12px;color:#cdc8bd;font-weight:700;margin:0 0 6px;">Телефон</div>
+                    <div style="display:grid;grid-template-columns:repeat(2,1fr);margin:0;gap:8px;">${strip('phone', LIFESTYLE_PHONES, curPhoneLvl(p), 'phones', 'phone')}</div>
+                </div>`;
+        }
+        // ═══════════ конец модуля «Образ жизни» (шаги 1 + 3 + 8) ═══════════
 
         // Глобально уникальный id заявки: время + счётчик + случайное.
         // Раньше был bare Date.now() → у двух игроков в одну миллисекунду совпадали id,
@@ -11491,9 +12019,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const taxDisc = Math.min(90, Math.max(0, Number(p.taxDiscPct) || 0));   // 🔒 тюрьма: «продавил силой» → скидка к налогам
             const taxes = Math.round((Math.max(0, p.prof.taxes + (Number(p.taxMod) || 0)) + Math.round(income * (Number(p.taxPct) || 0) / 100)) * (1 - taxDisc / 100) * (_clvl>=3?0.85:1));   // 🪜 директор: налоги −15%
             const _life = _rank.expMult || 1;   // 🪜 стал профи → живёшь дороже: ипотека/авто/кредитка растут со ступенью (Ринат 28июл)
-            const mortgagePay = p.isM ? 0 : Math.round(p.prof.mortgagePay * _life);
+            const mortgagePay = Math.round(curHomePay(p) * _life);   // 🏡 Образ жизни: платёж жилья с учётом апгрейда (curHomePay=0 если выкуплено)
             const eduPay = p.isE ? 0 : p.prof.eduPay;   // образование — прошлая учёба, не растёт
-            const autoPay = p.isA ? 0 : Math.round(p.prof.autoPay * _life);
+            const autoPay = Math.round(curCarPay(p) * _life);   // 🚗 Образ жизни: платёж авто с учётом апгрейда (curCarPay=0 если выкуплено)
             const ccPay = p.isCC ? 0 : Math.round(p.prof.ccPay * _life);
             const retailPay = p.isR ? 0 : Math.round(p.prof.retailPay * _life);
             const expUpPct = (Number(p.otherExpPct) || 0) + (Number(p.jailPress) || 0);   // 🔒 тюрьма: штраф «сломлен» + давление сидки
@@ -11504,8 +12032,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // Доход с кампаний остаётся живым спотом в кассу (см. мост), а несущая стоимость склада —
             // честный пассивный расход, влияет на поток и на условие победы. Ринат 20авг: «касса И месячный поток».
             const tovarkaRent = Math.max(0, Math.round(Number(p.tovarka && p.tovarka.rent) || 0));
+            // ❤️ ОТНОШЕНИЯ: алименты после развода = постоянный месячный расход в потоке (модуль шлёт monthly в снимке).
+            const relAlimony = Math.max(0, Math.round(Number(p.relationship && p.relationship.monthly) || 0));
 
-            const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay + farmWage + farmFeedExp + tovarkaRent;
+            const totalExp = taxes + mortgagePay + eduPay + autoPay + ccPay + retailPay + otherExp + childExp + bankPay + farmWage + farmFeedExp + tovarkaRent + relAlimony;
             const flow = income - totalExp;
             const target = totalExp * WIN_MULT;   // ПОБЕДА: пассив ≥ WIN_MULT × расходов (см. WIN_MULT выше)
 
@@ -11516,7 +12046,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (p) p._flow = flow;
 
             return { salary, baseSalary, skillBonus, passive, income, taxes, mortgagePay, eduPay, autoPay, ccPay, retailPay,
-                     otherExp, childExp, bankPay, farmInc, farmWage, farmFeed: farmFeedExp, tovarkaRent, totalExp, flow, target,
+                     otherExp, childExp, bankPay, farmInc, farmWage, farmFeed: farmFeedExp, tovarkaRent, relAlimony, totalExp, flow, target,
                      win: passive >= target };
         }
         // 5 УРОВНЕЙ «Путь свободы» (центр поля): по доле пассив/расходы. L5 = свобода (пассив ≥ расходов).
@@ -11645,7 +12175,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // на любом экране, остальные окна — по-прежнему только в бланке.
             if (state.view !== 'player') return renderWorldShow() + renderPayslipModal();   // 💰 получку видит и ведущий (он её выдаёт)
             const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return renderWorldShow() + renderPayslipModal();
-            return renderWorldShow() + renderPayslipModal() + renderBizReport() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup();
+            return renderWorldShow() + renderPayslipModal() + renderBizReport() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup() + renderHomeUpgradeModal() + renderCarUpgradeModal() + renderMirrorModal();
         }
         // 🎲 Личный попап «Твой ход» — показывается тому, чей ход настал, закрывается крестиком/кнопкой.
         function renderMyTurnPopup(){
@@ -11661,6 +12191,140 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function closeMyTurnPopup(){ state.myTurnPopup=false; paintOverlays(); }
         function paintOverlays(){ const ov=document.getElementById('overlay'); if(ov) ov.innerHTML = renderOverlays(); }
+
+        // ═══════════ 🪞 ЗЕРКАЛО ДУШИ — движок портрета + экран ═══════════
+        // Читает УЖЕ существующие поля игрока (казино-статы, долг, вклады, навыки,
+        // благотворительность, тень, тип отношений) + вечный PROFILE. Никакой новой
+        // механики не трогает — только смотрит. Где данных мало, честно говорит об этом.
+        // Метод: поступок → голос по кластеру → доминирующая «схема» (одна трещина) + сила + одна точка.
+        // Грунт и метод: 03 ДИЗАЙН-ДОКУМЕНТ/VIA_ПСИХОЛОГИЯ_ГРУНТ_ЯДРО_ОБНОВЛЕНИЯ.md
+        function _mn(x){ return Number(x)||0; }
+        function mirrorBuild(p){
+            if(!p) return null;
+            const s = p.stats || {};
+            const obs = [], strengths = [], votes = {};
+            const vote=(tag,w)=>{ votes[tag]=(votes[tag]||0)+(w||1); };
+            const savings=_mn(p.savings);
+            const loan=_mn(p.bankLoan);
+            const casinoPlays=_mn(s.casinoPlays), casinoLost=_mn(s.casinoLost), casinoWon=_mn(s.casinoWon);
+            const assetsN=(p.assets||[]).length;
+            const skillsN=(p.skills||[]).length + (p.branches ? ((p.branches.work||[]).length+(p.branches.free||[]).length+(p.branches.spirit||[]).length) : 0);
+            const charity=_mn(p.charity);
+            const jailCount=_mn(p.jailCount);
+            const shadow=_mn(p.shadow)+_mn(p.soulPoison);
+            const games=(typeof PROFILE!=='undefined') ? _mn(PROFILE.games) : 0;
+
+            if(casinoPlays>=5){
+                obs.push({br:'Азарт', q:'Почему тебя так тянет к столу?', verdict:'После проигрыша ты не уходишь — ты удваиваешь.', because:'риск даёт быструю дрожь, а проигрыш легко списать на удачу. За столом ты прячешься от ответственности, а не богатеешь.', sig:'казино: '+casinoPlays+' заходов'+(casinoLost>casinoWon?', в минусе':'')});
+                vote('chase',2); vote('external',1);
+                strengths.push('В тебе есть смелость и энергия идти на риск. Разверни её в дело — станет топливом, а не дырой.');
+            }
+            if(loan>0 && savings>loan){
+                obs.push({br:'Долги', q:'Почему ты не гасишь долг, хотя мог бы?', verdict:'Деньги на руках есть, а долг висит.', because:'гасить долг медленно и без дофамина. Тебе нужно, чтобы деньги «что-то делали сейчас», поэтому долг ты просто не замечаешь.', sig:'долг '+fmtN(loan)+'$ при кассе '+fmtN(savings)+'$'});
+                vote('chase',1); vote('avoid',1);
+            }
+            if(savings>8000 && assetsN===0){
+                obs.push({br:'Инвестиции', q:'Почему деньги лежат мёртвым грузом?', verdict:'Крупная касса — и ни одного вложения, даже под процент.', because:'вложить — значит отпустить и ждать. Медленное и тихое ты не выдерживаешь, а быстрое и громкое тянет.', sig:'свободно '+fmtN(savings)+'$, вложено 0'});
+                vote('chase',1); vote('avoid',1);
+            }
+            if(casinoPlays>=5 && assetsN===0 && !p.farm){
+                obs.push({br:'Риск', q:'Почему за столом ты смелый, а в своём деле — нет?', verdict:'Рискуешь там, где можно свалить на удачу; замираешь там, где ответишь лицом.', because:'проигрыш своего дела — это «я не смог», а проигрыш ставки — «не повезло». Ты выбираешь риск без ответственности.', sig:'ставки есть · дело — нет'});
+                vote('avoid',2);
+            }
+            if(games>=1 && skillsN<=1){
+                obs.push({br:'Развитие', q:'Почему ты почти не вкладывал в себя?', verdict:'В рост и навыки — почти ничего.', because:'вложение в себя окупается не завтра и его никто не видит. Тебе нужен быстрый и заметный результат.', sig:'навыков: '+skillsN});
+                vote('external',1); vote('avoid',1);
+            } else if(skillsN>=4){
+                strengths.push('Ты вкладываешься в себя — учишься и растёшь. Это самый окупаемый вид смелости.');
+                vote('_build',1);
+            }
+            if(games>=1 && charity<=0){
+                obs.push({br:'Люди', q:'Почему ты почти никому не помог?', verdict:'Ты прошёл мимо тех, кому мог протянуть руку.', because:'пока сам чувствуешь себя тонущим, кажется, что отдать нечего. Это мышление нехватки, а не жадность.', sig:'помощь: 0'});
+                vote('scarcity',1);
+            } else if(charity>0){
+                strengths.push('Ты умеешь отдавать — а это мускул, который есть не у всех. Значит внутри уже есть излишек.');
+            }
+            if(assetsN>=3){ strengths.push('Ты строишь — у тебя несколько источников дохода. Терпение есть, осталось донести его до всех веток.'); vote('_build',1); }
+            if(jailCount>0 || shadow>0){
+                obs.push({br:'Тень', q:'Почему ты срезал угол в тень?', verdict:'Ты выбирал короткую выгоду в обход правил.', because:'короткая выгода в тени копит долг доверия — он всегда возвращается, просто позже.', sig:(jailCount>0?('срывов: '+jailCount):'след тени')});
+                vote('chase',1);
+            }
+            const rel = p.relationship || null;
+            const relType = rel ? (rel.psychotype||rel.type||rel.myType||null) : null;
+            if(relType){
+                obs.push({br:'Отношения', q:'Почему ты выбираешь именно так?', verdict:'Твой рисунок в любви — «'+relType+'».', because:'кого мы выбираем и как уходим — самый честный датчик привязанности. Здесь виден твой способ быть близко.', sig:'тип: '+relType});
+            }
+
+            const clusterName = {
+                external:'Дефективность — в глубине ты не веришь, что тебя достаточно самого по себе.',
+                avoid:'Избегание — ты бежишь от всего, где придётся остаться один на один с результатом.',
+                chase:'Догоняющий — ты пока не умеешь проигрывать и вовремя уходить.',
+                scarcity:'Нехватка — ты ещё не почувствовал себя в безопасности настолько, чтобы отдавать.'
+            };
+            const aimByCluster = {
+                external:'секунда, когда тянет доказать что-то снаружи — купить, блеснуть. Останься в ней: ты уже достаточно и без этого.',
+                avoid:'секунда перед тем как бросить или сбежать. Продержись на один шаг дольше — именно там ты и растёшь.',
+                chase:'секунда сразу после потери, когда рука тянется удвоить. Сделай в ней паузу вместо рывка.',
+                scarcity:'один раз отдай тогда, когда кажется, что отдавать нечего — и увидишь, что излишек уже есть.'
+            };
+            let core=null, best=0;
+            for(const k in votes){ if(k.charAt(0)==='_') continue; if(votes[k]>best){best=votes[k]; core=k;} }
+            if(!strengths.length) strengths.push('Ты дошёл до Зеркала и смотришь на себя честно — это само по себе редкость и твоя опора.');
+
+            return {
+                name: p.name || 'Игрок',
+                enough: (obs.length>=2 && !!core),
+                obs,
+                coreText: core ? clusterName[core] : null,
+                aimText: core ? aimByCluster[core] : null,
+                strengths, games
+            };
+        }
+        function openMirror(){ state.mirrorModal = true; paintOverlays(); }
+        function closeMirror(){ state.mirrorModal = false; paintOverlays(); }
+        function renderMirrorModal(){
+            if(!state.mirrorModal) return '';
+            const p = me(); const M = mirrorBuild(p);
+            if(!M) return '';
+            const G='#e4c583', INK='#ecf1ff', MID='#c6cfe6', LOW='#8b93ad';
+            const obsHtml = M.obs.map(o=>`
+                <div style="margin:0 0 22px;">
+                    <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.22em;text-transform:uppercase;color:${LOW};margin-bottom:9px;">${o.br}</div>
+                    <div style="font-family:Georgia,serif;font-size:19px;line-height:1.25;color:${INK};margin-bottom:8px;">${o.q}</div>
+                    <div style="font-size:14.5px;line-height:1.65;color:${MID};"><b style="color:${INK};">${o.verdict}</b> <span style="color:${G};font-style:italic;">Потому что</span> ${o.because} <span style="display:inline-block;margin-top:5px;color:${G};font:500 12px/1.4 ui-monospace,monospace;border-bottom:1px dotted ${G};padding-bottom:1px;">${o.sig}</span></div>
+                </div>`).join('');
+            const strengthsHtml = M.strengths.map(x=>`<div style="font-size:14px;line-height:1.6;color:${MID};margin:0 0 10px;padding-left:14px;border-left:2px solid #84c4d2;">${x}</div>`).join('');
+            const body = M.enough ? `
+                <div style="background:linear-gradient(160deg,rgba(228,197,131,.10),transparent);border:1px solid ${G}55;border-radius:16px;padding:22px;margin:0 0 26px;text-align:center;">
+                    <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:${G};margin-bottom:10px;">Что это всё вместе — одна трещина</div>
+                    <div style="font-family:Georgia,serif;font-style:italic;font-size:21px;line-height:1.35;color:${INK};">${M.coreText}</div>
+                </div>
+                ${obsHtml}
+                <div style="border-top:1px solid rgba(150,170,220,.14);margin:28px 0;"></div>
+                <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:#84c4d2;margin-bottom:12px;">Где ты силён</div>
+                ${strengthsHtml}
+                <div style="border-left:2px solid ${G};padding:6px 0 6px 20px;margin:26px 0 8px;">
+                    <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:${G};margin-bottom:10px;">Куда бить точечно — одна точка</div>
+                    <div style="font-size:15px;line-height:1.65;color:#d8dfef;">У тебя всё держится на одном мгновении: ${M.aimText}</div>
+                </div>
+                <div style="text-align:center;font-family:Georgia,serif;font-style:italic;color:${LOW};font-size:14px;margin-top:24px;line-height:1.5;">Чем больше играешь, тем чётче Зеркало. Сыграй ещё — оно сравнит тебя с тобой прошлым.</div>
+            ` : `
+                <div style="text-align:center;padding:10px 0 4px;">
+                    <div style="font-family:Georgia,serif;font-size:19px;color:${INK};margin-bottom:12px;">Зеркало ещё присматривается.</div>
+                    <div style="font-size:14.5px;line-height:1.65;color:${MID};max-width:44ch;margin:0 auto 18px;">Ты пока сделал слишком мало, чтобы проступил устойчивый рисунок. Поживи в игре — рискни, вложись, выбери, откажи, помоги — и Зеркало покажет, кто ты, когда никто не ведёт за руку.</div>
+                </div>
+                ${obsHtml}
+            `;
+            return `<div style="position:fixed;inset:0;z-index:5600;background:radial-gradient(120% 70% at 50% -8%,#16203c,rgba(9,13,26,.96) 60%),rgba(6,8,14,.96);display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow-y:auto;" onclick="closeMirror()">
+                <div onclick="event.stopPropagation()" style="position:relative;max-width:640px;width:100%;margin:22px auto;background:rgba(16,22,38,.74);border:1px solid rgba(150,170,220,.16);border-radius:20px;padding:30px 24px 34px;box-shadow:0 30px 80px -30px #000;">
+                    <button onclick="closeMirror()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:${LOW};font-size:26px;line-height:1;cursor:pointer;">×</button>
+                    <div style="font:600 12px/1 ui-monospace,monospace;letter-spacing:.3em;text-transform:uppercase;color:${G};margin-bottom:16px;">🪞 Зеркало Души</div>
+                    <div style="font-family:Georgia,serif;font-size:28px;line-height:1.1;color:${INK};margin-bottom:6px;">${M.name},</div>
+                    <div style="font-family:Georgia,serif;font-style:italic;font-size:16px;color:${G};margin-bottom:26px;">по тому, что ты делал сам, видно, кто ты, когда на тебя не смотрят.</div>
+                    ${body}
+                </div>
+            </div>`;
+        }
         // 🔨 ВЕЧНАЯ ДВЕРЬ В ЖИВЫЕ ТОРГИ (Ринат 13авг): аукцион — событие с таймером, а окна-разделы
         // во весь экран взаимоисключающие (открыл другую ветку → аукцион закрылся и забылся _openSecs).
         // Пока status==='live', держим над всем экраном кнопку-огонёк: куда бы игрок ни ушёл (другой
@@ -13520,6 +14184,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ['🎯','Скилл от практики','Каждая кампания качает таргет-скилл: дешевле лиды, точнее попадание. Мастерство — реальный перевес.'],
                     ['🧹','Завис — слей','Рынок повернулся, остаток лежит и ест склад? Кнопка «Слить» вернёт часть денег. Держать мёртвый груз — ошибка.'],
                 ], foot:'Два закона: 🪞 Зеркало — как ведёшь дело, такова судьба. ⚖️ Внимание — пассив не бесплатный: не следишь, груз ест деньги.' },
+            relationship: { t:'❤️ Как работают Отношения', c:'#ff9db4',
+                intro:'Живая история с партнёршей у тебя на руках. Ты выбираешь её вслепую — по лицу; какая она на самом деле, узнаёшь со временем. Держится на Законе Внимания и Законе Зеркала.',
+                steps:[
+                    ['🙈','Выбор вслепую','Судьба даёт лица на выбор — ты видишь только внешность. Характер, что её греет и что ей нужно, вскрывается через её поступки и вопросы.'],
+                    ['❤️','Тепло тает','Каждый месяц Тепло само остывает — по её характеру. Греешь вниманием: свидания, разговоры, время, подарки — они стоят денег и спорят с делом. В этом весь баланс.'],
+                    ['📞','Она звонит тебе','Критический вопрос, ревность, или когда ты её забыл — приходят входящим звонком с её лицом. Возьми трубку и ответь, сбрось, или не бери — пропущенный бьёт по Теплу.'],
+                    ['🪜','Лестница жизни','Тепло и время открывают вехи: общее жильё → предложение → семья → её бизнес. Ставки растут — терять больнее.'],
+                    ['💸','Единый бланк','Свидания, кольцо, дети, её бизнес — всё из твоей реальной кассы. Развод бьёт кассу разделом, а алименты остаются в твоём месячном потоке навсегда.'],
+                    ['💳','Дать ей карту','Жест доверия — но кого выбрал, то и получишь. Статусные и яркие дивы тратят сами, и много: сумки, салоны, пластика, туры. Прилетит отчёт о трате — можешь забрать карту. Тихим и глубоким деньги не нужны — почти не тронут.'],
+                    ['🪞','Зеркало','Каждый выбор копит твой портрет: честный/врёшь, заботливый/эгоист, верный, человек выше дела. В конце ты видишь себя.'],
+                ], foot:'Два закона: ⚖️ Внимание — не следишь за ней, Тепло стынет, дальше кризис. 🪞 Зеркало — как относишься к ней, так судьба и отзеркалит.' },
         };
         function showCellInfo(k){ state.cellInfo=k; render(); }
         function closeCellInfo(){ state.cellInfo=null; render(); }
@@ -15737,6 +16412,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             app.innerHTML = `
                 <div class="blank-crest"><img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiID8+PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iMjA0OCIgaGVpZ2h0PSIyMDQ4IiB2aWV3Qm94PSIwIDAgMjA0OCAyMDQ4IiB4bWxuczpjMnBhPSJodHRwOi8vYzJwYS5vcmcvbWFuaWZlc3QiPjxtZXRhZGF0YT48YzJwYTptYW5pZmVzdD5BQUFnV21wMWJXSUFBQUFlYW5WdFpHTXljR0VBRVFBUWdBQUFxZ0E0bTNFRFl6SndZUUFBQUF4QmFuVnRZZ0FBQUVkcWRXMWtZekp0WVFBUkFCQ0FBQUNxQURpYmNRTjFjbTQ2WXpKd1lUcGlZbVEwTkRBd1pTMDNZbVZpTFRRMU1HVXRZV0UyTnkxalltTmpZalUyWWpNME5HWUFBQUFCNG1wMWJXSUFBQUFwYW5WdFpHTXlZWE1BRVFBUWdBQUFxZ0E0bTNFRFl6SndZUzVoYzNObGNuUnBiMjV6QUFBQUFPMXFkVzFpQUFBQVFXcDFiV1JqWW05eUFCRUFFSUFBQUtvQU9KdHhFMk15Y0dFdVlXTjBhVzl1Y3k1Mk1nQUFBQUFZWXpKemFCRWZpL0tkMldaUFBZbUV6eFIvN0k4QUFBQ2tZMkp2Y3FGbllXTjBhVzl1YzRHalptRmpkR2x2Ym14ak1uQmhMbU55WldGMFpXUnhaR2xuYVhSaGJGTnZkWEpqWlZSNWNHVjRSbWgwZEhBNkx5OWpkaTVwY0hSakxtOXlaeTl1WlhkelkyOWtaWE12WkdsbmFYUmhiSE52ZFhKalpYUjVjR1V2ZEhKaGFXNWxaRUZzWjI5eWFYUm9iV2xqVFdWa2FXRnJaR1Z6WTNKcGNIUnBiMjUyUTNKbFlYUmxaQ0JpZVNCU1pXTnlZV1owSUVGSkxnQUFBTVJxZFcxaUFBQUFRR3AxYldSalltOXlBQkVBRUlBQUFLb0FPSnR4RTJNeWNHRXVhR0Z6YUM1a1lYUmhBQUFBQUJoak1uTm9XYVhyaENrRW50NWdVMElWd0tqVmZBQUFBSHhqWW05eXBXcGxlR05zZFhOcGIyNXpnYUpsYzNSaGNuUVkyMlpzWlc1bmRHZ1pFSXhrYm1GdFpXNXFkVzFpWmlCdFlXNXBabVZ6ZEdOaGJHZG1jMmhoTWpVMlpHaGhjMmhZSUhZWnp0YklCckhId1NYMTR0QmhWRUZ1R2plQ0VvUUkvU0dna3pCZlhzc1BZM0JoWkVrQUFBQUFBQUFBQUFBQUFBSTBhblZ0WWdBQUFDZHFkVzFrWXpKamJBQVJBQkNBQUFDcUFEaWJjUU5qTW5CaExtTnNZV2x0TG5ZeUFBQUFBZ1ZqWW05eXBtcHBibk4wWVc1alpVbEVlQ3g0YlhBNmFXbGtPamxrT0dRd01UUmlMVEl3WWpndE5ERTJNaTFpWXpnNExXTXhNVFF4WXpnMk9EWmtOSFJqYkdGcGJWOW5aVzVsY21GMGIzSmZhVzVtYjZOa2JtRnRaV3B5WldOeVlXWjBMbUZwWjNabGNuTnBiMjU0S0RneFkyVTRNbVV5WXpWak0yTmlabUpsT0dNMlptSmxNVGM1WkRWbU9HUTVNV00wTURsalpURjNiM0puTG1OdmJuUmxiblJoZFhSb0xtTXljR0ZmY25ObU1DNDVNQzQzYVhOcFoyNWhkSFZ5WlhoTmMyVnNaaU5xZFcxaVpqMHZZekp3WVM5MWNtNDZZekp3WVRwaVltUTBOREF3WlMwM1ltVmlMVFExTUdVdFlXRTJOeTFqWW1OallqVTJZak0wTkdZdll6SndZUzV6YVdkdVlYUjFjbVZ5WTNKbFlYUmxaRjloYzNObGNuUnBiMjV6Z3FKamRYSnNlQ3B6Wld4bUkycDFiV0ptUFdNeWNHRXVZWE56WlhKMGFXOXVjeTlqTW5CaExtRmpkR2x2Ym5NdWRqSmthR0Z6YUZnZ2gyaGpOdXU3MDlvZ1BtdXdOMTVacDZFc2VGSEZBMUlUeERKdUtibXFDRHVpWTNWeWJIZ3BjMlZzWmlOcWRXMWlaajFqTW5CaExtRnpjMlZ5ZEdsdmJuTXZZekp3WVM1b1lYTm9MbVJoZEdGa2FHRnphRmdnTWd5VmJ3NVYvM0FWOGF4UjB3R1NhZzIvdTh2eExGRldqaVNsQVBLSFFDRm9aR002ZEdsMGJHVjRHbEpsWTNKaFpuUWdRVWtnUjJWdVpYSmhkR1ZrSUVsdFlXZGxZMkZzWjJaemFHRXlOVFlBQUFmY2FuVnRZZ0FBQUNocWRXMWtZekpqY3dBUkFCQ0FBQUNxQURpYmNRTmpNbkJoTG5OcFoyNWhkSFZ5WlFBQUFBZXNZMkp2Y3RLRVdRT3dvZ0VtR0NHQ1dRSG5NSUlCNHpDQ0FZbWdBd0lCQWdJSkFMZmVXbU5EVVc1Nk1Bb0dDQ3FHU000OUJBTUNNRUF4SHpBZEJnTlZCQU1NRmxKbFkzSmhablFnVTNSaFoybHVaeUJFWlhZZ1EwRXhFREFPQmdOVkJBb01CMUpsWTNKaFpuUXhDekFKQmdOVkJBWVRBbFZUTUI0WERUSTJNRFl4TWpFNU5ETTFNRm9YRFRJM01EWXhNakU1TkRNMU1Gb3dOekVMTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WQkFvVENsSmxZM0poWm5RZ1FVa3hFekFSQmdOVkJBTVRDbkpsWTNKaFpuUXVZV2t3V1RBVEJnY3Foa2pPUFFJQkJnZ3Foa2pPUFFNQkJ3TkNBQVJLYVRWYkFDc2cvRGVHM0xlT3hZZElEL1ZBNkVGRzczRTZPa25iK0tJaUNGSnlnUlV6NHVlTjJ6L3QycVliNkNJVXZTOFJ2Z09paUNsZm9xc1l0dzgxbzNVd2N6QU1CZ05WSFJNQkFmOEVBakFBTUE0R0ExVWREd0VCL3dRRUF3SUd3REFUQmdOVkhTVUVEREFLQmdnckJnRUZCUWNEQkRBZEJnTlZIUTRFRmdRVUx6SHBCZW45NlNMMXk0SVBIYThNa01zaFhmMHdId1lEVlIwakJCZ3dGb0FVQWdzcU9CcktxcGRLLy9tL2t4Wm83WlI0ZWJjd0NnWUlLb1pJemowRUF3SURTQUF3UlFJZ1U4aEtXMGFYdnZrOFNRZ1ZGTmtheDY5WW05YWU4R3NUMlJaVFF3K0I1MUFDSVFDMEQ0QmtFb1JENE4wcjJaUmtOeTBIWmFXM1dJQ3kvUVpHTjk1aWxGNHl6RmtCdlRDQ0Fia3dnZ0Zmb0FNQ0FRSUNDUUNjK1dnN1Q2QVRiekFLQmdncWhrak9QUVFEQWpCQU1SOHdIUVlEVlFRRERCWlNaV055WVdaMElGTjBZV2RwYm1jZ1JHVjJJRU5CTVJBd0RnWURWUVFLREFkU1pXTnlZV1owTVFzd0NRWURWUVFHRXdKVlV6QWVGdzB5TmpBMk1USXhPVFF3TVRaYUZ3MHlPREEyTVRFeE9UUXdNVFphTUVBeEh6QWRCZ05WQkFNTUZsSmxZM0poWm5RZ1UzUmhaMmx1WnlCRVpYWWdRMEV4RURBT0JnTlZCQW9NQjFKbFkzSmhablF4Q3pBSkJnTlZCQVlUQWxWVE1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVE5SVFCbGNWYkthS1BZclFTZk9oTC8wMHM3eFVEQzdSaW5JdUxPL0kxazk5eTl5aDZvV0Y5a1B4YVArdHgxdjFQZU9MM3lyVnF1SjczMEgwWkdpRHlxTkNNRUF3RHdZRFZSMFRBUUgvQkFVd0F3RUIvekFPQmdOVkhROEJBZjhFQkFNQ0FZWXdIUVlEVlIwT0JCWUVGQUlMS2pnYXlxcVhTdi81djVNV2FPMlVlSG0zTUFvR0NDcUdTTTQ5QkFNQ0EwZ0FNRVVDSUZRd05JbUxsWURlUWhqZ0YrWmlxVGJnY3V6U3FtT0p3M1EybFEvaHU4M0ZBaUVBOU84Y0xtL3hmb1ZMcUI0anRkYnVIemkzV0wrcDJSTitEUkdrd3BZc3dWdWhZM0JoWkZrRHBBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBOWxoQVFkNmZrdUw1cnI0RFRpdEV2bHZxZzhHTWpjOS9OMzRZL01lbUIrMm13MXBKQjZGY214enlHb0hUb3pycVRPckk0ZGJtOTdCZ1VoOUg2Y2pLbkwzQXNnQUFFL05xZFcxaUFBQUFSMnAxYldSak1tMWhBQkVBRUlBQUFLb0FPSnR4QTNWeWJqcGpNbkJoT2pBd016ZG1abVk1TFRaaVlUZ3ROR0V4TVMxaU9UUTFMV1prTm1FNE1EZGpNVEl5T1FBQUFBa2thblZ0WWdBQUFDbHFkVzFrWXpKaGN3QVJBQkNBQUFDcUFEaWJjUU5qTW5CaExtRnpjMlZ5ZEdsdmJuTUFBQUFHT21wMWJXSUFBQUJFYW5WdFpHTmliM0lBRVFBUWdBQUFxZ0E0bTNFVFl6SndZUzVwYm1keVpXUnBaVzUwTG5ZekFBQUFBQmhqTW5Ob0ZIckFReCtyWkM5VXdzamVpL1p4aFFBQUJlNWpZbTl5cDJ4eVpXeGhkR2x2Ym5Ob2FYQm9jR0Z5Wlc1MFQyWm9aR002ZEdsMGJHVm1jMjkxY21ObGFXUmpPbVp2Y20xaGRHMXBiV0ZuWlM5emRtY3JlRzFzY1haaGJHbGtZWFJwYjI1U1pYTjFiSFJ6b1c1aFkzUnBkbVZOWVc1cFptVnpkS05uYzNWalkyVnpjNFdqWkdOdlpHVjRIV05zWVdsdFUybG5ibUYwZFhKbExtbHVjMmxrWlZaaGJHbGthWFI1WTNWeWJIaE5jMlZzWmlOcWRXMWlaajB2WXpKd1lTOTFjbTQ2WXpKd1lUcGlZbVEwTkRBd1pTMDNZbVZpTFRRMU1HVXRZV0UyTnkxalltTmpZalUyWWpNME5HWXZZekp3WVM1emFXZHVZWFIxY21WclpYaHdiR0Z1WVhScGIyNTFZMnhoYVcwZ2MybG5ibUYwZFhKbElIWmhiR2xrbzJSamIyUmxlQmhqYkdGcGJWTnBaMjVoZEhWeVpTNTJZV3hwWkdGMFpXUmpkWEpzZUUxelpXeG1JMnAxYldKbVBTOWpNbkJoTDNWeWJqcGpNbkJoT21KaVpEUTBNREJsTFRkaVpXSXRORFV3WlMxaFlUWTNMV05pWTJOaU5UWmlNelEwWmk5ak1uQmhMbk5wWjI1aGRIVnlaV3RsZUhCc1lXNWhkR2x2Ym5WamJHRnBiU0J6YVdkdVlYUjFjbVVnZG1Gc2FXU2paR052WkdWNEdXRnpjMlZ5ZEdsdmJpNW9ZWE5vWldSVlVra3ViV0YwWTJoamRYSnNlRjV6Wld4bUkycDFiV0ptUFM5ak1uQmhMM1Z5Ympwak1uQmhPbUppWkRRME1EQmxMVGRpWldJdE5EVXdaUzFoWVRZM0xXTmlZMk5pTlRaaU16UTBaaTlqTW5CaExtRnpjMlZ5ZEdsdmJuTXZZekp3WVM1aFkzUnBiMjV6TG5ZeWEyVjRjR3hoYm1GMGFXOXVlRDVvWVhOb1pXUWdkWEpwSUcxaGRHTm9aV1E2SUhObGJHWWphblZ0WW1ZOVl6SndZUzVoYzNObGNuUnBiMjV6TDJNeWNHRXVZV04wYVc5dWN5NTJNcU5rWTI5a1pYZ1pZWE56WlhKMGFXOXVMbWhoYzJobFpGVlNTUzV0WVhSamFHTjFjbXg0WFhObGJHWWphblZ0WW1ZOUwyTXljR0V2ZFhKdU9tTXljR0U2WW1Ka05EUXdNR1V0TjJKbFlpMDBOVEJsTFdGaE5qY3RZMkpqWTJJMU5tSXpORFJtTDJNeWNHRXVZWE56WlhKMGFXOXVjeTlqTW5CaExtaGhjMmd1WkdGMFlXdGxlSEJzWVc1aGRHbHZibmc5YUdGemFHVmtJSFZ5YVNCdFlYUmphR1ZrT2lCelpXeG1JMnAxYldKbVBXTXljR0V1WVhOelpYSjBhVzl1Y3k5ak1uQmhMbWhoYzJndVpHRjBZYU5rWTI5a1pYZ1lZWE56WlhKMGFXOXVMbVJoZEdGSVlYTm9MbTFoZEdOb1kzVnliSGhkYzJWc1ppTnFkVzFpWmowdll6SndZUzkxY200Nll6SndZVHBpWW1RME5EQXdaUzAzWW1WaUxUUTFNR1V0WVdFMk55MWpZbU5qWWpVMllqTTBOR1l2WXpKd1lTNWhjM05sY25ScGIyNXpMMk15Y0dFdWFHRnphQzVrWVhSaGEyVjRjR3hoYm1GMGFXOXViMlJoZEdFZ2FHRnphQ0IyWVd4cFpHMXBibVp2Y20xaGRHbHZibUZzZ0dkbVlXbHNkWEpsZ2FOa1kyOWtaWGdiYzJsbmJtbHVaME55WldSbGJuUnBZV3d1ZFc1MGNuVnpkR1ZrWTNWeWJIaE5jMlZzWmlOcWRXMWlaajB2WXpKd1lTOTFjbTQ2WXpKd1lUcGlZbVEwTkRBd1pTMDNZbVZpTFRRMU1HVXRZV0UyTnkxalltTmpZalUyWWpNME5HWXZZekp3WVM1emFXZHVZWFIxY21WclpYaHdiR0Z1WVhScGIyNTRIWE5wWjI1cGJtY2dZMlZ5ZEdsbWFXTmhkR1VnZFc1MGNuVnpkR1ZrYW1sdWMzUmhibU5sU1VSNExIaHRjRHBwYVdRNk1qVmxZbVl3TW1FdE1qbGxZUzAwTWpnekxXSmtNell0T1RabVlUQm1ZVFZsTmpFd2JtRmpkR2wyWlUxaGJtbG1aWE4wbzJOMWNteDRQbk5sYkdZamFuVnRZbVk5TDJNeWNHRXZkWEp1T21NeWNHRTZZbUprTkRRd01HVXROMkpsWWkwME5UQmxMV0ZoTmpjdFkySmpZMkkxTm1Jek5EUm1ZMkZzWjJaemFHRXlOVFprYUdGemFGZ2c5U0xWWC9QeGYvVDJHSXNIczhzaTdUOW11T3NGM29aQWcvRzJ1Z0l3cW45dVkyeGhhVzFUYVdkdVlYUjFjbVdqWTNWeWJIaE5jMlZzWmlOcWRXMWlaajB2WXpKd1lTOTFjbTQ2WXpKd1lUcGlZbVEwTkRBd1pTMDNZbVZpTFRRMU1HVXRZV0UyTnkxalltTmpZalUyWWpNME5HWXZZekp3WVM1emFXZHVZWFIxY21WallXeG5abk5vWVRJMU5tUm9ZWE5vV0NBVG1iVm1LZVJ0ZHhiWGgrYmdTN3haTmI2NWp6WkV6NzRCUUdJY2hpK29od0FBQWZWcWRXMWlBQUFBUVdwMWJXUmpZbTl5QUJFQUVJQUFBS29BT0p0eEUyTXljR0V1WVdOMGFXOXVjeTUyTWdBQUFBQVlZekp6YUdsVDNNWml1YXJyZnh0TnphZXFXTGNBQUFHc1kySnZjcUZuWVdOMGFXOXVjNEtpWm1GamRHbHZibXRqTW5CaExtOXdaVzVsWkdwd1lYSmhiV1YwWlhKem9XdHBibWR5WldScFpXNTBjNEdpWTNWeWJIZ3RjMlZzWmlOcWRXMWlaajFqTW5CaExtRnpjMlZ5ZEdsdmJuTXZZekp3WVM1cGJtZHlaV1JwWlc1MExuWXpaR2hoYzJoWUlFQ2d5STZ5Q3hyZFk3dWVRbjFNVlVXajFMODd0c09KNHlMWFNrUFNPMUlZcEdaaFkzUnBiMjVyWXpKd1lTNWxaR2wwWldScWNHRnlZVzFsZEdWeWM2RnJhVzVuY21Wa2FXVnVkSE9Cb21OMWNteDRMWE5sYkdZamFuVnRZbVk5WXpKd1lTNWhjM05sY25ScGIyNXpMMk15Y0dFdWFXNW5jbVZrYVdWdWRDNTJNMlJvWVhOb1dDQkFvTWlPc2dzYTNXTzdua0o5VEZWRm85Uy9PN2JEaWVNaTEwcEQwanRTR0hGa2FXZHBkR0ZzVTI5MWNtTmxWSGx3WlhoVGFIUjBjRG92TDJOMkxtbHdkR011YjNKbkwyNWxkM05qYjJSbGN5OWthV2RwZEdGc2MyOTFjbU5sZEhsd1pTOWpiMjF3YjNOcGRHVlhhWFJvVkhKaGFXNWxaRUZzWjI5eWFYUm9iV2xqVFdWa2FXRnJaR1Z6WTNKcGNIUnBiMjUyUTNKbFlYUmxaQ0JpZVNCU1pXTnlZV1owSUVGSkxnQUFBTVJxZFcxaUFBQUFRR3AxYldSalltOXlBQkVBRUlBQUFLb0FPSnR4RTJNeWNHRXVhR0Z6YUM1a1lYUmhBQUFBQUJoak1uTm9EOWg3aStQUjVhUFBRSmRXUGpDMnRRQUFBSHhqWW05eXBXcGxlR05zZFhOcGIyNXpnYUpsYzNSaGNuUVk3R1pzWlc1bmRHZ1pLeVJrYm1GdFpXNXFkVzFpWmlCdFlXNXBabVZ6ZEdOaGJHZG1jMmhoTWpVMlpHaGhjMmhZSU1rWjEwa3NXVDF1QmUrcVpYaUpOQUVRRm5TeDNjcms5R1ZVTWgxeE01UlhZM0JoWkVrQUFBQUFBQUFBQUFBQUFBS2thblZ0WWdBQUFDZHFkVzFrWXpKamJBQVJBQkNBQUFDcUFEaWJjUU5qTW5CaExtTnNZV2x0TG5ZeUFBQUFBblZqWW05eXAycHBibk4wWVc1alpVbEVlQ3g0YlhBNmFXbGtPakl6TUdFeE5qaGpMVFprWmpNdE5EYzFNeTFpTWpVM0xXUTFOalJoTVRFeVlqVmhOM1JqYkdGcGJWOW5aVzVsY21GMGIzSmZhVzVtYjZOa2JtRnRaV3B5WldOeVlXWjBMbUZwWjNabGNuTnBiMjU0S0RneFkyVTRNbVV5WXpWak0yTmlabUpsT0dNMlptSmxNVGM1WkRWbU9HUTVNV00wTURsalpURjNiM0puTG1OdmJuUmxiblJoZFhSb0xtTXljR0ZmY25ObU1DNDVNQzQzYVhOcFoyNWhkSFZ5WlhoTmMyVnNaaU5xZFcxaVpqMHZZekp3WVM5MWNtNDZZekp3WVRvd01ETTNabVptT1MwMlltRTRMVFJoTVRFdFlqazBOUzFtWkRaaE9EQTNZekV5TWprdll6SndZUzV6YVdkdVlYUjFjbVZ5WTNKbFlYUmxaRjloYzNObGNuUnBiMjV6Z3FKamRYSnNlQ3B6Wld4bUkycDFiV0ptUFdNeWNHRXVZWE56WlhKMGFXOXVjeTlqTW5CaExtRmpkR2x2Ym5NdWRqSmthR0Z6YUZnZ1JhSjZRMmVIY09QbFAyQzZiSnBPSGFXYzNzSCs2Wkh2NmtML0F4eHczZWlpWTNWeWJIZ3BjMlZzWmlOcWRXMWlaajFqTW5CaExtRnpjMlZ5ZEdsdmJuTXZZekp3WVM1b1lYTm9MbVJoZEdGa2FHRnphRmdnOVpPOHdmeXdrdnVWd05FMURZZmEwS2Rlb1U3akJCUVdhY2JYMUNQVnJRWnpaMkYwYUdWeVpXUmZZWE56WlhKMGFXOXVjNEdpWTNWeWJIZ3RjMlZzWmlOcWRXMWlaajFqTW5CaExtRnpjMlZ5ZEdsdmJuTXZZekp3WVM1cGJtZHlaV1JwWlc1MExuWXpaR2hoYzJoWUlFQ2d5STZ5Q3hyZFk3dWVRbjFNVlVXajFMODd0c09KNHlMWFNrUFNPMUlZYUdSak9uUnBkR3hsZUJwU1pXTnlZV1owSUVGSklFZGxibVZ5WVhSbFpDQkpiV0ZuWldOaGJHZG1jMmhoTWpVMkFBQUgzR3AxYldJQUFBQW9hblZ0WkdNeVkzTUFFUUFRZ0FBQXFnQTRtM0VEWXpKd1lTNXphV2R1WVhSMWNtVUFBQUFIckdOaWIzTFNoRmtEc0tJQkpoZ2hnbGtCNXpDQ0FlTXdnZ0dKb0FNQ0FRSUNDUUMzM2xwalExRnVlakFLQmdncWhrak9QUVFEQWpCQU1SOHdIUVlEVlFRRERCWlNaV055WVdaMElGTjBZV2RwYm1jZ1JHVjJJRU5CTVJBd0RnWURWUVFLREFkU1pXTnlZV1owTVFzd0NRWURWUVFHRXdKVlV6QWVGdzB5TmpBMk1USXhPVFF6TlRCYUZ3MHlOekEyTVRJeE9UUXpOVEJhTURjeEN6QUpCZ05WQkFZVEFsVlRNUk13RVFZRFZRUUtFd3BTWldOeVlXWjBJRUZKTVJNd0VRWURWUVFERXdweVpXTnlZV1owTG1GcE1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVNtazFXd0FySVB3M2h0eTNqc1dIU0EvMVFPaEJSdTl4T2pwSjIvaWlJZ2hTY29FVk0rTG5qZHMvN2RxbUcrZ2lGTDB2RWI0RG9vZ3BYNktyR0xjUE5hTjFNSE13REFZRFZSMFRBUUgvQkFJd0FEQU9CZ05WSFE4QkFmOEVCQU1DQnNBd0V3WURWUjBsQkF3d0NnWUlLd1lCQlFVSEF3UXdIUVlEVlIwT0JCWUVGQzh4NlFYcC9la2k5Y3VDRHgydkRKRExJVjM5TUI4R0ExVWRJd1FZTUJhQUZBSUxLamdheXFxWFN2LzV2NU1XYU8yVWVIbTNNQW9HQ0NxR1NNNDlCQU1DQTBnQU1FVUNJRlBJU2x0R2w3NzVQRWtJRlJUWkdzZXZXSnZXbnZCckU5a1dVME1QZ2VkUUFpRUF0QStBWkJLRVErRGRLOW1VWkRjdEIyV2x0MWlBc3YwR1JqZmVZcFJlTXN4WkFiMHdnZ0c1TUlJQlg2QURBZ0VDQWdrQW5QbG9PMCtnRTI4d0NnWUlLb1pJemowRUF3SXdRREVmTUIwR0ExVUVBd3dXVW1WamNtRm1kQ0JUZEdGbmFXNW5JRVJsZGlCRFFURVFNQTRHQTFVRUNnd0hVbVZqY21GbWRERUxNQWtHQTFVRUJoTUNWVk13SGhjTk1qWXdOakV5TVRrME1ERTJXaGNOTWpnd05qRXhNVGswTURFMldqQkFNUjh3SFFZRFZRUUREQlpTWldOeVlXWjBJRk4wWVdkcGJtY2dSR1YySUVOQk1SQXdEZ1lEVlFRS0RBZFNaV055WVdaME1Rc3dDUVlEVlFRR0V3SlZVekJaTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEEwSUFCRVBTRUFaWEZXeW1pajJLMEVuem9TLzlOTE84VkF3dTBZcHlMaXp2eU5aUGZjdmNvZXFGaGZaRDhXai9yY2RiOVQzamk5OHExYXJpZTk5QjlHUm9nOHFqUWpCQU1BOEdBMVVkRXdFQi93UUZNQU1CQWY4d0RnWURWUjBQQVFIL0JBUURBZ0dHTUIwR0ExVWREZ1FXQkJRQ0N5bzRHc3FxbDByLytiK1RGbWp0bEhoNXR6QUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpQlVNRFNKaTVXQTNrSVk0QmZtWXFrMjRITHMwcXBqaWNOME5wVVA0YnZOeFFJaEFQVHZIQzV2OFg2RlM2Z2VJN1hXN2g4NHQxaS9xZGtUZmcwUnBNS1dMTUZib1dOd1lXUlpBNlFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFQWllRRWZtTFFyNGp6ZjV1aGt0V1N1VUJKZHdhbncwZDN6NkxndnFnL2YyZHZDWnpickJ6VWFkckV2UW5XYTd5aldZNitpSmE4bzExRnZHZ3BXa0tKbEZCTVk9PC9jMnBhOm1hbmlmZXN0PjwvbWV0YWRhdGE+PHBhdGggZmlsbD0iIzAxMDEwMyIgZD0iTTAgMEwyMDQ4IDBMMjA0OCAyMDQ4TDAgMjA0OEwwIDBaIi8+PHBhdGggZmlsbD0iI0NCQTk4MSIgZD0iTTEwMTIuMzEgNDQ4LjAwM0MxMzMwLjI3IDQ0MS40ODggMTU5My4zNSA2OTMuODg3IDE2MDAuMDEgMTAxMS44NUMxNjA2LjY3IDEzMjkuOCAxMzU0LjM5IDE1OTMgMTAzNi40MyAxNTk5LjhDNzE4LjI3NSAxNjA2LjYxIDQ1NC44NzUgMTM1NC4xMyA0NDguMjEgMTAzNS45N0M0NDEuNTQ2IDcxNy44MDggNjk0LjE0MyA0NTQuNTIzIDEwMTIuMzEgNDQ4LjAwM1oiLz48cGF0aCBmaWxsPSIjMDEwMTAzIiBkPSJNMTAwNy4xMyA0NDguNDNDMTAwNy4yMiA0NDguNDI0IDEwMDcuMzEgNDQ4LjQxOCAxMDA3LjQgNDQ4LjQxMkMxMTUyLjYgNDQ0LjE0NSAxMjkxLjgyIDQ5Ni43NTEgMTM5OS42OCA1OTIuNjQ4QzE1MTUuMDMgNjk1LjEyOCAxNTg0LjcyIDgzOS40MDQgMTU5My4yOCA5OTMuNDY3QzE2MDEuMzUgMTE0NC44MyAxNTQ5LjQzIDEyOTMuMjcgMTQ0OC43OSAxNDA2LjYxQzEzNjAuNzUgMTUwNi4zMiAxMjQwLjY0IDE1NzIuMTUgMTEwOS4yMyAxNTkyLjczQzEwODcuMjUgMTU5Ni4xNiAxMDY1LjQyIDE1OTcuNTUgMTA0My4yMyAxNTk4LjgyQzY5OC41NTMgMTYwNS4wMiA0MjQuOTExIDEzMTYuNTUgNDU2LjY5NCA5NzIuMzYzQzQ2Ny44MTkgODQ3LjcyOSA1MTkuMzM2IDczMC4xMzcgNjAzLjQxNCA2MzcuNDY0QzcxMS4yODEgNTE5LjA1NyA4NDcuNjQzIDQ1NS45MTYgMTAwNy4xMyA0NDguNDNaIi8+PHBhdGggZmlsbD0iIzAxMDEwMyIgZD0iTTY1Ni41NSA3MTkuNjk0Qzc0OC44MSA2MDguMzUgODg2LjU2OSA1NDQuODI5IDEwMzEuMTUgNTQ2Ljk2M0MxMTc1Ljc0IDU0OS4wOTYgMTMxMS41NiA2MTYuNjU0IDE0MDAuNSA3MzAuNjcxQzE0ODkuNiA4NDQuODk5IDE1MjIuMDEgOTkzLjQwOCAxNDg4LjU5IDExMzQuMzdDMTQ1NS4xNyAxMjc1LjMzIDEzNTkuNTUgMTM5My40OSAxMjI4LjY2IDE0NTUuNTdDMTIxOC4wOCAxNDYwLjU4IDEyMDcuMzIgMTQ2NS4yMSAxMTk2LjQgMTQ2OS40NEM5OTMuNzQ3IDE1NDcuODYgNzYzLjcwNSAxNDc5LjUzIDYzNi43MzQgMTMwMy4xOUM1MDkuNzY0IDExMjYuODUgNTE3LjkwOCA4ODcuMDEyIDY1Ni41NSA3MTkuNjk0WiIvPjxwYXRoIGZpbGw9IiNDQkE5ODEiIGQ9Ik02NTYuNTUgNzE5LjY5NEM2NTcuNTg2IDcyMC44ODMgNjU4LjU5OCA3MjIuMDUyIDY1OS42NjEgNzIzLjIxOUw2NTkuOTI5IDcyMy43MDdDNjU1LjEyMyA3MjYuMTM1IDY0Ny4wMDUgNzM4LjE5NyA2NDMuMzgyIDc0My4yOTdDNjE0LjU4NyA3ODMuMzMzIDU5Mi4xNzIgODI3LjU5MSA1NzYuOTM1IDg3NC40OTRDNTM3LjE2OCA5OTMuNTc2IDU0Ni4xNDEgMTEyMy41NiA2MDEuODkzIDEyMzYuMDVDNjA0LjUzMiAxMjQxLjIyIDYwNy4yMTUgMTI0Ni4zNiA2MDkuOTQxIDEyNTEuNDlDNjU5LjU2MiAxMjM3LjQ1IDY4Mi4xMSAxMjQ2Ljc0IDcyOS4wMzIgMTI2MS42NkM3NDMuNjQ1IDEyNjYuMyA4MDUuMjI5IDEyODIuODMgODE5LjY4OSAxMjgzLjA5Qzg2My44MyAxMzAzLjYgOTIzLjU2IDEzMTQuNDQgOTcxLjE2MSAxMzAyLjQ3QzEwMTcuMzEgMTI5MS40MyAxMDU2LjE2IDEzMDguNzQgMTEwMC4yIDEzMTIuMTZDMTE1NC44NSAxMzE2LjQgMTIxNC40MyAxMzQ2LjE2IDEyNjguNTYgMTM0MS44MUMxMjg1LjM2IDEzNDQuMTYgMTMxMi44NCAxMzQyLjg5IDEzMjkuNDIgMTMzOS4wNEMxMzQxLjA0IDEzMzUuNiAxMzcxLjY3IDEzMzIuMTQgMTM4NC4wNCAxMzMwLjY3TDEzODYuODcgMTMyNy4yQzE0NjcuODQgMTIyOC42NyAxNTA2LjE0IDExMDEuOTEgMTQ5My4yOCA5NzUuMDI3QzE0ODUuNyA5MDAuOTgxIDE0NjAuOTcgODI5LjcyIDE0MjEuMDYgNzY2Ljg5NkMxNDE2LjMxIDc1OS4zMTcgMTQwMy42MSA3MzkuMDggMTM5Ny4zMSA3MzMuOTY1TDEzOTcuNTUgNzMzLjA5OEwxNDAwLjUgNzMwLjY3MUMxNDg5LjYgODQ0Ljg5OSAxNTIyLjAxIDk5My40MDggMTQ4OC41OSAxMTM0LjM3QzE0NTUuMTcgMTI3NS4zMyAxMzU5LjU1IDEzOTMuNDkgMTIyOC42NiAxNDU1LjU3QzEyMTguMDggMTQ2MC41OCAxMjA3LjMyIDE0NjUuMjEgMTE5Ni40IDE0NjkuNDRDOTkzLjc0NyAxNTQ3Ljg2IDc2My43MDUgMTQ3OS41MyA2MzYuNzM0IDEzMDMuMTlDNTA5Ljc2NCAxMTI2Ljg1IDUxNy45MDggODg3LjAxMiA2NTYuNTUgNzE5LjY5NFoiLz48cGF0aCBmaWxsPSIjQUI4NjVFIiBkPSJNMTAwMy41MiAxMzUyLjk0QzEwMTAuNDIgMTM0Mi42OCAxMDE3LjA0IDEzMzQuNTggMTAyMy45MiAxMzI0Ljg0QzEwMzEuMjYgMTMzMy45MyAxMDM4LjI2IDEzNDMuMjkgMTA0NC45IDEzNTIuOUMxMDU3LjE5IDEzNTEuMTEgMTA2OS40NiAxMzQ5LjI0IDEwODEuNzMgMTM0Ny4yOEMxMDc5Ljc4IDEzNTcuNDUgMTA3Ny4xNCAxMzczLjczIDEwNzQuNTggMTM4My4yNkMxMDg0LjE1IDEzOTAuNDggMTA5My42MSAxMzk3LjgzIDExMDIuOTUgMTQwNS4zMkwxMDkzLjExIDE0MTMuNTVDMTEwNS4zMSAxNDE3LjA5IDExMTcuNDYgMTQyMC40OCAxMTI5LjQzIDE0MjQuNzVDMTE0OS4zNSAxNDMxLjg2IDExNjkuMTEgMTQ0MC4yIDExODkuNiAxNDQ1LjQ5QzExOTUuNTcgMTQ0Ny4wMyAxMjI1LjY5IDE0NTAuOTkgMTIyOC4xOSAxNDUyLjgyQzEyMjguNDQgMTQ1My44NCAxMjI4Ljc4IDE0NTQuNjQgMTIyOC42NiAxNDU1LjU3QzEyMTguMDggMTQ2MC41OCAxMjA3LjMyIDE0NjUuMjEgMTE5Ni40IDE0NjkuNDRDMTE5Mi44NyAxNDY4Ljc4IDExNDcuMTEgMTQ4NS42OCAxMTM4LjQ3IDE0ODcuN0MxMDk4LjQxIDE0OTcuMDMgMTA1OC45MiAxNTA0LjA3IDEwMTcuNTEgMTUwMS45MUMxMDIxLjcxIDE0OTkuOTkgMTAyOC43MiAxNTAyLjc5IDEwMzAuOTkgMTUwMUMxMDA3LjM2IDE1MDAuNDkgOTg0LjE2MyAxNDk5LjI0IDk2MC40NiAxNDk3Ljg1Qzk0MC4wMjYgMTQ5Ni4xNCA5MjAuMDYxIDE0ODkuNzIgODk5LjgzNSAxNDg2LjExQzg5NS43NzYgMTQ4NS4zOCA4NzAuNjc0IDE0NzYuMzQgODY3LjYxIDE0NzQuNTdDODcwLjE5IDE0NjkuMzggOTQ5LjgyNCAxNDY5LjkzIDk2NC41NSAxNDY0LjU0Qzk2Ni4xNjggMTQ2Mi4wMSA5NjUuNjM1IDE0NjMuNDEgOTY1LjQyNyAxNDYwLjA0Qzk1OS40NTUgMTQ1My45OSA5NDAuODI4IDE0NTIuNjEgOTMyLjU3MyAxNDUwLjY1Qzg4Ni42NTUgMTQzOS43NSA4NDAuMSAxNDM5LjEzIDc5My4zNzkgMTQzNS4yNEM3ODkuMjM4IDE0MzQuODkgNzgzLjA2NyAxNDMyLjk4IDc3OS44MzMgMTQzMC4xNUw3ODAuMTUyIDE0MjkuMTNDNzg3Ljk3NCAxNDI2LjI2IDgxNS40NDkgMTQyNy45NSA4MjUuMTIgMTQyNC42MkM4MzQuODE1IDE0MjEuMjkgODQ1LjkxNyAxNDE5LjE0IDg1NS43MTkgMTQxNS45NUM4OTMuNjAyIDE0MDMuNjUgOTE5LjA2MyAxMzk3Ljc5IDk1OC45NjEgMTM5NC45NEw5NzMuNTg1IDEzODMuNDRDOTcxLjE3MSAxMzcxLjIyIDk2OS4wMSAxMzU4Ljk0IDk2Ny4xMDYgMTM0Ni42M0M5NzkuMTk4IDEzNDguOTkgOTkxLjMzOSAxMzUxLjEgMTAwMy41MiAxMzUyLjk0WiIvPjxwYXRoIGZpbGw9IiMwMTAxMDMiIGQ9Ik0xMDAzLjUyIDEzNTIuOTRDMTAxMC40MiAxMzQyLjY4IDEwMTcuMDQgMTMzNC41OCAxMDIzLjkyIDEzMjQuODRDMTAzMS4yNiAxMzMzLjkzIDEwMzguMjYgMTM0My4yOSAxMDQ0LjkgMTM1Mi45QzEwNTcuMTkgMTM1MS4xMSAxMDY5LjQ2IDEzNDkuMjQgMTA4MS43MyAxMzQ3LjI4QzEwNzkuNzggMTM1Ny40NSAxMDc3LjE0IDEzNzMuNzMgMTA3NC41OCAxMzgzLjI2QzEwODQuMTUgMTM5MC40OCAxMDkzLjYxIDEzOTcuODMgMTEwMi45NSAxNDA1LjMyTDEwOTMuMTEgMTQxMy41NUMxMDg2Ljk4IDE0MTguNDEgMTA4MC43NyAxNDIzLjE2IDEwNzQuNDggMTQyNy44MUMxMDc2Ljk5IDE0MzcuOTYgMTA3OS40MiAxNDUzLjg3IDEwODEuNTIgMTQ2NC42OUMxMDY5LjQ2IDE0NjIuNTMgMTA1Ny40MSAxNDYwLjI3IDEwNDUuMzkgMTQ1Ny45MUMxMDM4LjUzIDE0NjcuOCAxMDMxLjg3IDE0NzUuOSAxMDI0LjI4IDE0ODUuMkMxMDE2LjM2IDE0NzUuODIgMTAxMC4yMiAxNDY4LjMxIDEwMDMuMDEgMTQ1OC4zN0M5OTAuOTMyIDE0NjAuNjIgOTc4LjgyNyAxNDYyLjcyIDk2Ni42OTUgMTQ2NC42NkM5NjguOTI4IDE0NTIuMzIgOTcxLjMwNSAxNDQwIDk3My44MjcgMTQyNy43MkM5NjQuMDQ0IDE0MjEuNTYgOTUzLjg5MyAxNDEzLjMzIDk0NC45NSAxNDA1Ljk0TDk1OC45NjEgMTM5NC45NEw5NzMuNTg1IDEzODMuNDRDOTcxLjE3MSAxMzcxLjIyIDk2OS4wMSAxMzU4Ljk0IDk2Ny4xMDYgMTM0Ni42M0M5NzkuMTk4IDEzNDguOTkgOTkxLjMzOSAxMzUxLjEgMTAwMy41MiAxMzUyLjk0WiIvPjxwYXRoIGZpbGw9IiNDQkE5ODEiIGQ9Ik0xMDIzLjk4IDEzMzkuODFDMTAyNi42OSAxMzQyLjM4IDEwMzguNDIgMTM1OS4wMiAxMDQxLjMyIDEzNjNDMTA1MC41NyAxMzYxLjAyIDEwNjEuMjcgMTM1OS4zNyAxMDcwLjY4IDEzNTcuN0MxMDY4Ljc4IDEzNjcuNzcgMTA2Ni42NiAxMzc3LjggMTA2NC4zMyAxMzg3Ljc3QzEwNzMuMzkgMTM5My43NCAxMDgwLjIgMTM5OS4wNCAxMDg4LjcxIDE0MDUuN0MxMDgwLjggMTQxMS45MiAxMDcyLjY3IDE0MTcuODUgMTA2NC4zMyAxNDIzLjQ3QzEwNjYuNjkgMTQzMy4yNCAxMDY4LjY5IDE0NDMuNzggMTA3MC43NCAxNDUzLjY3QzEwNjAuOSAxNDUyLjEzIDEwNTEuMTcgMTQ0OS45NSAxMDQxLjYyIDE0NDcuMTRMMTAyNC44NiAxNDcwLjg1QzEwMjAuNDUgMTQ2Ny44NSAxMDEwLjUyIDE0NTIuOTkgMTAwNi45MiAxNDQ3Ljg2Qzk5Ny4zMjMgMTQ1MC4yMyA5ODcuNTcyIDE0NTEuODUgOTc3Ljg0IDE0NTMuNTlDOTc5LjU5MiAxNDQzLjkgOTgxLjQ3OCAxNDM0LjIzIDk4My40OTggMTQyNC41OEM5NzUuNjQ0IDE0MTguMzQgOTY3Ljc1MyAxNDEyLjEzIDk1OS44MjcgMTQwNS45OEM5NjcuNjI5IDEzOTkuNiA5NzUuNTczIDEzOTMuMzkgOTgzLjY1MSAxMzg3LjM3Qzk4MS40NjEgMTM3Ny43NCA5NzkuNjAxIDEzNjcuNjIgOTc3LjY3MSAxMzU3LjlDOTg3Ljg4OSAxMzU5LjI3IDk5Ny41MzEgMTM2MC45NyAxMDA3LjQzIDEzNjMuODRDMTAxMy4xNiAxMzU0LjgzIDEwMTcuNDIgMTM0OC4zNyAxMDIzLjk4IDEzMzkuODFaIi8+PHBhdGggZmlsbD0iIzAxMDEwMyIgZD0iTTEwMjQuMiAxMzgzLjk1TDEwMjUuMjkgMTM4Mi45QzEwMzYuMjYgMTM3Mi4xNCAxMDM4Ljg1IDEzNzEuOTUgMTAzOS4wNyAxMzg5LjA1QzEwMzkuMTQgMTM5NC4zMiAxMDQ5LjczIDEzODggMTA1My4zNCAxMzkyLjMzQzEwNTYuMTggMTM5NS43MyAxMDQ4Ljk1IDE0MDEuODcgMTA0Ni43MSAxNDAzLjcxTDEwNDUuMiAxNDA0Ljk4QzEwNDcuNDQgMTQwNy4yNCAxMDU1LjYyIDE0MTUuMTIgMTA1NS4xMiAxNDE4LjZDMTA1NS4wNSAxNDE5LjA2IDEwNTQuODEgMTQxOS40NyAxMDU0LjQzIDE0MTkuNzVDMTA1Mi44MyAxNDIwLjkyIDEwNDUuODcgMTQyMS42IDEwNDQgMTQyMS4wN0MxMDMzLjgzIDE0MTguMTQgMTA0My4yOSAxNDMyLjMxIDEwMzUuNjggMTQzNi43MkMxMDI4LjU3IDE0MzMuMTIgMTAzMC4xMiAxNDMyLjkgMTAyNC40OCAxNDI4LjEyTDEwMjMuMjEgMTQyOS4zM0MxMDA5LjQxIDE0NDIuNTYgMTAxMC40OSAxNDM1LjQ5IDEwMDkuNTMgMTQyMC43NkMxMDA2LjUxIDE0MjAuOTIgOTk2LjAxMSAxNDIyLjEgOTk0LjU3MSAxNDIwLjA4Qzk5MS41MjggMTQxNS44IDEwMDEuNiAxNDA3LjYxIDEwMDMuNzQgMTQwNS44N0M5OTAuMzMzIDEzOTIuOTkgOTg4Ljc0NCAxMzg5LjY2IDEwMDkuNjUgMTM5MS42M0MxMDEwLjE0IDEzODUuNzIgMTAxMC43MSAxMzgwLjQ4IDEwMTEuOCAxMzc0LjYzQzEwMTcuNDQgMTM3Ny40OCAxMDE5Ljk3IDEzNzkuMjkgMTAyNC4yIDEzODMuOTVaIi8+PHBhdGggZmlsbD0iIzAxMDEwMyIgZD0iTTk4OC44MjEgMTM2OS42QzEwMDMuMzIgMTM3MS4zNCAxMDA0LjI2IDEzNjkuMzQgMTAwMC43NCAxMzgxLjY3Qzk5OS4xODkgMTM4My40OCA5OTEuNzYzIDEzODQuNDkgOTkwLjk3NyAxMzgwLjFDOTkwLjMzNyAxMzc2LjU4IDk4OS42MTggMTM3My4wOCA5ODguODIxIDEzNjkuNloiLz48cGF0aCBmaWxsPSIjMDEwMTAzIiBkPSJNMTA1NC41NyAxMzcwLjI3QzEwNTUuNzUgMTM3MC4wOSAxMDU3LjYzIDEzNjkuNDkgMTA1OC43MyAxMzcwLjMyQzEwNTkuMzggMTM3MS44NSAxMDU3LjE3IDEzODAuODkgMTA1Ni40IDEzODIuNjZDMTA1Ni4xNCAxMzgzLjI2IDEwNTMuMTIgMTM4My4xMyAxMDUyLjYxIDEzODMuMTNDMTA0OC40NCAxMzgxLjk3IDEwNDQuNTQgMTM4Mi4yMiAxMDQ1Ljc5IDEzNzIuNjhDMTA0NS45OSAxMzcxLjE1IDEwNTIuNyAxMzcwLjU5IDEwNTQuNTcgMTM3MC4yN1oiLz48cGF0aCBmaWxsPSIjMDEwMTAzIiBkPSJNMTAyMy40OCAxMzU1LjQ1QzEwMjQuMzIgMTM1NS45OSAxMDI1LjQzIDEzNTYuNjQgMTAyNS45OSAxMzU3LjUxQzEwMzMgMTM2OC40NSAxMDM0LjY5IDEzNjUuNjcgMTAyNC44MyAxMzcxLjIyQzEwMjIuMzkgMTM3MC44NiAxMDE4LjExIDEzNjguNDQgMTAxNS43NyAxMzY3LjIxQzEwMTguMjUgMTM2My4yMyAxMDIwLjgyIDEzNTkuMzEgMTAyMy40OCAxMzU1LjQ1WiIvPjxwYXRoIGZpbGw9IiMwMTAxMDMiIGQ9Ik0xMDI0LjE5IDE0NDAuMjZDMTAyNy4xOSAxNDQxLjYyIDEwMzAuMTcgMTQ0My4wMiAxMDMzLjEzIDE0NDQuNDZMMTAyNC45OSAxNDU1LjQ3QzEwMjEuNDcgMTQ1My45NSAxMDE4LjQzIDE0NDguMTYgMTAxNi4wNCAxNDQ0LjhDMTAxOC43MSAxNDQzLjE5IDEwMjEuNDMgMTQ0MS43MiAxMDI0LjE5IDE0NDAuMjZaIi8+PHBhdGggZmlsbD0iIzAxMDEwMyIgZD0iTTk4NS4wOTIgMTM5Ny45NEM5ODcuNSAxMzk5LjM0IDk4OS4zNjQgMTQwMyA5OTEuMDY4IDE0MDUuNDlDOTkwLjIyMSAxNDA2Ljc2IDk4OS4zOTggMTQwOC4wNCA5ODguNTk5IDE0MDkuMzRDOTg3LjA2NSAxNDExLjg1IDk4Ny4xMTYgMTQxMi44NSA5ODQuMzcxIDE0MTMuMzlDOTgxLjA3MyAxNDEwLjc2IDk3Ny44NDYgMTQwOC4wMyA5NzQuNjkyIDE0MDUuMjNDOTc4LjEwNiAxNDAyLjcyIDk4MS41NzQgMTQwMC4yOSA5ODUuMDkyIDEzOTcuOTRaIi8+PHBhdGggZmlsbD0iIzAxMDEwMyIgZD0iTTEwNjIuNTIgMTM5Ny40QzEwNjYuNDQgMTM5OS42OCAxMDcwLjMxIDE0MDIuODMgMTA3My45IDE0MDUuNjNMMTA2Ni42OSAxNDExLjMxQzEwNjEuODEgMTQxNC4xOSAxMDYyLjE5IDE0MTEuNjUgMTA1OC4zMyAxNDA2LjM0QzEwNTguMDEgMTQwNS45IDEwNjEuNjYgMTM5OS4zOCAxMDYyLjUyIDEzOTcuNFoiLz48cGF0aCBmaWxsPSIjMDEwMTAzIiBkPSJNOTkyLjAzMiAxNDI4LjUxTDk5My43MzIgMTQyOC44OEM5OTQuODQyIDE0MjkuMTIgMTAwMC41MSAxNDMwIDEwMDAuNzIgMTQzMC40M0MxMDAyLjA5IDE0MzMuMTcgMTAwNC4xOCAxNDM4LjA5IDEwMDAuNzYgMTQzOS44M0M5OTYuOTQ2IDE0NDAuNjkgOTkyLjk0OSAxNDQxLjYxIDk4OS4xMTYgMTQ0Mi4zNUM5OTAuMTQ3IDE0MzcuNjkgOTkxLjA2MyAxNDMzLjE3IDk5Mi4wMzIgMTQyOC41MVoiLz48cGF0aCBmaWxsPSIjMDEwMTAzIiBkPSJNMTA0Ny44NiAxNDI5Ljg0QzEwNTQuMDYgMTQyOS42NCAxMDU3LjAxIDE0MjcuOTcgMTA1Ny41OCAxNDM0Ljg2QzEwNTcuOCAxNDM3LjUgMTA1OC43MiAxNDM5LjA1IDEwNTguNSAxNDQxLjk3QzEwNTQuMDUgMTQ0MS4wMSAxMDQ5Ljk0IDE0NDAuMTUgMTA0NS40NyAxNDM5LjEyQzEwNDYuMTggMTQzNi4wMSAxMDQ3LjA4IDE0MzIuOTYgMTA0Ny44NiAxNDI5Ljg0WiIvPjxwYXRoIGZpbGw9IiNBQjg2NUUiIGQ9Ik03MjQuNzExIDEzMTUuNjRDNzU2LjIzMyAxMzI3LjUzIDc5OC40MTQgMTM0MS4xNCA4MzIuMDQxIDEzMzcuNDFDODMzLjU4NCAxMzM3LjE1IDgzNy44MzMgMTMzNi4zNiA4MzkuMzU1IDEzMzcuNDFMODM5LjQyNyAxMzM3LjZDODM4LjkwNyAxMzM4LjQ1IDgzOC4xNzcgMTMzOC42NCA4MzcuMjI2IDEzMzkuMDJDNzk4LjA4MyAxMzUxLjM0IDcyNC41NzcgMTM0Ny4wMyA2ODIuOTM0IDEzNDIuODZDNjc3LjcxMSAxMzQyLjM0IDY3MS4yMjIgMTM0MC4wNyA2NjcuOTc4IDEzMzUuNzJMNjY4LjMxOSAxMzM0LjQ2QzY4Ny44NTcgMTMzMC4wOCA3MDYuNTc0IDEzMjQuMjYgNzI0LjcxMSAxMzE1LjY0WiIvPjxwYXRoIGZpbGw9IiNENkI4OTQiIGQ9Ik04MzIuMDQxIDEzMzcuNDFDODMzLjU4NCAxMzM3LjE1IDgzNy44MzMgMTMzNi4zNiA4MzkuMzU1IDEzMzcuNDFMODM5LjQyNyAxMzM3LjZDODM4LjkwNyAxMzM4LjQ1IDgzOC4xNzcgMTMzOC42NCA4MzcuMjI2IDEzMzkuMDJMODMyLjA0MSAxMzM3LjQxWiIvPjxwYXRoIGZpbGw9IiNBQjg2NUUiIGQ9Ik0xMjM5Ljg1IDEzNzAuMzhDMTI1NS40NiAxMzY3LjAyIDEyNjEuMTQgMTM2NS4wNCAxMjc0LjU5IDEzNTYuNTVDMTI5MS40OCAxMzYyLjE3IDEzMTAuMyAxMzY5LjcxIDEzMjguMDIgMTM2OS44OUMxMzMzLjAxIDEzNjkuOTQgMTM0Ny4yNiAxMzY3LjM0IDEzNDkuNzcgMTM2Ny44MkMxMzQ4LjM4IDEzNzAuMTcgMTMzNy45OSAxMzczLjk1IDEzMzUuMiAxMzc0LjQ0QzEzMDUuNzYgMTM3OS42MSAxMjYwLjE2IDEzNzkuNyAxMjMyLjI1IDEzNzIuNThDMTIzMC45NiAxMzcyLjM5IDEyMjUuNDkgMTM3MS42NSAxMjI1LjI2IDEzNzAuMDNDMTIyNi4wNyAxMzY5IDEyMzcuOCAxMzcwLjAzIDEyMzkuODUgMTM3MC4zOFoiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNMTIzMi4yNSAxMzcyLjU4QzEyMzAuOTYgMTM3Mi4zOSAxMjI1LjQ5IDEzNzEuNjUgMTIyNS4yNiAxMzcwLjAzQzEyMjYuMDcgMTM2OSAxMjM3LjggMTM3MC4wMyAxMjM5Ljg1IDEzNzAuMzhDMTIzNi43MiAxMzcxLjgxIDEyMzUuMyAxMzcxLjA5IDEyMzIuMjUgMTM3Mi41OFoiLz48cGF0aCBmaWxsPSIjQUI4NjVFIiBkPSJNODU4LjQxIDEzNjguOTRDODgxLjE4IDEzNzUuNjYgODg5LjAyMiAxMzc2LjYzIDkxMi4wMTEgMTM3OC4wN0M4ODUuMDAxIDEzODcuMjUgODYxLjgyMSAxMzg2LjU3IDgzMy43NSAxMzg2LjM3QzgxMi43NCAxMzg1LjQxIDc5OC41MjkgMTM4My4wNCA3NzguNTUgMTM3Ni44QzgwNi4yODEgMTM3OC4zMyA4MzIuMDM3IDEzNzkuMzcgODU4LjQxIDEzNjguOTRaIi8+PHBhdGggZmlsbD0iI0FCODY1RSIgZD0iTTExMzQuMzYgMTM1Mi43NUMxMTQzLjkzIDEzNTUuNTkgMTE1MS44OCAxMzU3Ljc5IDExNjEuODMgMTM1OS4wM0MxMTYzLjYzIDEzNTguOTkgMTE3My4yMiAxMzU4LjE5IDExNzMuMzggMTM1OS45NUMxMTcyLjU3IDEzNjAuNzIgMTE3Mi4zNCAxMzYwLjY3IDExNzEuMTggMTM2MS4wMkMxMTUxLjU3IDEzNjYuMDkgMTEyNi45NSAxMzY1LjM1IDExMDcuMDIgMTM2MS44NkMxMTAzLjEzIDEzNjEuMDkgMTA5OS4yNiAxMzYwLjI0IDEwOTUuNDEgMTM1OS4zMUMxMTA5LjQxIDEzNTguMzUgMTExNi40IDEzNTcuODMgMTEzMC4wMSAxMzUzLjk3TDExMzQuMzYgMTM1Mi43NVoiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNMTE2MS44MyAxMzU5LjAzQzExNjMuNjMgMTM1OC45OSAxMTczLjIyIDEzNTguMTkgMTE3My4zOCAxMzU5Ljk1QzExNzIuNTcgMTM2MC43MiAxMTcyLjM0IDEzNjAuNjcgMTE3MS4xOCAxMzYxLjAyQzExNjguMDEgMTM2MC4zIDExNjUuMDIgMTM1OS44IDExNjEuODMgMTM1OS4wM1oiLz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImdyYWRpZW50XzAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4MT0iMTAyNy4xMzM0IiB5MT0iNTQ3Ljk5NjIyIiB4Mj0iMTAyNi45OTA4IiB5Mj0iNzMxLjgyNTUiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzAwMkI0QyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI0M0Q0NEOSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGZpbGw9InVybCgjZ3JhZGllbnRfMCkiIGQ9Ik02NTYuNTUgNzE5LjY5NEM3NDguODEgNjA4LjM1IDg4Ni41NjkgNTQ0LjgyOSAxMDMxLjE1IDU0Ni45NjNDMTE3NS43NCA1NDkuMDk2IDEzMTEuNTYgNjE2LjY1NCAxNDAwLjUgNzMwLjY3MUwxMzk3LjU1IDczMy4wOThMMTM5Ny4zMSA3MzMuOTY1QzEzOTIuNDggNzM1LjY1MyAxMzc1LjM0IDczNy40OTQgMTM2OS44NSA3MzguMTI4QzEzMzYuOTggNzQxLjkyNCAxMjg2LjIxIDc0NC43OTIgMTI1NS4zOSA3MzMuMTgzQzEyNDEuMDMgNzMwLjA1NCAxMjExLjg2IDcxNy45ODkgMTE5Ni45NCA3MTIuNDgxQzExNzIuMzcgNzAzLjMxOCAxMTQ2LjkgNjk2Ljc4OCAxMTIwLjk0IDY5Mi45OTlDMTA4Ni4wMSA2OTAuOSAxMDU0Ljg4IDY4OS43NjEgMTAyMC41OSA2OTguMTM3QzEwMTcuNjkgNjk4Ljg0NiAxMDA5LjI1IDcwMC43MzcgMTAwNi41MiA3MDAuODM4Qzk1OS44OTkgNzE1LjMyNCA5MTguMTE2IDcyMi44MjIgODY5LjM3OSA3MTEuNTRDODQ1LjQ3NSA3MDYuMDA2IDgzMi44NyA3MDAuNzU2IDgwNy40MjUgNzAxLjA4OEM3NzIuMDQ2IDcwMS41NSA3NDcuODI1IDcxNi42NjcgNzE0LjAzIDcyMi40OTJDNzA5LjkzOSA3MTcuODM4IDcwNS45ODkgNzIxLjk4NyA3MDEuNDQgNzIwLjM1NUM2OTUuNTc3IDcxOC4yNTEgNjg1LjM0MSA3MjEuMzg0IDY4MC44OTIgNzIwLjQ3OEM2NzYuNzM3IDcxOS42MzIgNjY3LjEzNyA3MTguMDc1IDY2My43OCA3MTcuMDExQzY2MS40NjQgNzE5Ljg1NyA2NjEuMTY0IDcyMC4wNDkgNjU5LjY2MSA3MjMuMjE5QzY1OC41OTggNzIyLjA1MiA2NTcuNTg2IDcyMC44ODMgNjU2LjU1IDcxOS42OTRaIi8+PHBhdGggZmlsbD0iI0NCQTk4MSIgZD0iTTY1Ni41NSA3MTkuNjk0Qzc0OC44MSA2MDguMzUgODg2LjU2OSA1NDQuODI5IDEwMzEuMTUgNTQ2Ljk2M0MxMTc1Ljc0IDU0OS4wOTYgMTMxMS41NiA2MTYuNjU0IDE0MDAuNSA3MzAuNjcxTDEzOTcuNTUgNzMzLjA5OEMxMzk1LjMzIDcyOC43NzggMTM5NC42OCA3MjguMjY2IDEzOTEuMDUgNzI0Ljk4NEMxMzc3LjgzIDcwNS42MDEgMTMzMC4xMiA2NTkuMDI2IDEzMDkuOTIgNjQ2LjM0N0MxMjkyIDYyOC4yMzkgMTIyNS40OSA1OTIuODExIDEyMDAuOTMgNTgzLjYyOEMxMjAwLjQ0IDU4My40MDYgMTE5OS45NSA1ODMuMTg0IDExOTkuNDYgNTgyLjk2MkMxMDg2Ljg5IDUzNy4zNDcgOTYyLjEyNyA1MzYuNzAxIDg1MC4yMzIgNTgyLjQyNEM4MTcuOTg3IDU5NC41OTYgNzUwLjU0NyA2MzEuMzA1IDcyNi45MTYgNjU1LjM2N0M3MDYuMTA0IDY3MC45NzcgNjgwLjE1NCA2OTYuODY0IDY2My43OCA3MTcuMDExQzY2MS40NjQgNzE5Ljg1NyA2NjEuMTY0IDcyMC4wNDkgNjU5LjY2MSA3MjMuMjE5QzY1OC41OTggNzIyLjA1MiA2NTcuNTg2IDcyMC44ODMgNjU2LjU1IDcxOS42OTRaIi8+PHBhdGggZmlsbD0iI0Q3RDlERCIgZD0iTTEyNTUuMzkgNzMzLjE4M0MxMjUyLjQ2IDcyOS45MzMgMTI0OS44MSA3MjkuNDQ0IDEyNDUuNzIgNzI4LjkxM0wxMjQ1Ljg4IDcyNy43NTZMMTI0Ny44NSA3MjYuNDczQzEyNjMuMjggNzI2LjY3IDEyNzUuNjMgNzI0LjE5NCAxMjkwLjcgNzIyLjM2NEMxMjk2LjU2IDcyMS42NTMgMTMwMC45MSA3MjkuMzA1IDEzMTEuNjQgNzIzLjkzM0wxMzEwLjUxIDcyMi44MzNMMTMwNS4zOCA3MjMuNzFMMTMwNS41MiA3MjIuNDJDMTMwOC4zMyA3MjAuNjI3IDEzMDkuMDIgNzIxLjQyOSAxMzEyLjA0IDcyMS40OTRDMTMzMC44NyA3MjEuODk0IDEzNTEuNTYgNzIwLjEyMSAxMzcwLjQ1IDcxOC43MzNDMTM3NS42OCA3MTguMzQ5IDEzNzIuNDIgNzIxLjc5MiAxMzc3LjMzIDcyMi4yNTVDMTM3Ny4zNiA3MjIuMjU3IDEzODIuNjQgNzE5LjkwMiAxMzgyLjY1IDcxOS45MDlDMTM4Ny40NyA3MjMuNTQgMTM4NS41MSA3MjQuMDggMTM5MS4wNSA3MjQuOTg0QzEzOTQuNjggNzI4LjI2NiAxMzk1LjMzIDcyOC43NzggMTM5Ny41NSA3MzMuMDk4TDEzOTcuMzEgNzMzLjk2NUMxMzkyLjQ4IDczNS42NTMgMTM3NS4zNCA3MzcuNDk0IDEzNjkuODUgNzM4LjEyOEMxMzM2Ljk4IDc0MS45MjQgMTI4Ni4yMSA3NDQuNzkyIDEyNTUuMzkgNzMzLjE4M1oiLz48cGF0aCBmaWxsPSIjQUI4NjVFIiBkPSJNODE5LjY4OSAxMjgzLjA5Qzg0OC4xMDggMTI3My4yNSA4NjYuMjkzIDEyNzcuMTQgODkzLjIzMSAxMjkwLjE3QzkwMC44NDMgMTI5My45MSA5MDguMzkxIDEyOTcuNzcgOTE1Ljg3NCAxMzAxLjc2Qzk0MS43MTUgMTI5My45OSA5NDYuNDEzIDEzMDEuMTMgOTcxLjE2MSAxMzAyLjQ3QzkyMy41NiAxMzE0LjQ0IDg2My44MyAxMzAzLjYgODE5LjY4OSAxMjgzLjA5WiIvPjxwYXRoIGZpbGw9IiNBQjg2NUUiIGQ9Ik0xMjY4LjU2IDEzNDEuODFDMTI4My43NiAxMzM4LjYxIDEyODkuNjYgMTMzNy4yIDEzMDQuMjQgMTMzMS4xNUMxMzEyLjU4IDEzMzMuMDkgMTMyMS41OSAxMzM1LjUxIDEzMjkuNDIgMTMzOS4wNEMxMzEyLjg0IDEzNDIuODkgMTI4NS4zNiAxMzQ0LjE2IDEyNjguNTYgMTM0MS44MVoiLz48cGF0aCBmaWxsPSIjRDdEOUREIiBkPSJNNjYzLjc4IDcxNy4wMTFDNjY3LjEzNyA3MTguMDc1IDY3Ni43MzcgNzE5LjYzMiA2ODAuODkyIDcyMC40NzhDNjg1LjM0MSA3MjEuMzg0IDY5NS41NzcgNzE4LjI1MSA3MDEuNDQgNzIwLjM1NUM3MDUuOTg5IDcyMS45ODcgNzA5LjkzOSA3MTcuODM4IDcxNC4wMyA3MjIuNDkyQzY5NC40NzYgNzI1LjIzNyA2NzkuNzMxIDcyNS43NTMgNjU5LjkyOSA3MjMuNzA3TDY1OS42NjEgNzIzLjIxOUM2NjEuMTY0IDcyMC4wNDkgNjYxLjQ2NCA3MTkuODU3IDY2My43OCA3MTcuMDExWiIvPjxwYXRoIGZpbGw9IiNENkI4OTQiIGQ9Ik0xMjIxLjg0IDg1OC4yNDhDMTIyNi4wNSA4NjQuNzQ5IDEyMzEuNzIgODc4LjQ4NCAxMjM1LjAxIDg4NS45NUwxMjU1LjIzIDkzMi4wNjlMMTMyNy41IDEwOTcuNTVDMTMzOC4xMyAxMTIxLjkxIDEzNDguNzYgMTE1MS4yNiAxMzY0Ljc5IDExNzIuMTRDMTM3MC4zIDExNzkuMzEgMTM3Ny42MyAxMTgyLjQ0IDEzODUuODMgMTE4NS42MUMxMzYyLjkyIDExODUuOTkgMTMzNi42IDExODYuMjUgMTMxMy43MiAxMTg1LjYyQzEzMTAuOTggMTE4NS42OCAxMjk5Ljc4IDExODYuMjEgMTI5OC4wNyAxMTg1LjIxQzEyOTQuNzYgMTE4My4yOCAxMzAyLjg4IDExODIuNTIgMTMwMy4wMSAxMTgyLjUxQzEzMTIuNSAxMTc2LjY0IDEzMTguNTIgMTE2OC4yMyAxMzE1LjMzIDExNTYuODNDMTMwNi43MSAxMTI1Ljk3IDEyOTEuMDUgMTA5NC44NiAxMjc4LjQzIDEwNjUuM0MxMjY2LjA4IDEwNTguOTEgMTI1Mi44NSAxMDU0LjQgMTIzOS4xNyAxMDUxLjkyQzEyMTEuMjEgMTA0Ni44OSAxMTc4LjggMTA1MS44IDExNTUuMjUgMTA2OC4zMUwxMTUzLjA0IDEwNjcuMzdDMTE4Ny4zNSAxMDM1LjU5IDEyMzQuNDMgMTA0MC4zMSAxMjc0LjYyIDEwNTYuNzVDMTI1My41NiAxMDA2LjgxIDEyMzIuMDYgOTU3LjA1NiAxMjEwLjEyIDkwNy40OTdMMTE0OS44OSAxMDU4LjE0QzExMzguMjIgMTA4Ni43OSAxMTI1LjQ4IDExMTUuNjggMTExNS42NSAxMTQ0Ljg1QzExMTEuNjIgMTE1Ni44MyAxMTA5LjQ0IDExNzcuMTQgMTEyNC4xMiAxMTgyLjA2QzExMjguMTggMTE4My40MiAxMTMyLjI2IDExODQuMzUgMTEzNi4yOCAxMTg1LjcyQzExMjAuODMgMTE4NS44OCAxMDg2LjQ1IDExODYuOTkgMTA3Mi40MyAxMTg1LjMzTDEwNzIuMDggMTE4NC40NUMxMDk3Ljg1IDExNzEuNDMgMTEwNC45MyAxMTUwLjkxIDExMTUuNTkgMTEyNS4zNUMxMTI0LjIyIDExMDQuNjYgMTEzMi4zOSAxMDgzLjc0IDExNDAuNzEgMTA2Mi45MkwxMjIxLjg0IDg1OC4yNDhaIi8+PHBhdGggZmlsbD0iI0NCQTk4MSIgZD0iTTEzMDMuMDEgMTE4Mi41MUMxMzA2LjU1IDExODcuMzMgMTMxMC4wMyAxMTgyLjIyIDEzMTMuNzIgMTE4NS42MkMxMzEwLjk4IDExODUuNjggMTI5OS43OCAxMTg2LjIxIDEyOTguMDcgMTE4NS4yMUMxMjk0Ljc2IDExODMuMjggMTMwMi44OCAxMTgyLjUyIDEzMDMuMDEgMTE4Mi41MVoiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNNjY0LjA2NCA4NTkuNDY0QzY3MS45MTkgODU4LjY1MiA3NDQuMzk2IDg1OC4zMzEgNzQ1LjcyMiA4NTkuOTE2Qzc0NS4yMjcgODYxLjU1OSA3NDMuMTk0IDg2MS41NCA3NDEuODA4IDg2MS42MDdDNzEzLjE1NyA4NzMuMzc4IDczMy40NjYgOTA3LjQ1OCA3NDIuMDg1IDkyNy40MzNMNzY0Ljg2IDk3OS42ODFMODM0LjUwOCAxMTQwLjVMODk2Ljc0MiA5OTIuNjM0QzkwOC4zOTkgOTY0LjgxOCA5MjEuNjQ2IDkzNS44MTcgOTMwLjU5IDkwNy4wMDRDOTMzLjY4IDg5Ny4wNDkgOTM0Ljk2OSA4ODMuODEzIDkzMS45MDEgODczLjg2MUM5MjkuMzUyIDg2NS41OTIgOTIyLjYxOCA4NjIuNDA2IDkxNS4zOTUgODU4Ljk0Nkw5ODAuNjcxIDg1OS4xNDVDOTc4LjM4OSA4NTkuOTM5IDk3Ni4xMjIgODYwLjc3NCA5NzMuODcgODYxLjY0OEM5NTMuNDczIDg2OS42NTIgOTQzLjQ3OSA4OTguOTIxIDkzNS4yMzYgOTE3Ljg3OUM5MjUuMzQgOTQxLjAyMSA5MTUuNjQ5IDk2NC4yNSA5MDYuMTY0IDk4Ny41NjRDODc4LjI3OSAxMDU0Ljk1IDg0OS43ODUgMTEyMi4wNyA4MjAuNjg1IDExODguOTRMNzM4LjQ3NSA5OTguNThMNzA5Ljg1NiA5MzIuNzAzQzcwMC4wMDQgOTEwLjI5NiA2ODUuOTc5IDg3Mi40NjIgNjYzLjY5IDg2MC40OUw2NjQuMDY0IDg1OS40NjRaIi8+PHBhdGggZmlsbD0iI0NCQTk4MSIgZD0iTTY2NC4wNjQgODU5LjQ2NEM2NzEuOTE5IDg1OC42NTIgNzQ0LjM5NiA4NTguMzMxIDc0NS43MjIgODU5LjkxNkM3NDUuMjI3IDg2MS41NTkgNzQzLjE5NCA4NjEuNTQgNzQxLjgwOCA4NjEuNjA3QzczNS4wMiA4NTcuOTM1IDY3Ni40NzIgODYyLjQ2MyA2NjQuMDY0IDg1OS40NjRaIi8+PHBhdGggZmlsbD0iI0Q2Qjg5NCIgZD0iTTk5Mi45OTggODYxLjY1NkM5OTEuNzMzIDg2MS41NzMgOTg4Ljg5IDg2MS41MjEgOTg4LjE0OSA4NjAuMTQxQzk4OC40NTEgODU4LjA3IDk5OS4wMjggODU4Ljg2NiAxMDAwLjg3IDg1OC44ODNDMTAxNy40NCA4NTkuMDMxIDEwMzQuMDcgODU4Ljg1MyAxMDUwLjYzIDg1OS4yNDVDMTA1OC41NyA4NTkuMTIzIDEwNjUuNzYgODU4Ljk5NiAxMDczLjY4IDg1OS40MTVDMTA2NC4xNCA4NjIuMjAxIDEwNTEuNzggODY1LjgwOCAxMDQ4LjI4IDg3NS43NDFDMTA0MS43NiA4OTQuMzAxIDEwNDMuNjcgOTI0LjIyNCAxMDQzLjY1IDk0My41NDNMMTA0My42MiAxMDIwLjQ2TDEwNDMuNiAxMDk5LjcyQzEwNDMuNTggMTExNS4wNyAxMDQzLjM2IDExMzAuNTIgMTA0My44MyAxMTQ1Ljg2QzEwNDQuMjggMTE2MC4xNyAxMDQ2LjgyIDExNzUuNTUgMTA2MS41NCAxMTgxLjg5QzEwNjQuNDcgMTE4My4xMiAxMDY3LjQyIDExODQuMjkgMTA3MC40IDExODUuMzlDMTA1Ni42OSAxMTg2LjM2IDEwMzguNzkgMTE4NS44NyAxMDI0LjY1IDExODUuODhDMTAxMS40NiAxMTg1Ljg5IDk5NC4wMDMgMTE4Ni4zNSA5ODEuMzA5IDExODUuMzJDMTAwNC45MiAxMTc5LjM5IDEwMDkuNyAxMTcyLjc5IDEwMTEuNCAxMTQ3LjgyQzEwMTIuMzggMTEzMy4zOCAxMDExLjc1IDExMTguNDUgMTAxMS43NiAxMTAzLjk1TDEwMTEuNzMgMTAyMy4wMkwxMDExLjcxIDk0NS4wMTFDMTAxMS43NyA5MjAuODQzIDEwMTcuOTcgODc0LjA2MiA5OTIuOTk4IDg2MS42NTZaIi8+PHBhdGggZmlsbD0iI0NCQTk4MSIgZD0iTTk5Mi45OTggODYxLjY1NkM5OTEuNzMzIDg2MS41NzMgOTg4Ljg5IDg2MS41MjEgOTg4LjE0OSA4NjAuMTQxQzk4OC40NTEgODU4LjA3IDk5OS4wMjggODU4Ljg2NiAxMDAwLjg3IDg1OC44ODNDMTAxNy40NCA4NTkuMDMxIDEwMzQuMDcgODU4Ljg1MyAxMDUwLjYzIDg1OS4yNDVDMTAzNy45IDg2My4wNzcgMTAwMS43NCA4NTcuMTcgOTkyLjk5OCA4NjEuNjU2WiIvPjxwYXRoIGZpbGw9IiNBQjg2NUUiIGQ9Ik0xMTQ0LjMxIDEwNzcuMzdDMTE0Ni44OCAxMDc0LjIzIDExNTAuMDggMTA3MC4wMyAxMTUzLjA0IDEwNjcuMzdMMTE1NS4yNSAxMDY4LjMxQzExNTEuOTcgMTA3MS4zNSAxMTQ3Ljg0IDEwNzQuNjEgMTE0NC4zMSAxMDc3LjM3WiIvPjxwYXRoIGZpbGw9IiNDQkE5ODEiIGQ9Ik03NzguNzA3IDE0NzguNTRDNzgxLjM1NSAxNDc3LjQ0IDc4NC4zODcgMTQ3Ny44NiA3ODYuNjQgMTQ3OS42M0M3ODguODkzIDE0ODEuNCA3OTAuMDE3IDE0ODQuMjUgNzg5LjU4IDE0ODcuMDhDNzg5LjE0MyAxNDg5LjkxIDc4Ny4yMTMgMTQ5Mi4yOSA3ODQuNTMyIDE0OTMuM0M3ODAuNDc2IDE0OTQuODIgNzc1Ljk0NSAxNDkyLjgyIDc3NC4zNTUgMTQ4OC43OEM3NzIuNzY0IDE0ODQuNzUgNzc0LjcwMSAxNDgwLjE5IDc3OC43MDcgMTQ3OC41NFoiLz48cGF0aCBmaWxsPSIjQ0JBOTgxIiBkPSJNOTM2LjUwOSAxNTMzLjU3Qzk0MC41MzYgMTUzMi40MiA5NDQuNzY1IDE1MzQuNiA5NDYuMTU1IDE1MzguNTVDOTQ3LjU0NSAxNTQyLjUgOTQ1LjYxNSAxNTQ2Ljg1IDk0MS43NTIgMTU0OC40N0M5MzkuMDQyIDE1NDkuNjEgOTM1LjkyNSAxNTQ5LjE1IDkzMy42NTcgMTU0Ny4yOEM5MzEuMzg5IDE1NDUuNDIgOTMwLjM0MyAxNTQyLjQ0IDkzMC45NDIgMTUzOS41N0M5MzEuNTQgMTUzNi42OSA5MzMuNjg0IDE1MzQuMzggOTM2LjUwOSAxNTMzLjU3WiIvPjxwYXRoIGZpbGw9IiNENkI4OTQiIGQ9Ik03MTEuMTEgNTk1LjM5MkM3MTUuMzM2IDU5NC44NjYgNzE5LjIxNCA1OTcuNzk2IDcxOS44NjIgNjAyLjAwNEM3MjAuNTExIDYwNi4yMTIgNzE3LjY5NiA2MTAuMTc0IDcxMy41MDggNjEwLjk0NUM3MTAuNjg5IDYxMS40NjQgNzA3LjgxIDYxMC40MDkgNzA1Ljk5MyA2MDguMTkxQzcwNC4xNzcgNjA1Ljk3MyA3MDMuNzA5IDYwMi45NDMgNzA0Ljc3NCA2MDAuMjgxQzcwNS44MzggNTk3LjYxOSA3MDguMjY1IDU5NS43NDYgNzExLjExIDU5NS4zOTJaIi8+PHBhdGggZmlsbD0iI0NCQTk4MSIgZD0iTTE1MTUuNzUgODU2LjU2QzE1MTguNDEgODU1LjU5MSAxNTIxLjM4IDg1Ni4xMjQgMTUyMy41NCA4NTcuOTU2QzE1MjUuNyA4NTkuNzg4IDE1MjYuNzEgODYyLjYzOCAxNTI2LjE4IDg2NS40MTlDMTUyNS42NSA4NjguMiAxNTIzLjY3IDg3MC40ODQgMTUyMSA4NzEuNEMxNTE2LjkxIDg3Mi43OTcgMTUxMi40NyA4NzAuNjQ1IDE1MTEuMDMgODY2LjU3NkMxNTA5LjU5IDg2Mi41MDcgMTUxMS43IDg1OC4wMzkgMTUxNS43NSA4NTYuNTZaIi8+PHBhdGggZmlsbD0iI0NCQTk4MSIgZD0iTTU5Ni41NTcgNzEyLjUyNEM1OTkuMTg3IDcxMS4yOTYgNjAyLjI4IDcxMS42MTYgNjA0LjYwMiA3MTMuMzU3QzYwNi45MjQgNzE1LjA5OCA2MDguMDk5IDcxNy45NzcgNjA3LjY1OCA3MjAuODQ1QzYwNy4yMTggNzIzLjcxNCA2MDUuMjMyIDcyNi4xMDcgNjAyLjQ5NCA3MjcuMDdDNTk4LjUzOSA3MjguNDYxIDU5NC4xODggNzI2LjUwNSA1OTIuNjAzIDcyMi42MjNDNTkxLjAxOSA3MTguNzQxIDU5Mi43NTggNzE0LjI5OCA1OTYuNTU3IDcxMi41MjRaIi8+PHBhdGggZmlsbD0iI0Q2Qjg5NCIgZD0iTTEzOTMuNDEgNjUyLjU5MUMxMzk2LjAxIDY1MS40MTkgMTM5OS4wNSA2NTEuNzUyIDE0MDEuMzMgNjUzLjQ2QzE0MDMuNjIgNjU1LjE2OSAxNDA0LjggNjU3Ljk4NCAxNDA0LjQyIDY2MC44MTNDMTQwNC4wMyA2NjMuNjQyIDE0MDIuMTQgNjY2LjA0IDEzOTkuNDggNjY3LjA3NUMxMzk1LjUxIDY2OC42MiAxMzkxLjA0IDY2Ni43MiAxMzg5LjM5IDY2Mi43OTJDMTM4Ny43NCA2NTguODY1IDEzODkuNTMgNjU0LjM0IDEzOTMuNDEgNjUyLjU5MVoiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNMTAyMC43NCA0OTMuNDMzQzEwMjQuNjEgNDkxLjgzOCAxMDI5LjA1IDQ5My41NTcgMTAzMC44NCA0OTcuMzQxQzEwMzIuNjIgNTAxLjEyNCAxMDMxLjEzIDUwNS42NDQgMTAyNy40NCA1MDcuNjE2QzEwMjQuODggNTA4Ljk4MSAxMDIxLjc4IDUwOC44MjggMTAxOS4zNyA1MDcuMjE2QzEwMTYuOTYgNTA1LjYwNCAxMDE1LjY0IDUwMi43OTcgMTAxNS45MiA0OTkuOTEzQzEwMTYuMjEgNDk3LjAyOSAxMDE4LjA2IDQ5NC41MzggMTAyMC43NCA0OTMuNDMzWiIvPjxwYXRoIGZpbGw9IiNENkI4OTQiIGQ9Ik03ODAuMzQ0IDU1MS40ODFDNzg0LjM0MSA1NTAuNzQ5IDc4OC4yMzUgNTUzLjE5MiA3ODkuMzE0IDU1Ny4xMUM3OTAuMzkzIDU2MS4wMjggNzg4LjI5OSA1NjUuMTIxIDc4NC40OTEgNTY2LjUzOEM3ODEuNzEzIDU2Ny41NzIgNzc4LjU4OSA1NjYuOTUgNzc2LjQxOCA1NjQuOTMxQzc3NC4yNDggNTYyLjkxMSA3NzMuNDAyIDU1OS44NDEgNzc0LjIzMyA1NTYuOTk1Qzc3NS4wNjMgNTU0LjE0OSA3NzcuNDI4IDU1Mi4wMTYgNzgwLjM0NCA1NTEuNDgxWiIvPjxwYXRoIGZpbGw9IiNENkI4OTQiIGQ9Ik0xMzMzLjYxIDU5Ni41NDRDMTMzNi4zNCA1OTUuNzg2IDEzMzkuMjggNTk2LjU2OSAxMzQxLjI3IDU5OC41ODlDMTM0My4yNyA2MDAuNjA5IDEzNDQuMDEgNjAzLjU1IDEzNDMuMjIgNjA2LjI3N0MxMzQyLjQzIDYwOS4wMDMgMTM0MC4yMyA2MTEuMDg4IDEzMzcuNDYgNjExLjcyN0MxMzMzLjMxIDYxMi42ODUgMTMyOS4xNSA2MTAuMTQ5IDEzMjguMSA2MDYuMDJDMTMyNy4wNiA2MDEuODkgMTMyOS41IDU5Ny42OCAxMzMzLjYxIDU5Ni41NDRaIi8+PHBhdGggZmlsbD0iI0Q2Qjg5NCIgZD0iTTcwOC4xMjkgMTQzNi41M0M3MTIuMjQzIDE0MzUuMjQgNzE2LjYyNyAxNDM3LjUyIDcxNy45MjggMTQ0MS42M0M3MTkuMjI4IDE0NDUuNzQgNzE2Ljk1NSAxNDUwLjEzIDcxMi44NDcgMTQ1MS40NEM3MDguNzI2IDE0NTIuNzUgNzA0LjMyMiAxNDUwLjQ3IDcwMy4wMTcgMTQ0Ni4zNUM3MDEuNzEzIDE0NDIuMjIgNzA0LjAwMyAxNDM3LjgyIDcwOC4xMjkgMTQzNi41M1oiLz48cGF0aCBmaWxsPSIjQ0JBOTgxIiBkPSJNNTA3LjExOCA5MzMuNDk3QzUxMS4yMjMgOTMyLjQ3OSA1MTUuMzkzIDkzNC45MTMgNTE2LjUyNiA5MzguOTg4QzUxNy42NTkgOTQzLjA2MyA1MTUuMzQ0IDk0Ny4yOTkgNTExLjMwMyA5NDguNTQ3QzUwOC41ODUgOTQ5LjM4NyA1MDUuNjI2IDk0OC42ODMgNTAzLjU3NyA5NDYuNzFDNTAxLjUyOCA5NDQuNzM3IDUwMC43MTQgOTQxLjgwNiA1MDEuNDUgOTM5LjA1OUM1MDIuMTg2IDkzNi4zMTEgNTA0LjM1NyA5MzQuMTgxIDUwNy4xMTggOTMzLjQ5N1oiLz48cGF0aCBmaWxsPSIjQ0JBOTgxIiBkPSJNMTQ5NS44MiAxMjUzLjU3QzE1MDAuMDEgMTI1Mi45NCAxNTAzLjk1IDEyNTUuNzggMTUwNC42OCAxMjU5Ljk2QzE1MDUuNCAxMjY0LjE0IDE1MDIuNjUgMTI2OC4xNCAxNDk4LjQ5IDEyNjguOTZDMTQ5NS43MSAxMjY5LjUxIDE0OTIuODUgMTI2OC41MSAxNDkxLjAyIDEyNjYuMzVDMTQ4OS4xOSAxMjY0LjE4IDE0ODguNjggMTI2MS4yIDE0ODkuNjcgMTI1OC41NUMxNDkwLjY3IDEyNTUuOSAxNDkzLjAyIDEyNTQgMTQ5NS44MiAxMjUzLjU3WiIvPjxwYXRoIGZpbGw9IiNDQkE5ODEiIGQ9Ik0xMzk0LjEzIDEzODEuNTFDMTM5OC4wNSAxMzc5Ljg5IDE0MDIuNTUgMTM4MS43IDE0MDQuMjYgMTM4NS41OEMxNDA1Ljk3IDEzODkuNDYgMTQwNC4yNyAxMzk0IDE0MDAuNDIgMTM5NS44QzEzOTcuODYgMTM5NyAxMzk0Ljg1IDEzOTYuNzIgMTM5Mi41NSAxMzk1LjA2QzEzOTAuMjUgMTM5My40MSAxMzg5LjAzIDEzOTAuNjQgMTM4OS4zNiAxMzg3LjgyQzEzODkuNjkgMTM4NS4wMSAxMzkxLjUxIDEzODIuNTkgMTM5NC4xMyAxMzgxLjUxWiIvPjxwYXRoIGZpbGw9IiNDQkE5ODEiIGQ9Ik04NTYuNDgyIDUxOC41NzJDODU5LjEzOSA1MTcuNjA0IDg2Mi4xMTIgNTE4LjE0OSA4NjQuMjUyIDUxOS45OTdDODY2LjM5MiA1MjEuODQ1IDg2Ny4zNjUgNTI0LjcwNyA4NjYuNzk1IDUyNy40NzZDODY2LjIyNCA1MzAuMjQ2IDg2NC4yIDUzMi40OSA4NjEuNTA0IDUzMy4zNDJDODU3LjQ1OCA1MzQuNjIxIDg1My4xMzIgNTMyLjQzMSA4NTEuNzY2IDUyOC40MTRDODUwLjQgNTI0LjM5NiA4NTIuNDk2IDUyMC4wMjQgODU2LjQ4MiA1MTguNTcyWiIvPjxwYXRoIGZpbGw9IiNDQkE5ODEiIGQ9Ik0xNTE1LjIxIDExODAuNTFDMTUxOS4zMSAxMTc5LjQyIDE1MjMuNTMgMTE4MS44MiAxNTI0LjY5IDExODUuOUMxNTI1Ljg2IDExODkuOTggMTUyMy41NCAxMTk0LjI0IDE1MTkuNDkgMTE5NS40OUMxNTE2Ljc5IDExOTYuMzIgMTUxMy44NiAxMTk1LjYyIDE1MTEuODIgMTE5My42OEMxNTA5Ljc4IDExOTEuNzMgMTUwOC45NSAxMTg4LjgzIDE1MDkuNjUgMTE4Ni4xQzE1MTAuMzYgMTE4My4zNiAxNTEyLjQ4IDExODEuMjMgMTUxNS4yMSAxMTgwLjUxWiIvPjxwYXRoIGZpbGw9IiNDQkE5ODEiIGQ9Ik0xMDIyLjMxIDE1NDEuNkMxMDI0Ljg5IDE1NDAuMzYgMTAyNy45NSAxNTQwLjYzIDEwMzAuMjcgMTU0Mi4zMkMxMDMyLjU5IDE1NDQgMTAzMy43OSAxNTQ2LjgyIDEwMzMuNDEgMTU0OS42NkMxMDMzLjAzIDE1NTIuNSAxMDMxLjExIDE1NTQuOSAxMDI4LjQzIDE1NTUuOTFDMTAyNC41MyAxNTU3LjM3IDEwMjAuMTcgMTU1NS41MSAxMDE4LjUzIDE1NTEuNjhDMTAxNi44OSAxNTQ3Ljg1IDEwMTguNTYgMTU0My40MSAxMDIyLjMxIDE1NDEuNloiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNNjQ5Ljk0NSAxMzgxLjUyQzY1Mi42NzUgMTM4MC44MyA2NTUuNTY3IDEzODEuNjcgNjU3LjUwMyAxMzgzLjcxQzY1OS40NCAxMzg1Ljc2IDY2MC4xMTkgMTM4OC42OSA2NTkuMjggMTM5MS4zOEM2NTguNDQgMTM5NC4wNyA2NTYuMjEyIDEzOTYuMDkgNjUzLjQ1NSAxMzk2LjY3QzY0OS4zMTQgMTM5Ny41NCA2NDUuMjM3IDEzOTQuOTQgNjQ0LjI4MSAxMzkwLjgyQzY0My4zMjYgMTM4Ni42OSA2NDUuODQzIDEzODIuNTYgNjQ5Ljk0NSAxMzgxLjUyWiIvPjxwYXRoIGZpbGw9IiNDQkE5ODEiIGQ9Ik04NTYuNDAyIDE1MTIuNDdDODYwLjIxNyAxNTEwLjkyIDg2NC41NzYgMTUxMi42MiA4NjYuMzQzIDE1MTYuMzNDODY4LjExMSAxNTIwLjA1IDg2Ni42NzMgMTUyNC41IDg2My4wNjYgMTUyNi40OEM4NjAuNTM2IDE1MjcuODcgODU3LjQ0NiAxNTI3Ljc1IDg1NS4wMzggMTUyNi4xNkM4NTIuNjMxIDE1MjQuNTcgODUxLjMwMiAxNTIxLjc3IDg1MS41ODkgMTUxOC45Qzg1MS44NzUgMTUxNi4wMyA4NTMuNzI4IDE1MTMuNTUgODU2LjQwMiAxNTEyLjQ3WiIvPjxwYXRoIGZpbGw9IiNENkI4OTQiIGQ9Ik0xMTA0LjggMTUzNC40N0MxMTA3LjMyIDE1MzMuMjEgMTExMC4zMiAxNTMzLjQyIDExMTIuNjUgMTUzNS4wMUMxMTE0Ljk4IDE1MzYuNiAxMTE2LjI2IDE1MzkuMzMgMTExNiAxNTQyLjEzQzExMTUuNzQgMTU0NC45NCAxMTEzLjk4IDE1NDcuMzggMTExMS40MSAxNTQ4LjUzQzExMDcuNTUgMTU1MC4yMyAxMTAzLjAzIDE1NDguNTUgMTEwMS4yMyAxNTQ0LjczQzEwOTkuNDQgMTU0MC45MSAxMTAxLjAyIDE1MzYuMzUgMTEwNC44IDE1MzQuNDdaIi8+PHBhdGggZmlsbD0iI0Q2Qjg5NCIgZD0iTTExODcuMjkgMTUxNC41NUMxMTg5Ljc1IDE1MTMuMjMgMTE5Mi43MyAxNTEzLjMzIDExOTUuMSAxNTE0LjgxQzExOTcuNDcgMTUxNi4zIDExOTguODUgMTUxOC45NCAxMTk4LjczIDE1MjEuNzNDMTE5OC42MSAxNTI0LjUyIDExOTYuOTkgMTUyNy4wMyAxMTk0LjUxIDE1MjguM0MxMTkwLjcyIDE1MzAuMjQgMTE4Ni4wNyAxNTI4Ljc3IDExODQuMDkgMTUyNUMxMTgyLjExIDE1MjEuMjMgMTE4My41NCAxNTE2LjU3IDExODcuMjkgMTUxNC41NVoiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNMTI2Mi42MiAxNDgxLjYyQzEyNjYuNDggMTQ3OS43MyAxMjcxLjE0IDE0ODEuMzIgMTI3My4wMyAxNDg1LjE4QzEyNzQuOTEgMTQ4OS4wNCAxMjczLjMxIDE0OTMuNyAxMjY5LjQ1IDE0OTUuNThDMTI2NS42IDE0OTcuNDUgMTI2MC45NSAxNDk1Ljg2IDEyNTkuMDcgMTQ5Mi4wMUMxMjU3LjE5IDE0ODguMTYgMTI1OC43OCAxNDgzLjUxIDEyNjIuNjIgMTQ4MS42MloiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNMTQ0NS43NCAxMzIxLjY1QzE0NDguMjEgMTMyMC4yOSAxNDUxLjIxIDEzMjAuMzcgMTQ1My42IDEzMjEuODdDMTQ1NS45OSAxMzIzLjM2IDE0NTcuMzggMTMyNi4wMyAxNDU3LjI0IDEzMjguODRDMTQ1Ny4wOSAxMzMxLjY1IDE0NTUuNDQgMTMzNC4xNyAxNDUyLjkxIDEzMzUuNDFDMTQ0OS4xMyAxMzM3LjI4IDE0NDQuNTUgMTMzNS43OCAxNDQyLjYgMTMzMi4wM0MxNDQwLjY1IDEzMjguMjkgMTQ0Mi4wNCAxMzIzLjY4IDE0NDUuNzQgMTMyMS42NVoiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNMTUzOC42MSA5MzMuNTI3QzE1NDIuNzIgOTMyLjU3NCAxNTQ2Ljg0IDkzNS4wOCAxNTQ3Ljg4IDkzOS4xNjlDMTU0OC45MyA5NDMuMjU4IDE1NDYuNTEgOTQ3LjQzIDE1NDIuNDQgOTQ4LjU2MkMxNTM5Ljc0IDk0OS4zMTYgMTUzNi44MyA5NDguNTQ1IDE1MzQuODUgOTQ2LjU0N0MxNTMyLjg3IDk0NC41NDggMTUzMi4xMyA5NDEuNjM1IDE1MzIuOTEgOTM4LjkzM0MxNTMzLjY5IDkzNi4yMzEgMTUzNS44NyA5MzQuMTYzIDE1MzguNjEgOTMzLjUyN1oiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNNTk3LjUyOSAxMzIxLjYxQzYwMS4zMjcgMTMxOS43MSA2MDUuOTQ2IDEzMjEuMjIgNjA3Ljg5NCAxMzI0Ljk5QzYwOS44NDIgMTMyOC43NiA2MDguMzk1IDEzMzMuNCA2MDQuNjQ3IDEzMzUuNEM2MDIuMTc5IDEzMzYuNzEgNTk5LjE5NSAxMzM2LjYgNTk2LjgzNSAxMzM1LjFDNTk0LjQ3NiAxMzMzLjYgNTkzLjEwNiAxMzMwLjk0IDU5My4yNDkgMTMyOC4xNUM1OTMuMzkzIDEzMjUuMzYgNTk1LjAyOCAxMzIyLjg2IDU5Ny41MjkgMTMyMS42MVoiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNMTI2MC42NSA1NTIuNTM0QzEyNjMuMTUgNTUxLjE5IDEyNjYuMTggNTUxLjMxNiAxMjY4LjU2IDU1Mi44NjFDMTI3MC45NCA1NTQuNDA3IDEyNzIuMjggNTU3LjEyNiAxMjcyLjA3IDU1OS45NTNDMTI3MS44NSA1NjIuNzggMTI3MC4xMSA1NjUuMjY1IDEyNjcuNTMgNTY2LjQzMkMxMjYzLjcyIDU2OC4xNTQgMTI1OS4yMyA1NjYuNTQ4IDEyNTcuMzggNTYyLjgwMkMxMjU1LjUzIDU1OS4wNTYgMTI1Ni45NyA1NTQuNTE1IDEyNjAuNjUgNTUyLjUzNFoiLz48cGF0aCBmaWxsPSIjQ0JBOTgxIiBkPSJNMTMzMC43MSAxNDM1LjU0QzEzMzMuMzYgMTQzNC42MSAxMzM2LjMxIDE0MzUuMiAxMzM4LjQxIDE0MzcuMDZDMTM0MC41MiAxNDM4LjkyIDEzNDEuNDUgMTQ0MS43OCAxMzQwLjg0IDE0NDQuNTJDMTM0MC4yNCAxNDQ3LjI3IDEzMzguMiAxNDQ5LjQ3IDEzMzUuNTEgMTQ1MC4yOEMxMzMxLjQ3IDE0NTEuNSAxMzI3LjIgMTQ0OS4yNyAxMzI1LjkgMTQ0NS4yNkMxMzI0LjU5IDE0NDEuMjUgMTMyNi43MyAxNDM2LjkzIDEzMzAuNzEgMTQzNS41NFoiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNOTM1LjMxOCA0OTkuNjA4QzkzOS4xMSA0OTcuNjA5IDk0My44MDMgNDk5LjA2NiA5NDUuNzk1IDUwMi44NjFDOTQ3Ljc4OCA1MDYuNjU2IDk0Ni4zMjIgNTExLjM0NyA5NDIuNTI0IDUxMy4zMzNDOTM4LjczNiA1MTUuMzE0IDkzNC4wNTggNTEzLjg1MyA5MzIuMDcxIDUxMC4wNjdDOTMwLjA4MyA1MDYuMjgyIDkzMS41MzYgNTAxLjYwMiA5MzUuMzE4IDQ5OS42MDhaIi8+PHBhdGggZmlsbD0iI0Q2Qjg5NCIgZD0iTTU1NS44ODkgMTI1Ni41MkM1NTguNDA3IDEyNTUuMjggNTYxLjQwMSAxMjU1LjQ5IDU2My43MTIgMTI1Ny4wOUM1NjYuMDI0IDEyNTguNjggNTY3LjI5MyAxMjYxLjQgNTY3LjAyOCAxMjY0LjJDNTY2Ljc2MyAxMjY2Ljk5IDU2NS4wMDcgMTI2OS40MyA1NjIuNDM3IDEyNzAuNTZDNTU4LjU4IDEyNzIuMjYgNTU0LjA3MyAxMjcwLjU2IDU1Mi4yOTIgMTI2Ni43NEM1NTAuNTExIDEyNjIuOTIgNTUyLjEwOSAxMjU4LjM4IDU1NS44ODkgMTI1Ni41MloiLz48cGF0aCBmaWxsPSIjQ0JBOTgxIiBkPSJNMTUzOC4yNiAxMTAyLjQxQzE1NDIuMyAxMTAxLjU2IDE1NDYuMyAxMTA0LjAzIDE1NDcuMzQgMTEwOC4wM0MxNTQ4LjM4IDExMTIuMDIgMTU0Ni4xMSAxMTE2LjEzIDE1NDIuMTcgMTExNy4zNkMxNTM5LjQ0IDExMTguMjIgMTUzNi40NyAxMTE3LjUgMTUzNC40NCAxMTE1LjVDMTUzMi40IDExMTMuNSAxNTMxLjYzIDExMTAuNTUgMTUzMi40MyAxMTA3LjgxQzE1MzMuMjMgMTEwNS4wNyAxNTM1LjQ3IDExMDIuOTkgMTUzOC4yNiAxMTAyLjQxWiIvPjxwYXRoIGZpbGw9IiNDQkE5ODEiIGQ9Ik0xNDg4LjMyIDc4Mi40OTlDMTQ5Mi4xOCA3ODAuNjU4IDE0OTYuOCA3ODIuMjkgMTQ5OC42NCA3ODYuMTQ2QzE1MDAuNDggNzkwLjAwMSAxNDk4Ljg1IDc5NC42MTkgMTQ5NC45OSA3OTYuNDYyQzE0OTEuMTQgNzk4LjMwNCAxNDg2LjUyIDc5Ni42NzIgMTQ4NC42OCA3OTIuODE2QzE0ODIuODMgNzg4Ljk2IDE0ODQuNDcgNzg0LjM0MSAxNDg4LjMyIDc4Mi40OTlaIi8+PHBhdGggZmlsbD0iI0Q2Qjg5NCIgZD0iTTY0OC40OTEgNjUyLjUyNEM2NTIuMzQzIDY1MC43NzMgNjU2Ljg4NyA2NTIuNDQ3IDY1OC42ODUgNjU2LjI3OEM2NjAuNDgyIDY2MC4xMDkgNjU4Ljg2NCA2NjQuNjczIDY1NS4wNTUgNjY2LjUxNkM2NTIuNTUgNjY3LjcyOSA2NDkuNTg2IDY2Ny41MDEgNjQ3LjI5NSA2NjUuOTE5QzY0NS4wMDUgNjY0LjMzNyA2NDMuNzQzIDY2MS42NDYgNjQzLjk5IDY1OC44NzNDNjQ0LjIzNyA2NTYuMTAxIDY0NS45NTcgNjUzLjY3NSA2NDguNDkxIDY1Mi41MjRaIi8+PHBhdGggZmlsbD0iI0Q2Qjg5NCIgZD0iTTUyNy41NTcgMTE4MC42M0M1MzAuMjcyIDExNzkuNzIgNTMzLjI2NSAxMTgwLjM5IDUzNS4zMzQgMTE4Mi4zN0M1MzcuNDAyIDExODQuMzUgNTM4LjIwNyAxMTg3LjMxIDUzNy40MjQgMTE5MC4wNkM1MzYuNjQxIDExOTIuODEgNTM0LjM5OSAxMTk0LjkxIDUzMS41OTkgMTE5NS41QzUyNy41OTUgMTE5Ni4zNSA1MjMuNjI0IDExOTMuOTIgNTIyLjU1IDExODkuOTdDNTIxLjQ3NyAxMTg2LjAyIDUyMy42NzQgMTE4MS45MiA1MjcuNTU3IDExODAuNjNaIi8+PHBhdGggZmlsbD0iI0NCQTk4MSIgZD0iTTQ5Ny40MyAxMDE4LjU5QzQ5OS43ODcgMTAxNy4wNCA1MDIuODA2IDEwMTYuOSA1MDUuMjk5IDEwMTguMjJDNTA3Ljc5MiAxMDE5LjU1IDUwOS4zNiAxMDIyLjEzIDUwOS4zODggMTAyNC45NkM1MDkuNDE2IDEwMjcuNzggNTA3Ljg5OCAxMDMwLjM5IDUwNS40MzIgMTAzMS43N0M1MDEuODA5IDEwMzMuNzkgNDk3LjIzOCAxMDMyLjU4IDQ5NS4wODQgMTAyOS4wNEM0OTIuOTMxIDEwMjUuNDkgNDkzLjk2NyAxMDIwLjg4IDQ5Ny40MyAxMDE4LjU5WiIvPjxwYXRoIGZpbGw9IiNDQkE5ODEiIGQ9Ik0xMTAzLjgxIDQ5OS41NTRDMTEwNi4zOSA0OTguNDU5IDExMDkuMzYgNDk4Ljg1IDExMTEuNTcgNTAwLjU3NkMxMTEzLjc4IDUwMi4zMDEgMTExNC44OCA1MDUuMDg5IDExMTQuNDQgNTA3Ljg1NkMxMTE0IDUxMC42MjQgMTExMi4wOSA1MTIuOTM0IDExMDkuNDYgNTEzLjg5MUMxMTA1LjUzIDUxNS4zMTcgMTEwMS4xOCA1MTMuMzU2IDEwOTkuNjUgNTA5LjQ2OUMxMDk4LjEzIDUwNS41ODMgMTA5OS45NyA1MDEuMTg2IDExMDMuODEgNDk5LjU1NFoiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNNTA2LjIzMSAxMTA0LjdDNTA4LjY2OSAxMTAzLjI4IDUxMS42ODQgMTEwMy4zMSA1MTQuMDkzIDExMDQuNzhDNTE2LjUwMiAxMTA2LjI0IDUxNy45MiAxMTA4LjkgNTE3Ljc4OSAxMTExLjcyQzUxNy42NTggMTExNC41MyA1MTUuOTk5IDExMTcuMDUgNTEzLjQ2NSAxMTE4LjI4QzUwOS43MzkgMTEyMC4xIDUwNS4yNDUgMTExOC42NCA1MDMuMjk4IDExMTQuOThDNTAxLjM1IDExMTEuMzIgNTAyLjY0NiAxMTA2Ljc4IDUwNi4yMzEgMTEwNC43WiIvPjxwYXRoIGZpbGw9IiNENkI4OTQiIGQ9Ik0xMTg4LjY2IDUxOS41MzlDMTE5MS4zOCA1MTguOTg4IDExOTQuMTkgNTE5Ljk0OCAxMTk2LjAxIDUyMi4wNTFDMTE5Ny44MyA1MjQuMTU0IDExOTguMzcgNTI3LjA3MyAxMTk3LjQzIDUyOS42ODhDMTE5Ni40OSA1MzIuMzAzIDExOTQuMjEgNTM0LjIwOCAxMTkxLjQ3IDUzNC42NzJDMTE4Ny4zMyA1MzUuMzczIDExODMuMzkgNTMyLjYyMSAxMTgyLjYyIDUyOC40ODlDMTE4MS44NSA1MjQuMzU2IDExODQuNTQgNTIwLjM3MyAxMTg4LjY2IDUxOS41MzlaIi8+PHBhdGggZmlsbD0iI0Q2Qjg5NCIgZD0iTTE1NDMuNiAxMDE5LjUzQzE1NDYuMyAxMDE4LjcxIDE1NDkuMjQgMTAxOS40MyAxNTUxLjI1IDEwMjEuNDFDMTU1My4yNSAxMDIzLjQgMTU1NC4wMiAxMDI2LjMyIDE1NTMuMjMgMTAyOS4wM0MxNTUyLjQ0IDEwMzEuNzUgMTU1MC4yMyAxMDMzLjgxIDE1NDcuNDggMTAzNC40MUMxNTQzLjQ0IDEwMzUuMjkgMTUzOS40MyAxMDMyLjgyIDE1MzguMzkgMTAyOC44M0MxNTM3LjM1IDEwMjQuODMgMTUzOS42NSAxMDIwLjczIDE1NDMuNiAxMDE5LjUzWiIvPjxwYXRoIGZpbGw9IiNENkI4OTQiIGQ9Ik01NTYuMzIyIDc4MS41NjdDNTU5LjAwNyA3ODAuNjg0IDU2MS45NiA3ODEuMzQ2IDU2NC4wMTIgNzgzLjI5MUM1NjYuMDY0IDc4NS4yMzUgNTY2Ljg4MyA3ODguMTQ5IDU2Ni4xNDYgNzkwLjg3OEM1NjUuNDA4IDc5My42MDYgNTYzLjIzMiA3OTUuNzEgNTYwLjQ4IDc5Ni4zNTZDNTU2LjQ3MyA3OTcuMjk3IDU1Mi40MzYgNzk0LjkxNSA1NTEuMzIyIDc5MC45NTNDNTUwLjIwNyA3ODYuOTkgNTUyLjQxMSA3ODIuODUzIDU1Ni4zMjIgNzgxLjU2N1oiLz48cGF0aCBmaWxsPSIjQ0JBOTgxIiBkPSJNNTI2LjY0MiA4NTYuNDMxQzUyOS4yNTkgODU1LjUwNyA1MzIuMTcxIDg1Ni4wNjUgNTM0LjI2IDg1Ny44OTJDNTM2LjM1IDg1OS43MTkgNTM3LjI5MiA4NjIuNTMgNTM2LjcyNCA4NjUuMjQ3QzUzNi4xNTcgODY3Ljk2NCA1MzQuMTY5IDg3MC4xNjQgNTMxLjUyMyA4NzEuMDAyQzUyNy41MjQgODcyLjI3IDUyMy4yNDggODcwLjA5NiA1MjEuOTE1IDg2Ni4xMThDNTIwLjU4MyA4NjIuMTQgNTIyLjY4NiA4NTcuODI5IDUyNi42NDIgODU2LjQzMVoiLz48cGF0aCBmaWxsPSIjRDZCODk0IiBkPSJNMTQ0Ny43OSA3MTIuNjA2QzE0NTEuODMgNzExLjI2OSAxNDU2LjE4IDcxMy40NzYgMTQ1Ny40OSA3MTcuNTI0QzE0NTguOCA3MjEuNTcxIDE0NTYuNTYgNzI1LjkxIDE0NTIuNTEgNzI3LjE5MUMxNDQ4LjQ5IDcyOC40NTkgMTQ0NC4yIDcyNi4yNDggMTQ0Mi45MSA3MjIuMjRDMTQ0MS42MSA3MTguMjMyIDE0NDMuNzkgNzEzLjkzIDE0NDcuNzkgNzEyLjYwNloiLz48L3N2Zz4=" style="width:104px;height:104px;border-radius:50%;object-fit:contain;display:block;margin:0 auto;filter:drop-shadow(0 2px 10px rgba(0,0,0,.5));" alt="VIA"></div>
                 <div class="blank-tag">Игра жизни</div>
+                <button onclick="openMirror()" style="display:block;width:100%;margin:0 0 10px;padding:11px;border-radius:12px;border:1px solid #6b551f;background:linear-gradient(180deg,#1a2033,#12151d);color:#efd8a3;font-weight:700;font-size:14px;letter-spacing:.02em;cursor:pointer;">🪞 Зеркало Души — твой психологический портрет</button>
                 ${/* 🌍 ЭПОХА. Одно слово, без объяснений — человек сам свяжет, что в перегрев все в
                       плюсе, а потом почему-то нет. Множителей эпохи он не видит никогда. */''}
                 ${(state.world && state.world.eraName) ? `<div class="era-line">Эпоха: <b>${state.world.eraName}</b></div>` : ''}
@@ -15850,6 +16526,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_training.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🎓 Развивать себя <span class="sec-hint">— тренинги и создание своего</span></summary><div class="sec-in">${winCover('win_training')}${renderSelfPanel(p)}</div></details>
 
+                ${/* 🏡 ОБРАЗ ЖИЗНИ — шаг 1: показать текущий дом и машину из бланка (только зеркало) */''}
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.45),rgba(8,10,14,.82)),url('cat_imgs/lifestyle/homes/home_lvl3_a.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏡 Образ жизни <span class="sec-hint">— дом и машина</span></summary><div class="sec-in">${winCover('win_assets')}<div class="card"><div class="block-title">🏡 Как ты живёшь</div>${renderLifestylePanel(p)}</div></div></details>
+
                 ${/* плитки у депозитов нет — открывается кнопкой у кассы, а окно то же самое */''}
                 <details class="sec tile-hidden"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_deposit.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏦 Депозиты <span class="sec-hint">— тихий рост без риска</span></summary><div class="sec-in">${winCover('win_deposit')}${renderDepositPanel(p)}</div></details>
 
@@ -15863,6 +16542,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">${infoBtn('tovarka')}</div>
                     <p style="font-size:13px;color:#9c988e;line-height:1.55;margin:0 0 12px;">Закупаешь партию — она приходит мёртвым грузом и сама не продаётся. Продажи вытаскиваешь руками: запускаешь рекламные кампании по каналам. Таргет-скилл качается от практики.</p>
                     <button onclick="openTovarka()" class="btn" style="width:100%;background:linear-gradient(180deg,#f4dd9c,#d9b877);color:#20180a;font-weight:800;padding:13px;border-radius:12px;">📦 Открыть Товарку</button>
+                </div></details>
+
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.45),rgba(8,10,14,.8)),url('cat_imgs/win_otnosheniya.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">❤️ Отношения <span class="sec-hint">— живая история с ней</span></summary><div class="sec-in">${winCover('win_otnosheniya')}
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">${infoBtn('relationship')}</div>
+                    <p style="font-size:13px;color:#c8a8b0;line-height:1.55;margin:0 0 12px;">Выбираешь её вслепую — по лицу. Тепло тает без внимания, она сама звонит тебе с вопросами, а вехи ведут от свидания до семьи. Всё из твоей кассы; развод — раздел и алименты в месячный поток.</p>
+                    <button onclick="openRelationship()" class="btn" style="width:100%;background:linear-gradient(180deg,#ff9db4,#ff7d9c);color:#2a0d14;font-weight:800;padding:13px;border-radius:12px;">❤️ Открыть Отношения</button>
                 </div></details>
 
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_assets.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🛒 Мои активы <span class="sec-hint">— бизнес, недвижимость</span></summary><div class="sec-in">${winCover('win_assets')}
@@ -15971,9 +16656,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div class="card">
                         <div class="block-title">📉 Расходы</div>
                         <div class="row-item" style="opacity:0.5;"><span>Налоги:</span><span>${f.taxes} $</span></div>
-                        <div class="row-item ${p.isM?'strike':''}"><span>Платёж по ипотеке:</span><span>${p.prof.mortgagePay} $</span></div>
+                        <div class="row-item"><span>${p.isM?'Содержание жилья:':'Платёж по ипотеке:'}</span><span>${curHomePay(p)} $</span></div>
                         <div class="row-item ${p.isE?'strike':''}" ${p.prof.eduPay===0?'style="opacity:0.4;"':''}><span>Платёж по образованию:</span><span>${p.prof.eduPay} $</span></div>
-                        <div class="row-item ${p.isA?'strike':''}"><span>Платёж по авто-кредиту:</span><span>${p.prof.autoPay} $</span></div>
+                        <div class="row-item ${p.isA?'strike':''}"><span>Платёж по авто-кредиту:</span><span>${curCarPay(p)} $</span></div>
                         <div class="row-item ${p.isCC?'strike':''}"><span>Платёж по кредитной карте:</span><span>${p.prof.ccPay} $</span></div>
                         <div class="row-item ${p.isR?'strike':''}"><span>Платёж по розничному кредиту:</span><span>${p.prof.retailPay} $</span></div>
                         <div class="row-item" style="opacity:0.5;"><span>Прочие расходы:</span><span>${f.otherExp} $</span></div>
@@ -15982,6 +16667,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         ${(f.farmFeed||0)>0?`<div class="row-item" style="background:#14251b;"><span>🌾 Корм и содержание фермы (${farmHeads(p)} гол):</span><b style="color:#ef4444;">${f.farmFeed} $</b></div>`:''}
                         ${(f.farmWage||0)>0?`<div class="row-item" style="background:#14251b;"><span>👔 Управляющий фермы:</span><b style="color:#ef4444;">${f.farmWage} $</b></div>`:''}
                         ${(f.tovarkaRent||0)>0?`<div class="row-item" style="background:#241a0c;"><span>📦 Склад товарки (держание партий):</span><b style="color:#ef4444;">${f.tovarkaRent} $</b></div>`:''}
+                        ${(f.relAlimony||0)>0?`<div class="row-item" style="background:#241016;"><span>❤️‍🩹 Алименты после развода:</span><b style="color:#ef4444;">${f.relAlimony} $</b></div>`:''}
                         <div class="sub-section">
                             <div class="row-item" style="background:#7f1d1d; border-color:#ef4444;">
                                 <b>Общий расход:</b>
@@ -15996,9 +16682,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <div class="card">
                     <div class="block-title">📋 Пассивы (долги на погашение)</div>
                     <div class="grid-2" style="margin:0; gap:10px;">
-                        ${debtRow(p.isM, 'Закладная на дом', p.mLeft, p.prof.mortgagePay, 'PAY_MORTGAGE')}
+                        ${debtRow(p.isM, 'Закладная на дом', p.mLeft, curHomePay(p), 'PAY_MORTGAGE')}
                         ${p.prof.eduPay > 0 ? debtRow(p.isE, 'Кредит на образование', p.eLeft, p.prof.eduPay, 'PAY_EDU') : ''}
-                        ${debtRow(p.isA, 'Авто-кредит', p.aLeft, p.prof.autoPay, 'PAY_AUTO')}
+                        ${debtRow(p.isA, 'Авто-кредит', p.aLeft, curCarPay(p), 'PAY_AUTO')}
                         ${debtRow(p.isCC, 'Долг по кредитным карточкам', p.ccLeft, p.prof.ccPay, 'PAY_CC')}
                         ${debtRow(p.isR, 'Розничный долг', p.rLeft, p.prof.retailPay, 'PAY_RETAIL')}
                         ${p.bankLoan > 0 ? `
@@ -16677,6 +17363,143 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <iframe id="tovarkaFrame" src="via_tovarka.html" title="Товарка" style="width:100%;height:calc(100vh - 96px);border:1px solid var(--lx-gold-ln);border-radius:16px;background:#06090f;display:block;"></iframe>
             </div>`;
         }
+        // ❤️ ОТНОШЕНИЯ — фоновый движок + ПЕРЕБИВКА ЗВОНКОМ поверх бланка.
+        // Модуль via_otnosheniya.html живёт в постоянном скрытом хосте на body (переживает перерисовки бланка) и
+        // тикает по фоновому таймеру ИГРЫ. Когда она звонит — показываем звонок поверх ЛЮБОГО экрана. Игноришь —
+        // модуль копит пропущенные (она делает выводы), тепло падает, дальше уход. Касса=savings; алименты→поток.
+        var REL_TICK_MS = 75000;   // ~75с реального времени = один прожитый ею месяц (мягко, не сливает кассу в фоне)
+        function relFrameWin(){ const fr=document.getElementById('relFrame'); return (fr&&fr.contentWindow)?fr.contentWindow:null; }
+        function relPostToModule(msg){ const w=relFrameWin(); if(w) w.postMessage(msg,'*'); }
+        function ensureRelHost(){
+            if(document.getElementById('relHost')) return;
+            const host=document.createElement('div');
+            host.id='relHost';
+            host.style.cssText='position:fixed;inset:0;z-index:8000;display:none;background:#0d0709;';
+            host.innerHTML = `<div style="max-width:660px;margin:0 auto;height:100%;display:flex;flex-direction:column;padding:8px 10px calc(10px + env(safe-area-inset-bottom));">
+                <button onclick="closeRelationship()" class="btn" style="flex:0 0 auto;background:#2a1620;border:1px solid #6b2a3a;color:#ff9db4;font-weight:800;padding:9px 15px;border-radius:11px;margin-bottom:8px;">← Назад в бланк</button>
+                <iframe id="relFrame" src="via_otnosheniya.html" title="Отношения" style="flex:1 1 auto;width:100%;border:1px solid #6b2a3a;border-radius:16px;background:#0d0709;display:block;"></iframe>
+            </div>`;
+            document.body.appendChild(host);
+            relBridgeInit();
+            if(window._relSpendSeq===undefined){ const p0=me(); window._relSpendSeq=(p0&&p0.relationship&&p0.relationship.spend&&p0.relationship.spend.seq)||0; }
+            if(!window._relTimer) window._relTimer=setInterval(relBackgroundTick, REL_TICK_MS);
+        }
+        function relBackgroundTick(){
+            const p=me(); if(!p||!p.relationship) return;
+            if(p.relationship.over) return;      // ушла — время замерло
+            if(document.hidden) return;          // вкладка не активна — не тикаем
+            relPostToModule({type:'rel_tick'});
+        }
+        function relBridgeInit(){
+            if(window._relBridge) return; window._relBridge=true;
+            window.addEventListener('message', function(e){
+                const d=e.data; if(!d||(d.type!=='rel_ready'&&d.type!=='rel_state')) return;
+                const p=me(); if(!p) return;
+                if(d.type==='rel_ready'){
+                    relPostToModule({type:'rel_init', cash:Number(p.savings)||0, state:p.relationship||null, year:curYear()});
+                } else {
+                    let ch=false;
+                    if(typeof d.cash==='number' && isFinite(d.cash) && Math.abs((Number(p.savings)||0)-d.cash)>0.001){ p.savings=Math.round(d.cash*100)/100; ch=true; }
+                    if(d.state){ p.relationship=d.state; ch=true; }
+                    if(ch) save(p.id);
+                    relInterrupt(d.state);     // звонок/прощание поверх бланка
+                    relSpendReport(d.state);   // 💳 отчёт о трате по карте поверх бланка
+                }
+            });
+        }
+        function relIsOpen(){ const h=document.getElementById('relHost'); return h && h.style.display!=='none'; }
+        function openRelationship(){ ensureRelHost(); document.getElementById('relHost').style.display='block'; relDismissOverlay(); }
+        function closeRelationship(){ const h=document.getElementById('relHost'); if(h) h.style.display='none'; const p=me(); if(p) relInterrupt(p.relationship); render(); }
+        // ── Перебивка: показать её звонок/прощание поверх любого экрана, когда окно Отношений закрыто ──
+        function relInterrupt(s){
+            if(!s){ relDismissOverlay(); return; }
+            if(relIsOpen()){ relDismissOverlay(); return; }   // окно открыто — там свой звонок, не дублируем
+            if(s.over && !s.farewellSeen){ relShowFarewell(s); return; }
+            if(s.incoming){ relShowCall(s); return; }
+            relDismissOverlay();
+        }
+        function relOverlayEl(){
+            if(!document.getElementById('relKeyframes')){ const stl=document.createElement('style'); stl.id='relKeyframes';
+                stl.textContent='@keyframes relring{0%{box-shadow:0 0 0 0 rgba(255,125,156,.55)}70%{box-shadow:0 0 0 24px rgba(255,125,156,0)}100%{box-shadow:0 0 0 0 rgba(255,125,156,0)}}@keyframes relacc{0%,100%{transform:none}50%{transform:scale(1.09)}}';
+                document.head.appendChild(stl); }
+            let o=document.getElementById('relCall');
+            if(!o){ o=document.createElement('div'); o.id='relCall';
+                o.style.cssText='position:fixed;inset:0;z-index:9200;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:26px;background:radial-gradient(120% 75% at 50% 12%,rgba(255,125,156,.17),transparent 62%),rgba(6,4,5,.95);';
+                document.body.appendChild(o); }
+            return o;
+        }
+        function relFaceHtml(s){ return s.face?`<img src="${s.face}" alt="" style="width:100%;height:100%;object-fit:cover;">`:`<span style="font-size:70px">${s.ava||(s.he?'🧔':'👩')}</span>`; }
+        function relShowCall(s){
+            const o=relOverlayEl();
+            const sub=(s.warm!=null&&s.warm<38)?('ты давно не '+(s.he?'была':'был')+' рядом'):(s.callKind||'хочет поговорить');
+            o.innerHTML = `<div style="font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;font-weight:800;color:#ff9db4;margin-bottom:20px;">входящий звонок…</div>
+                <div style="width:148px;height:148px;border-radius:50%;overflow:hidden;border:3px solid #ff9db4;display:flex;align-items:center;justify-content:center;background:#241820;animation:relring 1.5s infinite;">${relFaceHtml(s)}</div>
+                <div style="font-size:27px;font-weight:800;margin-top:20px;color:#f4eaed;">${s.name||''}</div>
+                <div style="font-size:13px;color:#b6a0a7;margin-top:5px;">${sub}</div>
+                <div style="font-family:Georgia,serif;font-style:italic;font-size:19px;color:#ffe7ee;line-height:1.42;margin:17px 6px 0;max-width:430px;">${s.callQ||''}</div>
+                <div style="display:flex;gap:46px;margin-top:32px;">
+                    <button onclick="relDeclineCall()" style="border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:9px;"><span style="width:66px;height:66px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:29px;color:#fff;background:linear-gradient(180deg,#d94048,#b8242c);">✕</span><span style="font-size:12px;color:#b6a0a7;font-weight:600;">Сбросить</span></button>
+                    <button onclick="relAnswerCall()" style="border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:9px;"><span style="width:66px;height:66px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:29px;color:#fff;background:linear-gradient(180deg,#39c47a,#2aa863);animation:relacc 1.3s infinite;">✓</span><span style="font-size:12px;color:#b6a0a7;font-weight:600;">Ответить</span></button>
+                </div>`;
+            o.style.display='flex';
+        }
+        function relShowFarewell(s){
+            const o=relOverlayEl();
+            const bye = s.he
+              ? ( s.overReason==='rival' ? 'Прости. Пока ты была занята собой, рядом оказалась та, кто была со мной. Я ухожу к ней.'
+                : s.overReason==='left' ? 'Я так долго ждал, что ты меня заметишь… Больше не могу. Прощай.'
+                : s.overReason==='betrayal' ? 'Я всё знаю о том, что ты скрывала. Не звони мне больше. Никогда.'
+                : 'Нас больше нет. Ты теряла меня по капле — и не заметила, как потеряла совсем.' )
+              : ( s.overReason==='rival' ? 'Прости. Пока ты был занят собой, рядом оказался тот, кто был со мной. Я ухожу к нему.'
+                : s.overReason==='left' ? 'Я так долго ждала, что ты меня заметишь… Больше не могу. Прощай.'
+                : s.overReason==='betrayal' ? 'Я всё знаю о том, что ты скрывал. Не звони мне больше. Никогда.'
+                : 'Нас больше нет. Ты терял меня по капле — и не заметил, как потерял совсем.' );
+            o.innerHTML = `<div style="font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;font-weight:800;color:#7e93ad;margin-bottom:20px;">${s.overReason==='betrayal'?'последнее сообщение':'прощальный звонок'}</div>
+                <div style="width:148px;height:148px;border-radius:50%;overflow:hidden;border:3px solid #7e93ad;filter:grayscale(.55) brightness(.85);display:flex;align-items:center;justify-content:center;background:#241820;">${relFaceHtml(s)}</div>
+                <div style="font-size:27px;font-weight:800;margin-top:20px;color:#f4eaed;">${s.name||''}</div>
+                <div style="font-family:Georgia,serif;font-style:italic;font-size:19px;color:#d9c3ca;line-height:1.42;margin:17px 6px 0;max-width:430px;">«${bye}»</div>
+                <button onclick="relAckOver()" style="margin-top:32px;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:9px;"><span style="width:66px;height:66px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:29px;color:#fff;background:linear-gradient(180deg,#8f7bb0,#6d5a90);">🕊️</span><span style="font-size:12px;color:#b6a0a7;font-weight:600;">Отпустить</span></button>`;
+            o.style.display='flex';
+        }
+        function relDismissOverlay(){ const o=document.getElementById('relCall'); if(o) o.style.display='none'; }
+        function relAnswerCall(){ relDismissOverlay(); openRelationship(); }              // взял трубку → открывается разговор
+        function relDeclineCall(){ relPostToModule({type:'rel_decline'}); relDismissOverlay(); }   // сбросил поверх бланка
+        function relAckOver(){ relPostToModule({type:'rel_ackover'}); relDismissOverlay(); }
+        // ── 💳 Отчёт о трате по карте поверх бланка (как push от банка) ──
+        function relSpendReport(s){
+            if(!s || !s.spend) return;
+            const seq=s.spend.seq||0;
+            if(seq > (window._relSpendSeq||0)){ window._relSpendSeq=seq; relShowSpend(s.spend); }
+        }
+        function relShowSpend(sp){
+            if(!sp) return;
+            let o=document.getElementById('relSpend');
+            if(!o){ o=document.createElement('div'); o.id='relSpend';
+                o.style.cssText='position:fixed;inset:0;z-index:9300;display:none;align-items:flex-start;justify-content:center;padding:calc(20px + env(safe-area-inset-top)) 16px 16px;background:rgba(6,4,5,.62);';
+                document.body.appendChild(o); }
+            const give=(sp.dir>0);
+            const title=give?'Пополнение по твоей карте':'Списание по твоей карте';
+            const who=(sp.name||(sp.he?'Он':'Она'))+' '+(give?(sp.he?'только что пополнил':'только что пополнила'):(sp.he?'только что расплатился':'только что расплатилась'));
+            const amtHtml=give?`<span style="color:#6ee0a6;">+${fmtN(sp.amount)} $</span>`:`<span style="color:#ff6b72;">−${fmtN(sp.amount)} $</span>`;
+            const takeBtn=give?'':`<button onclick="relTakeCard()" style="flex:1;border:none;background:linear-gradient(180deg,#d94048,#b8242c);color:#fff;font-weight:800;padding:11px;border-radius:11px;cursor:pointer;font-family:inherit;">🚫 Забрать карту</button>`;
+            o.innerHTML = `<div style="width:420px;max-width:100%;border:1px solid #6b2a3a;border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#241019,#160b10);box-shadow:0 20px 50px -12px rgba(0,0,0,.7);">
+                <div style="display:flex;align-items:center;gap:10px;padding:13px 16px;background:rgba(255,125,156,.08);border-bottom:1px solid #3a1f28;">
+                    <span style="font-size:22px;">💳</span>
+                    <div style="text-align:left;"><div style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#ff9db4;font-weight:800;">${title}</div>
+                    <div style="font-size:11px;color:#b6a0a7;">${who}</div></div>
+                    <div style="margin-left:auto;font-size:19px;font-weight:800;white-space:nowrap;">${amtHtml}</div>
+                </div>
+                <div style="padding:14px 16px;text-align:left;">
+                    <div style="font-size:15px;color:#f4eaed;font-weight:600;line-height:1.4;">${sp.big?(give?'💸 Крупное пополнение — ':'😳 Крупная трата — '):''}${sp.item}</div>
+                    <div style="display:flex;gap:10px;margin-top:14px;">
+                        <button onclick="relDismissSpend()" style="flex:1;border:1px solid #3a1f28;background:#1c1216;color:#ecdfe3;font-weight:800;padding:11px;border-radius:11px;cursor:pointer;font-family:inherit;">${give?'Спасибо':'Ладно'}</button>
+                        ${takeBtn}
+                    </div>
+                </div></div>`;
+            o.style.display='flex';
+        }
+        function relDismissSpend(){ const o=document.getElementById('relSpend'); if(o) o.style.display='none'; }
+        function relTakeCard(){ relPostToModule({type:'rel_takecard'}); relDismissSpend(); }
         function openFarm(){ const p=farmMe(); if(!p) return; if(p.farm){ farmMergeHerds(p); farmClock(p); save(p.id); } state.view='farm'; state.farmTab = p.farm ? 'mine' : 'buy'; render(); }
 
         function renderFarm(app){
