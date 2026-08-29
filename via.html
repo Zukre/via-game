@@ -11467,7 +11467,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const homeCard = `
                 <div class="card" style="padding:0;overflow:hidden;">
                   <div style="height:170px;position:relative;background:#0a0806;">
-                    <img src="cat_imgs/lifestyle/homes/${home.img}.webp" alt="${home.name}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/lifestyle/homes/${home.img}.png';">
+                    <img src="cat_imgs/homes/${home.img}.webp" alt="${home.name}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/homes/${home.img}.png';">
                     <div style="position:absolute;top:8px;left:8px;background:rgba(11,14,20,.82);border:1px solid var(--lx-gold-ln);border-radius:8px;color:var(--lx-gold-br);font-size:11px;font-weight:800;padding:3px 9px;">🏠 Жильё · ур. ${hl}/5</div>
                     ${rent ? `<div style="position:absolute;top:8px;right:8px;background:rgba(80,20,20,.85);border:1px solid #7f1d1d;border-radius:8px;color:#fca5a5;font-size:11px;font-weight:800;padding:3px 9px;">АРЕНДА</div>` : ''}
                   </div>
@@ -11501,7 +11501,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 carCard = `
                 <div class="card" style="padding:0;overflow:hidden;">
                   <div style="height:170px;position:relative;background:#0a0806;">
-                    <img src="cat_imgs/lifestyle/cars/${car.img}.webp" alt="${car.name}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/lifestyle/cars/${car.img}.png';">
+                    <img src="cat_imgs/cars/${car.img}.webp" alt="${car.name}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/cars/${car.img}.png';">
                     <div style="position:absolute;top:8px;left:8px;background:rgba(11,14,20,.82);border:1px solid var(--lx-gold-ln);border-radius:8px;color:var(--lx-gold-br);font-size:11px;font-weight:800;padding:3px 9px;">🚗 Машина · ур. ${cl}/6</div>
                   </div>
                   <div style="padding:11px 13px 13px;">
@@ -11602,7 +11602,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div class="card" style="padding:0;overflow:hidden;border-color:${isCur ? 'var(--lx-gold-ln)' : 'var(--lx-line)'};margin-bottom:10px;">
                       <div style="display:flex;gap:0;">
                         <div style="width:120px;flex:0 0 120px;background:#0a0806;">
-                            <img src="cat_imgs/lifestyle/homes/${H.img}.webp" alt="${H.name}" style="width:100%;height:100%;min-height:96px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/lifestyle/homes/${H.img}.png';">
+                            <img src="cat_imgs/homes/${H.img}.webp" alt="${H.name}" style="width:100%;height:100%;min-height:96px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/homes/${H.img}.png';">
                         </div>
                         <div style="flex:1;padding:9px 11px 11px;min-width:0;">
                             <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
@@ -11685,7 +11685,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div class="card" style="padding:0;overflow:hidden;border-color:${isCur ? 'var(--lx-gold-ln)' : 'var(--lx-line)'};margin-bottom:10px;">
                       <div style="display:flex;gap:0;">
                         <div style="width:120px;flex:0 0 120px;background:#0a0806;">
-                            <img src="cat_imgs/lifestyle/cars/${C.img}.webp" alt="${C.name}" style="width:100%;height:100%;min-height:96px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/lifestyle/cars/${C.img}.png';">
+                            <img src="cat_imgs/cars/${C.img}.webp" alt="${C.name}" style="width:100%;height:100%;min-height:96px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='cat_imgs/cars/${C.img}.png';">
                         </div>
                         <div style="flex:1;padding:9px 11px 11px;min-width:0;">
                             <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
@@ -11741,7 +11741,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 return `
                     <div class="card" style="padding:0;overflow:hidden;border-color:${border};">
                       <div style="aspect-ratio:16/9;background:#0a0806;position:relative;">
-                        <img src="cat_imgs/lifestyle/${folder}/${item.img}.webp" alt="${item.name}" style="width:100%;height:100%;object-fit:contain;display:block;${lvl>cur?'filter:grayscale(.55) brightness(.8);':''}" onerror="this.onerror=function(){this.replaceWith(Object.assign(document.createElement('div'),{style:'width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8a7f6a;font-size:11px;letter-spacing:.02em;background:#0a0806;',textContent:'📷 фото скоро'}))};this.src=this.src.replace('.webp','.png');">
+                        <img src="cat_imgs/${folder}/${item.img}.webp" alt="${item.name}" style="width:100%;height:100%;object-fit:contain;display:block;${lvl>cur?'filter:grayscale(.55) brightness(.8);':''}" onerror="this.onerror=function(){this.replaceWith(Object.assign(document.createElement('div'),{style:'width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8a7f6a;font-size:11px;letter-spacing:.02em;background:#0a0806;',textContent:'📷 фото скоро'}))};this.src=this.src.replace('.webp','.png');">
                         ${owned?`<div style="position:absolute;top:5px;right:5px;background:rgba(11,14,20,.85);border:1px solid var(--lx-gold-ln);border-radius:6px;color:var(--lx-gold-br);font-size:9px;font-weight:800;padding:2px 6px;">СЕЙЧАС</div>`:''}
                       </div>
                       <div style="padding:7px 8px 8px;">
@@ -16527,7 +16527,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_training.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🎓 Развивать себя <span class="sec-hint">— тренинги и создание своего</span></summary><div class="sec-in">${winCover('win_training')}${renderSelfPanel(p)}</div></details>
 
                 ${/* 🏡 ОБРАЗ ЖИЗНИ — шаг 1: показать текущий дом и машину из бланка (только зеркало) */''}
-                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.45),rgba(8,10,14,.82)),url('cat_imgs/lifestyle/homes/home_lvl3_a.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏡 Образ жизни <span class="sec-hint">— дом и машина</span></summary><div class="sec-in">${winCover('win_assets')}<div class="card"><div class="block-title">🏡 Как ты живёшь</div>${renderLifestylePanel(p)}</div></div></details>
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.45),rgba(8,10,14,.82)),url('cat_imgs/win_obraz.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏡 Образ жизни <span class="sec-hint">— дом и машина</span></summary><div class="sec-in">${winCover('win_assets')}<div class="card"><div class="block-title">🏡 Как ты живёшь</div>${renderLifestylePanel(p)}</div></div></details>
 
                 ${/* плитки у депозитов нет — открывается кнопкой у кассы, а окно то же самое */''}
                 <details class="sec tile-hidden"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_deposit.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏦 Депозиты <span class="sec-hint">— тихий рост без риска</span></summary><div class="sec-in">${winCover('win_deposit')}${renderDepositPanel(p)}</div></details>
@@ -16563,12 +16563,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div></details>
 
                 ${/* 🏢 БИЗНЕС — ветка: развитие/продажа/слежка живут тут (Ринат 12авг) */''}
-                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_assets.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏢 Бизнес <span class="sec-hint">— развивай и продавай дела</span></summary><div class="sec-in">${winCover('win_assets')}
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_biznes.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏢 Бизнес <span class="sec-hint">— развивай и продавай дела</span></summary><div class="sec-in">${winCover('win_assets')}
                 <div class="card"><div class="block-title">🏢 Мои дела</div>${renderBizBranch(p, hasP)}</div>
                 </div></details>
 
                 ${/* 🏠 НЕДВИЖИМОСТЬ — ветка: объекты (type ESTATE), улучшение/продажа */''}
-                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_assets.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏠 Недвижимость <span class="sec-hint">— улучшай и продавай объекты</span></summary><div class="sec-in">${winCover('win_assets')}
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_nedvizhimost.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏠 Недвижимость <span class="sec-hint">— улучшай и продавай объекты</span></summary><div class="sec-in">${winCover('win_assets')}
                 <div class="card"><div class="block-title">🏠 Мои объекты</div>${renderRealtyBranch(p, hasP)}</div>
                 </div></details>
 
