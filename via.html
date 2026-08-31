@@ -10646,10 +10646,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         //   Зарплата ×salMult, но и уровень жизни (прочие расходы) ×expMult. Бонус — копится (числа/эффекты Ринат тюнит).
         const CAREER_LADDER = [
             {name:'👤 Работник',              salMult:1.0, expMult:1.0,  cost:0,      skills:0, bonus:'старт'},
-            {name:'📈 Старший специалист',    salMult:1.3, expMult:1.15, cost:5000,   skills:1, bonus:'🏦 кредитный лимит ×1.5'},
-            {name:'🧑‍💼 Руководитель отдела',   salMult:1.7, expMult:1.35, cost:15000,  skills:2, bonus:'💼 бизнесы приносят +10%'},
-            {name:'🏢 Директор',              salMult:2.3, expMult:1.6,  cost:40000,  skills:3, bonus:'🎯 налоги −15%'},
-            {name:'👑 Региональный директор', salMult:3.0, expMult:2.0,  cost:100000, skills:4, bonus:'💎 весь пассив +15%'},
+            // 30авг (Ринат, рычаг 2): кривая expMult сжата — «профи живёт дороже» сохранено, но
+            // карьера уже не гонит планку победы почти вдвое. Рост планки Работник→вершина ×1.73→×1.31
+            // (зонд --lifeprobe по calc). salMult НЕ трогали — зарплатная награда за карьеру цела.
+            {name:'📈 Старший специалист',    salMult:1.3, expMult:1.08, cost:5000,   skills:1, bonus:'🏦 кредитный лимит ×1.5'},
+            {name:'🧑‍💼 Руководитель отдела',   salMult:1.7, expMult:1.18, cost:15000,  skills:2, bonus:'💼 бизнесы приносят +10%'},
+            {name:'🏢 Директор',              salMult:2.3, expMult:1.30, cost:40000,  skills:3, bonus:'🎯 налоги −15%'},
+            {name:'👑 Региональный директор', salMult:3.0, expMult:1.45, cost:100000, skills:4, bonus:'💎 весь пассив +15%'},
         ];
         function careerLvl(p){ return Math.max(0, Math.min(CAREER_LADDER.length-1, Number(p&&p.careerLvl)||0)); }
         function careerRank(p){ return CAREER_LADDER[careerLvl(p)]; }
@@ -13769,7 +13772,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function bizAdd(key, out, mult){
             const u=BIZ_UPGRADES.find(x=>x.k===key); if(!u) return 0;
-            return Math.round((Number(u.best)||0) * (Number(BIZ_STORY[key][out][2])||0) * bizSize(mult));
+            // 30авг (Ринат): ПОЛ вложенному — развитие больше не уходит в минус. Худшая карта = 0
+            // потока, а не потеря. Строить пассив стало осмысленно; дверь при этом закрыта (порог держим).
+            return Math.max(0, Math.round((Number(u.best)||0) * (Number(BIZ_STORY[key][out][2])||0) * bizSize(mult)));
         }
         // ШАНСЫ. Базово (минимальный вход): провал 25%, слабо 30%, средне 30%, лучшая 15%.
         // Ринат: «чем больше вкладываешь, тем вероятность лучшей карты выше». Вложил вдвое сверх
@@ -13780,8 +13785,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // то есть примерно один заход из четырёх, СКОЛЬКО БЫ ты ни заплатил. Гарантии нет
             // никогда. Провал тоже не исчезает (пол 12%). Крупный вклад окупается размером
             // выигрыша (bizSize), а не вероятностью — иначе деньги покупали бы удачу.
-            const boom = Math.round(Math.min(25, 15 + 1.2*(k-1)));
-            const bad  = Math.round(Math.max(12, 25 - 1.3*(k-1)));
+            // 30авг (Ринат): база сдвинута к плюсу — бум 15→20, провал 25→16. Шанс пройти ступень
+            // (mid+boom) ~45%→~52%. Бум всё равно ~1 из 5, гарантии нет — дверь не распахивается.
+            const boom = Math.round(Math.min(32, 20 + 1.2*(k-1)));
+            const bad  = Math.round(Math.max(8, 16 - 1.3*(k-1)));
             const rest = 100 - boom - bad;
             return { bad:bad, weak:Math.round(rest*0.5), mid:rest-Math.round(rest*0.5), boom:boom };
         }
