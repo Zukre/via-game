@@ -11240,7 +11240,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 trades:[], soulCard:null, soulSeen:{}, soulPoison:0, shadow:0, lastCell:0, joinYear:null,
                 soul5:[], doorsDone:{}, doorOpen:null, soulNew:null, soulBurn:null, cursed:false, briefSeen:false,
                 cheatPick:false, cheatOn:null, charity:0, charityLast:null,
-                choiceLog:[], viceScar:0
+                choiceLog:[], viceScar:0, mirrorSeen:false
             };
             for (const k in D){ if (p[k] === undefined) p[k] = D[k]; }
             if (!p.branches || typeof p.branches !== 'object') p.branches = {work:[],free:[],spirit:[]};
@@ -11304,7 +11304,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             medModal: null,
             childModal: null,
             casinoUnlocked: false,
-            mirrorModal: false
+            mirrorModal: false,
+            archiveModal: false
         };
 
         // ═══════════ 🏛️ ФУНДАМЕНТ ДАННЫХ: вечный профиль игрока ═══════════
@@ -11312,14 +11313,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Сюда стекаются сигналы со ВСЕХ сфер через ОДИН вход logSignal(sphere,key,value).
         // Ядро следа (soulWeight/archetypeOf) уже читает поля партии; тут копится вечный агрегат для Зеркала.
         // Ничего из существующей игры не трогает — только добавляет. Дизайн: VIA_ФУНДАМЕНТ_СТРУКТУРА_ДАННЫХ.md
-        const PROFILE_VERSION = 1;
+        // v2: два счётчика воронки (games — проходов начато, reachedMirror — дошли до Зеркала,
+        //     считается ОДИН раз за жизнь) + runs — вечный архив прожитых жизней (карточки 1,2,3…500).
+        const PROFILE_VERSION = 2;
         const PROFILE = (function(){
-            let base = { v: PROFILE_VERSION, created: Date.now(), updated: Date.now(), games: 0, signals: {} };
+            let base = { v: PROFILE_VERSION, created: Date.now(), updated: Date.now(),
+                         games: 0, reachedMirror: 0, runs: [], signals: {} };
             try {
                 const raw = localStorage.getItem('v0_profile');
                 if (raw) { const p = JSON.parse(raw); if (p && typeof p === 'object') base = Object.assign(base, p); }
             } catch(e) { console.warn('PROFILE load fail', e); }
             if (!base.signals || typeof base.signals !== 'object') base.signals = {};
+            if (typeof base.games !== 'number') base.games = 0;
+            if (typeof base.reachedMirror !== 'number') base.reachedMirror = 0;
+            if (!Array.isArray(base.runs)) base.runs = [];
+            base.v = PROFILE_VERSION;
             return base;
         })();
         function saveProfile() {
@@ -12235,7 +12243,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // на любом экране, остальные окна — по-прежнему только в бланке.
             if (state.view !== 'player') return renderWorldShow() + renderPayslipModal();   // 💰 получку видит и ведущий (он её выдаёт)
             const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return renderWorldShow() + renderPayslipModal();
-            return renderWorldShow() + renderPayslipModal() + renderBizReport() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup() + renderHomeUpgradeModal() + renderCarUpgradeModal() + renderMirrorModal();
+            return renderWorldShow() + renderPayslipModal() + renderBizReport() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup() + renderHomeUpgradeModal() + renderCarUpgradeModal() + renderMirrorModal() + renderArchiveModal();
         }
         // 🎲 Личный попап «Твой ход» — показывается тому, чей ход настал, закрывается крестиком/кнопкой.
         function renderMyTurnPopup(){
@@ -12406,7 +12414,33 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 strengths, games
             };
         }
-        function openMirror(){ state.mirrorModal = true; paintOverlays(); }
+        // ВОРОНКА + АРХИВ ЖИЗНЕЙ: при первом заходе в Зеркало за эту жизнь растим счётчик «дошёл до Зеркала»
+        // (один раз за жизнь — иначе цифра для гипотезы раздувается от повторных открытий) и сворачиваем
+        // прожитую жизнь в компактную карточку вечного архива PROFILE.runs (игры 1,2,3…500 — открыть можно позже).
+        function recordMirrorReached(p){
+            try {
+                if(!p || p.mirrorSeen) return;              // считаем ОДИН раз за жизнь
+                p.mirrorSeen = true;
+                PROFILE.reachedMirror = (PROFILE.reachedMirror || 0) + 1;
+                const M = (typeof mirrorBuild==='function') ? mirrorBuild(p) : null;
+                const snap = (typeof lifeSnapshot==='function') ? lifeSnapshot(p) : {};
+                const card = {
+                    id: p.id, name: p.name || 'Игрок', at: Date.now(), game: (PROFILE.games || 0),
+                    life: snap.t||0, worth: snap.worth||0, cash: snap.cash||0,
+                    debt: snap.debt||0, passive: snap.passive||0, health: snap.health||0,
+                    core: (M && M.coreText) ? M.coreText : null,
+                    obs: (M && Array.isArray(M.obs)) ? M.obs.length : 0,
+                    choices: Array.isArray(p.choiceLog) ? p.choiceLog.length : 0
+                };
+                if(!Array.isArray(PROFILE.runs)) PROFILE.runs = [];
+                const i = PROFILE.runs.findIndex(r => r && r.id === card.id);
+                if(i >= 0) PROFILE.runs[i] = card; else PROFILE.runs.push(card);
+                if(PROFILE.runs.length > 500) PROFILE.runs.splice(0, PROFILE.runs.length - 500);
+                saveProfile();
+                try { save(); } catch(e){}                 // p.mirrorSeen должен жить в сейве
+            } catch(e){ console.warn('recordMirrorReached', e); }
+        }
+        function openMirror(){ recordMirrorReached(me()); state.mirrorModal = true; paintOverlays(); }
         function closeMirror(){ state.mirrorModal = false; paintOverlays(); }
         function renderMirrorModal(){
             if(!state.mirrorModal) return '';
@@ -12451,6 +12485,105 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
             </div>`;
         }
+
+        // ═══════════ 📚 АРХИВ ПРОЖИТЫХ ЖИЗНЕЙ (Ринат 14 сен) ═══════════
+        // Каждая игра — отдельная сессия: её Зеркало собрало свежие данные и легло карточкой в PROFILE.runs.
+        // Здесь их можно листать, а СВОДКА складывает последние N жизней в один рисунок — что повторяется
+        // из игры в игру, как меняется капитал, растёт человек или ходит по кругу. Выгрузка отдаёт сырые
+        // карты боту/агенту для глубокого разбора «сложи 20 игр → полная сводка».
+        function openArchive(){ state.archiveModal = true; paintOverlays(); }
+        function closeArchive(){ state.archiveModal = false; paintOverlays(); }
+        // Чистая функция: сворачивает последние n карт в агрегат. Ничего не пишет.
+        function mirrorRunsSummary(n){
+            const all = (typeof PROFILE!=='undefined' && Array.isArray(PROFILE.runs)) ? PROFILE.runs : [];
+            const runs = n ? all.slice(-n) : all.slice();
+            if(!runs.length) return { count:0 };
+            const num = a => a.map(Number).filter(x=>isFinite(x));
+            const worths = num(runs.map(r=>r.worth));
+            const first = worths.length?worths[0]:0, last = worths.length?worths[worths.length-1]:0;
+            const wMax = worths.length?Math.max(...worths):0, wMin = worths.length?Math.min(...worths):0;
+            const lives = num(runs.map(r=>r.life)), choices = num(runs.map(r=>r.choices));
+            const avg = arr => arr.length ? Math.round(arr.reduce((s,x)=>s+x,0)/arr.length) : 0;
+            // психотип: сколько раз какое ядро повторилось за эти жизни
+            const coreCount = {};
+            runs.forEach(r=>{ const c=r.core||'—'; coreCount[c]=(coreCount[c]||0)+1; });
+            let domCore=null, domN=0;
+            for(const c in coreCount){ if(c!=='—' && coreCount[c]>domN){ domN=coreCount[c]; domCore=c; } }
+            const distinct = Object.keys(coreCount).filter(c=>c!=='—').length;
+            const trend = (last>first*1.15) ? 'растёт' : (last<first*0.85 ? 'падает' : 'на месте');
+            const repeat = domCore && domN >= Math.ceil(runs.length/2);
+            return {
+                count: runs.length,
+                gameFrom: runs[0].game||0, gameTo: runs[runs.length-1].game||0,
+                worthFirst:first, worthLast:last, worthMax:wMax, worthMin:wMin, trend,
+                avgLife: avg(lives), avgChoices: avg(choices),
+                domCore, domN, distinct, repeat,
+                runs
+            };
+        }
+        // Выгрузка сырых карт для агента/бота (работает при открытии файла локально).
+        function exportRuns(){
+            try {
+                const data = { exportedAt:new Date().toISOString(),
+                               games:(PROFILE.games||0), reachedMirror:(PROFILE.reachedMirror||0),
+                               runs:(PROFILE.runs||[]) };
+                const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'via_runs_'+Date.now()+'.json';
+                document.body.appendChild(a); a.click();
+                setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 500);
+            } catch(e){ console.warn('exportRuns', e); alert('Не удалось выгрузить: '+e.message); }
+        }
+        function renderArchiveModal(){
+            if(!state.archiveModal) return '';
+            const G='#e4c583', INK='#ecf1ff', MID='#c6cfe6', LOW='#8b93ad';
+            const S = mirrorRunsSummary(20);
+            const shortCore = c => c ? (String(c).split('—')[0].trim()) : '—';
+            let inner;
+            if(!S.count){
+                inner = `<div style="text-align:center;padding:20px 0;">
+                    <div style="font-family:Georgia,serif;font-size:19px;color:${INK};margin-bottom:10px;">Архив пока пуст.</div>
+                    <div style="font-size:14px;line-height:1.6;color:${MID};max-width:42ch;margin:0 auto;">Дойди в игре до Зеркала Души — прожитая жизнь сама ляжет сюда карточкой. Со второй-третьей игры здесь проступит твоя траектория.</div>
+                </div>`;
+            } else {
+                const rowsHtml = S.runs.slice().reverse().map(r=>`
+                    <div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(150,170,220,.10);">
+                        <div style="flex:0 0 46px;font:700 15px/1 ui-monospace,monospace;color:${G};">№${r.game||'?'}</div>
+                        <div style="flex:1 1 auto;min-width:0;">
+                            <div style="font-size:13.5px;color:${INK};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.name||'Игрок'} · <span style="color:${MID};">${shortCore(r.core)}</span></div>
+                            <div style="font:500 11.5px/1.4 ui-monospace,monospace;color:${LOW};">капитал ${fmtN(r.worth||0)}$ · долг ${fmtN(r.debt||0)}$ · пассив ${fmtN(r.passive||0)}$ · выборов ${r.choices||0}</div>
+                        </div>
+                    </div>`).join('');
+                const trendColor = S.trend==='растёт' ? '#84c4d2' : (S.trend==='падает' ? '#cf9a9a' : LOW);
+                inner = `
+                    <div style="background:linear-gradient(160deg,rgba(228,197,131,.10),transparent);border:1px solid ${G}55;border-radius:16px;padding:20px;margin:0 0 22px;">
+                        <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.22em;text-transform:uppercase;color:${G};margin-bottom:12px;">Сводка по последним ${S.count} ${S.count===1?'жизни':'жизням'}</div>
+                        <div style="font-size:14.5px;line-height:1.7;color:${MID};">
+                            Капитал за эти жизни <b style="color:${trendColor};">${S.trend}</b> — от ${fmtN(S.worthFirst)}$ к ${fmtN(S.worthLast)}$ (пик ${fmtN(S.worthMax)}$, дно ${fmtN(S.worthMin)}$).
+                            ${S.domCore ? (S.repeat
+                                ? `Из игры в игру повторяется один рисунок — <b style="color:${INK};">${shortCore(S.domCore)}</b> (${S.domN} из ${S.count}). Это устойчивый паттерн, а не случайность.`
+                                : `Психотип скачет: ${S.distinct} разных рисунка за ${S.count} игр — ты пробуешь себя по-разному, а не ходишь по одной колее.`)
+                              : `Ядро психотипа ещё не проступило — маловато прожитых жизней.`}
+                            В среднем ${S.avgLife} шагов жизни и ${S.avgChoices} выборов за игру.
+                        </div>
+                    </div>
+                    <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.22em;text-transform:uppercase;color:${LOW};margin-bottom:6px;">Карточки прожитых жизней</div>
+                    ${rowsHtml}
+                    <button onclick="exportRuns()" style="display:block;width:100%;margin:20px 0 0;padding:11px;border-radius:12px;border:1px solid #4a5a72;background:linear-gradient(180deg,#141b2b,#0f131c);color:${MID};font-weight:600;font-size:13px;cursor:pointer;">⬇️ Выгрузить все карты (JSON для агента-аналитика)</button>
+                    <div style="text-align:center;font-size:11.5px;color:${LOW};margin-top:8px;line-height:1.5;">Сложи хоть 20 игр — бот прожуёт эти карты и соберёт полную сводку.</div>
+                `;
+            }
+            return `<div style="position:fixed;inset:0;z-index:5600;background:radial-gradient(120% 70% at 50% -8%,#16203c,rgba(9,13,26,.96) 60%),rgba(6,8,14,.96);display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow-y:auto;" onclick="closeArchive()">
+                <div onclick="event.stopPropagation()" style="position:relative;max-width:640px;width:100%;margin:22px auto;background:rgba(16,22,38,.74);border:1px solid rgba(150,170,220,.16);border-radius:20px;padding:30px 24px 34px;box-shadow:0 30px 80px -30px #000;">
+                    <button onclick="closeArchive()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:${LOW};font-size:26px;line-height:1;cursor:pointer;">×</button>
+                    <div style="font:600 12px/1 ui-monospace,monospace;letter-spacing:.3em;text-transform:uppercase;color:${G};margin-bottom:16px;">📚 Мои прожитые жизни</div>
+                    ${inner}
+                </div>
+            </div>`;
+        }
+        // ═══════════ конец архива жизней ═══════════
+
         // 🔨 ВЕЧНАЯ ДВЕРЬ В ЖИВЫЕ ТОРГИ (Ринат 13авг): аукцион — событие с таймером, а окна-разделы
         // во весь экран взаимоисключающие (открыл другую ветку → аукцион закрылся и забылся _openSecs).
         // Пока status==='live', держим над всем экраном кнопку-огонёк: куда бы игрок ни ушёл (другой
@@ -16753,6 +16886,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                       <div style="font-size:11.5px;color:#c79285;">${p.demonSign?'Обе двери закрыты. Выход — служение и годы чистой жизни.':'Круг души закрыт. Свет вернёт колоду.'}</div>
                     </div></div>` : ''}
                 <button onclick="openMirror()" style="display:block;width:100%;margin:0 0 10px;padding:11px;border-radius:12px;border:1px solid #6b551f;background:linear-gradient(180deg,#1a2033,#12151d);color:#efd8a3;font-weight:700;font-size:14px;letter-spacing:.02em;cursor:pointer;">🪞 Зеркало Души — твой психологический портрет</button>
+                <button onclick="openArchive()" style="display:block;width:100%;margin:0 0 10px;padding:10px;border-radius:12px;border:1px solid #3d4b60;background:linear-gradient(180deg,#141b2b,#0f131c);color:#c6cfe6;font-weight:600;font-size:13px;letter-spacing:.02em;cursor:pointer;">📚 Мои прожитые жизни — архив всех игр и сводка</button>
                 ${/* 🌍 ЭПОХА. Одно слово, без объяснений — человек сам свяжет, что в перегрев все в
                       плюсе, а потом почему-то нет. Множителей эпохи он не видит никогда. */''}
                 ${(state.world && state.world.eraName) ? `<div class="era-line">Эпоха: <b>${state.world.eraName}</b></div>` : ''}
@@ -20165,9 +20299,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 otherExpPct: 0, taxDiscPct: 0, jailPress: 0, jailPending: null, ownedCards: [], skillTries: 0,
                 trades: [], soulCard: null, soulSeen: {}, soulPoison: 0, shadow: 0, lastCell: 0, joinYear: null,
                 soul5: [], doorsDone: {}, doorOpen: null, soulNew: null, soulBurn: null, cursed: false, briefSeen: false,
-                cheatPick: false, cheatOn: null, charity: 0, charityLast: null,
+                cheatPick: false, cheatOn: null, charity: 0, charityLast: null, mirrorSeen: false,
                 stats: { casinoPlays:0, casinoWins:0, casinoLosses:0, casinoWon:0, casinoLost:0, buys:0, buyAmt:0, sells:0, sellAmt:0, salaryCount:0, salaryTotal:0, feePaid:0 }
             });
+            // ВОРОНКА (гипотеза Astana Hub): новый бланк = новый проход. Растим вечный счётчик карточки.
+            try { PROFILE.games = (PROFILE.games || 0) + 1; saveProfile(); } catch(e){ console.warn('PROFILE games++', e); }
             state.chosenProf = null; state.nameDraft = ''; save(newId); render();
         }
 
