@@ -177,6 +177,8 @@
 
   <div id="insight" style="display:none"></div>
 
+  <div id="coach"></div>
+
   <div class="mirror">
     <div class="mh"><span>🪞</span><b>Зеркало: какой ты в близости</b><span id="mtag">по твоим выборам</span></div>
     <div id="traits"></div>
@@ -229,6 +231,9 @@ function relSnapshot(){
     t:Object.assign({},st.t), moves:st.moves, over:st.over, overReason:st.overReason, rival:st.rival, pool:(st.pool||[]).slice(),
     married:st.married, kids:st.kids, herBiz:st.herBiz, herBizMonths:st.herBizMonths, flat:st.flat, patience:st.patience, respect:st.respect,
     betrayalShown:st.betrayalShown, settle:st.settle, lastYear:st.lastYear||1,
+    psyKey: st.partner?pkey(st.partner):null,   // 🪞 ключ психотипа партнёра — для счёта паттерна ЧЕРЕЗ жизни
+    psychotype: st.partner?(((st.sex==='f')?PSYCH_M:PSYCH)[pkey(st.partner)]||{}).att||null:null,  // строка привязанности → Зеркало показывает
+    brokePattern: !!st.brokePattern, patternPsy: st.patternPsy||null,   // 🪞 проводок #4: разорвал ли привычный выбор
     monthly: (st.over && st.settle && st.settle.alimony)?st.settle.alimony:0,   // алименты → в Доход-расход игры
     // для перебивки поверх бланка: игре нужно знать, звонит ли она сейчас, и её лицо/реплику
     name: st.partner?st.partner.name:'', face: st.partner?st.partner.face:'', ava: st.partner?st.partner.ava:'',
@@ -244,6 +249,7 @@ function relHydrate(s){ if(!s) return; st.sex=(s.sex==='f')?'f':'m'; const g=ros
   st.married=!!s.married; st.kids=s.kids||0; st.herBiz=!!s.herBiz; st.herBizMonths=s.herBizMonths||0; st.flat=!!s.flat;
   st.patience=(s.patience==null?100:s.patience); st.respect=(s.respect==null?55:s.respect); st.betrayalShown=!!s.betrayalShown; st.settle=s.settle||null; st.lastYear=s.lastYear||1;
   st.cardGiven=!!s.cardGiven; st.spendSeq=(s.spend&&s.spend.seq)||st.spendSeq||0; st.lastSpend=null;
+  st.brokePattern=!!s.brokePattern;   // 🪞 проводок #4: перелом переживает синхрон
   st.event=null; st.incoming=false; st.answered=false; st.rings=0; st.farewellSeen=!!st.over; }
 function relCatchUp(gameYear){   // она прожила, пока тебя не было — по часам игры (как ферма навёрстывает годы)
   gameYear=Number(gameYear)||1;
@@ -252,11 +258,19 @@ function relCatchUp(gameYear){   // она прожила, пока тебя н�
   let m=Math.min(6, dy*3);   // ~3 её месяца за игровой год отсутствия, с потолком
   while(m-->0 && !st.over){ liveMonth(); }
 }
+let SEX_LOCKED=false;   // 👤 пол задан персонажем в игре → внутренний переключатель прячем, ветку фиксируем
 if(EMB){
   window.addEventListener('message', function(e){ const d=e.data; if(!d) return;
     if(d.type==='rel_init'){
       if(typeof d.cash==='number' && isFinite(d.cash)) st.cash=d.cash;
+      st.patternPsy = d.patternPsy||null;   // 🪞 проводок #4: повторяющийся тип игрока — подкинем ДРУГОЙ
       if(d.state){ relHydrate(d.state); } else { st.lastYear=Number(d.year)||1; }
+      // 👤 Пол игрока — авторитет из бланка. Мужчина → девушки ('m'), женщина → парни ('f').
+      // Фиксируем ветку и, если сохранённый партнёр из «чужого» пола (старое сохранение), сбрасываем на выбор.
+      if(d.sex==='m' || d.sex==='f'){
+        SEX_LOCKED=true;
+        if(st.sex!==d.sex){ st.sex=d.sex; st.partner=null; st.phase='choose'; st.pool=[]; rollPool(); }
+      }
       _relReady=true; relCatchUp(d.year); render(); relPost(); return;
     }
     if(d.type==='rel_tick'){   // фоновый ход времени по часам игры (даже когда окно закрыто)
@@ -522,7 +536,29 @@ let st={
 const POOL_SIZE=4;
 function rollPool(){ const ids=roster().map(g=>g.id);
   for(let i=ids.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [ids[i],ids[j]]=[ids[j],ids[i]]; }
-  st.pool=ids.slice(0,Math.min(POOL_SIZE,ids.length)); }
+  st.pool=ids.slice(0,Math.min(POOL_SIZE,ids.length));
+  ensurePoolTypes(); }
+// 🪞 проводок #4: среди лиц гарантируем ДРУГОЙ тип (шанс на перелом) и, если влезает, «знакомый» (соблазн).
+function ensurePoolTypes(){
+  if(!st.patternPsy) return;
+  const R=roster(), typeOf=id=>{ const g=R.find(x=>x.id===id); return g?pkey(g):null; };
+  const allIds=R.map(g=>g.id);
+  const sameIds=allIds.filter(id=>typeOf(id)===st.patternPsy);
+  const diffIds=allIds.filter(id=>{ const t=typeOf(id); return t&&t!==st.patternPsy; });
+  if(!sameIds.length || !diffIds.length) return;   // ростер однотипный — гарантировать нечего
+  const pick=arr=>arr[(Math.random()*arr.length)|0];
+  const hasSame=st.pool.some(id=>typeOf(id)===st.patternPsy);
+  const hasDiff=st.pool.some(id=>{ const t=typeOf(id); return t&&t!==st.patternPsy; });
+  if(!hasDiff){                                    // важнейшая гарантия: путь для перелома всегда на экране
+    const vi=st.pool.findIndex(id=>typeOf(id)===st.patternPsy);
+    const cand=diffIds.filter(id=>!st.pool.includes(id));
+    if(vi>=0 && cand.length) st.pool[vi]=pick(cand);
+  } else if(!hasSame){                             // соблазн знакомым — только если не съедаем последний «другой»
+    const diffs=st.pool.filter(id=>{ const t=typeOf(id); return t&&t!==st.patternPsy; });
+    const cand=sameIds.filter(id=>!st.pool.includes(id));
+    if(diffs.length>=2 && cand.length){ const vi=st.pool.indexOf(diffs[0]); if(vi>=0) st.pool[vi]=pick(cand); }
+  }
+}
 function rerollPool(){ rollPool(); render(); }
 function setSex(x){ x=(x==='f')?'f':'m'; if(st.sex===x) return; st.sex=x; st.partner=null; st.phase='choose'; rollPool(); render(); if(EMB) relPost(); }
 function chooseGirl(id){
@@ -533,6 +569,9 @@ function chooseGirl(id){
   st.incoming=false; st.answered=false; st.rings=0; st.farewellSeen=false;
   st.cardGiven=false; st.spendSeq=st.spendSeq||0; st.lastSpend=null;
   st.patience = g.rival ? 55 : 92;   // ветреные нетерпеливы, верные терпят долго
+  // 🪞 проводок #4: перелом — впервые выбрал НЕ свой привычный тип. Награда: чуть больше терпения у здорового выбора + знак, что судьба это видит.
+  st.brokePattern = !!(st.patternPsy && pkey(g)!==st.patternPsy);
+  if(st.brokePattern){ st.patience = Math.min(100, (st.patience||0)+10); if(typeof toast==='function') toast('Ты выбрал не как обычно — судьба присматривается к смелым.'); }
   st.respect = 55;                    // уважение к его слову — стартовое (доминанту важно)
   st.reflectDone=false; profPick(g);  // 🪞 сбор данных: какой типаж ты выбрал
   st.t={honesty:50,care:50,loyal:50,presence:50,priority:50};
@@ -1002,6 +1041,67 @@ function playerTypeBlock(){
     '<div style="font-size:12.5px;color:#d7d8ff;margin-top:5px;line-height:1.5;">'+d.line+'</div>'+
     '<div style="font-size:11px;color:var(--dim);margin-top:7px;">Собрано по '+n+' выбор'+(n===1?'у':(n<5?'ам':'ам'))+' и тому, как ты вёл(а) себя рядом. Чем дальше играешь — тем точнее зеркало.</div></div>';
 }
+// ══ 🧭 ПСИХОЛОГ СВЯЗИ — ПРЕМИУМ-СПЕЦИАЛИСТ (замок под ⭐ Stars) ══════════════
+// Читает ЖИВОЕ состояние (психотип партнёра, тепло, терпение, соперник, уважение,
+// твоё зеркало) и даёт ОДНУ честную фразу по приоритету: что горит + что делать.
+// Достоверность: те же школы, что в PSYCH/PSYCH_M. 0₸ на ходу, оффлайн.
+let COACH_UNLOCKED = (()=>{ try{ return localStorage.getItem('via_coach_unlocked')==='1'; }catch(e){ return false; } })();
+function unlockCoach(){ COACH_UNLOCKED=true; try{ localStorage.setItem('via_coach_unlocked','1'); }catch(e){} render(); }
+// язык любви по психотипу — совет для роста, когда ничего не горит
+const COACH_GROW={
+  guardian:'Ей не нужны твои деньги — её греют присутствие и разговоры. Твоё время сейчас дороже подарка.',
+  trophy:  'Её греют статус и блеск. Работает — но зеркало пишет: ты покупаешь любовь. Дай хоть раз время, а не деньги.',
+  muse:    'Ей нужен смысл и рост, а не кошелёк. Говори о будущем, расти рядом — этим ты её удержишь.',
+  storm:   'Ей нужен драйв и новизна, иначе скучает и ищет на стороне. Веди, удивляй, не давай остыть рутине.',
+  siren:   'Ей нужна сцена и восхищение, ревность — её топливо. Дай внимание щедро, но не устраивай допросов.',
+  mama:    'Он ищет маму, не партнёршу. Не заменяй ему мать — обозначай границы с теплом, иначе не повзрослеет.',
+  talker:  'Он кормит словами. Проси дела, а не обещания — иначе годы уйдут на его «вот-вот».',
+  rock:    'Он не бросает слов на ветер и ценит верность. Будь рядом душой — на таком держится дом.',
+  pretty:  'За красивой обложкой пусто. Не путай блеск с опорой — проверяй делами, а не фото.'
+};
+// возвращает {tone:'urg'|'warn'|'grow', line:'...'} — самый приоритетный совет сейчас
+function coachAdvice(){
+  const g=st.partner; if(!g) return null;
+  const k=pkey(g), warm=st.warm, pat=(st.patience==null?100:st.patience), riv=st.rival||0;
+  const dl=domLevel(g), resp=(st.respect==null?55:st.respect), prio=(st.t&&st.t.priority)||50;
+  const her=isF()?'он':'она', him=isF()?'его':'её', herA=isF()?'него':'неё';
+  // 1) горит соперник
+  if(g.rival && riv>=25 && warm<52)
+    return {tone:'urg', line:'⚠️ Соперник рядом ('+Math.round(riv)+'%). Подарком это не тушится — '+him+' сейчас нужно твоё присутствие. Сделай «По душам» или «Быть рядом» несколько ходов подряд, деньги тут не спасут.'};
+  // 2) доминант без уважения
+  if(dl>=0.7 && resp<40)
+    return {tone:'urg', line:'⚠️ Это доминантный тип: холодеет не от денег, а от неуважения к своему слову. Ты держишь себя выше — поставь '+herA+' хоть раз выше дела, иначе уйдёт именно поэтому.'};
+  // 3) терпение на исходе
+  if(pat<=35)
+    return {tone:'urg', line:'⏳ Терпение на исходе — '+her+' всё чаще молчит и смотрит в сторону. Ещё пара холодных ходов и '+her+' уйдёт сам'+(isF()?'':'а')+'. Согрей вниманием прямо сейчас, не откладывай.'};
+  // 4) тепло в холоде
+  if(warm<35)
+    return {tone:'warn', line:'❄️ Вы стали чужими. Одним жестом это не поднять — нужно внимание подряд, ход за ходом, а не разовый подарок. Начни с разговора по душам.'};
+  // 5) рост под психотип + зеркало
+  let line=COACH_GROW[k]||'Будь внимателен к '+herA+' — тепло держится на присутствии, а не на деньгах.';
+  if(prio<45) line+=' И честно: ты держишь дело выше '+herA+' (приоритет низкий) — с живым человеком это медленно стынет.';
+  return {tone:'grow', line:line};
+}
+// панель наставника: заперта — тизер под блюром; открыта — живой совет
+function coachPanel(){
+  const g=st.partner; if(!g || st.over) return '';
+  const a=coachAdvice(); if(!a) return '';
+  const col = a.tone==='urg'?'var(--bad)' : a.tone==='warn'?'#e0a63a' : 'var(--rose-br)';
+  if(!COACH_UNLOCKED){
+    return '<div style="position:relative;border:1px solid var(--gold-br);border-radius:16px;padding:16px;margin-top:14px;background:linear-gradient(180deg,#241d16,#1a140f);overflow:hidden;">'+
+      '<div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-br);margin-bottom:8px;">💎 Психолог связи · премиум</div>'+
+      '<div style="filter:blur(5px);user-select:none;pointer-events:none;font-size:13px;color:#e9dce0;line-height:1.5;">'+a.line+'</div>'+
+      '<div style="margin-top:12px;display:flex;flex-direction:column;gap:7px;">'+
+      '<div style="font-size:12px;color:#c9b48a;line-height:1.5;">🔒 Специалист видит, что происходит между вами прямо сейчас, и подсказывает точный ход. В Telegram открывается за ⭐ Stars.</div>'+
+      '<button class="act" style="border-color:var(--gold-br);background:linear-gradient(180deg,#2c2318,#1f1810);text-align:center;justify-content:center;" onclick="unlockCoach()"><b style="color:var(--gold-br);">Открыть специалиста ⭐</b><span style="color:#c9b48a;">здесь — бесплатно для теста</span></button>'+
+      '</div></div>';
+  }
+  const seen = warmWord(st.warm);
+  return '<div style="border:1px solid '+col+';border-radius:16px;padding:14px 16px;margin-top:14px;background:linear-gradient(180deg,var(--surf),var(--surf2));">'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;"><span style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:'+col+';">🧭 Психолог связи</span>'+
+    '<span style="font-size:11px;color:var(--dim);margin-left:auto;">видит: тепло «'+seen+'»</span></div>'+
+    '<div style="font-size:13px;color:#e9dce0;line-height:1.55;">'+a.line+'</div></div>';
+}
 // ── 💳 ЕЁ ТРАТЫ ПО ТВОЕЙ КАРТЕ (дал доступ к кассе — некоторые дивы тратят сами; зеркало выбора) ──
 // chance = шанс траты в месяц; big = шанс крупного шопинга; суммы масштабируются психотипом.
 const SPEND={
@@ -1268,7 +1368,7 @@ function checkState(){
     render();
   }
 }
-function resetGame(){ setAuto(false); const _kc=EMB?st.cash:4000, _ky=EMB?(st.lastYear||1):1, _sx=st.sex||'m'; st={sex:_sx,phase:'choose',partner:null,stage:'Встречаетесь',months:0,warm:0,cash:_kc,t:{honesty:50,care:50,loyal:50,presence:50,priority:50},event:null,moves:0,over:false,overReason:null,rival:0,pool:[],married:false,kids:0,herBiz:false,herBizMonths:0,flat:false,patience:100,auto:false,silence:0,betrayalShown:false,settle:null,incoming:false,answered:false,rings:0,farewellSeen:false,cardGiven:false,spendSeq:0,lastSpend:null}; st.lastYear=_ky; rollPool(); toast('Новая история — судьба свела с новыми.'); render(); }
+function resetGame(){ setAuto(false); const _kc=EMB?st.cash:4000, _ky=EMB?(st.lastYear||1):1, _sx=st.sex||'m', _pp=st.patternPsy||null; st={sex:_sx,phase:'choose',partner:null,stage:'Встречаетесь',months:0,warm:0,cash:_kc,t:{honesty:50,care:50,loyal:50,presence:50,priority:50},event:null,moves:0,over:false,overReason:null,rival:0,pool:[],married:false,kids:0,herBiz:false,herBizMonths:0,flat:false,patience:100,auto:false,silence:0,betrayalShown:false,settle:null,incoming:false,answered:false,rings:0,farewellSeen:false,cardGiven:false,spendSeq:0,lastSpend:null}; st.lastYear=_ky; st.patternPsy=_pp; rollPool(); toast('Новая история — судьба свела с новыми.'); render(); }
 
 // ── АВТО-ЖИЗНЬ: время идёт само, она живёт своим умом (агент) ──
 const TICK_MS=7000;   // один месяц проходит сам за ~7 сек
@@ -1395,10 +1495,13 @@ function renderChoose(){
   if(!st.pool || !st.pool.length) rollPool();
   const shown=roster().filter(g=>st.pool.includes(g.id));
   document.getElementById('evttl').textContent='Выбери сердцем — по лицу';
-  const sexTgl='<div style="display:flex;gap:8px;margin:0 3px 12px;">'+
-    '<button class="act" style="flex:1;text-align:center;padding:10px;'+(!isF()?'border-color:var(--rose-br);background:#2a1620;':'opacity:.6;')+'" onclick="setSex(\'m\')"><b style="font-size:13.5px;color:#f0e2e6;">👩 Девушки</b></button>'+
-    '<button class="act" style="flex:1;text-align:center;padding:10px;'+(isF()?'border-color:var(--rose-br);background:#2a1620;':'opacity:.6;')+'" onclick="setSex(\'f\')"><b style="font-size:13.5px;color:#f0e2e6;">🧔 Парни</b></button>'+
-    '</div>';
+  // Пол задан персонажем в игре → переключатель прячем, показываем только зафиксированную ветку (без путаницы).
+  const sexTgl = SEX_LOCKED
+    ? '<div style="text-align:center;margin:0 3px 12px;padding:9px;border:1px solid var(--rose-br);background:#2a1620;border-radius:12px;font-size:13px;color:#f0e2e6;">'+(isF()?'🧔 Твоя ветка — парни':'👩 Твоя ветка — девушки')+'</div>'
+    : '<div style="display:flex;gap:8px;margin:0 3px 12px;">'+
+      '<button class="act" style="flex:1;text-align:center;padding:10px;'+(!isF()?'border-color:var(--rose-br);background:#2a1620;':'opacity:.6;')+'" onclick="setSex(\'m\')"><b style="font-size:13.5px;color:#f0e2e6;">👩 Девушки</b></button>'+
+      '<button class="act" style="flex:1;text-align:center;padding:10px;'+(isF()?'border-color:var(--rose-br);background:#2a1620;':'opacity:.6;')+'" onclick="setSex(\'f\')"><b style="font-size:13.5px;color:#f0e2e6;">🧔 Парни</b></button>'+
+      '</div>';
   document.getElementById('stageArea').innerHTML=
     sexTgl+
     '<div style="text-align:center;font-size:12px;color:var(--dim);margin:-2px 3px 12px;line-height:1.55;">Как в жизни: ты видишь только лицо. '+(isF()?'Какой он, что любит и что ему нужно':'Какая она, что любит и что ей нужно')+' — узнаёшь со временем.</div>'+
@@ -1411,6 +1514,7 @@ function renderChoose(){
     '<button class="act" style="width:100%;margin-top:10px;padding:10px;text-align:center;opacity:.7;" onclick="rerollPool()"><b style="font-size:12.5px;">🎲 Другие лица (тест)</b><span style="display:block;font-size:10.5px;">в игре судьба даёт один расклад из 23</span></button>';
   document.getElementById('traits').innerHTML='';
   const ins0=document.getElementById('insight'); if(ins0){ ins0.style.display='none'; ins0.innerHTML=''; }
+  const co0=document.getElementById('coach'); if(co0){ co0.style.display='none'; co0.innerHTML=''; }
   document.getElementById('verdict').textContent='Выбери — и зеркало начнёт собирать тебя.';
 }
 function renderCall(){
@@ -1588,6 +1692,10 @@ function render(){
       (n>=3?'<div style="font-size:11px;color:var(--dim);margin-top:9px;padding-top:9px;border-top:1px solid var(--line);">'+(isF()?'Его психотип: ':'Её психотип: ')+PS.att+'</div>':'')+
       '</div>';
   } else { ins.style.display='none'; ins.innerHTML=''; }
+
+  // 🧭 психолог связи (премиум-специалист)
+  const co=document.getElementById('coach');
+  if(co){ const ch=coachPanel(); co.innerHTML=ch; co.style.display=ch?'block':'none'; }
 
   // зеркало
   document.getElementById('traits').innerHTML=TRAITS.map(([k,nm,ic])=>{

@@ -11285,15 +11285,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         let state = {
             view: 'lobby',
             board: null,   // состояние поля (движок хода) — всегда свежее с сервера
-            players: SERVER_MODE ? [] : (JSON.parse(localStorage.getItem('v0_players')) || []),
-            deals: SERVER_MODE ? [] : (JSON.parse(localStorage.getItem('v0_deals')) || []),
+            // ФИКС 19сен: раньше в server-режиме грузили ПУСТО и ждали бэкенд. Но на статике
+            // (viagame.online / Cloudflare Pages) бэкенда /data НЕТ → созданный персонаж жил
+            // только в памяти и стирался при F5. Теперь ВСЕГДА поднимаем локальное зеркало из
+            // localStorage; если реальный сервер есть — он перезапишет данные через 1-3с (applyServerData).
+            players: JSON.parse(localStorage.getItem('v0_players') || 'null') || [],
+            deals: JSON.parse(localStorage.getItem('v0_deals') || 'null') || [],
             currentPlayerId: null,
             chosenProf: null,
             nameDraft: '',
+            sexDraft: 'm',   // 👤 пол создаваемого персонажа: 'm' мужчина (ветка — девушки) / 'f' женщина (ветка — парни)
             err: '',
             skillModal: null,
             govModal: null,
-            world: SERVER_MODE ? null : (JSON.parse(localStorage.getItem('v0_world') || 'null')),
+            world: JSON.parse(localStorage.getItem('v0_world') || 'null'),
             worldDraw: null,
             worldShow: null,
             workModal: null,
@@ -11948,6 +11953,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const me = (meId != null) ? meId
                       : (state.view === 'player' ? state.currentPlayerId : null);
             lastSavedId = me;   // чей бланк защищаем 2.2с — ТОЛЬКО его, чужие обновляются сразу
+            // ЛОКАЛЬНОЕ ЗЕРКАЛО (фикс 19сен): пишем на диск ВСЕГДА, даже в server-режиме.
+            // На статике (viagame.online) бэкенда нет → это единственная защита персонажа от F5.
+            // При реальном сервере зеркало безвредно: applyServerData перезапишет игроков истиной сервера.
+            try {
+                localStorage.setItem('v0_players', JSON.stringify(state.players));
+                localStorage.setItem('v0_deals', JSON.stringify(state.deals));
+                localStorage.setItem('v0_world', JSON.stringify(state.world || null));
+            } catch(e){ console.warn('local mirror save', e); }
             if (SERVER_MODE) {
                 // fire-and-forget POST — UI обновится мгновенно, остальные браузеры подтянут polling'ом
                 fetch('/data', {
@@ -11957,9 +11970,6 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 }).catch(e => console.warn('save error:', e));
                 return;
             }
-            localStorage.setItem('v0_players', JSON.stringify(state.players));
-            localStorage.setItem('v0_deals', JSON.stringify(state.deals));
-            localStorage.setItem('v0_world', JSON.stringify(state.world || null));
             lastDataHash = dataHash();
             if (bc) { try { bc.postMessage('updated'); } catch(e) {} }
         }
@@ -12372,6 +12382,31 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(relType){
                 obs.push({br:'Отношения', q:'Почему ты выбираешь именно так?', verdict:'Твой рисунок в любви — «'+relType+'».', because:'кого мы выбираем и как уходим — самый честный датчик привязанности. Здесь виден твой способ быть близко.', sig:'тип: '+relType});
             }
+            // 🪞 ПАТТЕРН ЧЕРЕЗ ЖИЗНИ (Ринат 15 сен): бесплатный удар — тянет ли тебя к одному типу из жизни в жизнь.
+            // На заходе в Зеркало текущая жизнь ещё НЕ в PROFILE.runs — берём прошлые + текущий выбор.
+            const curPsy = rel ? (rel.psyKey||null) : null;
+            if(curPsy){
+                const prevRuns = (typeof PROFILE!=='undefined' && Array.isArray(PROFILE.runs)) ? PROFILE.runs : [];
+                const seq = prevRuns.filter(r=>r && r.id===p.id && r.relPsy).map(r=>r.relPsy).concat([curPsy]);
+                let streak=0; for(let i=seq.length-1;i>=0;i--){ if(seq[i]===curPsy) streak++; else break; }
+                if(streak>=2){
+                    const nWord = ['','','вторую','третью','четвёртую','пятую'][streak] || (streak+'-ю');
+                    const because = streak>=3
+                        ? 'это уже не случайность, а твой почерк: тебя тянет к одному и тому же — и рвётся по одному и тому же. Здесь прячется то, что стоит проработать в себе.'
+                        : 'уже не первый раз — присмотрись, не твой ли это почерк. Кого мы выбираем снова и снова, тот и показывает, чего мы на самом деле ищем и боимся.';
+                    obs.push({br:'Отношения', q:'Ты замечаешь, что это повторяется?', verdict: nWord+' жизнь подряд ты выбираешь один и тот же тип — «'+(relType||curPsy)+'».', because: because, sig:'повтор ×'+streak});
+                }
+            }
+            // 🪞 НАГРАДА ЗА ПЕРЕЛОМ (Ринат 15 сен, проводок #4): впервые потянулся к ДРУГОМУ типу — это и есть изменение.
+            if(rel && rel.brokePattern){
+                const held = !rel.over && (((rel.months||0)>=6) || ((rel.warm||0)>=55));
+                obs.push({br:'Отношения', q:'Ты почувствовал разницу?',
+                    verdict: held
+                        ? 'Впервые ты потянулся к другому типу — и удержал. Ты разорвал свою петлю.'
+                        : 'Впервые ты выбрал другого — не как обычно. Это уже смелость, даже если не срослось.',
+                    because:'сломать свой привычный выбор труднее всего — именно здесь начинается изменение, а не просто знание о себе.',
+                    sig: held?'перелом · удержал':'перелом · попытка'});
+            }
 
             // 🪞 вливаем живые паттерны из журнала выборов (сырьё «как есть»)
             const J = mirrorJournal(p);
@@ -12387,6 +12422,26 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 else if(top[0]==='цепи'){ obs.push({br:'Портфель', q:'Во что утекла твоя жизнь на самом деле?', verdict:'Твой самый большой вклад — непокрытые долги, что ничего не зарабатывают.', because:'это не рычаг под доходное дело, а груз: он ест поток и держит на привязи.', sig:'портфель души: цепи впереди'}); vote('avoid',1); }
                 else if(top[0]==='свободу'){ strengths.push('Твой самый большой вклад — в свободу: поток, что кормит без твоего труда. Это фундамент, а не витрина.'); vote('_build',1); }
                 else if(top[0]==='людей'){ strengths.push('Больше всего за жизнь ты вложил в людей — и не разово, а ценой и регулярно. Самый редкий портфель.'); }
+            }
+            // 🪞 ДЕНЬГИ ЧЕРЕЗ ЖИЗНИ (Ринат 16 сен): повтор денежного русла + НАГРАДА ЗА ПЕРЕЛОМ. Без кэша — правило «игра не дарит деньги», награда = признание.
+            const MK={'распад':'poison','цепи':'chains','свободу':'freedom','людей':'people'};
+            const curMoney=(top&&top[1]>0)?MK[top[0]]:null;
+            if(curMoney){
+                const badKey=k=>k==='poison'||k==='chains';
+                const NAME={poison:'распад',chains:'цепи',freedom:'свободу',people:'людей'};
+                const prevRuns=(typeof PROFILE!=='undefined'&&Array.isArray(PROFILE.runs))?PROFILE.runs:[];
+                const mine=prevRuns.filter(r=>r&&r.id===p.id&&r.moneyTop).map(r=>r.moneyTop);
+                const prevKey=mine.length?mine[mine.length-1]:null;
+                const seq=mine.concat([curMoney]);
+                let mstreak=0; for(let i=seq.length-1;i>=0;i--){ if(seq[i]===curMoney) mstreak++; else break; }
+                const nWordM=s=>['','','вторую','третью','четвёртую','пятую'][s]||(s+'-ю');
+                if(badKey(prevKey) && !badKey(curMoney)){
+                    obs.push({br:'Деньги', q:'Ты почувствовал, что развернул руль?', verdict:'Раньше твоя жизнь по деньгам утекала в '+NAME[prevKey]+' — в этот раз ты развернул её в '+NAME[curMoney]+'. Ты сломал денежную петлю.', because:'сменить то, куда годами утекали твои деньги, труднее любой сделки — это и есть настоящее изменение.', sig:'перелом денег: '+prevKey+'→'+curMoney}); vote('_build',1);
+                } else if(mstreak>=2 && badKey(curMoney)){
+                    obs.push({br:'Деньги', q:'Ты замечаешь, что это повторяется?', verdict:nWordM(mstreak)+' жизнь подряд твоя жизнь по деньгам утекает в '+NAME[curMoney]+'.', because:'это не разовая ошибка, а русло: деньги находят одну и ту же воронку, пока ты не увидишь её и не перекроешь.', sig:'русло денег ×'+mstreak+': '+curMoney}); vote(curMoney==='poison'?'chase':'avoid',1);
+                } else if(mstreak>=2 && !badKey(curMoney)){
+                    strengths.push(nWordM(mstreak)+' жизнь подряд ты вкладываешь жизнь в '+NAME[curMoney]+' — это уже не случайность, а твой почерк, и он тебя держит.');
+                }
             }
 
             const clusterName = {
@@ -12424,17 +12479,29 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 PROFILE.reachedMirror = (PROFILE.reachedMirror || 0) + 1;
                 const M = (typeof mirrorBuild==='function') ? mirrorBuild(p) : null;
                 const snap = (typeof lifeSnapshot==='function') ? lifeSnapshot(p) : {};
+                // 🪞 ДЕНЬГИ: куда утекла жизнь по деньгам (investLedger) — ключ ведущей корзины, для счёта паттерна через жизни.
+                let moneyTop = null;
+                try { const _il=(typeof investLedger==='function')?investLedger(p):null;
+                    if(_il){ const b=[['freedom',_il.freedom||0],['chains',_il.chains||0],['poison',_il.poison||0],['people',_il.people||0]].sort((x,y)=>y[1]-x[1])[0]; if(b&&b[1]>0) moneyTop=b[0]; }
+                } catch(e){}
                 const card = {
                     id: p.id, name: p.name || 'Игрок', at: Date.now(), game: (PROFILE.games || 0),
                     life: snap.t||0, worth: snap.worth||0, cash: snap.cash||0,
                     debt: snap.debt||0, passive: snap.passive||0, health: snap.health||0,
                     core: (M && M.coreText) ? M.coreText : null,
                     obs: (M && Array.isArray(M.obs)) ? M.obs.length : 0,
-                    choices: Array.isArray(p.choiceLog) ? p.choiceLog.length : 0
+                    choices: Array.isArray(p.choiceLog) ? p.choiceLog.length : 0,
+                    relPsy: (p.relationship && p.relationship.psyKey) || null,        // 🪞 какой психотип партнёра выбран в ЭТОЙ жизни
+                    relAttach: (p.relationship && p.relationship.psychotype) || null, // человеческая строка привязанности
+                    relBroke: !!(p.relationship && p.relationship.brokePattern),      // 🪞 проводок #4: разорвал ли привычный выбор
+                    moneyTop: moneyTop                                                // 🪞 деньги: ведущая корзина этой жизни (freedom/chains/poison/people)
                 };
                 if(!Array.isArray(PROFILE.runs)) PROFILE.runs = [];
-                const i = PROFILE.runs.findIndex(r => r && r.id === card.id);
-                if(i >= 0) PROFILE.runs[i] = card; else PROFILE.runs.push(card);
+                // 🪞 АРХИВ КАЖДОЙ жизни: добавляем карточку, НЕ перезаписываем по id.
+                // mirrorSeen выше уже гарантирует одну запись за жизнь; замена по id раньше
+                // схлопывала архив в одну карту на игрока и убивала паттерн-через-жизни (relPatternPsy),
+                // сводку и экран «Мои прожитые жизни».
+                PROFILE.runs.push(card);
                 if(PROFILE.runs.length > 500) PROFILE.runs.splice(0, PROFILE.runs.length - 500);
                 saveProfile();
                 try { save(); } catch(e){}                 // p.mirrorSeen должен жить в сейве
@@ -12622,6 +12689,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="border-bottom:1px solid var(--lx-gold-ln); padding-bottom:20px; margin-bottom:20px;">
                         <p style="font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--lx-muted); font-weight:700; margin-bottom:8px;">Как тебя зовут</p>
                         <input type="text" id="pName" placeholder="Имя игрока" class="inp" style="margin-bottom:14px; font-family:Georgia,serif; font-size:15px;" value="${state.nameDraft || ''}" oninput="state.nameDraft = this.value;">
+                        <p style="font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--lx-muted); font-weight:700; margin-bottom:8px;">Ты мужчина или женщина</p>
+                        <div style="display:flex; gap:10px; margin-bottom:14px;">
+                            <button onclick="state.sexDraft='m'; render();" class="btn ${(state.sexDraft||'m')==='m'?'btn-green':'btn-gray'}" style="flex:1;">👨 Мужчина</button>
+                            <button onclick="state.sexDraft='f'; render();" class="btn ${(state.sexDraft||'m')==='f'?'btn-green':'btn-gray'}" style="flex:1;">👩 Женщина</button>
+                        </div>
+                        <p style="font-size:11px; color:var(--lx-muted); margin:-8px 0 15px; line-height:1.5;">В отношениях тебе будет открыт только противоположный пол: мужчине — девушки, женщине — парни.</p>
                         <div style="display:flex; gap:10px; align-items:stretch; margin-bottom:15px;">
                             <button onclick="roll()" class="btn btn-gray" style="flex:0 0 auto; white-space:nowrap;">🎲 Роль</button>
                             <div style="flex:1; min-width:0; background:var(--lx-ink); border:1px solid ${state.chosenProf?'var(--lx-gold-ln)':'var(--lx-line)'}; border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:10px;">
@@ -17884,13 +17957,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(document.hidden) return;          // вкладка не активна — не тикаем
             relPostToModule({type:'rel_tick'});
         }
+        // 🪞 проводок #4: повторяющийся психотип партнёра из прошлых жизней — чтобы модуль подкинул ДРУГОЙ тип.
+        function relPatternPsy(p){
+            try{
+                const runs=(typeof PROFILE!=='undefined'&&Array.isArray(PROFILE.runs))?PROFILE.runs:[];
+                const cnt={}; for(const r of runs){ if(r&&r.id===p.id&&r.relPsy) cnt[r.relPsy]=(cnt[r.relPsy]||0)+1; }
+                let best=null,bn=0; for(const k in cnt){ if(cnt[k]>bn){ bn=cnt[k]; best=k; } }
+                return bn>=2 ? best : null;   // паттерн есть только если тип повторялся ≥2 жизней
+            }catch(e){ return null; }
+        }
         function relBridgeInit(){
             if(window._relBridge) return; window._relBridge=true;
             window.addEventListener('message', function(e){
                 const d=e.data; if(!d||(d.type!=='rel_ready'&&d.type!=='rel_state')) return;
                 const p=me(); if(!p) return;
                 if(d.type==='rel_ready'){
-                    relPostToModule({type:'rel_init', cash:Number(p.savings)||0, state:p.relationship||null, year:curYear()});
+                    relPostToModule({type:'rel_init', cash:Number(p.savings)||0, state:p.relationship||null, year:curYear(), patternPsy:relPatternPsy(p), sex:(p.sex==='f'?'f':'m')});
                 } else {
                     let ch=false;
                     if(typeof d.cash==='number' && isFinite(d.cash) && Math.abs((Number(p.savings)||0)-d.cash)>0.001){ p.savings=Math.round(d.cash*100)/100; ch=true; }
@@ -20291,6 +20373,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try { localStorage.setItem('via_me', JSON.stringify({id:newId, pin})); } catch(e){}
             state.players.push({
                 id: newId, name, pin, prof: pr, holdings: {},
+                sex: (state.sexDraft==='f' ? 'f' : 'm'),   // 👤 пол игрока → фиксирует ветку отношений (m: девушки, f: парни)
                 children: 0, bankLoan: 0, savings: pr.savings,
                 isM: false, isE: pr.initEdu===0, isA: false, isCC: false, isR: false,
                 mLeft: pr.initMortgage, eLeft: pr.initEdu, aLeft: pr.initAuto,
@@ -20304,7 +20387,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             });
             // ВОРОНКА (гипотеза Astana Hub): новый бланк = новый проход. Растим вечный счётчик карточки.
             try { PROFILE.games = (PROFILE.games || 0) + 1; saveProfile(); } catch(e){ console.warn('PROFILE games++', e); }
-            state.chosenProf = null; state.nameDraft = ''; save(newId); render();
+            state.chosenProf = null; state.nameDraft = ''; state.sexDraft = 'm'; save(newId); render();
         }
 
         // ─── ИНВЕСТИЦИИ (карты Рината: депозиты 🟩 / облигации 🟦 / рискованные 🟥) — вкладываешь сумму, получаешь % каждый круг ───
