@@ -10840,6 +10840,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // разный товар и разная цена), у рыбы — ИКРА, а не «яйцо». Старые ключи eggs/fish оставлены для уже
         // накопленного товара (продастся). egg_ostrich/farm_ostrichegg/farm_duckeggs — картинки Ринат догенерит.
         const FARM_STOCK_LABELS = { egg_hen:'🥚 Куриные яйца', egg_duck:'🥚 Утиные яйца', egg_ostrich:'🥚 Страусиные яйца', eggs:'🥚 Яйца', milk:'🥛 Молоко', shubat:'🥛 Шубат (верблюжье)', meat:'🥩 Мясо', hooves:'🦴 Копыта', horns:'🦬 Рога', hide:'🐾 Шкура', caviar:'🍥 Икра', blackcaviar:'🖤 Чёрная икра', fish:'🐟 Рыба', honey:'🍯 Мёд', wool:'🧶 Шерсть', feath:'🪶 Перья', flowers:'🌹 Цветы', micro:'🌱 Микрозелень', fruits:'🍇 Виноград/фрукты', fert:'💩 Удобрения', crocleather:'🐊 Кожа крокодила', bag:'👜 Сумка из кожи' };
+        // 💵 БАЗОВАЯ ЦЕНА за ЕДИНИЦУ продукта склада (Ринат 19сен: раньше её не было — всё продавалось по ~1$/шт по одному индексу).
+        //   Итоговая цена продажи = units × FARM_PROD_PRICE × priceIdx (рыночный множитель 0.70..1.30, +~3%/год).
+        //   Мясо/шкура/копыта/рога/сумка/кожа — база 1: на склад кладётся сразу денежная ценность (c.meat и доли), там индекс и так верен.
+        //   Всё, что идёт с УРОЖАЯ (яйца/молоко/мёд/цветы/микрозелень…), теперь имеет реальную цену за штуку. Числа — ЧЕРНОВИК, тюним.
+        const FARM_PROD_PRICE = {
+            egg_hen:4, egg_duck:6, egg_ostrich:60, eggs:4,
+            milk:3, shubat:12,
+            caviar:25, blackcaviar:150, fish:8,
+            honey:10, wool:6, feath:5,
+            flowers:8, micro:12, fruits:5, fert:3,
+            meat:1, hide:1, hooves:1, horns:1, crocleather:1, bag:1
+        };
+        // цена за единицу с учётом рынка: база × живой индекс (если базы нет — 1, чтобы денежные товары остались как были)
+        function farmUnitPrice(prod){ const base=(FARM_PROD_PRICE[prod]!=null)?FARM_PROD_PRICE[prod]:1; return base*priceIdx(prod); }
         // 📦 картинка товара на складе (нет файла → farmThumb сам скроет, пока не сгенерим)
         const FARM_PROD_IMG = { egg_hen:'farm_eggs', egg_duck:'farm_duckeggs', egg_ostrich:'farm_ostrichegg', eggs:'farm_eggs', milk:'farm_milk', shubat:'farm_shubat', meat:'farm_beef', hooves:'farm_hooves', horns:'farm_horns', hide:'farm_hide', caviar:'farm_caviar', blackcaviar:'farm_blackcaviar', fish:'farm_troutfresh', honey:'farm_honey', wool:'farm_wool', feath:'farm_feather', flowers:'farm_flowers', micro:'farm_microgreens', fruits:'farm_grapes', fert:'farm_fertilizer', crocleather:'farm_crocleather', bag:'farm_crocbag' };
         // 🐊👜 КОЖА → СУМКИ и 🦴🦬 КОПЫТА/РОГА (Ринат 4авг): кожу крокодила шьёшь в дорогие сумки (мастерская в ⚗️ Производство);
@@ -10891,7 +10905,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     else { farmToast('⚠️ Недобор по «'+cf.name+'»: склада не хватило. Ещё год провалишь — разрыв.'); } } }
             p.farm.contractY=y; }
         // 💰 сколько СЕЙЧАС стоит весь товар на складе по живой цене (для показа «продать всё»)
-        function farmStockValue(p, prod){ if(!p||!p.farm) return 0; const st=p.farm.stock||{}; const units=Math.floor(Number(st[prod])||0); return Math.round(units*priceIdx(prod)); }
+        function farmStockValue(p, prod){ if(!p||!p.farm) return 0; const st=p.farm.stock||{}; const units=Math.floor(Number(st[prod])||0); return Math.round(units*farmUnitPrice(prod)); }
         // 🥛 доильные аппараты: 1 аппарат = 1 корова. Старый булев milker → 1 аппарат (миграция).
         function farmMilkers(p){ if(!p||!p.farm) return 0; if(p.farm.milkers==null) p.farm.milkers = p.farm.milker ? 1 : 0; return Number(p.farm.milkers)||0; }
         function farmCowHeads(p){ let n=0; for(const a of ((p&&p.farm&&p.farm.animals)||[])){ if(a.kind==='cow' && a.mature) n+=(a.count||1); } return n; }
@@ -11240,7 +11254,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 trades:[], soulCard:null, soulSeen:{}, soulPoison:0, shadow:0, lastCell:0, joinYear:null,
                 soul5:[], doorsDone:{}, doorOpen:null, soulNew:null, soulBurn:null, cursed:false, briefSeen:false,
                 cheatPick:false, cheatOn:null, charity:0, charityLast:null,
-                choiceLog:[], viceScar:0, mirrorSeen:false
+                choiceLog:[], viceScar:0, mirrorSeen:false,
+                actionLog:[]   // 📜 полная история действий за жизнь (лента по годам) — logAction()
             };
             for (const k in D){ if (p[k] === undefined) p[k] = D[k]; }
             if (!p.branches || typeof p.branches !== 'object') p.branches = {work:[],free:[],spirit:[]};
@@ -11415,6 +11430,27 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return rec;
         }
         window.logChoice = logChoice; // для отладочного просмотра журнала
+        // 📜 ИСТОРИЯ ДЕЙСТВИЙ (Ринат 19сен): единая лента ВСЕГО, что игрок делал за жизнь — деньги, ферма,
+        // биржа, отношения, выборы. Копится в p.actionLog, показывается экраном «📜 История». Метка времени —
+        // игровой год + номер прожитого месяца (зарплаты). ic — эмодзи-метка, t — текст, sph — сфера, amt — ±$.
+        const ACTION_LOG_CAP = 4000;
+        function logAction(p, ic, text, opts){
+            if(!p || !text) return;
+            opts = opts || {};
+            if(!Array.isArray(p.actionLog)) p.actionLog = [];
+            let yr = 0; try { yr = curYear(); } catch(e){}
+            let sc = 0; try { sc = Number(pstat(p).salaryCount)||0; } catch(e){}
+            p.actionLog.push({
+                y: yr, sc: sc,
+                ic: ic || '•',
+                t: String(text),
+                sph: opts.sphere || '',
+                amt: (opts.amt!=null ? Math.round(Number(opts.amt)||0) : null),
+                ts: Date.now()
+            });
+            if(p.actionLog.length > ACTION_LOG_CAP) p.actionLog.splice(0, p.actionLog.length - ACTION_LOG_CAP);
+        }
+        window.logAction = logAction;
         // ═══════════ конец журнала выборов ═══════════
 
         // ═══════════ 🏡 ОБРАЗ ЖИЗНИ — шаг 1: дом и машина из бланка становятся видимыми ═══════════
@@ -12032,7 +12068,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // 🛡️ (Ринат 19июл: «тик цен обновляет страницу, окна сбиваются») — НЕ дёргаем полную
             // перерисовку от тика рынка, когда открыто окно или крутится слот: картинка бы моргала,
             // барабаны слота сбивались, прокрутка прыгала. Живые цены догонят при закрытии окна / действии.
-            const _winOpen = !!(state.catPopup||state.soulsInfo||state.farmInfo||state.cellInfo||state.howto||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.bankModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.marginModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.childModal||state.showHistory||state.doorOpen||state.soulCard);
+            const _winOpen = !!(state.catPopup||state.soulsInfo||state.farmInfo||state.cellInfo||state.howto||state.cellLocked||state.bizModal||state.bizBudget||state.bizDraw||state.loanModal||state.bankModal||state.darkReveal||state.partnerModal||state.charityModal||state.buyModal||state.marginModal||state.sellModal||state.taxModal||state.govModal||state.skillModal||state.workModal||state.expenseModal||state.svyazModal||state.sdelkaModal||state.medModal||state.childModal||state.showHistory||state.doorOpen||state.soulCard||state.mirrorModal||state.archiveModal||state.homeUpModal||state.carUpModal||state.payslipModal);
             // 🛡️ (Ринат 6авг «окно покупки/продажи дёргается от живой цены»): пока открыто окно СДЕЛКИ,
             // полный ре-рендер НЕ трогаем вообще — иначе тик рынка/чужой ход пересобирает модалку и поле
             // ввода прыгает. Живую цену выхода держит slipRefresh точечно (slipBox), не рушя ввод.
@@ -17471,10 +17507,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
                 <div style="display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:8px;border-top:1px solid var(--lx-gold-ln);padding-top:8px;">
                     <span style="font-size:11px;color:var(--lx-muted);font-weight:700;text-transform:uppercase;letter-spacing:.12em;">⏱ Таймер хода:</span>
-                    <button onclick="boardStartTimer()" class="btn btn-gray" title="Запустить/перезапустить таймер хода (2 мин)">▶ Пуск</button>
+                    <button onclick="boardStartTimer()" class="btn btn-gray" title="Запустить/перезапустить таймер хода (2 мин)">▶ Пуск · 2 мин</button>
                     <button onclick="boardStopTimer()" class="btn btn-gray" title="Полностью остановить таймер хода">⏸ Стоп</button>
                     <span style="font-size:11px;color:var(--lx-muted);font-weight:700;text-transform:uppercase;letter-spacing:.12em;margin-left:6px;">🛒 Таймер акций:</span>
-                    <button onclick="boardStartBuy()" class="btn btn-gray" title="Открыть окно покупки акций/сделок на 1 мин ВСЕМ">▶ Пуск</button>
+                    <button onclick="boardStartBuy()" class="btn btn-gray" title="Открыть окно покупки акций/сделок на 1 мин ВСЕМ">▶ Пуск · 1 мин</button>
                     <button onclick="boardStopBuy()" class="btn btn-gray" title="Закрыть окно покупки">⏹ Стоп</button>
                 </div>
                 <div style="display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:8px;border-top:1px solid #1f2937;padding-top:8px;">
@@ -17925,9 +17961,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function renderTovarka(app){
             // Не пересобираем, если iframe уже смонтирован — иначе тик рынка/чужой ход перезагружали бы модуль.
             if(app.querySelector('#tovarkaFrame')) return;
-            app.innerHTML = `<div style="max-width:660px;margin:0 auto;padding:8px 10px calc(14px + env(safe-area-inset-bottom));">
-                <button onclick="state.view='player';render();" class="btn" style="background:#1a2233;border:1px solid var(--lx-gold-ln);color:var(--lx-gold-br);font-weight:800;padding:9px 15px;border-radius:11px;margin-bottom:10px;">← Назад в бланк</button>
-                <iframe id="tovarkaFrame" src="via_tovarka.html" title="Товарка" style="width:100%;height:calc(100vh - 96px);border:1px solid var(--lx-gold-ln);border-radius:16px;background:#06090f;display:block;"></iframe>
+            app.innerHTML = `<div style="max-width:660px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;padding:8px 10px calc(10px + env(safe-area-inset-bottom));box-sizing:border-box;">
+                <button onclick="state.view='player';render();" class="btn" style="flex:0 0 auto;background:#1a2233;border:1px solid var(--lx-gold-ln);color:var(--lx-gold-br);font-weight:800;padding:9px 15px;border-radius:11px;margin-bottom:8px;">← Назад в бланк</button>
+                <iframe id="tovarkaFrame" src="via_tovarka.html" title="Товарка" style="flex:1 1 auto;width:100%;border:1px solid var(--lx-gold-ln);border-radius:16px;background:#06090f;display:block;"></iframe>
             </div>`;
         }
         // ❤️ ОТНОШЕНИЯ — фоновый движок + ПЕРЕБИВКА ЗВОНКОМ поверх бланка.
@@ -18379,8 +18415,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmSellBatch(bid){ const p=farmMe(); if(!p||!p.farm) return; const b=(p.farm.batches||[]).find(x=>x.bid===bid); if(!b) return; const cfg=FARM_CFG.aging[b.kind]; const val=batchValue(b); farmSpend(p,-val); p.farm.batches=p.farm.batches.filter(x=>x.bid!==bid); save(p.id); render(); alert('💰 Продано: '+cfg.name+' выдержки '+(b.years||0)+' лет — +'+val+'$ в кассу!'); }
 
         // ─── 📦 СКЛАД: продажа товара (всё сразу или по отдельности), холодильник, запас корма ───
-        function farmSellProduct(prod){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; const units=Math.floor(Number(st[prod])||0); if(units<=0){ alert('Этого товара на складе нет.'); return; } const val=Math.round(units*priceIdx(prod)); st[prod]=0; if(prod==='meat') p.farm.meatFreshY=null; farmSpend(p,-val); save(p.id); render(); alert('💰 Продано со склада: '+(FARM_STOCK_LABELS[prod]||prod)+' — +'+fmtN(val)+'$ по живой цене.'); }
-        function farmSellAllStock(){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; let total=0, any=false; for(const prod in FARM_STOCK_LABELS){ const units=Math.floor(Number(st[prod])||0); if(units>0){ total+=Math.round(units*priceIdx(prod)); st[prod]=0; any=true; } } if(!any){ alert('Склад пуст — продавать нечего.'); return; } p.farm.meatFreshY=null; farmSpend(p,-total); save(p.id); render(); alert('💰 Продан весь склад — +'+fmtN(total)+'$ в кассу!'); }
+        function farmSellProduct(prod){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; const units=Math.floor(Number(st[prod])||0); if(units<=0){ alert('Этого товара на складе нет.'); return; } const val=Math.round(units*farmUnitPrice(prod)); st[prod]=0; if(prod==='meat') p.farm.meatFreshY=null; farmSpend(p,-val); save(p.id); render(); alert('💰 Продано со склада: '+(FARM_STOCK_LABELS[prod]||prod)+' — +'+fmtN(val)+'$ по живой цене.'); }
+        function farmSellAllStock(){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; let total=0, any=false; for(const prod in FARM_STOCK_LABELS){ const units=Math.floor(Number(st[prod])||0); if(units>0){ total+=Math.round(units*farmUnitPrice(prod)); st[prod]=0; any=true; } } if(!any){ alert('Склад пуст — продавать нечего.'); return; } p.farm.meatFreshY=null; farmSpend(p,-total); save(p.id); render(); alert('💰 Продан весь склад — +'+fmtN(total)+'$ в кассу!'); }
         // 🌾 ОКНО КОЛИЧЕСТВА корма (Ринат 28июл): впиши, сколько купить; видно цену и на сколько лет хватит.
         function farmCloseModal(){ const m=document.getElementById('farmModal'); if(m) m.remove(); }
         // 🩹 (Ринат 28июл «покупаешь животных — кидает вверх»): нативные prompt/alert сбрасывают прокрутку,
@@ -18435,6 +18471,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmSignContract(id){ const p=farmMe(); if(!p||!p.farm) return; const cf=FARM_CONTRACTS[id]; if(!cf) return;
             if(farmContracts(p).some(c=>c.id===id)){ farmToast('Такой контракт уже подписан.'); return; }
             const rep=repScore(p).rep; if(rep<cf.rep){ farmToast('Мало репутации для этого заказчика: нужно ≥'+cf.rep+' (у тебя '+rep+').'); return; }
+            // ⚖️ честная поставка: не даём молча подписать то, что ферма не тянет. Мясо копится убоем → смотрим склад; остальное — годовое производство.
+            const have=Math.floor(Number((p.farm.stock||{})[cf.prod])||0); const rate=farmProdRate(p,cf.prod);
+            const canSupply = cf.prod==='meat' ? (have>=cf.qtyYr) : (rate>=cf.qtyYr || have>=cf.qtyYr);
+            if(!canSupply){
+                const line = cf.prod==='meat'
+                    ? 'нужно '+fmtN(cf.qtyYr)+' мяса/год, а на складе '+fmtN(have)
+                    : 'нужно '+fmtN(cf.qtyYr)+'/год, а ферма даёт ~'+fmtN(rate)+'/год';
+                if(!confirm('Ферма пока НЕ тянет этот контракт: '+line+'.\n\nПодпишешь — два года недобора подряд, и заказчик разорвёт контракт, ударив по репутации.\n\nВсё равно подписать?')) return;
+            }
             if(p.farm.contractY==null) p.farm.contractY=curYear();
             p.farm.contracts.push({id:id, since:curYear(), ok:true, strikes:0});
             save(p.id); render(); farmToast('🤝 Контракт подписан: '+cf.name+'. Держи поставки — капает +'+fmtN(cf.payMo)+'$/мес в пассив.'); }
@@ -18507,13 +18552,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const st=p.farm.stock||{};
             let out = `<div class="card"><div class="block-title">📦 Склад — товар и продажа</div>${farmImg('farm_warehouse',150)}<p style="font-size:12px;color:#9ca3af;margin:10px 0;">Тут копится всё, что даёт ферма: яйца, молоко, мясо, рыба, мёд, шерсть, цветы. Продавай по живой цене — <b>всё сразу</b> или <b>по отдельности</b>. 🥛 молоко и 🍇 виноград можно вместо продажи пустить на переработку (сыр/вино) во вкладке ⚗️ Производство.</p>`;
             let cards='', totalVal=0;
-            for(const prod in FARM_STOCK_LABELS){ const units=Math.floor(Number(st[prod])||0); if(units<=0) continue; const val=Math.round(units*priceIdx(prod)); totalVal+=val;
+            for(const prod in FARM_STOCK_LABELS){ const units=Math.floor(Number(st[prod])||0); if(units<=0) continue; const unitP=farmUnitPrice(prod); const val=Math.round(units*unitP); totalVal+=val;
                 const meatWarn=(prod==='meat'&&!p.farm.fridge)?`<div style="font-size:10px;color:#f87171;margin-top:3px;line-height:1.3;">⚠️ протухнет за год без 🧊</div>`:'';
                 const rawNote=(FARM_RAW.indexOf(prod)>=0)?`<div style="font-size:10px;color:#9ca3af;margin-top:3px;line-height:1.3;">🥛 или на переработку в ⚗️ Производстве</div>`:'';
                 cards += `<div style="background:linear-gradient(180deg,#141821,#0e1117);border:1px solid #2a2f3a;border-radius:13px;padding:9px;display:flex;flex-direction:column;">
                     ${farmImg(FARM_PROD_IMG[prod],92)||'<div style="height:92px;border-radius:10px;background:#0a0806;"></div>'}
                     <div style="font-weight:800;font-size:13px;margin-top:7px;line-height:1.25;">${FARM_STOCK_LABELS[prod]} <span style="color:#9ca3af;font-weight:600;">×${fmtN(units)}</span></div>
-                    <div style="font-size:10.5px;color:#9ca3af;margin-top:3px;">цена ${priceIdx(prod).toFixed(2)}× · на руки <b style="color:#efd8a3;">${fmtN(val)}$</b></div>
+                    <div style="font-size:10.5px;color:#9ca3af;margin-top:3px;">${unitP>=1?fmtN(Math.round(unitP*100)/100)+'$/шт':priceIdx(prod).toFixed(2)+'×'} · на руки <b style="color:#efd8a3;">${fmtN(val)}$</b></div>
                     ${meatWarn}${rawNote}
                     <button onclick="farmSellProduct('${prod}')" class="btn btn-green" style="width:100%;padding:8px;font-size:12px;font-weight:800;margin-top:auto;">Продать · ${fmtN(val)}$</button>
                 </div>`; }
@@ -20036,8 +20081,29 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function sdPerson(){const nm=SD_NAMES[Math.floor(Math.random()*SD_NAMES.length)];const pool=SD_FACES[nm.g]||SD_FACES.m;return{name:nm.n,g:nm.g,ava:(nm.g==='f'?'👩':'🧑'),face:pool[Math.floor(Math.random()*pool.length)],intro:SD_INTRO[Math.floor(Math.random()*SD_INTRO.length)]};}
         function sdAskQuestion(i){ const m=state.sdelkaModal; if(!m||!m.drawn||m.drawn.kind!=='read') return; const d=m.drawn; d.asked=d.asked||[];
             if(d.asked.length>=2 || d.asked.some(a=>a.i===i)) return;   // не больше 2 вопросов, один вопрос — раз
-            const Q=SD_QUESTIONS[i]; if(!Q) return; const ans=d.honest?Q.g:Q.r; d.asked.push({i:i, q:Q.q, ic:ans.ic, t:ans.t}); render(); }
-        function sdTells(honest){const g=sdShuffle(SD_GREEN).slice(0,honest?(2+Math.floor(Math.random()*2)):(Math.random()<0.4?1:0));const r=sdShuffle(SD_RED).slice(0,honest?(Math.random()<0.4?1:0):(2+Math.floor(Math.random()*2)));const n=sdShuffle(SD_NEU).slice(0,1+Math.floor(Math.random()*2));return sdShuffle([...g,...r,...n]);}
+            const Q=SD_QUESTIONS[i]; if(!Q) return;
+            // 🦊 хитрый кидала чаще звучит убедительно (зелёный ответ), но ~35% прокалывается; честный отвечает прямо; грубый кидала юлит.
+            let ans; if(d.honest) ans=Q.g; else if(d.cunning) ans=(Math.random()<0.65)?Q.g:Q.r; else ans=Q.r;
+            d.asked.push({i:i, q:Q.q, ic:ans.ic, t:ans.t}); render(); }
+        // Сигналы больше НЕ линейны (Ринат 19сен): хитрый кидала маскируется под честного, честный иногда нервничает.
+        //   honest        → 2-3 зелёных, изредка 1 «нервный» красный;
+        //   scam + cunning → 🦊 выглядит честным: 2-3 зелёных, лишь 40% шанс 1 красной «протечки» (на таких попадаются);
+        //   scam обычный   → почти без зелени, 2-3 красных (грубый, читается).
+        function sdTells(honest, cunning){
+            let g, r;
+            if(honest){
+                g=sdShuffle(SD_GREEN).slice(0, 2+Math.floor(Math.random()*2));
+                r=sdShuffle(SD_RED).slice(0, Math.random()<0.25?1:0);
+            } else if(cunning){
+                g=sdShuffle(SD_GREEN).slice(0, 2+Math.floor(Math.random()*2));
+                r=sdShuffle(SD_RED).slice(0, Math.random()<0.4?1:0);
+            } else {
+                g=sdShuffle(SD_GREEN).slice(0, Math.random()<0.4?1:0);
+                r=sdShuffle(SD_RED).slice(0, 2+Math.floor(Math.random()*2));
+            }
+            const n=sdShuffle(SD_NEU).slice(0, 1+Math.floor(Math.random()*2));
+            return sdShuffle([...g,...r,...n]);
+        }
         // «Деньги идут к деньгам» (Ринат 1авг): человек с предложением подходит ТОЛЬКО к тому, у кого есть
         // деньги или активы. Пустому — никто не интересен. Учит сначала подняться, потом ловить предложения.
         function sdInteresting(p){ return ((Number(p.savings)||0) >= 1500) || ((p.assets||[]).length > 0); }
@@ -20049,7 +20115,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const pool = deck.filter(x => x.k !== 'business');   // именно ЧЕЛОВЕК с предложением, не голый актив
             const c = pool[Math.floor(Math.random()*pool.length)] || pool[0];
             const honest = (c.k !== 'scam');
-            m.drawn = { kind:'read', card:c, person:sdPerson(), honest, tells:sdTells(honest) };
+            const cunning = !honest && Math.random()<0.45;   // 🦊 45% кидал — хитрые, маскируются под честных
+            m.drawn = { kind:'read', card:c, person:sdPerson(), honest, cunning, tells:sdTells(honest, cunning) };
             render();
         }
         function drawSdelkaCard(){
@@ -20065,7 +20132,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (!sdInteresting(p)) { m.drawn = { kind:'noone' }; render(); return; }
             // cash/scam/partner/none — СНАЧАЛА читаем контрагента, развязка ПОСЛЕ решения
             const honest = (c.k !== 'scam');
-            m.drawn = { kind:'read', card:c, person:sdPerson(), honest, tells:sdTells(honest) };
+            const cunning = !honest && Math.random()<0.45;   // 🦊 45% кидал — хитрые, маскируются под честных
+            m.drawn = { kind:'read', card:c, person:sdPerson(), honest, cunning, tells:sdTells(honest, cunning) };
             render();
         }
         // Игрок доверился → отыгрываем настоящую развязку карты (та же экономика, что была на вытягивании)
@@ -22071,6 +22139,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             let v = (Number(p.savings)||0) + portfolioValue(p);
             (p.assets||[]).forEach(a=>{ v += bizValue(a) - (Number(a.liab)||0); });   // дело = 20 потоков
             v -= (Number(p.bankLoan)||0);
+            // 🏠 СОБСТВЕННОСТЬ В ЖИЛЬЕ (Ринат 19сен): купленная квартира/дом — это капитал, а не слив.
+            // Доля = тело минус остаток ипотеки (mLeft). Выкупил целиком → mLeft=0 → в капитал идёт всё тело.
+            v += Math.max(0, (Number(p.homeBody)||0) - (Number(p.mLeft)||0));
             return Math.round(v);
         }
         // История срезов копится в localStorage (на устройстве ведущего) — переживает очистку стола.

@@ -2294,6 +2294,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             lender.setdefault('p2pLoans', []).append(
                                 {'id': d['id'], 'fromId': borrower['id'], 'fromName': borrower.get('name', ''),
                                  'amount': amount, 'pct': pct, 'due': due})
+                            # 🤝 карта души «Служение»: считаем ВЫДАННЫЕ займы за всю игру (запись переживает возврат)
+                            lender['loansGivenTotal'] = int(lender.get('loansGivenTotal') or 0) + 1
                             d['status'] = 'done'; d['accepted'] = [pid]
                             bump(lender, borrower)
                             borrower['notify'] = '🤝 %s дал тебе в долг %s$ под %d%%. Вернуть: %s$.' % (
