@@ -6,14 +6,16 @@
     <title>VIA GAME</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-      /* Telegram Mini App — полный экран на телефоне. Вне Телеграма НИЧЕГО не делает. */
+      /* Telegram Mini App — ОБЫЧНЫЙ режим (как у Кирилла): Telegram сам держит контент
+         ПОД своей шапкой (Закрыть/▼/…), поэтому руками отступы считать не надо и ничего не наложится.
+         НЕ включаем requestFullscreen: он тянул webview под системную панель и требовал ручных инсетов
+         на каждом экране (товарка/отношения лезли под шапку). Вне Телеграма НИЧЕГО не делает. */
       (function(){
         try{
           var tg = window.Telegram && window.Telegram.WebApp;
           if(!tg || !tg.platform || tg.platform==='unknown') return; // не внутри Телеграма
           tg.ready();
-          try{ tg.expand(); }catch(e){}
-          if(typeof tg.requestFullscreen==='function'){ try{ tg.requestFullscreen(); }catch(e){} }
+          try{ tg.expand(); }catch(e){}   // на всю высоту, но ПОД шапкой Telegram (без fullscreen)
           if(typeof tg.disableVerticalSwipes==='function'){ try{ tg.disableVerticalSwipes(); }catch(e){} }
           try{ tg.setHeaderColor && tg.setHeaderColor('#0d1016'); }catch(e){}
           try{ tg.setBackgroundColor && tg.setBackgroundColor('#0d1016'); }catch(e){}
