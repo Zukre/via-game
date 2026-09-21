@@ -15360,6 +15360,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
         // ── 🎰 КАЗИНО-ГЕЙТ (табу): перед входом — зеркало разрухи. Вживил 16 авг.
         const CASINO_REP_HIT = 8;   // −рейтинг за вход в казино (ручка баланса)
+        const CASINO_RUIN_AT = 20;  // 🎰 фото разорения показываем ТОЛЬКО после 20+ заходов (Ринат 20сен, прав был Александр): сначала свобода выбора, потом зеркало последствий — не пугаем сразу
         const CASINO_RUIN = [
             ['01','Пустая квартира','вывезли всё, только экран телефона'],
             ['02','Ушедшая семья','чемоданы у двери'],
@@ -15395,6 +15396,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function cgTick(){ _cgIdx=(_cgIdx+1)%CASINO_RUIN.length; cgPaint(); }
         function renderCasinoGate(p){
+            const _cplays = Number(pstat(p).casinoPlays)||0;
+            if(_cplays < CASINO_RUIN_AT){
+                // 🚪 СВОБОДНЫЙ ВХОД (Ринат 20сен): пока наиграно < порога — НЕ пугаем фото, даём выбор.
+                // Долгое нажатие оставлено как осознанная дверь; фото последствий придут после 20+ заходов.
+                return `<div class="card" style="background:linear-gradient(180deg,#0b0e14,#0a0c11);border:1px solid #2a2016;">
+                    <div style="font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:600;color:var(--lx-gold-br);text-align:center;letter-spacing:.02em;">Казино «VIA» 🎰</div>
+                    <div style="text-align:center;color:#c9d0dc;font-size:12.5px;line-height:1.45;margin:6px 0 14px;">Играешь на удачу. Ни один стол не отдаёт на дистанции — но выбор твой.</div>
+                    <div style="display:flex;align-items:center;gap:10px;background:#0e1119;border:1px solid #232a38;border-radius:12px;padding:11px 14px;margin-bottom:12px;">
+                        <div style="color:#8891a3;font-size:12px;">на руках</div>
+                        <div style="margin-left:auto;color:var(--lx-gold-br);font-weight:900;font-size:17px;">${fmtN(p.savings)} $</div>
+                    </div>
+                    <div id="cgPlay" onmousedown="casinoHoldStart(event)" onmouseup="casinoHoldEnd()" onmouseleave="casinoHoldEnd()" ontouchstart="casinoHoldStart(event)" ontouchend="casinoHoldEnd()" style="position:relative;padding:15px;border:1px solid #b98a3e;border-radius:12px;overflow:hidden;text-align:center;font-size:15px;font-weight:800;color:#efd8a3;background:#140f0a;cursor:pointer;user-select:none;-webkit-user-select:none;margin-bottom:10px;">
+                        <div id="cgFill" style="position:absolute;inset:0;width:0%;background:linear-gradient(90deg,#7a5a1f,#e7bd63);opacity:.85;transition:width .06s linear;"></div>
+                        <div style="position:relative;">Сесть за стол<small style="display:block;font-weight:600;color:#8f8470;margin-top:2px;font-size:10px;">держи 3 сек</small></div>
+                    </div>
+                    <button onclick="casinoLeave()" class="btn" style="width:100%;padding:11px;border:1px solid #2a3340;border-radius:12px;font-size:13px;font-weight:700;color:#9fb0c4;background:#0e1119;">Не сейчас — уйти</button>
+                </div>`;
+            }
+            // 🩸 НАИГРАНО 20+ — теперь показываем, к чему азарт привёл других (фото разорения + процессия).
             if(!_cgTimer) _cgTimer=setInterval(cgTick, 2800);   // запускаем процессию один раз
             const N=CASINO_RUIN.length, off=Math.floor(N/2);
             const tile=(id,idx)=>{ const s=CASINO_RUIN[idx];
@@ -22270,6 +22290,292 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (state.pendingQR && state.currentPlayerId) applyQRCard(state.pendingQR);
             if (document.getElementById('assetFields')) renderAssetForm();
         })();
+    </script>
+
+    <!-- ═══════════ З1.1 · ПОЛЕ + НИЖНИЙ БАР + ОБРАТНАЯ СВЯЗЬ (добавочный слой, рендер бланка не трогает) ═══════════ -->
+    <style id="viaFieldCss">
+      body{padding-bottom:82px !important;}
+      html.tg-app body{padding-bottom:calc(82px + env(safe-area-inset-bottom,0px)) !important;}
+      #viaBottomBar{position:fixed;left:0;right:0;bottom:0;z-index:960;display:flex;gap:8px;
+        padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));
+        background:linear-gradient(180deg,rgba(13,10,6,.82),rgba(13,10,6,.98));
+        border-top:1px solid var(--lx-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+      #viaBottomBar button{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+        padding:11px 6px;border-radius:12px;border:1px solid var(--lx-line);background:var(--lx-panel);
+        color:var(--lx-text);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s;}
+      #viaBottomBar button .vb-ic{font-size:16px;}
+      #viaBottomBar button.vb-active{border-color:var(--lx-gold);color:var(--lx-gold-br);box-shadow:0 0 16px -6px var(--lx-gold);}
+      #viaField{position:fixed;inset:0;z-index:850;overflow-y:auto;-webkit-overflow-scrolling:touch;
+        padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;
+        background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.10), transparent 60%), #0a0703;}
+      html.tg-app.tg-fs #viaField{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
+      #viaField[hidden]{display:none;}
+      .vf-head{max-width:600px;margin:0 auto 14px;text-align:center;}
+      .vf-head h2{font-size:20px;color:var(--lx-gold-br);font-weight:600;letter-spacing:.02em;}
+      .vf-head p{font-size:12.5px;color:var(--lx-muted);margin-top:4px;line-height:1.4;}
+      .vf-board{max-width:min(94vw,540px);margin:0 auto;aspect-ratio:1;display:grid;
+        grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,1fr);gap:6px;}
+      .vf-cell{position:relative;border:1px solid var(--lx-line);border-radius:11px;
+        background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+        cursor:pointer;padding:4px 3px;color:var(--lx-text);font-family:inherit;transition:.15s;text-align:center;}
+      .vf-cell:hover,.vf-cell:active{border-color:var(--lx-gold);box-shadow:0 0 16px -7px var(--lx-gold);transform:translateY(-1px);}
+      .vf-cell .e{font-size:min(6.2vw,26px);line-height:1;}
+      .vf-cell .l{font-size:min(2.7vw,11px);color:var(--lx-muted);line-height:1.05;}
+      .vf-center{grid-area:2/2/5/5;border:1px dashed var(--lx-line);border-radius:14px;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:12px;text-align:center;
+        background:radial-gradient(circle at 50% 40%,rgba(231,189,99,.06),transparent 70%);}
+      .vf-center .k{font-size:min(12vw,52px);line-height:1;}
+      .vf-center .t{font-size:13px;color:var(--lx-text);font-weight:600;}
+      .vf-center .s{font-size:11px;color:var(--lx-faint);max-width:22ch;line-height:1.35;}
+      .vf-cell.vf-here{border-color:var(--lx-gold);box-shadow:0 0 0 2px var(--lx-gold),0 0 18px -4px var(--lx-gold);}
+      .vf-cell.vf-here::after{content:'🔵';position:absolute;top:2px;right:3px;font-size:9px;line-height:1;}
+      .vf-month{font-size:11.5px;color:var(--lx-muted);min-height:14px;}
+      .vf-die{font-size:min(13vw,54px);line-height:1;}
+      .vf-roll{padding:9px 18px;border-radius:20px;border:1px solid var(--lx-gold);background:var(--lx-gold);color:#1a1405;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;transition:.12s;}
+      .vf-roll:active{transform:scale(.96);}
+      .vf-landed{font-size:12px;color:var(--lx-text);display:flex;flex-direction:column;gap:6px;align-items:center;}
+      .vf-landed .ll{color:var(--lx-muted);}
+      .vf-enter{padding:7px 14px;border-radius:16px;border:1px solid var(--lx-line);background:var(--lx-panel);color:var(--lx-gold-br);font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit;}
+      .vf-epoch{max-width:540px;margin:0 auto 12px;border:1px solid var(--lx-line);border-radius:12px;padding:9px 14px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));display:flex;align-items:center;gap:11px;}
+      .vf-epoch .ei{font-size:23px;line-height:1;flex:none;}
+      .vf-epoch .col{display:flex;flex-direction:column;min-width:0;}
+      .vf-epoch .et{font-size:13.5px;color:var(--lx-gold-br);font-weight:600;line-height:1.15;}
+      .vf-epoch .em{font-size:11.5px;color:var(--lx-muted);margin-top:2px;line-height:1.25;}
+      .vf-ipo{display:block;margin:0 auto 14px;max-width:540px;width:100%;padding:11px;border-radius:12px;border:1px solid var(--lx-gold-ln);background:linear-gradient(180deg,rgba(231,189,99,.11),rgba(231,189,99,.03));color:var(--lx-gold-br);font-weight:600;font-size:13.5px;cursor:pointer;font-family:inherit;}
+      .vf-ipo:active{transform:scale(.99);}
+      #viaIpo{position:fixed;inset:0;z-index:855;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.10), transparent 60%), #0a0703;}
+      html.tg-app.tg-fs #viaIpo{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
+      #viaIpo[hidden]{display:none;}
+      .vi-wrap{max-width:560px;margin:0 auto;}
+      .vi-head{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+      .vi-head h2{font-size:19px;color:var(--lx-gold-br);font-weight:600;}
+      .vi-back{padding:7px 12px;border-radius:16px;border:1px solid var(--lx-line);background:var(--lx-panel);color:var(--lx-text);font-size:12.5px;cursor:pointer;font-family:inherit;}
+      .vi-heat{font-size:12.5px;color:var(--lx-muted);margin-bottom:14px;line-height:1.4;}
+      .vi-offers,.vi-mine{display:flex;flex-direction:column;gap:10px;}
+      .vi-mine{margin-top:8px;}
+      .vi-sec-t{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--lx-faint);margin:18px 0 4px;}
+      .vi-card{border:1px solid var(--lx-line);border-radius:13px;padding:14px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));}
+      .vi-card .nm{font-size:15px;color:var(--lx-text);font-weight:600;}
+      .vi-card .meta{font-size:11.5px;color:var(--lx-muted);margin-top:3px;line-height:1.4;}
+      .vi-card .row{display:flex;gap:8px;margin-top:11px;align-items:center;}
+      .vi-card input{flex:1;min-width:0;border-radius:9px;border:1px solid var(--lx-line);background:var(--lx-ink);color:var(--lx-text);padding:9px 10px;font-family:inherit;font-size:14px;}
+      .vi-card .bid{padding:9px 15px;border-radius:9px;border:1px solid var(--lx-gold);background:var(--lx-gold);color:#1a1405;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+      .vi-hold .st{font-size:11.5px;margin-top:4px;}
+      .vi-hold .sell{padding:8px 14px;border-radius:9px;border:1px solid var(--lx-line);background:var(--lx-panel);color:var(--lx-gold-br);font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit;}
+      .vi-hold .sell:disabled{opacity:.45;cursor:default;}
+      .vi-empty{font-size:13px;color:var(--lx-faint);text-align:center;padding:16px;border:1px dashed var(--lx-line);border-radius:12px;}
+      .vi-pos{color:var(--lx-em);} .vi-neg{color:var(--lx-rose);}
+      #viaFeedback{position:fixed;inset:0;z-index:6000;display:none;align-items:center;justify-content:center;padding:18px;
+        background:rgba(6,5,3,.72);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);}
+      #viaFeedback.on{display:flex;}
+      .vf-fb{width:100%;max-width:420px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));
+        border:1px solid var(--lx-line);border-radius:16px;padding:20px;}
+      .vf-fb h3{font-size:17px;color:var(--lx-gold-br);margin-bottom:4px;}
+      .vf-fb p{font-size:12.5px;color:var(--lx-muted);margin-bottom:12px;line-height:1.4;}
+      .vf-fb textarea{width:100%;min-height:96px;resize:vertical;border-radius:10px;border:1px solid var(--lx-line);
+        background:var(--lx-ink);color:var(--lx-text);padding:10px;font-family:inherit;font-size:14px;}
+      .vf-fb .row{display:flex;gap:9px;margin-top:12px;}
+      .vf-fb button{flex:1;padding:11px;border-radius:10px;border:1px solid var(--lx-line);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;}
+      .vf-fb .send{background:var(--lx-gold);color:#1a1405;border-color:var(--lx-gold);}
+      .vf-fb .cancel{background:transparent;color:var(--lx-muted);}
+      .vf-toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);z-index:6100;
+        background:var(--lx-panel);border:1px solid var(--lx-gold);color:var(--lx-text);
+        padding:9px 15px;border-radius:20px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;max-width:80vw;text-align:center;}
+      .vf-toast.on{opacity:1;}
+    </style>
+
+    <div id="viaField" hidden>
+      <div class="vf-head"><h2>Денежное поле</h2><p>Наступай на клетку — открывается её дело. Помни: время дороже денег.</p></div>
+      <div class="vf-epoch" id="viaEpochBar"></div>
+      <button class="vf-ipo" id="viIpoOpen">🚀 Размещения — IPO</button>
+      <div class="vf-board" id="viaBoard"></div>
+    </div>
+
+    <div id="viaIpo" hidden>
+      <div class="vi-wrap">
+        <div class="vi-head"><button class="vi-back" id="viIpoBack">← Поле</button><h2>Размещения · IPO</h2></div>
+        <div class="vi-heat" id="viHeat"></div>
+        <div class="vi-sec-t">Открытые размещения</div>
+        <div class="vi-offers" id="viOffers"></div>
+        <div class="vi-sec-t">Мои размещения</div>
+        <div class="vi-mine" id="viMine"></div>
+      </div>
+    </div>
+
+    <div id="viaFeedback">
+      <div class="vf-fb">
+        <h3>Обратная связь</h3>
+        <p>Что улучшить или какой баг ты нашёл? Пиши прямо — это идёт нам, по этому и правим.</p>
+        <textarea id="viaFbText" placeholder="Например: цена на складе неверная / кнопка не нажимается…"></textarea>
+        <div class="row"><button class="cancel" id="viaFbCancel">Отмена</button><button class="send" id="viaFbSend">Отправить</button></div>
+      </div>
+    </div>
+
+    <div id="viaBottomBar">
+      <button id="vbField"><span class="vb-ic">🗺️</span>Поле</button>
+      <button id="vbBlank" class="vb-active"><span class="vb-ic">🧾</span>Бланк</button>
+      <button id="vbFb"><span class="vb-ic">✍️</span>Отзыв</button>
+    </div>
+    <div class="vf-toast" id="viaToast"></div>
+
+    <script>
+    (function(){
+      // клетка → раздел бланка (ищем по тексту заголовка details.sec)
+      var CELLS=[
+        ['💼','Зарплата','Доход и расходы'],
+        ['📈','Биржа','Биржа'],
+        ['🏢','Бизнес','Бизнес'],
+        ['🏠','Недвиж.','Недвижимость'],
+        ['📦','Товарка','Товарка'],
+        ['🎓','Навыки','Развивать себя'],
+        ['❤️','Отнош.','Отношения'],
+        ['🏦','Депозит','Депозиты'],
+        ['🎰','Казино','Казино'],
+        ['💎','Коллек.','Коллекция'],
+        ['🔨','Аукцион','Аукцион'],
+        ['🛒','Активы','Мои активы'],
+        ['🏡','Образ','Образ жизни'],
+        ['🎴','Клетки','Клетки и действия'],
+        ['🏦','Долги','Долги'],
+        ['🏆','Победа','Путь к победе']
+      ];
+      // ── ЭПОХИ (З5.3): живая динамика мира без ведущего. Тикает от игрового времени (месяцев). ──
+      var PHASES=[
+        {k:'growth',nm:'Рост', ic:'📈',len:8,mktMul:1.06,ipoHeat:1.4,mood:'Рынок растёт, оптимизм — попутный ветер делу.'},
+        {k:'peak',  nm:'Пик',  ic:'🔥',len:2,mktMul:1.02,ipoHeat:1.8,mood:'Эйфория и перегрев — всё дорого, тут самый капкан.'},
+        {k:'bear',  nm:'Спад', ic:'📉',len:4,mktMul:0.93,ipoHeat:0.4,mood:'Медведь: падение и страх — выживает кэш и терпение.'},
+        {k:'bottom',nm:'Дно',  ic:'🌱',len:3,mktMul:0.99,ipoHeat:0.7,mood:'Тихо и дёшево — здесь закладывается будущий рост.'}
+      ];
+      var THEMES=['Технологический бум','Крипто-мания','Промышленный век','Сырьевой цикл','Эпоха ИИ'];
+      var EPOCH_CYCLE=PHASES.reduce(function(s,p){return s+p.len;},0); // 17 мес: бык(рост+пик=10) ~2.5× медведя(спад=4)
+      function epochAt(M){
+        M=Math.max(0,Math.floor(Number(M)||0));
+        var pos=M%EPOCH_CYCLE, cyc=Math.floor(M/EPOCH_CYCLE), acc=0, ph=PHASES[0], monthsIn=0;
+        for(var i=0;i<PHASES.length;i++){ if(pos<acc+PHASES[i].len){ ph=PHASES[i]; monthsIn=pos-acc; break; } acc+=PHASES[i].len; }
+        return {phase:ph, theme:THEMES[cyc%THEMES.length], monthsIn:monthsIn, cycle:cyc};
+      }
+      function perim(n){var c=[],x,y;for(x=1;x<=n;x++)c.push([1,x]);for(y=2;y<=n;y++)c.push([y,n]);for(x=n-1;x>=1;x--)c.push([n,x]);for(y=n-1;y>=2;y--)c.push([y,1]);return c;}
+      var board=document.getElementById('viaBoard'),cells=[],pawnIdx=0,rolling=false;
+      function curP(){try{if(typeof state!=='undefined'&&state&&state.players)return state.players.find(function(x){return x.id==state.currentPlayerId;});}catch(e){}return null;}
+      function paintPawn(){for(var i=0;i<cells.length;i++)cells[i].classList.toggle('vf-here',i===pawnIdx);}
+      function updMonth(){var p=curP(),m=0;if(p){try{m=Number(pstat(p).salaryCount)||0;}catch(e){}}var el=document.getElementById('vfMonth');if(el)el.textContent=p?('Прожито месяцев: '+m):'Войди в игру — вкладка «Бланк»';updEpoch(m);}
+      function updEpoch(m){try{var e=epochAt(m);window.viaEpoch={phase:e.phase.k,phaseName:e.phase.nm,theme:e.theme,mktMul:e.phase.mktMul,ipoHeat:e.phase.ipoHeat,monthsIn:e.monthsIn,phaseLen:e.phase.len,cycle:e.cycle};var eb=document.getElementById('viaEpochBar');if(eb)eb.innerHTML='<span class="ei">'+e.phase.ic+'</span><span class="col"><span class="et">Эпоха: '+e.phase.nm+' · '+e.theme+'</span><span class="em">'+e.phase.mood+'</span></span>';}catch(err){}}
+      function landed(){var c=CELLS[pawnIdx];if(!c)return;var box=document.getElementById('vfLanded');updMonth();if(box){box.innerHTML='<div class="ll">Стоишь на: <b>'+c[1]+'</b></div><button class="vf-enter" id="vfEnter">Войти в «'+c[1]+'»</button>';var be=document.getElementById('vfEnter');if(be)be.addEventListener('click',function(){openRazdel(c[2]);});}}
+      function payday(){var p=curP();if(!p)return;if(typeof giveSalary==='function'&&typeof state!=='undefined'){try{giveSalary(state.currentPlayerId);}catch(e){}}toast('💵 Прошёл месяц — получка упала в бланк');}
+      function stepMove(n){var crossed=false,steps=0;var iv=setInterval(function(){pawnIdx=(pawnIdx+1)%cells.length;if(pawnIdx===0)crossed=true;paintPawn();if(++steps>=n){clearInterval(iv);if(crossed)payday();landed();rolling=false;}},150);}
+      function rollDie(){if(rolling)return;var p=curP();if(!p){toast('Сначала войди в игру — вкладка «Бланк»');return;}rolling=true;var n=1+Math.floor(Math.random()*6),die=document.getElementById('vfDie'),F=['⚀','⚁','⚂','⚃','⚄','⚅'],t=0;var iv=setInterval(function(){if(die)die.textContent=F[Math.floor(Math.random()*6)];if(++t>7){clearInterval(iv);if(die)die.textContent=F[n-1];stepMove(n);}},65);}
+      if(board){
+        var pos=perim(5),h='';
+        for(var i=0;i<CELLS.length&&i<pos.length;i++){var c=CELLS[i],pp=pos[i];
+          h+='<button class="vf-cell" data-key="'+c[2]+'" style="grid-row:'+pp[0]+';grid-column:'+pp[1]+'"><span class="e">'+c[0]+'</span><span class="l">'+c[1]+'</span></button>';}
+        h+='<div class="vf-center"><div class="vf-month" id="vfMonth"></div><div class="vf-die" id="vfDie">🎲</div><button class="vf-roll" id="vfRoll">Бросить кубик</button><div class="vf-landed" id="vfLanded"></div></div>';
+        board.innerHTML=h;
+        cells=Array.prototype.slice.call(board.querySelectorAll('.vf-cell'));
+        var rb=document.getElementById('vfRoll');if(rb)rb.addEventListener('click',rollDie);
+        board.addEventListener('click',function(e){var b=e.target.closest('.vf-cell');if(!b)return;var i=cells.indexOf(b);if(i===pawnIdx){openRazdel(b.getAttribute('data-key'));}else{toast('🎲 Дойди кубиком — вход в дело стоит хода');}});
+        paintPawn();landed();
+      }
+      function toast(m){var t=document.getElementById('viaToast');if(!t)return;t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('on');},2200);}
+      function openRazdel(key){
+        var list=document.querySelectorAll('details.sec'),found=null;
+        for(var i=0;i<list.length;i++){var s=list[i].querySelector('summary');if(s&&s.textContent.indexOf(key)!==-1){found=list[i];break;}}
+        showField(false);
+        if(found){try{found.open=true;}catch(e){}setTimeout(function(){try{found.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}},70);}
+        else{toast('Этот раздел сейчас недоступен');}
+      }
+      var field=document.getElementById('viaField'),bF=document.getElementById('vbField'),bB=document.getElementById('vbBlank');
+      function showField(on){if(field)field.hidden=!on;if(bF)bF.classList.toggle('vb-active',on);if(bB)bB.classList.toggle('vb-active',!on);if(on){try{updMonth();}catch(e){}try{field.scrollTop=0;}catch(e){}}}
+      if(bF)bF.addEventListener('click',function(){showField(true);});
+      if(bB)bB.addEventListener('click',function(){showField(false);});
+      // обратная связь
+      var fb=document.getElementById('viaFeedback');
+      document.getElementById('vbFb').addEventListener('click',function(){fb.classList.add('on');var t=document.getElementById('viaFbText');if(t)setTimeout(function(){try{t.focus();}catch(e){}},50);});
+      document.getElementById('viaFbCancel').addEventListener('click',function(){fb.classList.remove('on');});
+      fb.addEventListener('click',function(e){if(e.target===fb)fb.classList.remove('on');});
+      document.getElementById('viaFbSend').addEventListener('click',function(){
+        var t=document.getElementById('viaFbText'),txt=(t&&t.value||'').trim();
+        if(!txt){toast('Напиши пару слов');return;}
+        var rec={text:txt,ts:new Date().toISOString(),url:location.href,ua:navigator.userAgent};
+        try{var a=JSON.parse(localStorage.getItem('via_feedback')||'[]');a.push(rec);localStorage.setItem('via_feedback',JSON.stringify(a));}catch(e){}
+        if(location.protocol==='http:'||location.protocol==='https:'){try{fetch('/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(rec)}).catch(function(){});}catch(e){}}
+        if(t)t.value='';fb.classList.remove('on');toast('Спасибо! Записал.');
+      });
+
+      // ── IPO / РАЗМЕЩЕНИЯ (З5.2): вклад любой суммой, аллокация при переподписке, дебют pop/flop, лок-ап. Читает window.viaEpoch. ──
+      var IPO_SECTORS={'Технологический бум':['ИИ-стартап','Облачный сервис','Соцсеть','Кибербез'],'Крипто-мания':['Крипто-биржа','Блокчейн','Web3','Майнинг'],'Промышленный век':['Завод','Логистика','Стройхолдинг','Энергетика'],'Сырьевой цикл':['Нефтегаз','Металлы','Агрохолдинг','Удобрения'],'Эпоха ИИ':['ИИ-лаба','Робототехника','Дата-центр','Автопилот']};
+      var IPO_NAMES=['Nova','Orion','Vertex','Zenith','Lumen','Atlas','Quant','Helios','Aurum','Titan','Delta','Sigma'];
+      var curOffers=[],ipoEl=document.getElementById('viaIpo');
+      function epochHeat(){return (window.viaEpoch&&window.viaEpoch.ipoHeat)||1;}
+      function nowMonth(){var p=curP();if(!p)return 0;try{return Number(pstat(p).salaryCount)||0;}catch(e){return 0;}}
+      function money(n){n=Math.round(Number(n)||0);try{return (typeof fmtN==='function'?fmtN(n):n)+'$';}catch(e){return n+'$';}}
+      function ipoState(p){if(!p.viaIpo)p.viaIpo={holds:[]};if(!p.viaIpo.holds)p.viaIpo.holds=[];return p.viaIpo;}
+      function stars(h){h=Math.max(1,Math.min(3,h));return '★★★☆☆☆'.slice(3-h,6-h);}
+      function genOffers(){
+        var heat=epochHeat(),theme=(window.viaEpoch&&window.viaEpoch.theme)||'Технологический бум';
+        var secs=IPO_SECTORS[theme]||IPO_SECTORS['Технологический бум'];
+        var n=heat>=1.5?2:(heat>=0.9?1:(Math.random()<heat?1:0)),offs=[];
+        for(var i=0;i<n;i++){
+          var hype=Math.min(3,Math.max(1,Math.round(1+Math.random()*2*Math.min(1.4,heat))));
+          var oversub=1+Math.random()*(heat>=1.3?2.5:1);
+          var debut=0.9+(hype-1)*0.2*heat+(Math.random()-0.45)*1.2; debut=Math.max(0.35,Math.min(2.8,debut));
+          offs.push({nm:IPO_NAMES[Math.floor(Math.random()*IPO_NAMES.length)]+' · '+secs[i%secs.length],price:5+Math.floor(Math.random()*40),hype:hype,oversub:oversub,debut:debut});
+        }
+        return offs;
+      }
+      function renderIpo(){
+        var p=curP(),heatEl=document.getElementById('viHeat'),offEl=document.getElementById('viOffers'),mineEl=document.getElementById('viMine');
+        var heat=epochHeat(),ep=(window.viaEpoch&&window.viaEpoch.phaseName)||'—',th=(window.viaEpoch&&window.viaEpoch.theme)||'—';
+        if(heatEl)heatEl.textContent='Эпоха: '+ep+' · '+th+' — окна '+(heat>=1.3?'🔥 горячие: летят вверх, но аллокацию режут сильнее':(heat<0.7?'❄️ заморожены: мало и рискованно':'спокойные'))+'.';
+        if(!p){if(offEl)offEl.innerHTML='<div class="vi-empty">Войди в игру (вкладка «Бланк»), чтобы участвовать.</div>';if(mineEl)mineEl.innerHTML='';return;}
+        var oh='';
+        if(!curOffers.length)oh='<div class="vi-empty">Сейчас размещений нет — эпоха холодная. Загляни в фазе роста.</div>';
+        for(var i=0;i<curOffers.length;i++){var o=curOffers[i];
+          oh+='<div class="vi-card"><div class="nm">'+o.nm+'</div><div class="meta">Цена размещения '+o.price+'$ · хайп '+stars(o.hype)+' · спрос ×'+o.oversub.toFixed(1)+' (переподписка режет аллокацию)</div><div class="row"><input id="viAmt'+i+'" inputmode="numeric" placeholder="сколько вложить, $"><button class="bid" data-idx="'+i+'">Подать заявку</button></div></div>';}
+        if(offEl)offEl.innerHTML=oh;
+        var st=ipoState(p),m=nowMonth(),mh='';
+        if(!st.holds.length)mh='<div class="vi-empty">Пока нет размещений. Подай заявку выше.</div>';
+        for(var j=0;j<st.holds.length;j++){var hd=st.holds[j];
+          var debuted=m>=hd.debutAt,val=debuted?hd.invested*hd.debut:hd.invested,pl=val-hd.invested,canSell=(m>=hd.lockupUntil)&&debuted;
+          var stTxt=debuted?('дебют '+(hd.debut>=1?'▲':'▼')+' — стоит '+money(val)+' ('+(pl>=0?'+':'')+money(pl)+')'):'ждёт дебюта — следующий месяц';
+          mh+='<div class="vi-card vi-hold"><div class="nm">'+hd.nm+'</div><div class="meta">Вложено '+money(hd.invested)+(hd.alloc<hd.asked?(' · аллокация из заявки '+money(hd.asked)):'')+'</div><div class="st '+(debuted?(pl>=0?'vi-pos':'vi-neg'):'')+'">'+stTxt+'</div><div class="row"><button class="sell" data-hid="'+hd.id+'"'+(canSell?'':' disabled')+'>'+(m>=hd.lockupUntil?'Продать за '+money(val):'Лок-ап: ещё '+Math.max(0,hd.lockupUntil-m)+' мес')+'</button></div></div>';}
+        if(mineEl)mineEl.innerHTML=mh;
+      }
+      function invest(idx){
+        var p=curP();if(!p){toast('Сначала войди в игру');return;}
+        var o=curOffers[idx];if(!o)return;
+        var inp=document.getElementById('viAmt'+idx),asked=Math.floor(Number((inp&&inp.value||'').replace(/\D/g,''))||0);
+        if(asked<100){toast('Минимум 100$');return;}
+        if((Number(p.savings)||0)<asked){toast('Не хватает в кассе');return;}
+        var frac=1/o.oversub; if(o.oversub>2.5&&Math.random()<0.25)frac*=0.15;
+        var alloc=Math.max(0,Math.round(asked*frac));
+        if(alloc<1){toast('Аллокация 0 — заявку не удовлетворили (бывает в горячих IPO)');return;}
+        p.savings=Math.round((Number(p.savings)-alloc)*100)/100;
+        var m=nowMonth(),st=ipoState(p);
+        st.holds.push({id:'h'+Date.now()+Math.floor(Math.random()*999),nm:o.nm,asked:asked,alloc:alloc,invested:alloc,debut:o.debut,debutAt:m+1,lockupUntil:m+3});
+        curOffers.splice(idx,1);
+        try{if(typeof save==='function'&&typeof state!=='undefined')save(state.currentPlayerId);}catch(e){}
+        try{if(typeof render==='function')render();}catch(e){}
+        toast('Заявка подана: аллокация '+money(alloc)+(alloc<asked?(' из '+money(asked)):'')+'. Дебют — следующий месяц.');
+        renderIpo();
+      }
+      function sellIpo(hid){
+        var p=curP();if(!p)return;var st=ipoState(p),m=nowMonth();
+        for(var i=0;i<st.holds.length;i++){var hd=st.holds[i];if(hd.id===hid){
+          if(m<hd.lockupUntil){toast('Ещё лок-ап');return;}
+          var val=Math.round(hd.invested*hd.debut);
+          p.savings=Math.round((Number(p.savings)+val)*100)/100; st.holds.splice(i,1);
+          try{if(typeof save==='function'&&typeof state!=='undefined')save(state.currentPlayerId);}catch(e){}
+          try{if(typeof render==='function')render();}catch(e){}
+          toast('Продано за '+money(val)+' — в кассу'); renderIpo(); return;
+        }}
+      }
+      function openIpo(){curOffers=genOffers();if(ipoEl)ipoEl.hidden=false;renderIpo();}
+      function closeIpo(){if(ipoEl)ipoEl.hidden=true;}
+      var oib=document.getElementById('viIpoOpen');if(oib)oib.addEventListener('click',openIpo);
+      var ibk=document.getElementById('viIpoBack');if(ibk)ibk.addEventListener('click',closeIpo);
+      if(ipoEl)ipoEl.addEventListener('click',function(e){var b=e.target.closest('.bid');if(b){invest(parseInt(b.getAttribute('data-idx'),10));return;}var s=e.target.closest('.sell');if(s&&!s.disabled){sellIpo(s.getAttribute('data-hid'));}});
+    })();
     </script>
 </body>
 </html>
