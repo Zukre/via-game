@@ -11998,6 +11998,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 localStorage.setItem('v0_players', JSON.stringify(state.players));
                 localStorage.setItem('v0_deals', JSON.stringify(state.deals));
                 localStorage.setItem('v0_world', JSON.stringify(state.world || null));
+                if (state.market && state.market._offline) localStorage.setItem('v0_market', JSON.stringify(state.market));   // 🏛️ офлайн-биржа: цены/листинги живут между входами
             } catch(e){ console.warn('local mirror save', e); }
             if (SERVER_MODE) {
                 // fire-and-forget POST — UI обновится мгновенно, остальные браузеры подтянут polling'ом
@@ -13106,6 +13107,106 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Имя в CSV = «Bitcoin (BTC)» → берём BTC. Без скобок («BNB», «XRP») — оставляем как есть.
         function assetTicker(nm){ nm=String(nm||''); const m=/\(([^)]+)\)\s*$/.exec(nm); return (m?m[1]:nm).trim(); }
         function assetTickerById(id){ const a=assetById(id); return a?assetTicker(a.name):''; }
+
+        // ═══════════ 🏛️ ОФЛАЙН-БИРЖА + ЭПОХИ (без сервера) ═══════════
+        // Биржа была построена под Python-сервер (via_market.py): цены двигал он. В залитой игре
+        // (Zukre / Telegram / file://) сервера НЕТ → рынок не грузился, биржа висела «загружается…».
+        // Здесь клиентский движок: те же 27 активов, цены ЖИВУТ и двигаются ПО ПРОЖИТЫМ МЕСЯЦАМ
+        // (время=ресурс — хребет VIA), а эпоха (рост/пик/спад/дно + тема) качает весь рынок.
+        // Включается ТОЛЬКО когда сервер не дал своего рынка (флаг _offline). Серверный режим не трогаем.
+        const OFFLINE_MARKET_SEED = [
+        ["1", "Apple (AAPL)", "stock", 240.0, 3, 150.0, 340.0],
+        ["2", "Microsoft (MSFT)", "stock", 450.0, 3, 300.0, 620.0],
+        ["3", "Nvidia (NVDA)", "stock", 140.0, 6, 80.0, 240.0],
+        ["4", "Amazon (AMZN)", "stock", 220.0, 4, 140.0, 320.0],
+        ["5", "Tesla (TSLA)", "stock", 400.0, 7, 200.0, 620.0],
+        ["6", "Bitcoin (BTC)", "crypto", 100000.0, 12, 3000.0, 155000.0],
+        ["7", "Ethereum (ETH)", "crypto", 3500.0, 15, 105.0, 5500.0],
+        ["8", "BNB", "crypto", 700.0, 12, 21.0, 1100.0],
+        ["9", "Solana (SOL)", "crypto", 200.0, 20, 6.0, 330.0],
+        ["10", "XRP", "crypto", 2.5, 18, 0.075, 4.2],
+        ["11", "Cardano (ADA)", "crypto", 1.0, 20, 0.03, 1.8],
+        ["12", "Dogecoin (DOGE)", "crypto", 0.35, 30, 0.0105, 0.9],
+        ["13", "Avalanche (AVAX)", "crypto", 40.0, 22, 1.2, 72.0],
+        ["14", "Chainlink (LINK)", "crypto", 25.0, 20, 0.75, 46.0],
+        ["15", "Polkadot (DOT)", "crypto", 8.0, 20, 0.24, 15.0],
+        ["16", "Золото (Gold)", "metal", 2600.0, 1, 2000.0, 3400.0],
+        ["17", "Серебро (Silver)", "metal", 30.0, 2, 20.0, 46.0],
+        ["18", "Платина (Platinum)", "metal", 1000.0, 2, 700.0, 1500.0],
+        ["19", "Нефть (Oil)", "commodity", 75.0, 3, 45.0, 120.0],
+        ["20", "Пшеница (Wheat)", "commodity", 6.0, 2, 4.0, 10.0],
+        ["21", "Кукуруза (Corn)", "commodity", 4.5, 2, 3.0, 8.0],
+        ["22", "Dombra (DMBR)", "crypto", 0.05, 60, 0.001, 8.0],
+        ["23", "KAZAXSTAN (KZT)", "crypto", 0.02, 62, 0.0005, 5.0],
+        ["24", "KAZAX (KZX)", "crypto", 0.01, 65, 0.0002, 3.0],
+        ["25", "KAZAX GERLS (KGRL)", "crypto", 0.15, 58, 0.002, 12.0],
+        ["26", "BLOY (BLOY)", "crypto", 0.005, 68, 0.0001, 2.0],
+        ["27", "SHIMIR (SHMR)", "crypto", 0.5, 55, 0.01, 40.0]
+      ];
+        // округление ПО ЗНАЧИМОСТИ: копеечные монеты (BLOY 0.005, KAZAX 0.0002) не схлопываются в 0.00
+        function _r2(n){ n=Number(n)||0; const a=Math.abs(n); if(a>=1000) return Math.round(n); if(a>=1) return Math.round(n*100)/100; if(a>=0.01) return Math.round(n*10000)/10000; return Math.round(n*1e6)/1e6; }
+        // тема эпохи → «горячий» сектор (летит сильнее): «то крипта, то акции, то сырьё»
+        const EPOCH_HOT_CAT = {'Технологический бум':'stock','Крипто-мания':'crypto','Промышленный век':'comm','Сырьевой цикл':'metal','Эпоха ИИ':'stock'};
+        function seedOfflineMarket(force){
+            if(!force && state.market && state.market.assets && state.market.assets.length) return;
+            // 1) поднять сохранённый офлайн-рынок (цены/листинги живут между входами)
+            if(!force){ try{ const raw=localStorage.getItem('v0_market'); if(raw){ const m=JSON.parse(raw); if(m && m.assets && m.assets.length){ m._offline=true; state.market=m; return; } } }catch(e){} }
+            // 2) свежий посев из 27 активов + мягкая предыстория (спарклайн живой с 1-го месяца)
+            const assets = OFFLINE_MARKET_SEED.map(function(s){
+                const id=String(s[0]), name=s[1], type=s[2], price=Number(s[3]), vol=Number(s[4])||3, mn=Number(s[5]), mx=Number(s[6]);
+                let pr=price, hist=[];
+                for(let k=0;k<20;k++){ pr=Math.max(mn, Math.min(mx, pr*(1+(Math.random()-0.5)*(vol/100)*1.4))); hist.push(_r2(pr)); }
+                hist.push(_r2(price));
+                return { id:id, name:name, type:type, price:_r2(price), price0:_r2(price), min:mn, max:mx, vol:vol, anchor:_r2(price), history:hist };
+            });
+            state.market = { assets:assets, game_year:1, _offline:true, _tickMonth:0, events_last:[], started_at:Date.now() };
+            try{ persistOfflineMarket(); }catch(e){}
+        }
+        function persistOfflineMarket(){ try{ if(state.market && state.market._offline) localStorage.setItem('v0_market', JSON.stringify(state.market)); }catch(e){} }
+        // Один месяц жизни рынка под данной эпохой
+        function _marketTickOneMonth(ep){
+            const hot = EPOCH_HOT_CAT[ep && ep.theme] || null;
+            const mm = (ep && Number(ep.mktMul)) || 1;
+            for(const a of state.market.assets){
+                const cat = assetCat(a);
+                // дрейф от эпохи (mktMul — «настрой рынка», берём мягко, чтобы не улетал за месяц)
+                let drift = 1 + (mm - 1) * 0.5;
+                if(hot && cat===hot) drift += 0.02;                 // горячий сектор эпохи летит сильнее
+                const noise = 1 + (Math.random()-0.5) * ((Number(a.vol)||3)/100) * 2.2;   // волатильность актива = шум
+                let np = a.price * drift * noise;
+                // редкий срыв у мемов/крипты — пусть игрок обжигается (принцип Рината), не глухая стена
+                if((Number(a.vol)||0)>=45 && Math.random()<0.05) np *= (Math.random()<0.5 ? 0.45 : 2.1);
+                np = Math.max(Number(a.min)||np*0.2, Math.min(Number(a.max)||np*6, np));
+                a.price = _r2(np);
+                a.history = (a.history||[]).concat([a.price]); if(a.history.length>40) a.history = a.history.slice(-40);
+            }
+        }
+        function marketMonthTick(fromMonth, months){
+            if(!state.market || !state.market._offline) return;
+            months = Math.min(24, Math.max(0, Math.floor(months||0)));   // кап на разовый догон (защита старых сейвов)
+            for(let k=0;k<months;k++){
+                const M = fromMonth + k;
+                const ep = (typeof window.viaEpochInfo==='function') ? window.viaEpochInfo(M) : (window.viaEpoch || {mktMul:1, theme:''});
+                _marketTickOneMonth(ep);
+            }
+        }
+        // Догнать офлайн-рынок до прожитого месяца (монотонно, назад не откатывает)
+        function viaMarketSync(month){
+            if(!state.market || !state.market.assets || !state.market.assets.length) seedOfflineMarket();
+            if(!state.market || !state.market._offline) return;         // серверный рынок ведёт сервер — не трогаем
+            month = Math.max(0, Math.floor(Number(month)||0));
+            const done = Number(state.market._tickMonth)||0;
+            if(month <= done) return;
+            marketMonthTick(done, month - done);
+            state.market._tickMonth = month;
+            state.market.game_year = Math.floor(month/12) + 1;
+            try{ persistOfflineMarket(); }catch(e){}
+        }
+        function _viaCurMonth(){ try{ const p=state.players.find(x=>x.id==state.currentPlayerId); if(p) return Number(pstat(p).salaryCount)||0; }catch(e){} return 0; }
+        function viaMarketSyncCurrent(){ viaMarketSync(_viaCurMonth()); }
+        // видимы боту/эпохе через window
+        window.viaMarketSync = viaMarketSync; window.seedOfflineMarket = seedOfflineMarket; window.persistOfflineMarket = persistOfflineMarket;
+
         // 🖼️ ОКНА АКТИВОВ (Ринат 19июл): при ПЕРВОМ заходе в категорию — всплывает окно с картинкой и текстом.
         const CAT_POPUP={
             stock:{img:'cat_imgs/0.webp', t:'📈 Акции', c:'#5cb08b', txt:'Доли компаний. Растут ~5–10% в год, стабильно. Большие деньги, тихо. Выигрывает терпеливый, кто держит и не дёргается.'},
@@ -15313,6 +15414,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else if(ev.k==='delay') salDelta = -f.salary;           // оклад не пришёл, расходы остались
             const flow = Math.round((f.flow + salDelta)*100)/100;   // фактический поток в кассу этот месяц
             const _st=pstat(p); _st.salaryCount++; _st.salaryTotal=Math.round((_st.salaryTotal+flow)*100)/100;
+            try{ viaMarketSync(_st.salaryCount); }catch(e){}   // 🏛️ прожит месяц → офлайн-биржа шагает под текущей эпохой (в серверном режиме молчит)
             soulYearTick(p);                                        // 🕯️ прожитый год: чистые годы, висящий долг, отпускает ли дно
             try{ bizYearTick(p); }catch(e){}                        // 🏢 годовой тик бизнеса: тяготы + закон внимания (износ потока без развития)
             try{ bizReportCheck(p); }catch(e){}                     // 🏢 раз в 3 года — окно отчёта «было→стало» + решение развивать
@@ -17602,6 +17704,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const left=state.market.nextTickAt - Date.now()/1000;
                 mk.textContent = left>0 ? ('⏳ Цены держатся ещё '+Math.ceil(left)+'с') : '🔄 обновление цен…';
                 mk.style.color = left>0 ? (left<6?'#f59e0b':'#7dd3fc') : '#34d399';
+            } else if(mk && state.market && state.market._offline){
+                const ep=(window.viaEpoch&&window.viaEpoch.phaseName)||'—';
+                mk.textContent = '📅 Год '+(state.market.game_year||1)+' · эпоха: '+ep+' — рынок двигается каждый прожитый месяц';
+                mk.style.color = '#c9a961';
             }
             const b=state.board; if(!b) return;
             const tt=document.getElementById('turnTimer');
@@ -22284,6 +22390,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 startSSE();                      // мгновенный push — главный канал
                 setInterval(pollServer, 3000);   // страховка на случай обрыва провода
             }
+            // 🏛️ ОФЛАЙН-БИРЖА: сервер не дал рынок (статик/Telegram/file://) → посеять клиентский и догнать до месяца игрока.
+            try{ if(!state.market || !state.market.assets || !state.market.assets.length){ seedOfflineMarket(); } if(state.market && state.market._offline){ viaMarketSyncCurrent(); } }catch(e){ console.warn('offline market boot', e); }
             const _qr = new URLSearchParams(location.search).get('card');
             if (_qr) { state.pendingQR = _qr; }   // пришли по QR-ссылке ?card=<тип>
             render();
@@ -22364,6 +22472,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       .vi-hold .st{font-size:11.5px;margin-top:4px;}
       .vi-hold .sell{padding:8px 14px;border-radius:9px;border:1px solid var(--lx-line);background:var(--lx-panel);color:var(--lx-gold-br);font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit;}
       .vi-hold .sell:disabled{opacity:.45;cursor:default;}
+      .vi-hold .toexch{padding:8px 14px;border-radius:9px;border:1px solid var(--lx-gold);background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit;}
       .vi-empty{font-size:13px;color:var(--lx-faint);text-align:center;padding:16px;border:1px dashed var(--lx-line);border-radius:12px;}
       .vi-pos{color:var(--lx-em);} .vi-neg{color:var(--lx-rose);}
       #viaFeedback{position:fixed;inset:0;z-index:6000;display:none;align-items:center;justify-content:center;padding:18px;
@@ -22455,11 +22564,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         for(var i=0;i<PHASES.length;i++){ if(pos<acc+PHASES[i].len){ ph=PHASES[i]; monthsIn=pos-acc; break; } acc+=PHASES[i].len; }
         return {phase:ph, theme:THEMES[cyc%THEMES.length], monthsIn:monthsIn, cycle:cyc};
       }
+      // Эпоха конкретного месяца — для офлайн-биржи (тик под точной эпохой каждого прожитого месяца)
+      window.viaEpochInfo=function(M){var e=epochAt(M);return {mktMul:e.phase.mktMul, ipoHeat:e.phase.ipoHeat, theme:e.theme, phase:e.phase.k, phaseName:e.phase.nm};};
       function perim(n){var c=[],x,y;for(x=1;x<=n;x++)c.push([1,x]);for(y=2;y<=n;y++)c.push([y,n]);for(x=n-1;x>=1;x--)c.push([n,x]);for(y=n-1;y>=2;y--)c.push([y,1]);return c;}
       var board=document.getElementById('viaBoard'),cells=[],pawnIdx=0,rolling=false;
       function curP(){try{if(typeof state!=='undefined'&&state&&state.players)return state.players.find(function(x){return x.id==state.currentPlayerId;});}catch(e){}return null;}
       function paintPawn(){for(var i=0;i<cells.length;i++)cells[i].classList.toggle('vf-here',i===pawnIdx);}
-      function updMonth(){var p=curP(),m=0;if(p){try{m=Number(pstat(p).salaryCount)||0;}catch(e){}}var el=document.getElementById('vfMonth');if(el)el.textContent=p?('Прожито месяцев: '+m):'Войди в игру — вкладка «Бланк»';updEpoch(m);}
+      function updMonth(){var p=curP(),m=0;if(p){try{m=Number(pstat(p).salaryCount)||0;}catch(e){}}var el=document.getElementById('vfMonth');if(el)el.textContent=p?('Прожито месяцев: '+m):'Войди в игру — вкладка «Бланк»';updEpoch(m);try{if(typeof viaMarketSync==='function')viaMarketSync(m);}catch(e){}}
       function updEpoch(m){try{var e=epochAt(m);window.viaEpoch={phase:e.phase.k,phaseName:e.phase.nm,theme:e.theme,mktMul:e.phase.mktMul,ipoHeat:e.phase.ipoHeat,monthsIn:e.monthsIn,phaseLen:e.phase.len,cycle:e.cycle};var eb=document.getElementById('viaEpochBar');if(eb)eb.innerHTML='<span class="ei">'+e.phase.ic+'</span><span class="col"><span class="et">Эпоха: '+e.phase.nm+' · '+e.theme+'</span><span class="em">'+e.phase.mood+'</span></span>';}catch(err){}}
       function landed(){var c=CELLS[pawnIdx];if(!c)return;var box=document.getElementById('vfLanded');updMonth();if(box){box.innerHTML='<div class="ll">Стоишь на: <b>'+c[1]+'</b></div><button class="vf-enter" id="vfEnter">Войти в «'+c[1]+'»</button>';var be=document.getElementById('vfEnter');if(be)be.addEventListener('click',function(){openRazdel(c[2]);});}}
       function payday(){var p=curP();if(!p)return;if(typeof giveSalary==='function'&&typeof state!=='undefined'){try{giveSalary(state.currentPlayerId);}catch(e){}}toast('💵 Прошёл месяц — получка упала в бланк');}
@@ -22538,7 +22649,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         for(var j=0;j<st.holds.length;j++){var hd=st.holds[j];
           var debuted=m>=hd.debutAt,val=debuted?hd.invested*hd.debut:hd.invested,pl=val-hd.invested,canSell=(m>=hd.lockupUntil)&&debuted;
           var stTxt=debuted?('дебют '+(hd.debut>=1?'▲':'▼')+' — стоит '+money(val)+' ('+(pl>=0?'+':'')+money(pl)+')'):'ждёт дебюта — следующий месяц';
-          mh+='<div class="vi-card vi-hold"><div class="nm">'+hd.nm+'</div><div class="meta">Вложено '+money(hd.invested)+(hd.alloc<hd.asked?(' · аллокация из заявки '+money(hd.asked)):'')+'</div><div class="st '+(debuted?(pl>=0?'vi-pos':'vi-neg'):'')+'">'+stTxt+'</div><div class="row"><button class="sell" data-hid="'+hd.id+'"'+(canSell?'':' disabled')+'>'+(m>=hd.lockupUntil?'Продать за '+money(val):'Лок-ап: ещё '+Math.max(0,hd.lockupUntil-m)+' мес')+'</button></div></div>';}
+          var _btns='<button class="sell" data-hid="'+hd.id+'"'+(canSell?'':' disabled')+'>'+(m>=hd.lockupUntil?'Продать за '+money(val):'Лок-ап: ещё '+Math.max(0,hd.lockupUntil-m)+' мес')+'</button>';
+          if(canSell) _btns+='<button class="toexch" data-hid="'+hd.id+'" style="margin-left:6px;">📈 Вывести на биржу</button>';
+          mh+='<div class="vi-card vi-hold"><div class="nm">'+hd.nm+'</div><div class="meta">Вложено '+money(hd.invested)+(hd.alloc<hd.asked?(' · аллокация из заявки '+money(hd.asked)):'')+'</div><div class="st '+(debuted?(pl>=0?'vi-pos':'vi-neg'):'')+'">'+stTxt+'</div><div class="row">'+_btns+'</div></div>';}
         if(mineEl)mineEl.innerHTML=mh;
       }
       function invest(idx){
@@ -22552,7 +22665,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         if(alloc<1){toast('Аллокация 0 — заявку не удовлетворили (бывает в горячих IPO)');return;}
         p.savings=Math.round((Number(p.savings)-alloc)*100)/100;
         var m=nowMonth(),st=ipoState(p);
-        st.holds.push({id:'h'+Date.now()+Math.floor(Math.random()*999),nm:o.nm,asked:asked,alloc:alloc,invested:alloc,debut:o.debut,debutAt:m+1,lockupUntil:m+3});
+        st.holds.push({id:'h'+Date.now()+Math.floor(Math.random()*999),nm:o.nm,asked:asked,alloc:alloc,invested:alloc,debut:o.debut,debutAt:m+1,lockupUntil:m+3,price0:o.price,theme:(window.viaEpoch&&window.viaEpoch.theme)||''});
         curOffers.splice(idx,1);
         try{if(typeof save==='function'&&typeof state!=='undefined')save(state.currentPlayerId);}catch(e){}
         try{if(typeof render==='function')render();}catch(e){}
@@ -22570,11 +22683,39 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           toast('Продано за '+money(val)+' — в кассу'); renderIpo(); return;
         }}
       }
+      function ipoTypeByTheme(th){ if(th==='Крипто-мания')return 'crypto'; if(th==='Сырьевой цикл')return 'commodity'; return 'stock'; }
+      // 📈 IPO после лок-апа → на ОБЫЧНУЮ биржу: доля становится живым активом, торгуется и двигается с эпохой.
+      function ipoToExchange(hid){
+        var p=curP(); if(!p){toast('Сначала войди в игру');return;}
+        var st=ipoState(p), m=nowMonth();
+        for(var i=0;i<st.holds.length;i++){ var hd=st.holds[i]; if(hd.id!==hid) continue;
+          if(m<hd.lockupUntil){ toast('Ещё лок-ап'); return; }
+          if(typeof state==='undefined'){ toast('Биржа недоступна'); return; }
+          if(typeof viaMarketSync==='function') viaMarketSync(m);
+          if(!state.market || !state.market.assets){ toast('Биржа ещё грузится — попробуй через миг'); return; }
+          if(!state.market._offline){ sellIpo(hid); return; }   // на сервере биржа своя — просто в кассу
+          var val=Math.round(hd.invested*(Number(hd.debut)||1));
+          var price=Math.max(0.01, Math.round((Number(hd.price0)||10)*(Number(hd.debut)||1)*100)/100);
+          var qty=Math.max(1, Math.floor(val/price));
+          var id='ipo_'+hd.id, type=ipoTypeByTheme(hd.theme);
+          var vol=(type==='crypto'?38:14), pr=price, hist=[];
+          for(var k=0;k<18;k++){ pr=Math.max(price*0.5, pr*(1+(Math.random()-0.5)*0.08)); hist.push(Math.round(pr*100)/100); }
+          hist.push(price);
+          state.market.assets.push({id:id,name:hd.nm,type:type,price:price,price0:price,min:Math.round(price*0.2*100)/100,max:Math.round(price*6*100)/100,vol:vol,anchor:price,history:hist});
+          p.holdings=p.holdings||{}; p.holdings[id]={qty:qty,avg:price,name:hd.nm};
+          st.holds.splice(i,1);
+          try{ if(typeof persistOfflineMarket==='function') persistOfflineMarket(); }catch(e){}
+          try{ if(typeof save==='function') save(state.currentPlayerId); }catch(e){}
+          try{ if(typeof render==='function') render(); }catch(e){}
+          toast('📈 «'+hd.nm+'» на бирже: '+qty+' шт по '+money(price)+' — теперь торгуй как обычным активом (вкладка «Биржа»).');
+          renderIpo(); return;
+        }
+      }
       function openIpo(){curOffers=genOffers();if(ipoEl)ipoEl.hidden=false;renderIpo();}
       function closeIpo(){if(ipoEl)ipoEl.hidden=true;}
       var oib=document.getElementById('viIpoOpen');if(oib)oib.addEventListener('click',openIpo);
       var ibk=document.getElementById('viIpoBack');if(ibk)ibk.addEventListener('click',closeIpo);
-      if(ipoEl)ipoEl.addEventListener('click',function(e){var b=e.target.closest('.bid');if(b){invest(parseInt(b.getAttribute('data-idx'),10));return;}var s=e.target.closest('.sell');if(s&&!s.disabled){sellIpo(s.getAttribute('data-hid'));}});
+      if(ipoEl)ipoEl.addEventListener('click',function(e){var b=e.target.closest('.bid');if(b){invest(parseInt(b.getAttribute('data-idx'),10));return;}var x=e.target.closest('.toexch');if(x){ipoToExchange(x.getAttribute('data-hid'));return;}var s=e.target.closest('.sell');if(s&&!s.disabled){sellIpo(s.getAttribute('data-hid'));}});
     })();
     </script>
 </body>
