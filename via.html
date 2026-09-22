@@ -11230,6 +11230,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // (sync между ВСЕМИ браузерами). file:// → fallback на localStorage (только Chrome).
         const SERVER_MODE = location.protocol === 'http:' || location.protocol === 'https:';
 
+        // 🎮 SOLO_APP: VIA — строгая одиночная Аппка (Ринат 22сен). Ведущего/стола на несколько игроков
+        // больше НЕТ: время ведёт само ПОЛЕ (таймер лет). Глушим мультиплеер-поверхность —
+        // «жди свой ход / ходит Оля», «клетки закрыты, ждёт ведущий», окно покупки, пульт-админку.
+        const SOLO_APP = true;
+
         // ═══════════ 🔄 ЖИВЫЕ ОБНОВЛЕНИЯ: версия сейва + миграции ═══════════
         // ДВИЖОК (этот код: карты/клетки/логика/арт) обновляем свободно.
         // СЕЙВ (localStorage: v0_players/deals/world — деньги, очки, прогресс) — священен.
@@ -12762,14 +12767,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                             }).join('')}
                     </div>
 
-                    <div style="border-top:1px solid var(--lx-gold-ln); padding-top:20px;">
+                    ${SOLO_APP ? '' : `<div style="border-top:1px solid var(--lx-gold-ln); padding-top:20px;">
                         <p style="font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--lx-muted); font-weight:700; margin-bottom:10px;">Пульт ведущего</p>
                         <div style="display:flex; gap:10px;">
                             <input type="password" id="pass" placeholder="Пароль ведущего" class="inp" style="padding:11px;">
                             <button onclick="login()" class="btn btn-gray" style="flex:0 0 auto; white-space:nowrap;">Управлять</button>
                         </div>
                         ${state.err ? `<p style="color:#ef4444; font-size:12px; margin-top:8px; font-weight:bold;">${state.err}</p>` : ''}
-                    </div>
+                    </div>`}
                 </div>
             `;
         }
@@ -12832,7 +12837,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             </svg>`;
         }
         // Окно покупки: открывается на 1 мин, когда кто-то встаёт на клетку «Акции/Крипта» (для ВСЕХ).
-        function buyWindowOpen(){ const b=state.board; return !!(b && b.buyWindowEndsAt && b.buyWindowEndsAt*1000 > Date.now()); }
+        function buyWindowOpen(){ if(SOLO_APP) return true; const b=state.board; return !!(b && b.buyWindowEndsAt && b.buyWindowEndsAt*1000 > Date.now()); }
         // Разделение разрядов (1 000 000) — числа легче читать. Только для ПОКАЗА, не для арифметики.
         function fmtN(n){ return (Math.round(Number(n)||0)).toLocaleString('ru-RU'); }
         // Проценты: большие (мемы +240 000%) с разрядами, мелкие с десятой.
@@ -16885,6 +16890,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Обновляется ОТДЕЛЬНО от остального экрана (updateTurnPlate), потому что safeRerender()
         // молчит, когда игрок стоит в поле ввода — из-за этого плашка застывала и врала.
         function turnPlateHtml(p){
+            if(SOLO_APP) return '';   // соло-Аппка: ходов/ведущего нет, время ведёт поле
             const b=state.board; if(!b||!b.order||!b.order.length||!p) return '';
             const nm=id=>(state.players.find(x=>x.id==id)||{}).name||'игрок';
             const tp=b.order[b.turnIdx];
@@ -17159,8 +17165,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="font-size:10px;color:#b9ab8f;margin-top:6px;text-align:center;">🔨 деньги в кассу · 🕯️ поднять дух · 🏋️ закалка · 📖 навык на волю · 🤝 риск ставкой. Срок и досрочку ведёт игра — жди свой ход.</div>
                 </div>` : ''}
                 <div id="turnPlate">${turnPlateHtml(p)}</div>
-                ${p.allow ? `<div style="background:linear-gradient(90deg,#065f46,#047857);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">✅ Ведущий ОТКРЫЛ клетку: ${ALLOW_LABEL[p.allow]||p.allow}. Жми её кнопку и тяни карту.</div>` : `<div style="background:#1f2937;color:#9ca3af;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-size:12px;text-align:center;">🔒 Клетки закрыты. Попал на клетку → жди, пока ведущий откроет её тебе.</div>`}
-                <button onclick="startScan()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;font-size:15px;padding:14px;margin-bottom:12px;box-shadow:0 10px 26px rgba(217,184,119,.22);">📷 Сканировать карту</button>
+                ${SOLO_APP ? '' : (p.allow ? `<div style="background:linear-gradient(90deg,#065f46,#047857);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">✅ Ведущий ОТКРЫЛ клетку: ${ALLOW_LABEL[p.allow]||p.allow}. Жми её кнопку и тяни карту.</div>` : `<div style="background:#1f2937;color:#9ca3af;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-size:12px;text-align:center;">🔒 Клетки закрыты. Попал на клетку → жди, пока ведущий откроет её тебе.</div>`)}
+                ${SOLO_APP ? '' : `<button onclick="startScan()" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;font-size:15px;padding:14px;margin-bottom:12px;box-shadow:0 10px 26px rgba(217,184,119,.22);">📷 Сканировать карту</button>`}
                 <div class="card flex-between" style="flex-wrap:wrap;gap:8px;">
                     <div>
                         <h2 style="font-size:21px; font-weight:800;"><span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${playerColor(p.id)};border:1px solid #0f172a;box-shadow:0 0 8px ${playerColor(p.id)};vertical-align:middle;margin-right:7px;"></span>${p.name} <span style="font-size:13px;color:${playerColor(p.id)};font-weight:800;">(${playerColorName(p.id)})</span></h2>
@@ -22445,6 +22451,30 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       .vf-landed{font-size:12px;color:var(--lx-text);display:flex;flex-direction:column;gap:6px;align-items:center;}
       .vf-landed .ll{color:var(--lx-muted);}
       .vf-enter{padding:7px 14px;border-radius:16px;border:1px solid var(--lx-line);background:var(--lx-panel);color:var(--lx-gold-br);font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit;}
+      /* ── НАСТОЯЩАЯ ДОСКА (SVG): деньги 29 клеток + душа + двери + часы лет ── */
+      .vf-tabs{max-width:540px;margin:0 auto 12px;display:flex;gap:8px;}
+      .vf-tabs button{flex:1;padding:9px 6px;border-radius:11px;border:1px solid var(--lx-line);background:var(--lx-panel);color:var(--lx-muted);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s;}
+      .vf-tabs button.on{border-color:var(--lx-gold);color:var(--lx-gold-br);box-shadow:0 0 14px -6px var(--lx-gold);}
+      .vf-boardwrap{position:relative;max-width:min(96vw,460px);margin:0 auto;}
+      .vf-svg{width:100%;height:auto;display:block;}
+      .vf-c{cursor:pointer;}
+      .vf-ci{font-size:15px;}
+      .vf-cn{font-size:7px;fill:#e8e0d0;font-family:inherit;font-weight:600;}
+      .vf-c.vf-on rect{stroke-width:2.8;}
+      .vf-center2{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:60%;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;}
+      .vf-clockbox{width:100%;max-width:170px;}
+      .vf-clock{width:100%;height:auto;display:block;}
+      .vf-soulpanel{max-width:540px;margin:12px auto 0;border:1px solid var(--lx-line);border-radius:12px;padding:12px 14px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));font-size:13px;color:var(--lx-text);min-height:54px;}
+      .vf-soulpanel .sq{font-style:italic;color:var(--lx-gold-br);margin-top:6px;line-height:1.45;}
+      .vf-doors{max-width:540px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+      @media(max-width:520px){.vf-doors{grid-template-columns:1fr;}}
+      .vf-door{border-radius:14px;padding:12px;border:1px solid #3a3350;background:linear-gradient(160deg,#1a1526,#0a0812);}
+      .vf-door.light{border-color:#4a6f52;} .vf-door.crack{border-color:#6b3a44;}
+      .vf-door .from{font-size:10px;letter-spacing:.5px;text-transform:uppercase;opacity:.55;}
+      .vf-door h4{margin:4px 0;font-size:15px;color:#e5d8ff;}
+      .vf-door .seed{font-size:12px;color:#8fe0b0;} .vf-door .seed.neg{color:#f08a8a;}
+      .vf-door .whisper{font-size:12px;font-style:italic;opacity:.72;margin-top:6px;border-left:2px solid #5a4f70;padding-left:8px;line-height:1.4;}
+      #app{padding-bottom:88px;}
       .vf-epoch{max-width:540px;margin:0 auto 12px;border:1px solid var(--lx-line);border-radius:12px;padding:9px 14px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));display:flex;align-items:center;gap:11px;}
       .vf-epoch .ei{font-size:23px;line-height:1;flex:none;}
       .vf-epoch .col{display:flex;flex-direction:column;min-width:0;}
@@ -22495,10 +22525,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     </style>
 
     <div id="viaField" hidden>
-      <div class="vf-head"><h2>Денежное поле</h2><p>Наступай на клетку — открывается её дело. Помни: время дороже денег.</p></div>
+      <div class="vf-head"><h2>Поле жизни</h2><p>Брось кубик — фишка идёт по клеткам, круг = месяц, время ведут часы лет. Стоишь на клетке → входишь в её дело.</p></div>
+      <div class="vf-tabs" id="vfTabs">
+        <button data-view="money" class="on">🕌 Деньги</button>
+        <button data-view="soul">🕊️ Душа</button>
+        <button data-view="door">🚪 Двери</button>
+      </div>
       <div class="vf-epoch" id="viaEpochBar"></div>
       <button class="vf-ipo" id="viIpoOpen">🚀 Размещения — IPO</button>
-      <div class="vf-board" id="viaBoard"></div>
+      <div id="viaBoard"></div>
+      <div class="vf-soulpanel" id="vfSoulPanel" hidden>Нажми клетку Души — раскроется её вопрос.</div>
     </div>
 
     <div id="viaIpo" hidden>
@@ -22531,24 +22567,92 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     <script>
     (function(){
       // клетка → раздел бланка (ищем по тексту заголовка details.sec)
-      var CELLS=[
-        ['💼','Зарплата','Доход и расходы'],
-        ['📈','Биржа','Биржа'],
-        ['🏢','Бизнес','Бизнес'],
-        ['🏠','Недвиж.','Недвижимость'],
-        ['📦','Товарка','Товарка'],
-        ['🎓','Навыки','Развивать себя'],
-        ['❤️','Отнош.','Отношения'],
-        ['🏦','Депозит','Депозиты'],
-        ['🎰','Казино','Казино'],
-        ['💎','Коллек.','Коллекция'],
-        ['🔨','Аукцион','Аукцион'],
-        ['🛒','Активы','Мои активы'],
-        ['🏡','Образ','Образ жизни'],
-        ['🎴','Клетки','Клетки и действия'],
-        ['🏦','Долги','Долги'],
-        ['🏆','Победа','Путь к победе']
+      // ── НАСТОЯЩАЯ ДЕНЕЖНАЯ ДОСКА (VIA_МАКЕТ_ДВЕ_ДОСКИ): 29 клеток. [иконка, имя, раздел-бланка, категория] ──
+      var MONEY=[
+        ['💰','Зарплата','Доход и расходы','доход'],
+        ['🎯','Карьера','Клетки и действия','работа'],
+        ['📈','Акции·Крипта','Биржа','инвест'],
+        ['🧠','Навык','Развивать себя','развитие'],
+        ['👶','Дети','Клетки и действия','семья'],
+        ['🛒','Рынок','Мои активы','активы'],
+        ['💸','Расходы','Образ жизни','быт'],
+        ['📈','Акции·Крипта','Биржа','инвест'],
+        ['🤝','Сделки','Клетки и действия','сделки'],
+        ['🏛️','Государство','Клетки и действия','власть'],
+        ['🕸️','Мир.событие','Клетки и действия','мир'],
+        ['🔒','Тюрьма','Клетки и действия','срыв'],
+        ['🧳','Работа','Клетки и действия','работа'],
+        ['🚗','Расходы','Образ жизни','быт'],
+        ['🏦','Налоги','Клетки и действия','власть'],
+        ['🎫','Золотой билет','Путь к победе','шанс'],
+        ['🤝','Сделки','Клетки и действия','сделки'],
+        ['📈','Акции·Крипта','Биржа','инвест'],
+        ['🛒','Рынок','Мои активы','активы'],
+        ['💸','Расходы','Образ жизни','быт'],
+        ['🌐','Связи','Клетки и действия','люди'],
+        ['🧠','Навык','Развивать себя','развитие'],
+        ['📈','Акции·Крипта','Биржа','инвест'],
+        ['🤝','Сделки','Клетки и действия','сделки'],
+        ['💰','Зарплата','Доход и расходы','доход'],
+        ['🕶️','Чёрный рынок','Товарка','тьма'],
+        ['⚕️','Медицина','Клетки и действия','здоровье'],
+        ['🔍','Проверки','Клетки и действия','власть'],
+        ['🤝','Помощь людей','Клетки и действия','люди']
       ];
+      var CELLS=MONEY;   // совместимость со старым кодом
+      // ── ДУШЕВНАЯ ДОСКА (Акт II): 40 клеток. [имя, тема, вопрос] ──
+      var SOUL=[
+        ['Психология','Корни','Кто ты, если убрать всё, что дали тебе родители?'],
+        ['Душа','Диагностика','Счастлив ли ты сейчас?'],
+        ['Обман','Исповедь','Кого ты предал и так и не признал этого?'],
+        ['Демон','Голос','Чей голос внутри тебя тебя же и разрушает?'],
+        ['Ангел','Знак','Ты видишь знаки — или ждёшь, что тебя потащат за руку?'],
+        ['Змея','Яд','Что отравляет твою жизнь прямо сейчас?'],
+        ['История','Опора','Кто твои пятеро — кто реально придёт, когда всё рухнет?'],
+        ['Золотой Шут','Правда','Что ты сделаешь, когда потеряешь всё?'],
+        ['Длинная дорога','Путь','Ты идёшь своей дорогой — или чужой?'],
+        ['Большой Камень','Удар','Когда судьба бьёт — ты ломаешься или обходишь?'],
+        ['Изобилие','Достаток','Когда у тебя есть всё — что ты с этим делаешь?'],
+        ['Тихий Ветер','Стержень','Тебя сносит ветром — или ты стоишь?'],
+        ['Глубокое дно','Пустота','Чем ты пытаешься заполнить пустоту внутри?'],
+        ['Замок','Фундамент','Из чего ты строишь жизнь — камень, золото, солома или лёд?'],
+        ['Робот','Будущее','Какого мира ты боишься больше всего?'],
+        ['Наполнение','Источник','Откуда ты берёшь силы — и даёшь ли их другим?'],
+        ['Смерть','Итог','Если убрать все эмоции — на что ты обратишь внимание в жизни?'],
+        ['Чистая душа','Совесть','Где ты предал себя?'],
+        ['Состояние','Сила','Ты сейчас пуст или полон — и почему?'],
+        ['Испытание','Стойкость','Ты нашёл своё предназначение — или всё ещё бежишь?'],
+        ['Дружба','Окружение','Твои люди тянут тебя вверх — или вниз?'],
+        ['Любовь','Сердце','Любил ли ты по-настоящему?'],
+        ['Прощение','Отпустить','Кого ты не смог простить — и у кого не попросил прощения?'],
+        ['Тайна','Страх','Что уничтожило бы тебя, если бы вскрылось?'],
+        ['Ребёнок','Мечта','Маленький ты спрашивает: стал ли ты тем, кем мечтал?'],
+        ['Встреча','Стыд','Ты встретил Того, кто выше. За что тебе стыдно?'],
+        ['Время','Сейчас','Что ты откладываешь, зная, что времени уже мало?'],
+        ['Боль','Ответ','Кому ты причинил боль, за которую ещё не ответил?'],
+        ['Свет','Надежда','Что даёт тебе силы жить?'],
+        ['Сила','Не сдаться','Где ты был готов сдаться — но не сдался?'],
+        ['Чёрный','Темнота','Что ты боишься увидеть, когда становится темно?'],
+        ['Тишина','Слушание','Что ты услышишь, если наконец замолчишь?'],
+        ['Враг','Тень','Кто твой главный враг — и не ты ли это сам?'],
+        ['Игра','Правила','В чьи правила ты играешь, даже не зная их?'],
+        ['Манипуляция','Выгода','Кому выгодно, что ты поступаешь именно так?'],
+        ['Глаз','Другая сторона','Что видят в тебе другие, чего ты сам не видишь?'],
+        ['Красота','Своя жизнь','Не живёшь ли ты чужую жизнь, глядя в зеркало на другого?'],
+        ['Стальной','Выживание','Твоя сила — для людей или чтобы просто выжить?'],
+        ['Ум','Дар','Ради чего тебе дан именно такой ум — и раскрыл ли ты его?'],
+        ['ЗЕРКАЛО','Отражение','Готов увидеть, кем ты был на самом деле?']
+      ];
+      // ── ДВЕРИ ПЕРЕХОДА: [через что вышел, архетип, светлый?, seed, трещина] ──
+      var DOORS=[
+        ['Помогал другим','Служитель',true,'Служение +3 · Любовь +1','','Ты вошёл, отдавая. Помни это, когда станет тяжело.'],
+        ['Держал слово','Честный',true,'Искренность +3 · Совесть +1','','Ты держал слово там, где мог солгать. Дверь узнала тебя.'],
+        ['Жертвовал ради будущего','Строитель',true,'Любовь +2 · Служение +1','','Ты строил не для себя. Кто-то после тебя будет свободен.'],
+        ['Рисковал','Завоеватель',false,'Мужество +3','трещина: Гордыня +1','Ты не боялся падать. Но спроси — ради чего был весь этот риск?'],
+        ['Выбирал выгоду','Делец',false,'Гордыня +3','трещина: Совесть −2','Ты выбирал выгоду. Дверь впустит тебя — но Зеркало запомнит.'],
+        ['Шёл в тень','Теневик',false,'Страх +2','трещина: Совесть −3','Ты прошёл в тени. Здесь тени нет. Здесь только ты.']
+      ];
+      var catCol={доход:'#e7c25b',работа:'#c9962f',инвест:'#6fae7a',развитие:'#7fb0d6',семья:'#d68fb0',активы:'#c98f4a',быт:'#9a8a6a',сделки:'#d6b34a',власть:'#b06a3a',мир:'#8a9ad6',срыв:'#c0392b',шанс:'#f4d489',люди:'#7ec0a0',здоровье:'#d67a7a',тьма:'#6b5b8a'};
       // ── ЭПОХИ (З5.3): живая динамика мира без ведущего. Тикает от игрового времени (месяцев). ──
       var PHASES=[
         {k:'growth',nm:'Рост', ic:'📈',len:8,mktMul:1.06,ipoHeat:1.4,mood:'Рынок растёт, оптимизм — попутный ветер делу.'},
@@ -22567,26 +22671,34 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       // Эпоха конкретного месяца — для офлайн-биржи (тик под точной эпохой каждого прожитого месяца)
       window.viaEpochInfo=function(M){var e=epochAt(M);return {mktMul:e.phase.mktMul, ipoHeat:e.phase.ipoHeat, theme:e.theme, phase:e.phase.k, phaseName:e.phase.nm};};
       function perim(n){var c=[],x,y;for(x=1;x<=n;x++)c.push([1,x]);for(y=2;y<=n;y++)c.push([y,n]);for(x=n-1;x>=1;x--)c.push([n,x]);for(y=n-1;y>=2;y--)c.push([y,1]);return c;}
-      var board=document.getElementById('viaBoard'),cells=[],pawnIdx=0,rolling=false;
+      var board=document.getElementById('viaBoard'),pawnIdx=0,rolling=false,BOARD_VIEW='money';
       function curP(){try{if(typeof state!=='undefined'&&state&&state.players)return state.players.find(function(x){return x.id==state.currentPlayerId;});}catch(e){}return null;}
-      function paintPawn(){for(var i=0;i<cells.length;i++)cells[i].classList.toggle('vf-here',i===pawnIdx);}
-      function updMonth(){var p=curP(),m=0;if(p){try{m=Number(pstat(p).salaryCount)||0;}catch(e){}}var el=document.getElementById('vfMonth');if(el)el.textContent=p?('Прожито месяцев: '+m):'Войди в игру — вкладка «Бланк»';updEpoch(m);try{if(typeof viaMarketSync==='function')viaMarketSync(m);}catch(e){}}
+      function curMonth(){var p=curP();if(!p)return 0;try{return Number(pstat(p).salaryCount)||0;}catch(e){return 0;}}
       function updEpoch(m){try{var e=epochAt(m);window.viaEpoch={phase:e.phase.k,phaseName:e.phase.nm,theme:e.theme,mktMul:e.phase.mktMul,ipoHeat:e.phase.ipoHeat,monthsIn:e.monthsIn,phaseLen:e.phase.len,cycle:e.cycle};var eb=document.getElementById('viaEpochBar');if(eb)eb.innerHTML='<span class="ei">'+e.phase.ic+'</span><span class="col"><span class="et">Эпоха: '+e.phase.nm+' · '+e.theme+'</span><span class="em">'+e.phase.mood+'</span></span>';}catch(err){}}
-      function landed(){var c=CELLS[pawnIdx];if(!c)return;var box=document.getElementById('vfLanded');updMonth();if(box){box.innerHTML='<div class="ll">Стоишь на: <b>'+c[1]+'</b></div><button class="vf-enter" id="vfEnter">Войти в «'+c[1]+'»</button>';var be=document.getElementById('vfEnter');if(be)be.addEventListener('click',function(){openRazdel(c[2]);});}}
-      function payday(){var p=curP();if(!p)return;if(typeof giveSalary==='function'&&typeof state!=='undefined'){try{giveSalary(state.currentPlayerId);}catch(e){}}toast('💵 Прошёл месяц — получка упала в бланк');}
-      function stepMove(n){var crossed=false,steps=0;var iv=setInterval(function(){pawnIdx=(pawnIdx+1)%cells.length;if(pawnIdx===0)crossed=true;paintPawn();if(++steps>=n){clearInterval(iv);if(crossed)payday();landed();rolling=false;}},150);}
-      function rollDie(){if(rolling)return;var p=curP();if(!p){toast('Сначала войди в игру — вкладка «Бланк»');return;}rolling=true;var n=1+Math.floor(Math.random()*6),die=document.getElementById('vfDie'),F=['⚀','⚁','⚂','⚃','⚄','⚅'],t=0;var iv=setInterval(function(){if(die)die.textContent=F[Math.floor(Math.random()*6)];if(++t>7){clearInterval(iv);if(die)die.textContent=F[n-1];stepMove(n);}},65);}
-      if(board){
-        var pos=perim(5),h='';
-        for(var i=0;i<CELLS.length&&i<pos.length;i++){var c=CELLS[i],pp=pos[i];
-          h+='<button class="vf-cell" data-key="'+c[2]+'" style="grid-row:'+pp[0]+';grid-column:'+pp[1]+'"><span class="e">'+c[0]+'</span><span class="l">'+c[1]+'</span></button>';}
-        h+='<div class="vf-center"><div class="vf-month" id="vfMonth"></div><div class="vf-die" id="vfDie">🎲</div><button class="vf-roll" id="vfRoll">Бросить кубик</button><div class="vf-landed" id="vfLanded"></div></div>';
-        board.innerHTML=h;
-        cells=Array.prototype.slice.call(board.querySelectorAll('.vf-cell'));
-        var rb=document.getElementById('vfRoll');if(rb)rb.addEventListener('click',rollDie);
-        board.addEventListener('click',function(e){var b=e.target.closest('.vf-cell');if(!b)return;var i=cells.indexOf(b);if(i===pawnIdx){openRazdel(b.getAttribute('data-key'));}else{toast('🎲 Дойди кубиком — вход в дело стоит хода');}});
-        paintPawn();landed();
-      }
+      function updMonth(){var m=curMonth();updEpoch(m);try{if(typeof viaMarketSync==='function')viaMarketSync(m);}catch(e){}try{drawClock();}catch(e){}}
+      function payday(){var p=curP();if(!p)return;if(typeof giveSalary==='function'&&typeof state!=='undefined'){try{giveSalary(state.currentPlayerId);}catch(e){}}toast('💵 Прошёл месяц — получка в бланк');}
+      // ── SVG-раскладка клеток по квадратному периметру ──
+      var BW=360, PAD=18, CS=42, RING=BW-CS-2*PAD;
+      function ringXY(t){t=t-Math.floor(t);var per=4*RING,d=t*per,s=RING,x=PAD,y=PAD;if(d<s){x=PAD+d;y=PAD;}else if(d<2*s){x=PAD+s;y=PAD+(d-s);}else if(d<3*s){x=PAD+s-(d-2*s);y=PAD+s;}else{x=PAD;y=PAD+s-(d-3*s);}return [x,y];}
+      function shortName(s){return s.length>9?s.slice(0,8)+'…':s;}
+      function buildMoney(){var n=MONEY.length,s='<svg viewBox="0 0 '+BW+' '+BW+'" class="vf-svg">';for(var i=0;i<n;i++){var c=MONEY[i],p=ringXY(i/n),x=p[0],y=p[1],col=catCol[c[3]]||'#d9a441';s+='<g class="vf-c" data-i="'+i+'"><rect x="'+x+'" y="'+y+'" width="'+CS+'" height="'+CS+'" rx="8" fill="rgba(28,20,8,.92)" stroke="'+col+'" stroke-width="1.4"/><rect x="'+x+'" y="'+y+'" width="'+CS+'" height="4" rx="2" fill="'+col+'"/><text x="'+(x+CS/2)+'" y="'+(y+CS/2-1)+'" text-anchor="middle" class="vf-ci">'+c[0]+'</text><text x="'+(x+CS/2)+'" y="'+(y+CS-6)+'" text-anchor="middle" class="vf-cn">'+shortName(c[1])+'</text></g>';}var pp=ringXY(pawnIdx/n);s+='<circle id="vfPawn" cx="'+(pp[0]+CS/2)+'" cy="'+(pp[1]+CS/2)+'" r="'+(CS/2-2)+'" fill="none" stroke="#f4d489" stroke-width="3"/>';s+='</svg>';return s;}
+      function paintPawn(){var n=MONEY.length,pp=ringXY(pawnIdx/n),pawn=document.getElementById('vfPawn');if(pawn){pawn.setAttribute('cx',pp[0]+CS/2);pawn.setAttribute('cy',pp[1]+CS/2);}if(board){var gs=board.querySelectorAll('.vf-c');for(var i=0;i<gs.length;i++)gs[i].classList.toggle('vf-on',i===pawnIdx);}}
+      function landed(){var c=MONEY[pawnIdx];if(!c)return;updMonth();var box=document.getElementById('vfLanded');if(box){box.innerHTML='<div class="ll">Клетка: <b>'+c[1]+'</b></div><button class="vf-enter" id="vfEnter">Войти →</button>';var be=document.getElementById('vfEnter');if(be)be.addEventListener('click',function(){openRazdel(c[2]);});}}
+      function stepMove(k){var crossed=false,steps=0,n=MONEY.length;var iv=setInterval(function(){pawnIdx=(pawnIdx+1)%n;if(pawnIdx===0)crossed=true;paintPawn();if(++steps>=k){clearInterval(iv);if(crossed)payday();landed();rolling=false;}},160);}
+      function rollDie(){if(rolling)return;var p=curP();if(!p){toast('Сначала войди в игру — вкладка «Бланк»');return;}rolling=true;var k=1+Math.floor(Math.random()*6),die=document.getElementById('vfDie'),F=['⚀','⚁','⚂','⚃','⚄','⚅'],t=0;var iv=setInterval(function(){if(die)die.textContent=F[Math.floor(Math.random()*6)];if(++t>7){clearInterval(iv);if(die)die.textContent=F[k-1];stepMove(k);}},60);}
+      // ── Живые часы: год + стадия жизни (VIA_ЧАСЫ_ЖИВЫЕ). Ведёт время самого поля. ──
+      var LIFE_STAGES=['Рождение','Учёба','Труд','Рост','Дело','Кризис','Свобода','Влияние','Мудрость','Служение','Итог','Наследие'];
+      function drawClock(){var host=document.getElementById('vfClock');if(!host)return;var m=curMonth(),year=Math.floor(m/12)+1,ang=(m%12)/12*360,C=90,R=80;var s='<svg viewBox="0 0 180 180" class="vf-clock"><defs><radialGradient id="vfdisc" cx="50%" cy="42%" r="60%"><stop offset="0%" stop-color="#241a0b"/><stop offset="100%" stop-color="#070502"/></radialGradient></defs>';s+='<circle cx="90" cy="90" r="'+R+'" fill="url(#vfdisc)" stroke="#d9a441" stroke-width="2"/>';for(var i=0;i<12;i++){var a=i/12*2*Math.PI-Math.PI/2,r1=R-3,r2=R-9,big=(i%3===0);s+='<line x1="'+(C+r1*Math.cos(a)).toFixed(1)+'" y1="'+(C+r1*Math.sin(a)).toFixed(1)+'" x2="'+(C+r2*Math.cos(a)).toFixed(1)+'" y2="'+(C+r2*Math.sin(a)).toFixed(1)+'" stroke="#f4d489" stroke-width="'+(big?2:1)+'" opacity="'+(big?0.9:0.4)+'"/>';}var ah=ang*Math.PI/180-Math.PI/2;s+='<line x1="90" y1="90" x2="'+(C+(R-22)*Math.cos(ah)).toFixed(1)+'" y2="'+(C+(R-22)*Math.sin(ah)).toFixed(1)+'" stroke="#f6dd93" stroke-width="4" stroke-linecap="round"/>';s+='<circle cx="90" cy="90" r="26" fill="#120d05" stroke="#d9a441" stroke-width="2"/>';s+='<text x="90" y="85" text-anchor="middle" fill="#f4d489" style="font:700 12px Georgia,serif">ГОД</text>';s+='<text x="90" y="104" text-anchor="middle" fill="#f4d489" style="font:700 18px Georgia,serif">'+year+'</text>';s+='<text x="90" y="172" text-anchor="middle" fill="#c8a86a" style="font:600 11px Georgia,serif">'+LIFE_STAGES[Math.min(11,year-1)]+'</text>';s+='</svg>';host.innerHTML=s;}
+      // ── Двери перехода (обряд Деньги→Душа) ──
+      function buildDoors(){var h='<div class="vf-doors">';for(var i=0;i<DOORS.length;i++){var d=DOORS[i];h+='<div class="vf-door '+(d[2]?'light':'crack')+'"><div class="from">вышел через · '+d[0]+'</div><h4>🚪 '+d[1]+'</h4><div class="seed">'+d[3]+'</div>'+(d[4]?'<div class="seed neg">'+d[4]+'</div>':'')+'<div class="whisper">«'+d[5]+'»</div></div>';}h+='</div>';return h;}
+      // ── Душевная доска (Акт II) — просмотр вопросов ──
+      function buildSoul(){var n=SOUL.length,s='<svg viewBox="0 0 '+BW+' '+BW+'" class="vf-svg">';for(var i=0;i<n;i++){var c=SOUL[i];if(c[0]==='ЗЕРКАЛО'){s+='<g class="vf-c" data-i="'+i+'"><circle cx="'+(BW/2)+'" cy="'+(BW/2)+'" r="30" fill="rgba(180,220,240,.10)" stroke="#dff2fb" stroke-width="2"/><text x="'+(BW/2)+'" y="'+(BW/2-2)+'" text-anchor="middle" class="vf-ci">🪞</text><text x="'+(BW/2)+'" y="'+(BW/2+13)+'" text-anchor="middle" class="vf-cn" style="fill:#dff2fb">ЗЕРКАЛО</text></g>';continue;}var p=ringXY(i/(n-1)),x=p[0],y=p[1];s+='<g class="vf-c" data-i="'+i+'"><rect x="'+x+'" y="'+y+'" width="'+CS+'" height="'+CS+'" rx="8" fill="rgba(12,30,44,.9)" stroke="#a9d4e6" stroke-width="1.2"/><text x="'+(x+CS/2)+'" y="'+(y+CS/2+2)+'" text-anchor="middle" class="vf-cn" style="fill:#dff2fb;font-size:7px">'+shortName(c[0])+'</text></g>';}s+='</svg>';return s;}
+      function renderField(){if(!board)return;var sp=document.getElementById('vfSoulPanel');
+        if(BOARD_VIEW==='money'){if(sp)sp.hidden=true;board.innerHTML='<div class="vf-boardwrap">'+buildMoney()+'<div class="vf-center2"><div id="vfClock" class="vf-clockbox"></div><div class="vf-die" id="vfDie" style="font-size:34px">🎲</div><button class="vf-roll" id="vfRoll">Бросить кубик</button><div class="vf-landed" id="vfLanded"></div></div></div>';var rb=document.getElementById('vfRoll');if(rb)rb.addEventListener('click',rollDie);var gs=board.querySelectorAll('.vf-c');for(var i=0;i<gs.length;i++){(function(g){g.addEventListener('click',function(){var idx=+g.getAttribute('data-i');if(idx===pawnIdx){openRazdel(MONEY[idx][2]);}else{toast('🎲 Дойди кубиком — вход в дело стоит хода');}});})(gs[i]);}paintPawn();drawClock();landed();}
+        else if(BOARD_VIEW==='soul'){if(sp){sp.hidden=false;sp.innerHTML='Нажми клетку Души — раскроется её вопрос.';}board.innerHTML='<div class="vf-boardwrap">'+buildSoul()+'</div>';var gs2=board.querySelectorAll('.vf-c');for(var j=0;j<gs2.length;j++){(function(g){g.addEventListener('click',function(){var idx=+g.getAttribute('data-i'),c=SOUL[idx];if(sp){sp.hidden=false;sp.innerHTML='<div class="ll"><b>'+c[0]+'</b> · '+c[1]+'</div><div class="sq">«'+c[2]+'»</div>';}});})(gs2[j]);}}
+        else{if(sp)sp.hidden=true;board.innerHTML=buildDoors();}}
+      (function(){var tabs=document.getElementById('vfTabs');if(!tabs)return;tabs.addEventListener('click',function(e){var b=e.target.closest('button[data-view]');if(!b)return;BOARD_VIEW=b.getAttribute('data-view');var bs=tabs.querySelectorAll('button');for(var i=0;i<bs.length;i++)bs[i].classList.toggle('on',bs[i]===b);var ipoBtn=document.getElementById('viIpoOpen');if(ipoBtn)ipoBtn.style.display=(BOARD_VIEW==='money')?'block':'none';renderField();});})();
+      if(board){renderField();}
       function toast(m){var t=document.getElementById('viaToast');if(!t)return;t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('on');},2200);}
       function openRazdel(key){
         var list=document.querySelectorAll('details.sec'),found=null;
