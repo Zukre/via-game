@@ -16891,17 +16891,26 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // ── ПЛАШКА ХОДА: кто ходит сейчас и кто следующий ──
         // Обновляется ОТДЕЛЬНО от остального экрана (updateTurnPlate), потому что safeRerender()
         // молчит, когда игрок стоит в поле ввода — из-за этого плашка застывала и врала.
+        // ═══════════ 🎲 АВТО-ХОД (Ринат 22сен): ход = 2 мин, БЕЗ ведущего, круг по игрокам ═══════════
+        // Порядок = кто раньше создал бланк (id = Date.now при регистрации). Сам отдал ход → следующий
+        // стартует автоматически, «Ваш ход», побежало время. Тайм-аут 2 мин → авто-передача. До 6-8 человек.
+        const TURN_MS = 120000;
+        function turnOrder(){ return (state.players||[]).slice().sort((a,b)=>a.id-b.id); }
+        function getTurnState(){ try{ return JSON.parse(localStorage.getItem('v0_turn')||'null'); }catch(e){ return null; } }
+        function setTurnState(t){ state.turn=t; try{ localStorage.setItem('v0_turn', JSON.stringify(t)); }catch(e){} if(typeof bc!=='undefined'&&bc){ try{ bc.postMessage('updated'); }catch(e){} } }
+        function ensureTurn(){ const ord=turnOrder(); if(!ord.length) return null; let t=getTurnState(); if(!t||!ord.some(x=>x.id===t.curId)){ t={curId:ord[0].id, endsAt:Date.now()+TURN_MS}; setTurnState(t); } else { state.turn=t; } return t; }
+        function isMyTurn(){ const ord=turnOrder(); if(ord.length<=1) return true; const t=ensureTurn(); return !!(t && String(t.curId)===String(state.currentPlayerId)); }
+        function passTurn(){ const ord=turnOrder(); if(ord.length<=1) return; const t=ensureTurn(); if(!t) return; let i=ord.findIndex(x=>x.id===t.curId); if(i<0)i=0; i=(i+1)%ord.length; setTurnState({curId:ord[i].id, endsAt:Date.now()+TURN_MS}); try{ if(typeof render==='function') render(); }catch(e){} }
+        function turnMMSS(endsAt){ const s=Math.max(0,Math.round((endsAt-Date.now())/1000)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+        window.isMyTurn=isMyTurn; window.passTurn=passTurn;
         function turnPlateHtml(p){
-            if(SOLO_APP) return '';   // соло-Аппка: ходов/ведущего нет, время ведёт поле
-            const b=state.board; if(!b||!b.order||!b.order.length||!p) return '';
+            const ord=turnOrder();
+            if(!p || ord.length<=1) return '';   // соло — без ходов/таймера, играй свободно
+            const t=ensureTurn(); if(!t) return '';
             const nm=id=>(state.players.find(x=>x.id==id)||{}).name||'игрок';
-            const tp=b.order[b.turnIdx];
-            const nextPid=b.order[(b.turnIdx+1)%b.order.length];
-            const nextTxt = b.order.length>1
-                ? `<div style="font-size:11.5px;font-weight:700;opacity:.9;margin-top:4px;">⏭️ Следующий — <b>${nextPid==p.id?'ТЫ':nm(nextPid)}</b></div>`
-                : '';
-            if(tp==p.id) return `<div style="background:linear-gradient(90deg,#1d4ed8,#2563eb);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:800;text-align:center;">🎯 ТВОЙ ХОД! Действуй.${nextTxt}</div>`;
-            return `<div style="background:#3f1d1d;color:#fecaca;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">⏳ Сейчас ходит <b>${nm(tp)}</b> — жди свой ход. Твои действия отключены (только казино и общее окно покупки).${nextTxt}</div>`;
+            const mine=String(t.curId)===String(p.id), left=turnMMSS(t.endsAt);
+            if(mine) return `<div id="turnBanner" style="background:linear-gradient(90deg,#1d4ed8,#2563eb);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:800;text-align:center;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;">🎯 Ваш ход · <span id="turnClock" style="font-family:ui-monospace,monospace;">${left}</span><button onclick="passTurn()" style="background:#0b1020;color:#fff;border:1px solid #93c5fd;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;">Передать ход →</button></div>`;
+            return `<div id="turnBanner" style="background:#3f1d1d;color:#fecaca;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">⏳ Ходит <b>${nm(t.curId)}</b> · <span id="turnClock" style="font-family:ui-monospace,monospace;">${left}</span> — жди свой ход</div>`;
         }
         function updateTurnPlate(){
             // 🎲 Личный попап «Твой ход» на ФРОНТЕ перехода (был не мой ход → стал мой). Только на своём экране.
@@ -17738,6 +17747,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(open) _buyWasOpen=true;
         }
         setInterval(tickTimers, 1000);
+        // 🎲 тикер авто-хода: обновляет «Ваш ход MM:SS», по тайм-ауту сам передаёт ход (только активный игрок)
+        setInterval(function(){
+            try{
+                const ord=turnOrder(); if(ord.length<=1) return;
+                const t=state.turn||getTurnState(); if(!t) return;
+                const cl=document.getElementById('turnClock'); if(cl) cl.textContent=turnMMSS(t.endsAt);
+                if(Date.now()>t.endsAt+400 && String(t.curId)===String(state.currentPlayerId)) passTurn();
+            }catch(e){}
+        }, 1000);
 
         // ─── 🤖 АВТОПРОГОН БОТОВ (видимая имитация игры для проверки; ускоренная скорость) ───
         let _autoToastT=null;
@@ -22257,6 +22275,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p = state.players.find(x => x.id === id);
             if (!p) return false;
             if ((Number(p.jail)||0) > 0) { alert('🔒 Ты в тюрьме — доступна только лудка (казино). Отбывай ходы или откупись.'); return false; }
+            if (SOLO_APP) { p.allow = null; return true; }   // соло/авто-ход: клетки не запирает ведущий — действуешь в свой ход
             if (p.allow !== key) { showCellLocked(key); return false; }   // #17: объясняем клетку, а не глухой блок
             p.allow = null; save();   // одноразовое: разрешение потрачено
             return true;
@@ -22503,6 +22522,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       #viaIpo{position:fixed;inset:0;z-index:855;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.10), transparent 60%), #0a0703;}
       html.tg-app.tg-fs #viaIpo{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
       #viaIpo[hidden]{display:none;}
+      #viaDeals{position:fixed;inset:0;z-index:856;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.10), transparent 60%), #0a0703;}
+      html.tg-app.tg-fs #viaDeals{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
+      #viaDeals[hidden]{display:none;}
+      .vd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:560px;margin:6px auto 0;}
+      .vd-b{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:14px;border-radius:13px;border:1px solid var(--lx-line);background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));color:var(--lx-text);font-family:inherit;cursor:pointer;text-align:left;}
+      .vd-b:active{transform:scale(.98);}
+      .vd-b .e{font-size:24px;line-height:1;}
+      .vd-b .t{font-size:14px;font-weight:700;color:var(--lx-gold-br);}
+      .vd-b .d{font-size:11px;color:var(--lx-muted);line-height:1.3;}
       .vi-wrap{max-width:560px;margin:0 auto;}
       .vi-head{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
       .vi-head h2{font-size:19px;color:var(--lx-gold-br);font-weight:600;}
@@ -22561,6 +22589,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       </div>
     </div>
 
+    <div id="viaDeals" hidden>
+      <div class="vi-wrap">
+        <div class="vi-head"><button class="vi-back" id="viDealsBack">← Поле</button><h2>Рынок сделок</h2></div>
+        <div class="vi-heat">Твой ход — твоё время. Реши, куда его вложить: мелкая или крупная сделка, товар, навык, земля, аукцион или дело.</div>
+        <div id="viDealsGrid" class="vd-grid"></div>
+      </div>
+    </div>
+
     <div id="viaFeedback">
       <div class="vf-fb">
         <h3>Обратная связь</h3>
@@ -22592,7 +22628,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         ['🛒','Рынок','Мои активы','активы',45.91,14.66,7],
         ['💸','Расходы','Образ жизни','быт',52.69,14.96,7],
         ['📈','Акции·Крипта','Биржа','инвест',60.15,14.96,7],
-        ['🤝','Сделки','Клетки и действия','сделки',67.36,14.66,7],
+        ['🤝','Сделки','@deals','сделки',67.36,14.66,7],
         ['🏛️','Государство','Клетки и действия','власть',74.39,14.96,7],
         ['🌍','Мир.событие','Клетки и действия','мир',81.85,15.11,7],
         ['🔒','Тюрьма','Клетки и действия','срыв',90.21,17.19,9.8],
@@ -22601,16 +22637,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         ['🏦','Налоги','Клетки и действия','власть',91.32,64.85,7],
         ['🕶️','Чёрный рынок','Товарка','тьма',90.15,82.21,9.8],
         ['💰','Зарплата','Доход и расходы','доход',80.89,84.44,7],
-        ['🤝','Сделки','Клетки и действия','сделки',72.49,84.15,7],
+        ['🤝','Сделки','@deals','сделки',72.49,84.15,7],
         ['📈','Акции·Крипта','Биржа','инвест',64.95,84.59,7],
         ['🧠','Навык','Развивать себя','развитие',57.45,84.44,7],
         ['🌐','Связи','Клетки и действия','люди',49.06,84.89,7],
         ['💸','Расходы','Образ жизни','быт',41.11,84.89,7],
         ['🛒','Рынок','Мои активы','активы',33.58,84.89,7],
         ['📈','Акции·Крипта','Биржа','инвест',26.24,84.89,7],
-        ['🤝','Сделки','Клетки и действия','сделки',18.96,84.74,7],
+        ['🤝','Сделки','@deals','сделки',18.96,84.74,7],
         ['🎫','Золотой билет','Путь к победе','шанс',10.27,82.95,9.4],
-        ['🤝','Сделки','Клетки и действия','сделки',9.0,64.85,7],
+        ['🤝','Сделки','@deals','сделки',9.0,64.85,7],
         ['🔍','Государство','Клетки и действия','власть',9.0,49.7,7],
         ['⚕️','Медицина','Клетки и действия','здоровье',9.0,32.6,7]
       ];
@@ -22701,7 +22737,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       function paintPawn(){var c=MONEY[pawnIdx],pawn=document.getElementById('vfPawn');if(pawn&&c){pawn.style.left=c[4]+'%';pawn.style.top=c[5]+'%';}if(board){var gs=board.querySelectorAll('.vf-c2');for(var i=0;i<gs.length;i++)gs[i].classList.toggle('vf-on',i===pawnIdx);}}
       function landed(){var c=MONEY[pawnIdx];if(!c)return;updMonth();var box=document.getElementById('vfLanded');if(box){box.innerHTML='<div class="ll">Клетка: <b>'+c[1]+'</b></div><button class="vf-enter" id="vfEnter">Войти →</button>';var be=document.getElementById('vfEnter');if(be)be.addEventListener('click',function(){enterCell(c[2]);});}}
       function stepMove(k){var crossed=false,steps=0,n=MONEY.length;var iv=setInterval(function(){pawnIdx=(pawnIdx+1)%n;if(pawnIdx===0)crossed=true;paintPawn();if(++steps>=k){clearInterval(iv);if(crossed)payday();landed();rolling=false;}},160);}
-      function rollDie(){if(rolling)return;var p=curP();if(!p){toast('Сначала войди в игру — вкладка «Бланк»');return;}rolling=true;var k=1+Math.floor(Math.random()*6),die=document.getElementById('vfDie'),F=['⚀','⚁','⚂','⚃','⚄','⚅'],t=0;var iv=setInterval(function(){if(die)die.textContent=F[Math.floor(Math.random()*6)];if(++t>7){clearInterval(iv);if(die)die.textContent=F[k-1];stepMove(k);}},60);}
+      function rollDie(){if(rolling)return;var p=curP();if(!p){toast('Сначала войди в игру — вкладка «Бланк»');return;}if(typeof window.isMyTurn==='function'&&!window.isMyTurn()){toast('Сейчас не твой ход — жди «Ваш ход»');return;}rolling=true;var k=1+Math.floor(Math.random()*6),die=document.getElementById('vfDie'),F=['⚀','⚁','⚂','⚃','⚄','⚅'],t=0;var iv=setInterval(function(){if(die)die.textContent=F[Math.floor(Math.random()*6)];if(++t>7){clearInterval(iv);if(die)die.textContent=F[k-1];stepMove(k);}},60);}
       // ── Живые часы: год + стадия жизни (VIA_ЧАСЫ_ЖИВЫЕ). Ведёт время самого поля. ──
       var LIFE_STAGES=['Рождение','Учёба','Труд','Рост','Дело','Кризис','Свобода','Влияние','Мудрость','Служение','Итог','Наследие'];
       function drawClock(){var host=document.getElementById('vfClock');if(!host)return;var m=curMonth(),year=Math.floor(m/12)+1,ang=(m%12)/12*360,C=90,R=80;var s='<svg viewBox="0 0 180 180" class="vf-clock"><defs><radialGradient id="vfdisc" cx="50%" cy="42%" r="60%"><stop offset="0%" stop-color="#241a0b"/><stop offset="100%" stop-color="#070502"/></radialGradient></defs>';s+='<circle cx="90" cy="90" r="'+R+'" fill="url(#vfdisc)" stroke="#d9a441" stroke-width="2"/>';for(var i=0;i<12;i++){var a=i/12*2*Math.PI-Math.PI/2,r1=R-3,r2=R-9,big=(i%3===0);s+='<line x1="'+(C+r1*Math.cos(a)).toFixed(1)+'" y1="'+(C+r1*Math.sin(a)).toFixed(1)+'" x2="'+(C+r2*Math.cos(a)).toFixed(1)+'" y2="'+(C+r2*Math.sin(a)).toFixed(1)+'" stroke="#f4d489" stroke-width="'+(big?2:1)+'" opacity="'+(big?0.9:0.4)+'"/>';}var ah=ang*Math.PI/180-Math.PI/2;s+='<line x1="90" y1="90" x2="'+(C+(R-22)*Math.cos(ah)).toFixed(1)+'" y2="'+(C+(R-22)*Math.sin(ah)).toFixed(1)+'" stroke="#f6dd93" stroke-width="4" stroke-linecap="round"/>';s+='<circle cx="90" cy="90" r="26" fill="#120d05" stroke="#d9a441" stroke-width="2"/>';s+='<text x="90" y="85" text-anchor="middle" fill="#f4d489" style="font:700 12px Georgia,serif">ГОД</text>';s+='<text x="90" y="104" text-anchor="middle" fill="#f4d489" style="font:700 18px Georgia,serif">'+year+'</text>';s+='<text x="90" y="172" text-anchor="middle" fill="#c8a86a" style="font:600 11px Georgia,serif">'+LIFE_STAGES[Math.min(11,year-1)]+'</text>';s+='</svg>';host.innerHTML=s;}
@@ -22716,7 +22752,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       (function(){var tabs=document.getElementById('vfTabs');if(!tabs)return;tabs.addEventListener('click',function(e){var b=e.target.closest('button[data-view]');if(!b)return;BOARD_VIEW=b.getAttribute('data-view');var bs=tabs.querySelectorAll('button');for(var i=0;i<bs.length;i++)bs[i].classList.toggle('on',bs[i]===b);var ipoBtn=document.getElementById('viIpoOpen');if(ipoBtn)ipoBtn.style.display=(BOARD_VIEW==='money')?'block':'none';renderField();});})();
       if(board){renderField();}
       function toast(m){var t=document.getElementById('viaToast');if(!t)return;t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('on');},2200);}
-      function enterCell(sec){ if(sec==='@farm'){ showField(false); try{ if(typeof openFarm==='function') openFarm(); }catch(e){ toast('Ферма недоступна'); } return; } openRazdel(sec); }
+      function enterCell(sec){ if(sec==='@deals'){ openDeals(); return; } if(sec==='@farm'){ showField(false); try{ if(typeof openFarm==='function') openFarm(); }catch(e){ toast('Ферма недоступна'); } return; } openRazdel(sec); }
       function openRazdel(key){
         var list=document.querySelectorAll('details.sec'),found=null;
         for(var i=0;i<list.length;i++){var s=list[i].querySelector('summary');if(s&&s.textContent.indexOf(key)!==-1){found=list[i];break;}}
@@ -22728,6 +22764,24 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       function showField(on){if(field)field.hidden=!on;if(bF)bF.classList.toggle('vb-active',on);if(bB)bB.classList.toggle('vb-active',!on);if(on){try{updMonth();}catch(e){}try{field.scrollTop=0;}catch(e){}}}
       if(bF)bF.addEventListener('click',function(){showField(true);});
       if(bB)bB.addEventListener('click',function(){showField(false);});
+      // ── 🤝 РЫНОК СДЕЛОК: клетка «Сделки» открывает выбор, куда вложить время ──
+      var DEAL_VENTURES=[
+        ['🤝','Мелкие сделки','предложения от людей — прочитай и реши','sdelka_small'],
+        ['💼','Крупные сделки','бизнесы и жирные контракты','sdelka_big'],
+        ['📦','Товарка','закуп и кампании','Товарка'],
+        ['🎓','Навыки / повышение','вложись в себя','Развивать себя'],
+        ['🐄','Ферма','земля, скот, урожай','@farm'],
+        ['🔨','Аукцион','торги за редкое','Аукцион'],
+        ['🏢','Бизнес','купить дело — пассив','Бизнес'],
+        ['🏠','Недвижимость','квартиры и аренда','Недвижимость'],
+        ['🚗','Машина / образ жизни','покупки и статус','Образ жизни']
+      ];
+      var dealsEl=document.getElementById('viaDeals');
+      function openDeals(){var g=document.getElementById('viDealsGrid');if(g){var h='';for(var i=0;i<DEAL_VENTURES.length;i++){var v=DEAL_VENTURES[i];h+='<button class="vd-b" data-t="'+v[3]+'"><span class="e">'+v[0]+'</span><span class="t">'+v[1]+'</span><span class="d">'+v[2]+'</span></button>';}g.innerHTML=h;}if(dealsEl)dealsEl.hidden=false;}
+      function closeDeals(){if(dealsEl)dealsEl.hidden=true;}
+      function dealPick(t){closeDeals();showField(false);try{if(t==='sdelka_small'){if(typeof openSdelkaSmall==='function')openSdelkaSmall(state.currentPlayerId);}else if(t==='sdelka_big'){if(typeof openSdelkaBig==='function')openSdelkaBig(state.currentPlayerId);}else if(t==='@farm'){if(typeof openFarm==='function')openFarm();}else{openRazdel(t);}}catch(e){toast('Раздел недоступен');}}
+      if(dealsEl)dealsEl.addEventListener('click',function(e){if(e.target===dealsEl){closeDeals();return;}var b=e.target.closest('.vd-b');if(b)dealPick(b.getAttribute('data-t'));});
+      var vdb=document.getElementById('viDealsBack');if(vdb)vdb.addEventListener('click',closeDeals);
       // обратная связь
       var fb=document.getElementById('viaFeedback');
       document.getElementById('vbFb').addEventListener('click',function(){fb.classList.add('on');var t=document.getElementById('viaFbText');if(t)setTimeout(function(){try{t.focus();}catch(e){}},50);});
