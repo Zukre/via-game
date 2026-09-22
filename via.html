@@ -22526,11 +22526,6 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
     <div id="viaField" hidden>
       <div class="vf-head"><h2>Поле жизни</h2><p>Брось кубик — фишка идёт по клеткам, круг = месяц, время ведут часы лет. Стоишь на клетке → входишь в её дело.</p></div>
-      <div class="vf-tabs" id="vfTabs">
-        <button data-view="money" class="on">🕌 Деньги</button>
-        <button data-view="soul">🕊️ Душа</button>
-        <button data-view="door">🚪 Двери</button>
-      </div>
       <div class="vf-epoch" id="viaEpochBar"></div>
       <button class="vf-ipo" id="viIpoOpen">🚀 Размещения — IPO</button>
       <div id="viaBoard"></div>
@@ -22568,36 +22563,37 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     (function(){
       // клетка → раздел бланка (ищем по тексту заголовка details.sec)
       // ── НАСТОЯЩАЯ ДЕНЕЖНАЯ ДОСКА (VIA_МАКЕТ_ДВЕ_ДОСКИ): 29 клеток. [иконка, имя, раздел-бланка, категория] ──
+      // ── ПРОСТОЕ ПОЛЕ: ВСЕ реальные разделы игры (Ринат 22сен: «правильная раскладка всех полей»). ──
+      // [иконка, имя, куда вести (раздел бланка или @farm), категория-цвет]
       var MONEY=[
         ['💰','Зарплата','Доход и расходы','доход'],
-        ['🎯','Карьера','Клетки и действия','работа'],
-        ['📈','Акции·Крипта','Биржа','инвест'],
-        ['🧠','Навык','Развивать себя','развитие'],
-        ['👶','Дети','Клетки и действия','семья'],
-        ['🛒','Рынок','Мои активы','активы'],
-        ['💸','Расходы','Образ жизни','быт'],
-        ['📈','Акции·Крипта','Биржа','инвест'],
+        ['📈','Биржа','Биржа','инвест'],
+        ['🐄','Ферма','@farm','активы'],
         ['🤝','Сделки','Клетки и действия','сделки'],
+        ['📦','Товарка','Товарка','активы'],
+        ['🏢','Бизнес','Бизнес','работа'],
+        ['🎓','Навык','Развивать себя','развитие'],
+        ['🎰','Казино','Казино','срыв'],
+        ['🏠','Недвижимость','Недвижимость','активы'],
+        ['📈','Биржа','Биржа','инвест'],
+        ['❤️','Отношения','Отношения','люди'],
+        ['🏦','Депозиты','Депозиты','доход'],
         ['🏛️','Государство','Клетки и действия','власть'],
-        ['🕸️','Мир.событие','Клетки и действия','мир'],
-        ['🔒','Тюрьма','Клетки и действия','срыв'],
-        ['🧳','Работа','Клетки и действия','работа'],
-        ['🚗','Расходы','Образ жизни','быт'],
-        ['🏦','Налоги','Клетки и действия','власть'],
-        ['🎫','Золотой билет','Путь к победе','шанс'],
+        ['🎫','Победа','Путь к победе','шанс'],
+        ['🛒','Мои активы','Мои активы','активы'],
+        ['💎','Коллекция','Коллекция','активы'],
+        ['🔨','Аукцион','Аукцион','активы'],
         ['🤝','Сделки','Клетки и действия','сделки'],
-        ['📈','Акции·Крипта','Биржа','инвест'],
-        ['🛒','Рынок','Мои активы','активы'],
-        ['💸','Расходы','Образ жизни','быт'],
-        ['🌐','Связи','Клетки и действия','люди'],
-        ['🧠','Навык','Развивать себя','развитие'],
-        ['📈','Акции·Крипта','Биржа','инвест'],
-        ['🤝','Сделки','Клетки и действия','сделки'],
-        ['💰','Зарплата','Доход и расходы','доход'],
-        ['🕶️','Чёрный рынок','Товарка','тьма'],
+        ['🏡','Образ жизни','Образ жизни','быт'],
         ['⚕️','Медицина','Клетки и действия','здоровье'],
-        ['🔍','Проверки','Клетки и действия','власть'],
-        ['🤝','Помощь людей','Клетки и действия','люди']
+        ['📈','Биржа','Биржа','инвест'],
+        ['🏢','Бизнес','Бизнес','работа'],
+        ['🌐','Связи','Клетки и действия','люди'],
+        ['🕸️','Мир.событие','Клетки и действия','мир'],
+        ['💰','Зарплата','Доход и расходы','доход'],
+        ['🏦','Долги','Долги и кредит','срыв'],
+        ['🎓','Навык','Развивать себя','развитие'],
+        ['🏡','Образ жизни','Образ жизни','быт']
       ];
       var CELLS=MONEY;   // совместимость со старым кодом
       // ── ДУШЕВНАЯ ДОСКА (Акт II): 40 клеток. [имя, тема, вопрос] ──
@@ -22683,7 +22679,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       function shortName(s){return s.length>9?s.slice(0,8)+'…':s;}
       function buildMoney(){var n=MONEY.length,s='<svg viewBox="0 0 '+BW+' '+BW+'" class="vf-svg">';for(var i=0;i<n;i++){var c=MONEY[i],p=ringXY(i/n),x=p[0],y=p[1],col=catCol[c[3]]||'#d9a441';s+='<g class="vf-c" data-i="'+i+'"><rect x="'+x+'" y="'+y+'" width="'+CS+'" height="'+CS+'" rx="8" fill="rgba(28,20,8,.92)" stroke="'+col+'" stroke-width="1.4"/><rect x="'+x+'" y="'+y+'" width="'+CS+'" height="4" rx="2" fill="'+col+'"/><text x="'+(x+CS/2)+'" y="'+(y+CS/2-1)+'" text-anchor="middle" class="vf-ci">'+c[0]+'</text><text x="'+(x+CS/2)+'" y="'+(y+CS-6)+'" text-anchor="middle" class="vf-cn">'+shortName(c[1])+'</text></g>';}var pp=ringXY(pawnIdx/n);s+='<circle id="vfPawn" cx="'+(pp[0]+CS/2)+'" cy="'+(pp[1]+CS/2)+'" r="'+(CS/2-2)+'" fill="none" stroke="#f4d489" stroke-width="3"/>';s+='</svg>';return s;}
       function paintPawn(){var n=MONEY.length,pp=ringXY(pawnIdx/n),pawn=document.getElementById('vfPawn');if(pawn){pawn.setAttribute('cx',pp[0]+CS/2);pawn.setAttribute('cy',pp[1]+CS/2);}if(board){var gs=board.querySelectorAll('.vf-c');for(var i=0;i<gs.length;i++)gs[i].classList.toggle('vf-on',i===pawnIdx);}}
-      function landed(){var c=MONEY[pawnIdx];if(!c)return;updMonth();var box=document.getElementById('vfLanded');if(box){box.innerHTML='<div class="ll">Клетка: <b>'+c[1]+'</b></div><button class="vf-enter" id="vfEnter">Войти →</button>';var be=document.getElementById('vfEnter');if(be)be.addEventListener('click',function(){openRazdel(c[2]);});}}
+      function landed(){var c=MONEY[pawnIdx];if(!c)return;updMonth();var box=document.getElementById('vfLanded');if(box){box.innerHTML='<div class="ll">Клетка: <b>'+c[1]+'</b></div><button class="vf-enter" id="vfEnter">Войти →</button>';var be=document.getElementById('vfEnter');if(be)be.addEventListener('click',function(){enterCell(c[2]);});}}
       function stepMove(k){var crossed=false,steps=0,n=MONEY.length;var iv=setInterval(function(){pawnIdx=(pawnIdx+1)%n;if(pawnIdx===0)crossed=true;paintPawn();if(++steps>=k){clearInterval(iv);if(crossed)payday();landed();rolling=false;}},160);}
       function rollDie(){if(rolling)return;var p=curP();if(!p){toast('Сначала войди в игру — вкладка «Бланк»');return;}rolling=true;var k=1+Math.floor(Math.random()*6),die=document.getElementById('vfDie'),F=['⚀','⚁','⚂','⚃','⚄','⚅'],t=0;var iv=setInterval(function(){if(die)die.textContent=F[Math.floor(Math.random()*6)];if(++t>7){clearInterval(iv);if(die)die.textContent=F[k-1];stepMove(k);}},60);}
       // ── Живые часы: год + стадия жизни (VIA_ЧАСЫ_ЖИВЫЕ). Ведёт время самого поля. ──
@@ -22694,12 +22690,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       // ── Душевная доска (Акт II) — просмотр вопросов ──
       function buildSoul(){var n=SOUL.length,s='<svg viewBox="0 0 '+BW+' '+BW+'" class="vf-svg">';for(var i=0;i<n;i++){var c=SOUL[i];if(c[0]==='ЗЕРКАЛО'){s+='<g class="vf-c" data-i="'+i+'"><circle cx="'+(BW/2)+'" cy="'+(BW/2)+'" r="30" fill="rgba(180,220,240,.10)" stroke="#dff2fb" stroke-width="2"/><text x="'+(BW/2)+'" y="'+(BW/2-2)+'" text-anchor="middle" class="vf-ci">🪞</text><text x="'+(BW/2)+'" y="'+(BW/2+13)+'" text-anchor="middle" class="vf-cn" style="fill:#dff2fb">ЗЕРКАЛО</text></g>';continue;}var p=ringXY(i/(n-1)),x=p[0],y=p[1];s+='<g class="vf-c" data-i="'+i+'"><rect x="'+x+'" y="'+y+'" width="'+CS+'" height="'+CS+'" rx="8" fill="rgba(12,30,44,.9)" stroke="#a9d4e6" stroke-width="1.2"/><text x="'+(x+CS/2)+'" y="'+(y+CS/2+2)+'" text-anchor="middle" class="vf-cn" style="fill:#dff2fb;font-size:7px">'+shortName(c[0])+'</text></g>';}s+='</svg>';return s;}
       function renderField(){if(!board)return;var sp=document.getElementById('vfSoulPanel');
-        if(BOARD_VIEW==='money'){if(sp)sp.hidden=true;board.innerHTML='<div class="vf-boardwrap">'+buildMoney()+'<div class="vf-center2"><div id="vfClock" class="vf-clockbox"></div><div class="vf-die" id="vfDie" style="font-size:34px">🎲</div><button class="vf-roll" id="vfRoll">Бросить кубик</button><div class="vf-landed" id="vfLanded"></div></div></div>';var rb=document.getElementById('vfRoll');if(rb)rb.addEventListener('click',rollDie);var gs=board.querySelectorAll('.vf-c');for(var i=0;i<gs.length;i++){(function(g){g.addEventListener('click',function(){var idx=+g.getAttribute('data-i');if(idx===pawnIdx){openRazdel(MONEY[idx][2]);}else{toast('🎲 Дойди кубиком — вход в дело стоит хода');}});})(gs[i]);}paintPawn();drawClock();landed();}
+        if(BOARD_VIEW==='money'){if(sp)sp.hidden=true;board.innerHTML='<div class="vf-boardwrap">'+buildMoney()+'<div class="vf-center2"><div id="vfClock" class="vf-clockbox"></div><div class="vf-die" id="vfDie" style="font-size:34px">🎲</div><button class="vf-roll" id="vfRoll">Бросить кубик</button><div class="vf-landed" id="vfLanded"></div></div></div>';var rb=document.getElementById('vfRoll');if(rb)rb.addEventListener('click',rollDie);var gs=board.querySelectorAll('.vf-c');for(var i=0;i<gs.length;i++){(function(g){g.addEventListener('click',function(){var idx=+g.getAttribute('data-i');if(idx===pawnIdx){enterCell(MONEY[idx][2]);}else{toast('🎲 Дойди кубиком — вход в дело стоит хода');}});})(gs[i]);}paintPawn();drawClock();landed();}
         else if(BOARD_VIEW==='soul'){if(sp){sp.hidden=false;sp.innerHTML='Нажми клетку Души — раскроется её вопрос.';}board.innerHTML='<div class="vf-boardwrap">'+buildSoul()+'</div>';var gs2=board.querySelectorAll('.vf-c');for(var j=0;j<gs2.length;j++){(function(g){g.addEventListener('click',function(){var idx=+g.getAttribute('data-i'),c=SOUL[idx];if(sp){sp.hidden=false;sp.innerHTML='<div class="ll"><b>'+c[0]+'</b> · '+c[1]+'</div><div class="sq">«'+c[2]+'»</div>';}});})(gs2[j]);}}
         else{if(sp)sp.hidden=true;board.innerHTML=buildDoors();}}
       (function(){var tabs=document.getElementById('vfTabs');if(!tabs)return;tabs.addEventListener('click',function(e){var b=e.target.closest('button[data-view]');if(!b)return;BOARD_VIEW=b.getAttribute('data-view');var bs=tabs.querySelectorAll('button');for(var i=0;i<bs.length;i++)bs[i].classList.toggle('on',bs[i]===b);var ipoBtn=document.getElementById('viIpoOpen');if(ipoBtn)ipoBtn.style.display=(BOARD_VIEW==='money')?'block':'none';renderField();});})();
       if(board){renderField();}
       function toast(m){var t=document.getElementById('viaToast');if(!t)return;t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('on');},2200);}
+      function enterCell(sec){ if(sec==='@farm'){ showField(false); try{ if(typeof openFarm==='function') openFarm(); }catch(e){ toast('Ферма недоступна'); } return; } openRazdel(sec); }
       function openRazdel(key){
         var list=document.querySelectorAll('details.sec'),found=null;
         for(var i=0;i<list.length;i++){var s=list[i].querySelector('summary');if(s&&s.textContent.indexOf(key)!==-1){found=list[i];break;}}
