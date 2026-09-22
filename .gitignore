@@ -1,0 +1,6 @@
+Token Bot.txt
+bot_token.txt
+token.txt
+.bot_token
+*.token
+.env

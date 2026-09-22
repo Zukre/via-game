@@ -1229,6 +1229,95 @@ if not DATA.get('board'):
 # сразу посадить уже загруженных игроков на поле
 sync_board_roster()
 save_data(DATA)
+
+# ═══════════ ⭐ TELEGRAM STARS / ОПЛАТЫ (Ринат 22сен) ═══════════
+# Токен читаем ТОЛЬКО из окружения BOT_TOKEN (Render) или из файла рядом ('Token Bot.txt') —
+# в git токен НЕ хранится. Реестр платежей живёт в DATA['star_ledger'] (переживает рестарт).
+import urllib.request as _urlreq
+import urllib.parse as _urlparse
+import re as _re
+
+def _load_bot_token():
+    t = os.environ.get('BOT_TOKEN') or os.environ.get('TELEGRAM_TOKEN')
+    if t:
+        return t.strip()
+    for name in ('Token Bot.txt', 'bot_token.txt', 'token.txt', '.bot_token'):
+        p = ROOT / name
+        try:
+            if p.exists():
+                m = _re.search(r'([0-9]{8,10}:[A-Za-z0-9_-]{30,45})', p.read_text(encoding='utf-8', errors='ignore'))
+                if m:
+                    return m.group(1)
+        except Exception:
+            pass
+    return None
+
+BOT_TOKEN = _load_bot_token()
+
+def _tg_api(method, params=None, timeout=25):
+    if not BOT_TOKEN:
+        return {'ok': False, 'description': 'no token'}
+    url = 'https://api.telegram.org/bot%s/%s' % (BOT_TOKEN, method)
+    data = _urlparse.urlencode(params or {}).encode('utf-8')
+    try:
+        with _urlreq.urlopen(url, data=data, timeout=timeout) as r:
+            return json.loads(r.read().decode('utf-8'))
+    except Exception as e:
+        return {'ok': False, 'description': str(e)}
+
+def stars_create_invoice(title, description, payload, amount):
+    return _tg_api('createInvoiceLink', {
+        'title': title, 'description': description, 'payload': payload,
+        'currency': 'XTR', 'prices': json.dumps([{'label': title, 'amount': int(amount)}]),
+    })
+
+def _star_ledger():
+    return DATA.setdefault('star_ledger', [])
+
+def _star_poller():
+    # Приём оплат звёздами: getUpdates → подтверждаем pre_checkout → пишем successful_payment в реестр.
+    # Работает, только если задан BOT_TOKEN и НЕ настроен webhook. Без токена — тихо выходит.
+    if not BOT_TOKEN:
+        print('[stars] BOT_TOKEN не задан — серверный приём оплат выключен (история только клиентская).')
+        return
+    offset = 0
+    print('[stars] слушатель оплат запущен.')
+    while True:
+        res = _tg_api('getUpdates', {
+            'offset': offset, 'timeout': 25,
+            'allowed_updates': json.dumps(['pre_checkout_query', 'message']),
+        }, timeout=35)
+        if not res.get('ok'):
+            time.sleep(3)
+            continue
+        for upd in res.get('result', []):
+            offset = upd['update_id'] + 1
+            pcq = upd.get('pre_checkout_query')
+            if pcq:
+                _tg_api('answerPreCheckoutQuery', {'pre_checkout_query_id': pcq['id'], 'ok': 'true'})
+                continue
+            msg = upd.get('message') or {}
+            sp = msg.get('successful_payment')
+            if sp:
+                frm = msg.get('from') or {}
+                rec = {
+                    'ts': int(time.time() * 1000),
+                    'amount': sp.get('total_amount'),
+                    'currency': sp.get('currency'),
+                    'payload': sp.get('invoice_payload'),
+                    'from': frm.get('id'),
+                    'name': frm.get('first_name'),
+                    'charge_id': sp.get('telegram_payment_charge_id'),
+                }
+                with LOCK:
+                    led = _star_ledger()
+                    led.insert(0, rec)
+                    del led[500:]
+                try:
+                    _flush_now()
+                except Exception:
+                    pass
+                print('[stars] оплата: %s %s от %s' % (rec['amount'], rec['currency'], rec.get('name')))
 # ликвидность стакана могла отсутствовать у активов из старого via_data.json — проставляем по типу
 if via_market and DATA.get('market') and DATA['market'].get('assets'):
     _liq_changed = False
@@ -1348,6 +1437,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if self.path == '/stars/history':
+            with LOCK:
+                body = json.dumps({'ledger': DATA.get('star_ledger', []), 'server': bool(BOT_TOKEN)}, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store')
+            self._cors()
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path == '/newgame':
             # НОВАЯ ИГРА — свежая биржа с нуля (Год 1), игроки/сделки очищены.
             with LOCK:
@@ -1388,6 +1487,31 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        if self.path == '/stars/invoice':
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw) if raw else {}
+            except Exception:
+                req = {}
+            amount = int(req.get('amount') or 0)
+            title = str(req.get('title') or ('VIA — %s⭐' % amount))
+            desc = str(req.get('description') or 'Оплата в игре VIA')
+            payload = str(req.get('payload') or ('buy_%s' % amount))
+            if amount < 1:
+                out = {'ok': False, 'description': 'amount must be >= 1'}
+            elif not BOT_TOKEN:
+                out = {'ok': False, 'description': 'no bot token on server'}
+            else:
+                res = stars_create_invoice(title, desc, payload, amount)
+                out = {'ok': bool(res.get('ok')), 'link': res.get('result'), 'description': res.get('description')}
+            body = json.dumps(out, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self._cors()
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path == '/data':
             n = int(self.headers.get('Content-Length', 0) or 0)
             raw = self.rfile.read(n).decode('utf-8') if n else '{}'
@@ -2497,6 +2621,7 @@ def main():
 
     if not IS_CLOUD:   # don't try to open a browser on a headless cloud server
         threading.Timer(0.4, lambda: webbrowser.open(url)).start()
+    threading.Thread(target=_star_poller, daemon=True).start()   # ⭐ приём оплат звёздами (если задан BOT_TOKEN)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
