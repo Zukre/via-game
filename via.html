@@ -22525,6 +22525,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       #viaDeals{position:fixed;inset:0;z-index:856;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.10), transparent 60%), #0a0703;}
       html.tg-app.tg-fs #viaDeals{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
       #viaDeals[hidden]{display:none;}
+      #viaSupport{position:fixed;inset:0;z-index:857;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.12), transparent 60%), #0a0703;}
+      html.tg-app.tg-fs #viaSupport{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
+      #viaSupport[hidden]{display:none;}
+      .vs-tier{display:flex;align-items:center;justify-content:center;gap:6px;padding:16px 10px;border-radius:13px;border:1px solid var(--lx-gold-ln);background:linear-gradient(180deg,rgba(244,212,137,.12),rgba(244,212,137,.03));color:var(--lx-gold-br);font-family:inherit;font-weight:800;font-size:17px;cursor:pointer;}
+      .vs-tier:active{transform:scale(.98);}
       .vd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:560px;margin:6px auto 0;}
       .vd-b{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:14px;border-radius:13px;border:1px solid var(--lx-line);background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));color:var(--lx-text);font-family:inherit;cursor:pointer;text-align:left;}
       .vd-b:active{transform:scale(.98);}
@@ -22574,6 +22579,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       <div class="vf-head"><h2>Поле жизни</h2><p>Брось кубик — фишка идёт по клеткам, круг = месяц, время ведут часы лет. Стоишь на клетке → входишь в её дело.</p></div>
       <div class="vf-epoch" id="viaEpochBar"></div>
       <button class="vf-ipo" id="viIpoOpen">🚀 Размещения — IPO</button>
+      <button class="vf-ipo" id="viSupportOpen" style="border-color:var(--lx-gold);background:linear-gradient(180deg,rgba(244,212,137,.16),rgba(244,212,137,.04));">⭐ Поддержать VIA</button>
       <div id="viaBoard"></div>
       <div class="vf-soulpanel" id="vfSoulPanel" hidden>Нажми клетку Души — раскроется её вопрос.</div>
     </div>
@@ -22594,6 +22600,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         <div class="vi-head"><button class="vi-back" id="viDealsBack">← Поле</button><h2>Рынок сделок</h2></div>
         <div class="vi-heat">Твой ход — твоё время. Реши, куда его вложить: мелкая или крупная сделка, товар, навык, земля, аукцион или дело.</div>
         <div id="viDealsGrid" class="vd-grid"></div>
+      </div>
+    </div>
+
+    <div id="viaSupport" hidden>
+      <div class="vi-wrap">
+        <div class="vi-head"><button class="vi-back" id="viSupportBack">← Поле</button><h2>⭐ Поддержать VIA</h2></div>
+        <div class="vi-heat">Выбери, сколько звёзд ты готов вложить в развитие игры. Оплата идёт напрямую через Telegram Stars — спасибо, что помогаешь VIA расти.</div>
+        <div id="viStarTiers" class="vd-grid"></div>
+        <div class="vi-sec-t">История звёзд</div>
+        <div id="viStarHistory" class="vi-mine"></div>
       </div>
     </div>
 
@@ -22782,6 +22798,38 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       function dealPick(t){closeDeals();showField(false);try{if(t==='sdelka_small'){if(typeof openSdelkaSmall==='function')openSdelkaSmall(state.currentPlayerId);}else if(t==='sdelka_big'){if(typeof openSdelkaBig==='function')openSdelkaBig(state.currentPlayerId);}else if(t==='@farm'){if(typeof openFarm==='function')openFarm();}else{openRazdel(t);}}catch(e){toast('Раздел недоступен');}}
       if(dealsEl)dealsEl.addEventListener('click',function(e){if(e.target===dealsEl){closeDeals();return;}var b=e.target.closest('.vd-b');if(b)dealPick(b.getAttribute('data-t'));});
       var vdb=document.getElementById('viDealsBack');if(vdb)vdb.addEventListener('click',closeDeals);
+      // ── ⭐ ПОДДЕРЖКА VIA ЗВЁЗДАМИ (Telegram Stars). Ссылки-счета отчеканены заранее ботом, токен в код НЕ идёт. ──
+      var STAR_TIERS=[
+        [25,'https://t.me/$_RIi0W3-mUlpHQAAldejJ6UHXwg'],
+        [50,'https://t.me/$HhY63W3-mUlqHQAAfUiDr_rVy5w'],
+        [100,'https://t.me/$XTaGe23-mUlrHQAA2ln_xbf8fTY'],
+        [250,'https://t.me/$uSmwhW3-mUlsHQAAb10cRFAh4h8'],
+        [500,'https://t.me/$g46MAm3-mUltHQAADaNDqZ-aoKQ'],
+        [1000,'https://t.me/$4HwgCW3-mUluHQAAVFejhhuRNWI']
+      ];
+      var supEl=document.getElementById('viaSupport');
+      function tgWA(){ try{ return window.Telegram && window.Telegram.WebApp; }catch(e){ return null; } }
+      function starHistory(){ try{ return JSON.parse(localStorage.getItem('via_star_history')||'[]'); }catch(e){ return []; } }
+      function pushStarHistory(rec){ try{ var a=starHistory(); a.unshift(rec); localStorage.setItem('via_star_history', JSON.stringify(a.slice(0,50))); }catch(e){} }
+      function renderStarHistory(){ var el=document.getElementById('viStarHistory'); if(!el) return; var a=starHistory(); if(!a.length){ el.innerHTML='<div class="vi-empty">Пока нет платежей. Поддержи VIA звёздами выше ⭐</div>'; return; } var h=''; for(var i=0;i<a.length;i++){ var r=a[i], dt=''; try{ dt=new Date(r.ts).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){} h+='<div class="vi-card" style="padding:10px 13px;"><div class="nm">⭐ '+r.amount+' — '+(r.status==='paid'?'оплачено':r.status)+'</div><div class="meta">'+dt+'</div></div>'; } el.innerHTML=h; }
+      function buyStars(link, amount){
+        var wa=tgWA();
+        if(wa && typeof wa.openInvoice==='function'){
+          try{ wa.openInvoice(link, function(status){
+            if(status==='paid'){ pushStarHistory({amount:amount,status:'paid',ts:Date.now()}); toast('⭐ Спасибо за поддержку! ('+amount+')'); renderStarHistory(); }
+            else if(status==='cancelled'){ toast('Оплата отменена'); }
+            else if(status==='failed'){ toast('Оплата не прошла — попробуй ещё'); }
+          }); }catch(e){ toast('Не удалось открыть оплату'); }
+        } else {
+          try{ window.open(link,'_blank'); }catch(e){}
+          toast('Открой игру в Telegram, чтобы платить звёздами');
+        }
+      }
+      function openSupport(){ var g=document.getElementById('viStarTiers'); if(g){ var h=''; for(var i=0;i<STAR_TIERS.length;i++){ h+='<button class="vs-tier" data-i="'+i+'">⭐ '+STAR_TIERS[i][0]+'</button>'; } g.innerHTML=h; } renderStarHistory(); if(supEl)supEl.hidden=false; }
+      function closeSupport(){ if(supEl)supEl.hidden=true; }
+      if(supEl)supEl.addEventListener('click',function(e){ if(e.target===supEl){ closeSupport(); return; } var b=e.target.closest('.vs-tier'); if(b){ var i=+b.getAttribute('data-i'); var t=STAR_TIERS[i]; if(t) buyStars(t[1], t[0]); } });
+      var vso=document.getElementById('viSupportOpen'); if(vso)vso.addEventListener('click',openSupport);
+      var vsb=document.getElementById('viSupportBack'); if(vsb)vsb.addEventListener('click',closeSupport);
       // обратная связь
       var fb=document.getElementById('viaFeedback');
       document.getElementById('vbFb').addEventListener('click',function(){fb.classList.add('on');var t=document.getElementById('viaFbText');if(t)setTimeout(function(){try{t.focus();}catch(e){}},50);});
