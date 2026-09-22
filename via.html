@@ -11361,6 +11361,73 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try { PROFILE.updated = Date.now(); localStorage.setItem('v0_profile', JSON.stringify(PROFILE)); }
             catch(e) { console.warn('PROFILE save fail', e); }
         }
+        // ═══════════ 💎 МОНЕТИЗАЦИЯ: замки блоков + магазин (Ринат 23сен, Telegram Stars) ═══════════
+        // BitLife-модель: ядро бесплатно (Бизнес/Биржа/Недвижимость/бланк), ценные блоки и Зеркало — за звёзды,
+        // открываются НАВСЕГДА (в вечном профиле). Счета отчеканены заранее ботом @viaoffbot; токен в код НЕ идёт.
+        if(!PROFILE.unlocked || typeof PROFILE.unlocked!=='object') PROFILE.unlocked={};
+        if(!Array.isArray(PROFILE.purchases)) PROFILE.purchases=[];
+        const SHOP = {
+          mirror:{t:'🪞 Зеркало Души',a:600,link:'https://t.me/$F-RNtm3-mUnZHQAAFfdJ7tVPSnY',d:'Твой психологический портрет — ради чего ты играл.'},
+          relationships:{t:'❤️ Отношения',a:300,link:'https://t.me/$ZdtPo23-mUnaHQAAjAtvFgEksPc',d:'Любовь, партнёры, семья.'},
+          ferma:{t:'🐄 Ферма',a:300,link:'https://t.me/$XsO74G3-mUnbHQAANC78Q9gWFLk',d:'Земля, скот, урожай, свой бренд.'},
+          tovarka:{t:'📦 Товарка',a:300,link:'https://t.me/$nic-9m3-mUncHQAADd-HrAlv52E',d:'Закуп и кампании — быстрый оборот.'},
+          auction:{t:'🔨 Аукцион',a:300,link:'https://t.me/$aLzqLm3-mUndHQAAxXQQRUXy0cY',d:'Торги за редкое.'},
+          skills:{t:'🎓 Развить себя',a:125,link:'https://t.me/$QL3IQ23-mUneHQAAJqx9uA725dQ',d:'Дерево навыков и баффов.'},
+          lifestyle:{t:'🏡 Образ жизни',a:125,link:'https://t.me/$M-Ttpm3-mUnfHQAAyZRYzpE1deA',d:'Покупки, статус, апгрейды жизни.'},
+          extend_turn:{t:'⏱️ +1 минута к ходу',a:30,link:'https://t.me/$sdEckG3-mUngHQAApORU4Xd1Ewo',d:'Разово продлить свой ход.'},
+          extra_card:{t:'🃏 Ещё карта сделки',a:60,link:'https://t.me/$H-SEtG3-mUnhHQAASSO1CqfJhMI',d:'Разово вытянуть ещё одну карту.'},
+          bundle_all:{t:'🌟 ВСЁ ВКЛЮЧЕНО',a:1200,link:'https://t.me/$ASCCXG3-mUniHQAA9DORfOKectM',d:'Все блоки + Зеркало навсегда. Дешевле, чем по отдельности.'},
+          vip_founder:{t:'👑 Основатель клуба VIA',a:3000,link:'https://t.me/$CLiMWW3-mUnjHQAAx-xfP46tu6g',d:'Всё навсегда + статус основателя + весь будущий контент.'}
+        };
+        const BLOCK_KEYS = {ferma:1,tovarka:1,auction:1,relationships:1,skills:1,lifestyle:1,mirror:1};
+        function viaUnlocked(key){ try{ const u=PROFILE.unlocked||{}; if(u.vip_founder||u.bundle_all) return true; return !!u[key]; }catch(e){ return false; } }
+        function viaSetUnlocked(key){ try{ PROFILE.unlocked[key]=true; saveProfile(); }catch(e){} }
+        function recordPurchase(key,amt){ try{ PROFILE.purchases.unshift({key:key,amount:amt,ts:Date.now()}); PROFILE.purchases=PROFILE.purchases.slice(0,100); saveProfile(); }catch(e){} }
+        function viaBuy(key, onPaid){
+          const it=SHOP[key]; if(!it) return;
+          const wa=(window.Telegram&&window.Telegram.WebApp);
+          if(wa && typeof wa.openInvoice==='function'){
+            try{ wa.openInvoice(it.link, function(status){
+              if(status==='paid'){
+                if(key==='bundle_all'||key==='vip_founder'||BLOCK_KEYS[key]) viaSetUnlocked(key);
+                recordPurchase(key, it.a); closePaywall();
+                try{ if(typeof toast==='function') toast('✅ Готово! '+it.t); }catch(e){}
+                if(typeof onPaid==='function') onPaid();
+                try{ render(); }catch(e){}
+              } else if(status==='failed'){ try{ if(typeof toast==='function') toast('Оплата не прошла'); }catch(e){} }
+            }); }catch(e){ try{ if(typeof toast==='function') toast('Не удалось открыть оплату'); }catch(_){} }
+          } else {
+            try{ window.open(it.link,'_blank'); }catch(e){}
+            try{ if(typeof toast==='function') toast('Открой игру в Telegram, чтобы платить звёздами'); }catch(e){}
+          }
+        }
+        function showPaywall(key){
+          const it=SHOP[key]; if(!it) return;
+          const el=document.getElementById('viaPaywall'); if(!el) return;
+          el.innerHTML='<div class="pw-card"><div class="pw-lock">🔒</div><div class="pw-t">'+it.t+'</div><div class="pw-d">'+(it.d||'')+'</div>'
+            +'<button class="pw-buy" onclick="viaBuy(\''+key+'\')">Открыть за ⭐ '+it.a+'</button>'
+            +(key!=='bundle_all'&&key!=='vip_founder'?'<button class="pw-bundle" onclick="viaBuy(\'bundle_all\')">🌟 Или всё сразу — ⭐ '+SHOP.bundle_all.a+'</button>':'')
+            +'<button class="pw-close" onclick="closePaywall()">← Назад</button></div>';
+          el.hidden=false;
+        }
+        function closePaywall(){ const el=document.getElementById('viaPaywall'); if(el) el.hidden=true; }
+        function openShop(){
+          const el=document.getElementById('viaShop'), g=document.getElementById('viaShopGrid'); if(!el||!g) return;
+          const order=['bundle_all','vip_founder','mirror','relationships','ferma','tovarka','auction','skills','lifestyle'];
+          let h='';
+          for(const key of order){ const it=SHOP[key], owned=(key!=='extend_turn'&&key!=='extra_card')&&viaUnlocked(key);
+            h+='<div class="sh-item"><div class="sh-hd"><span class="sh-t">'+it.t+'</span><span class="sh-a">⭐ '+it.a+'</span></div><div class="sh-d">'+(it.d||'')+'</div>'
+              +(owned?'<div class="sh-owned">✓ Открыто навсегда</div>':'<button class="sh-buy" onclick="viaBuy(\''+key+'\',openShop)">Купить</button>')+'</div>';
+          }
+          g.innerHTML=h; el.hidden=false;
+        }
+        function closeShop(){ const el=document.getElementById('viaShop'); if(el) el.hidden=true; }
+        const SECTION_LOCK=[['Товарка','tovarka'],['Аукцион','auction'],['Отношения','relationships'],['Развивать себя','skills'],['Образ жизни','lifestyle']];
+        function viaSectionGate(summaryText){
+          for(let i=0;i<SECTION_LOCK.length;i++){ if(summaryText.indexOf(SECTION_LOCK[i][0])!==-1){ const key=SECTION_LOCK[i][1]; if(!viaUnlocked(key)){ showPaywall(key); return key; } return null; } }
+          return null;
+        }
+        window.viaUnlocked=viaUnlocked; window.viaBuy=viaBuy; window.showPaywall=showPaywall; window.closePaywall=closePaywall; window.openShop=openShop; window.closeShop=closeShop; window.viaSectionGate=viaSectionGate;
         // ЕДИНЫЙ ВХОД. Любая сфера зовёт это, а не пишет в профиль напрямую.
         // Копит: count (сколько раз), sum/avg/max/min (если value число), last, first, ts.
         function logSignal(sphere, key, value) {
@@ -12210,6 +12277,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const d = e.target;
             if(!(d instanceof HTMLDetailsElement)) return;
             const k = secKey(d); if(!k) return;
+            // 💎 ПЕЙВОЛ: платный блок закрыт, пока не куплен (навсегда через профиль)
+            if(d.open && typeof viaSectionGate==='function'){ const _pk=viaSectionGate(k); if(_pk){ d.open=false; return; } }
             if(d.open) _openSecs.add(k); else _openSecs.delete(k);
             // 🧱 Плитки: открытая плитка занимает весь экран, поэтому открытой может быть
             // только ОДНА — иначе два окна лягут друг на друга. Остальные закрываем.
@@ -12551,7 +12620,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 try { save(); } catch(e){}                 // p.mirrorSeen должен жить в сейве
             } catch(e){ console.warn('recordMirrorReached', e); }
         }
-        function openMirror(){ recordMirrorReached(me()); state.mirrorModal = true; paintOverlays(); }
+        function openMirror(){ recordMirrorReached(me()); if(typeof viaUnlocked==='function' && !viaUnlocked('mirror')){ showPaywall('mirror'); return; } state.mirrorModal = true; paintOverlays(); }
         function closeMirror(){ state.mirrorModal = false; paintOverlays(); }
         function renderMirrorModal(){
             if(!state.mirrorModal) return '';
@@ -18277,7 +18346,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function relDismissSpend(){ const o=document.getElementById('relSpend'); if(o) o.style.display='none'; }
         function relTakeCard(){ relPostToModule({type:'rel_takecard'}); relDismissSpend(); }
-        function openFarm(){ const p=farmMe(); if(!p) return; if(p.farm){ farmMergeHerds(p); farmClock(p); save(p.id); } state.view='farm'; state.farmTab = p.farm ? 'mine' : 'buy'; render(); }
+        function openFarm(){ if(typeof viaUnlocked==='function' && !viaUnlocked('ferma')){ showPaywall('ferma'); return; } const p=farmMe(); if(!p) return; if(p.farm){ farmMergeHerds(p); farmClock(p); save(p.id); } state.view='farm'; state.farmTab = p.farm ? 'mine' : 'buy'; render(); }
 
         function renderFarm(app){
             const p = farmMe();
@@ -22530,6 +22599,24 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       #viaSupport[hidden]{display:none;}
       .vs-tier{display:flex;align-items:center;justify-content:center;gap:6px;padding:16px 10px;border-radius:13px;border:1px solid var(--lx-gold-ln);background:linear-gradient(180deg,rgba(244,212,137,.12),rgba(244,212,137,.03));color:var(--lx-gold-br);font-family:inherit;font-weight:800;font-size:17px;cursor:pointer;}
       .vs-tier:active{transform:scale(.98);}
+      /* 💎 пейвол + магазин */
+      #viaPaywall{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(6,5,3,.86);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+      #viaPaywall[hidden]{display:none;}
+      .pw-card{width:100%;max-width:360px;text-align:center;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));border:1px solid var(--lx-gold-ln);border-radius:18px;padding:24px 20px;display:flex;flex-direction:column;gap:10px;}
+      .pw-lock{font-size:40px;} .pw-t{font-size:20px;color:var(--lx-gold-br);font-weight:700;} .pw-d{font-size:13px;color:var(--lx-muted);line-height:1.4;margin-bottom:6px;}
+      .pw-buy{padding:14px;border-radius:12px;border:1px solid var(--lx-gold);background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;}
+      .pw-bundle{padding:11px;border-radius:12px;border:1px solid var(--lx-gold-ln);background:rgba(244,212,137,.08);color:var(--lx-gold-br);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;}
+      .pw-close{padding:9px;border-radius:12px;border:1px solid var(--lx-line);background:transparent;color:var(--lx-muted);font-size:13px;cursor:pointer;font-family:inherit;}
+      #viaShop{position:fixed;inset:0;z-index:858;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.12), transparent 60%), #0a0703;}
+      html.tg-app.tg-fs #viaShop{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
+      #viaShop[hidden]{display:none;}
+      .sh-grid{display:flex;flex-direction:column;gap:10px;max-width:560px;margin:6px auto 0;}
+      .sh-item{border:1px solid var(--lx-line);border-radius:13px;padding:13px 15px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));}
+      .sh-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+      .sh-t{font-size:15px;color:var(--lx-text);font-weight:700;} .sh-a{font-size:14px;color:var(--lx-gold-br);font-weight:800;white-space:nowrap;}
+      .sh-d{font-size:11.5px;color:var(--lx-muted);margin:4px 0 9px;line-height:1.35;}
+      .sh-buy{width:100%;padding:10px;border-radius:10px;border:1px solid var(--lx-gold);background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;font-size:13.5px;cursor:pointer;font-family:inherit;}
+      .sh-owned{font-size:12.5px;color:#34e0a1;font-weight:700;}
       .vd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:560px;margin:6px auto 0;}
       .vd-b{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:14px;border-radius:13px;border:1px solid var(--lx-line);background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));color:var(--lx-text);font-family:inherit;cursor:pointer;text-align:left;}
       .vd-b:active{transform:scale(.98);}
@@ -22579,6 +22666,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       <div class="vf-head"><h2>Поле жизни</h2><p>Брось кубик — фишка идёт по клеткам, круг = месяц, время ведут часы лет. Стоишь на клетке → входишь в её дело.</p></div>
       <div class="vf-epoch" id="viaEpochBar"></div>
       <button class="vf-ipo" id="viIpoOpen">🚀 Размещения — IPO</button>
+      <button class="vf-ipo" id="viShopOpen" style="border-color:var(--lx-gold);background:linear-gradient(180deg,rgba(244,212,137,.16),rgba(244,212,137,.04));" onclick="if(window.openShop)openShop()">🛒 Магазин · открыть блоки за ⭐</button>
       <button class="vf-ipo" id="viSupportOpen" style="border-color:var(--lx-gold);background:linear-gradient(180deg,rgba(244,212,137,.16),rgba(244,212,137,.04));">⭐ Поддержать VIA</button>
       <div id="viaBoard"></div>
       <div class="vf-soulpanel" id="vfSoulPanel" hidden>Нажми клетку Души — раскроется её вопрос.</div>
@@ -22610,6 +22698,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         <div id="viStarTiers" class="vd-grid"></div>
         <div class="vi-sec-t">История звёзд</div>
         <div id="viStarHistory" class="vi-mine"></div>
+      </div>
+    </div>
+
+    <div id="viaPaywall" hidden></div>
+    <div id="viaShop" hidden>
+      <div class="vi-wrap">
+        <div class="vi-head"><button class="vi-back" onclick="if(window.closeShop)closeShop()">← Поле</button><h2>🛒 Магазин VIA</h2></div>
+        <div class="vi-heat">Ядро игры бесплатно. Ценные блоки и Зеркало Души открываются НАВСЕГДА за звёзды. Оплата — через Telegram Stars.</div>
+        <div id="viaShopGrid" class="sh-grid"></div>
       </div>
     </div>
 
