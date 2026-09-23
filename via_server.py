@@ -1236,6 +1236,8 @@ save_data(DATA)
 import urllib.request as _urlreq
 import urllib.parse as _urlparse
 import re as _re
+import hmac as _hmac
+import hashlib as _hashlib
 
 def _load_bot_token():
     t = os.environ.get('BOT_TOKEN') or os.environ.get('TELEGRAM_TOKEN')
@@ -1270,6 +1272,76 @@ def stars_create_invoice(title, description, payload, amount):
         'title': title, 'description': description, 'payload': payload,
         'currency': 'XTR', 'prices': json.dumps([{'label': title, 'amount': int(amount)}]),
     })
+
+# ═══ 🔗 TELEGRAM-ID: проверка подписи + вечные покупки по ID (Ринат 23сен) ═══
+# Внутри Telegram у нас есть initData — подписанная строка. Проверяем подпись токеном бота:
+# secret = HMAC_SHA256("WebAppData", BOT_TOKEN); hash = HMAC_SHA256(secret, data_check_string).
+# Совпало → user.id НАСТОЯЩИЙ, подделать нельзя. Покупки храним по этому id в DATA['users'].
+BLOCK_KEYS_SRV = ('ferma', 'tovarka', 'auction', 'relationships', 'skills', 'lifestyle', 'mirror')
+VIP_GROUP_URL = 'https://t.me/+cVxsQHkS_yJlYTUy'
+
+def verify_init_data(init_data, max_age=86400):
+    if not BOT_TOKEN or not init_data:
+        return None
+    try:
+        pairs, recv_hash = [], None
+        for part in init_data.split('&'):
+            if '=' not in part:
+                continue
+            k, v = part.split('=', 1)
+            k = _urlparse.unquote(k); v = _urlparse.unquote(v)
+            if k == 'hash':
+                recv_hash = v
+            else:
+                pairs.append((k, v))
+        if not recv_hash:
+            return None
+        pairs.sort()
+        dcs = '\n'.join('%s=%s' % (k, v) for k, v in pairs)
+        secret = _hmac.new(b'WebAppData', BOT_TOKEN.encode('utf-8'), _hashlib.sha256).digest()
+        calc = _hmac.new(secret, dcs.encode('utf-8'), _hashlib.sha256).hexdigest()
+        if not _hmac.compare_digest(calc, recv_hash):
+            return None
+        data = dict(pairs)
+        try:
+            if max_age and (time.time() - int(data.get('auth_date', '0'))) > max_age:
+                return None
+        except Exception:
+            pass
+        user = json.loads(data['user']) if data.get('user') else {}
+        return user if user.get('id') else None
+    except Exception:
+        return None
+
+def _user(uid):
+    u = DATA.setdefault('users', {}).setdefault(str(uid), {})
+    u.setdefault('unlocked', {}); u.setdefault('purchases', []); u.setdefault('name', ''); u.setdefault('updated', 0)
+    return u
+
+def _credit_unlock(uid, key, amount=None, name=None):
+    if not uid or not key:
+        return
+    with LOCK:
+        u = _user(uid)
+        if name:
+            u['name'] = name
+        u['unlocked'][key] = True
+        if key in ('bundle_all', 'vip_founder'):
+            for k in BLOCK_KEYS_SRV:
+                u['unlocked'][k] = True
+        u['purchases'].insert(0, {'key': key, 'amount': amount, 'ts': int(time.time() * 1000)})
+        del u['purchases'][100:]
+        u['updated'] = int(time.time() * 1000)
+    try:
+        _flush_now()
+    except Exception:
+        pass
+    if key == 'vip_founder':   # 👑 сразу шлём вход в закрытую VIP-группу (если юзер стартовал бота)
+        try:
+            _tg_api('sendMessage', {'chat_id': uid,
+                'text': '👑 Добро пожаловать в Клуб Основателей VIA!\nВот вход в закрытую VIP-группу: ' + VIP_GROUP_URL})
+        except Exception:
+            pass
 
 def _star_ledger():
     return DATA.setdefault('star_ledger', [])
@@ -1317,7 +1389,19 @@ def _star_poller():
                     _flush_now()
                 except Exception:
                     pass
-                print('[stars] оплата: %s %s от %s' % (rec['amount'], rec['currency'], rec.get('name')))
+                # 🔗 payload вида "key:vip_founder|uid:12345" → зачисляем покупку на реальный ID
+                pkey, puid = None, frm.get('id')
+                for tok in str(sp.get('invoice_payload') or '').split('|'):
+                    if tok.startswith('key:'):
+                        pkey = tok[4:]
+                    elif tok.startswith('uid:'):
+                        try:
+                            puid = int(tok[4:])
+                        except Exception:
+                            pass
+                if pkey:
+                    _credit_unlock(puid, pkey, sp.get('total_amount'), frm.get('first_name'))
+                print('[stars] оплата: %s %s от %s (key=%s uid=%s)' % (rec['amount'], rec['currency'], rec.get('name'), pkey, puid))
 # ликвидность стакана могла отсутствовать у активов из старого via_data.json — проставляем по типу
 if via_market and DATA.get('market') and DATA['market'].get('assets'):
     _liq_changed = False
@@ -1487,6 +1571,36 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        if self.path == '/me':
+            # 🔗 Привязка к Telegram: клиент присылает initData → проверяем подпись → отдаём вечные покупки этого ID
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw) if raw else {}
+            except Exception:
+                req = {}
+            user = verify_init_data(req.get('initData') or req.get('init_data') or '')
+            if not user:
+                out = {'ok': False, 'description': 'bad initData'}
+            else:
+                with LOCK:
+                    u = _user(user['id'])
+                    nm = (str(user.get('first_name', '')) + (' ' + str(user.get('last_name', '')) if user.get('last_name') else '')).strip() or str(user.get('username', ''))
+                    if nm:
+                        u['name'] = nm
+                    out = {'ok': True, 'uid': user['id'], 'name': u.get('name', ''),
+                           'unlocked': u.get('unlocked', {}), 'purchases': u.get('purchases', [])}
+                try:
+                    _flush_now()
+                except Exception:
+                    pass
+            body = json.dumps(out, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self._cors()
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path == '/stars/invoice':
             n = int(self.headers.get('Content-Length', 0) or 0)
             raw = self.rfile.read(n).decode('utf-8') if n else '{}'

@@ -11377,6 +11377,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             doBind(true);   // вне поддержки showConfirm — привязываем сразу (вход через Telegram сам подтверждает аккаунт)
         }
         window.viaBindTelegram=viaBindTelegram; window.viaTgUser=viaTgUser;
+        // 🔗 ВОССТАНОВЛЕНИЕ ПОКУПОК С СЕРВЕРА: шлём подпись → сервер отдаёт вечные покупки этого ID → вливаем в профиль.
+        // Так купленное на одном устройстве открывается на любом другом, где вошёл тот же Telegram.
+        function viaSyncPurchases(){
+            const u=viaTgUser(); if(!u) return;
+            const wa=window.Telegram&&window.Telegram.WebApp; const initData=(wa&&wa.initData)||'';
+            if(!SERVER_MODE || !initData) return;
+            fetch('/me',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:initData})})
+              .then(function(r){return r.json();}).then(function(j){
+                if(!j||!j.ok||!j.unlocked) return;
+                let changed=false; PROFILE.unlocked=PROFILE.unlocked||{};
+                for(const k in j.unlocked){ if(j.unlocked[k] && !PROFILE.unlocked[k]){ PROFILE.unlocked[k]=true; changed=true; } }
+                if(changed){ saveProfile(); try{ if(typeof toast==='function') toast('🔗 Твои покупки восстановлены'); }catch(e){} try{ render(); }catch(e){} }
+              }).catch(function(){});
+        }
+        window.viaSyncPurchases=viaSyncPurchases;
         // ═══════════ 💎 МОНЕТИЗАЦИЯ: замки блоков + магазин (Ринат 23сен, Telegram Stars) ═══════════
         // BitLife-модель: ядро бесплатно (Бизнес/Биржа/Недвижимость/бланк), ценные блоки и Зеркало — за звёзды,
         // открываются НАВСЕГДА (в вечном профиле). Счета отчеканены заранее ботом @viaoffbot; токен в код НЕ идёт.
@@ -11406,21 +11421,32 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function viaBuy(key, onPaid){
           const it=SHOP[key]; if(!it) return;
           const wa=(window.Telegram&&window.Telegram.WebApp);
-          if(wa && typeof wa.openInvoice==='function'){
-            try{ wa.openInvoice(it.link, function(status){
-              if(status==='paid'){
-                if(key==='bundle_all'||key==='vip_founder'||BLOCK_KEYS[key]) viaSetUnlocked(key);
-                recordPurchase(key, it.a); closePaywall();
-                try{ if(typeof toast==='function') toast(key==='vip_founder'?'👑 Добро пожаловать в клуб Основателей!':'✅ Готово! '+it.t); }catch(e){}
-                if(key==='vip_founder'){ try{ revealVipGroup(); }catch(e){} }   // 👑 сразу веди в закрытую VIP-группу
-                if(typeof onPaid==='function') onPaid();
-                try{ render(); }catch(e){}
-              } else if(status==='failed'){ try{ if(typeof toast==='function') toast('Оплата не прошла'); }catch(e){} }
-            }); }catch(e){ try{ if(typeof toast==='function') toast('Не удалось открыть оплату'); }catch(_){} }
-          } else {
-            try{ window.open(it.link,'_blank'); }catch(e){}
-            try{ if(typeof toast==='function') toast('Открой игру в Telegram, чтобы платить звёздами'); }catch(e){}
+          function openWith(link){
+            if(wa && typeof wa.openInvoice==='function'){
+              try{ wa.openInvoice(link, function(status){
+                if(status==='paid'){
+                  if(key==='bundle_all'||key==='vip_founder'||BLOCK_KEYS[key]) viaSetUnlocked(key);
+                  recordPurchase(key, it.a); closePaywall();
+                  try{ if(typeof toast==='function') toast(key==='vip_founder'?'👑 Добро пожаловать в клуб Основателей!':'✅ Готово! '+it.t); }catch(e){}
+                  if(key==='vip_founder'){ try{ revealVipGroup(); }catch(e){} }   // 👑 сразу веди в закрытую VIP-группу
+                  if(typeof onPaid==='function') onPaid();
+                  try{ render(); }catch(e){}
+                } else if(status==='failed'){ try{ if(typeof toast==='function') toast('Оплата не прошла'); }catch(e){} }
+              }); }catch(e){ try{ if(typeof toast==='function') toast('Не удалось открыть оплату'); }catch(_){} }
+            } else {
+              try{ window.open(link,'_blank'); }catch(e){}
+              try{ if(typeof toast==='function') toast('Открой игру в Telegram, чтобы платить звёздами'); }catch(e){}
+            }
           }
+          // Онлайн + подпись Telegram → серверный счёт с payload «key+uid» (покупка привяжется к ID навсегда).
+          // Иначе (офлайн/без подписи) — заранее отчеканенная ссылка, как раньше. Платежи не ломаются.
+          const u=(typeof viaTgUser==='function')?viaTgUser():null;
+          const initData=(wa&&wa.initData)||'';
+          if(SERVER_MODE && initData && u && u.id){
+            fetch('/stars/invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:it.a,title:it.t,description:(it.d||''),payload:'key:'+key+'|uid:'+u.id})})
+              .then(function(r){return r.json();}).then(function(j){ openWith((j&&j.ok&&j.link)?j.link:it.link); })
+              .catch(function(){ openWith(it.link); });
+          } else { openWith(it.link); }
         }
         function showPaywall(key){
           const it=SHOP[key]; if(!it) return;
@@ -23125,8 +23151,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       var oib=document.getElementById('viIpoOpen');if(oib)oib.addEventListener('click',openIpo);
       var ibk=document.getElementById('viIpoBack');if(ibk)ibk.addEventListener('click',closeIpo);
       if(ipoEl)ipoEl.addEventListener('click',function(e){var b=e.target.closest('.bid');if(b){invest(parseInt(b.getAttribute('data-idx'),10));return;}var x=e.target.closest('.toexch');if(x){ipoToExchange(x.getAttribute('data-hid'));return;}var s=e.target.closest('.sell');if(s&&!s.disabled){sellIpo(s.getAttribute('data-hid'));}});
-      // 🔗 предложить привязку к Telegram — после первого рендера, чтобы подтверждение не всплыло на пустом экране
-      try{ setTimeout(function(){ if(window.viaBindTelegram) window.viaBindTelegram(); }, 1500); }catch(e){}
+      // 🔗 после первого рендера: предложить привязку к Telegram + подтянуть вечные покупки с сервера
+      try{ setTimeout(function(){ if(window.viaBindTelegram) window.viaBindTelegram(); if(window.viaSyncPurchases) window.viaSyncPurchases(); }, 1500); }catch(e){}
     })();
     </script>
 </body>
