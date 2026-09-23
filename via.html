@@ -10663,8 +10663,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const lvl = careerLvl(p); if(lvl >= CAREER_LADDER.length-1){ alert('Ты на вершине карьеры — региональный директор.'); return; }
             const next = CAREER_LADDER[lvl+1];
             const haveSkills = (p.selfSkills||[]).length;
-            if(haveSkills < next.skills){ alert('🎓 Для «'+next.name+'» нужно '+next.skills+' навыка из «Развить себя» (у тебя '+haveSkills+'). Учись дальше.'); return; }
-            if((Number(p.savings)||0) < next.cost){ alert('Не хватает кассы. Повышение до «'+next.name+'» стоит '+fmtN(next.cost)+'$.'); return; }
+            if(haveSkills < next.skills){ try{ logFail(p,'🎓','Хотел повышение до «'+next.name+'»','не хватило навыков: нужно '+next.skills+', есть '+haveSkills,{sphere:'развитие'}); }catch(e){} alert('🎓 Для «'+next.name+'» нужно '+next.skills+' навыка из «Развить себя» (у тебя '+haveSkills+'). Учись дальше.'); return; }
+            if((Number(p.savings)||0) < next.cost){ try{ logFail(p,'🎓','Хотел повышение до «'+next.name+'»','не хватило кассы — нужно '+fmtN(next.cost)+'$',{sphere:'развитие'}); }catch(e){} alert('Не хватает кассы. Повышение до «'+next.name+'» стоит '+fmtN(next.cost)+'$.'); return; }
             if(!confirm('Повыситься до «'+next.name+'» за '+fmtN(next.cost)+'$?\n\nЗарплата ×'+next.salMult+', но и уровень жизни (расходы) ×'+next.expMult+'.\nБонус навсегда: '+next.bonus+'.')) return;
             p.savings = Math.round(((Number(p.savings)||0) - next.cost)*100)/100;
             p.careerLvl = lvl+1;
@@ -11361,6 +11361,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try { PROFILE.updated = Date.now(); localStorage.setItem('v0_profile', JSON.stringify(PROFILE)); }
             catch(e) { console.warn('PROFILE save fail', e); }
         }
+        // 🔗 ПРИВЯЗКА К TELEGRAM (Ринат 23сен). Внутри Telegram у нас УЖЕ есть стабильный ID аккаунта
+        // (initDataUnsafe.user.id) — не телефон и не IP, а именно ID. Человеку остаётся только подтвердить,
+        // и прогресс/покупки привязаны к нему. ВАЖНО: доверять этому ID для вечных покупок на всех устройствах
+        // можно лишь ПОСЛЕ серверной проверки initData ботом (via_server.py, BOT_TOKEN). Здесь — клиентская привязка + подтверждение.
+        function viaTgUser(){ try{ const tg=window.Telegram&&window.Telegram.WebApp; const u=tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user; return (u&&u.id)?u:null; }catch(e){ return null; } }
+        function viaBindTelegram(){
+            const u=viaTgUser(); if(!u) return;                                             // не внутри Telegram — тихо выходим
+            if(PROFILE.tg && PROFILE.tg.id===u.id && PROFILE.tg.confirmed) return;           // этот аккаунт уже привязан
+            const nm=[u.first_name,u.last_name].filter(Boolean).join(' ')||u.username||('id '+u.id);
+            const doBind=function(ok){ if(!ok) return; PROFILE.tg={ id:u.id, name:nm, username:u.username||'', confirmed:true, boundAt:Date.now() }; saveProfile(); try{ if(typeof toast==='function') toast('🔗 Прогресс привязан к твоему Telegram'); }catch(e){} };
+            const tg=window.Telegram&&window.Telegram.WebApp;
+            const msg='Ты вошёл как '+nm+'.\nПривязать прогресс и покупки к этому Telegram? Тогда они останутся с тобой на любом устройстве.';
+            if(tg && typeof tg.showConfirm==='function'){ try{ tg.showConfirm(msg, doBind); return; }catch(e){} }
+            doBind(true);   // вне поддержки showConfirm — привязываем сразу (вход через Telegram сам подтверждает аккаунт)
+        }
+        window.viaBindTelegram=viaBindTelegram; window.viaTgUser=viaTgUser;
         // ═══════════ 💎 МОНЕТИЗАЦИЯ: замки блоков + магазин (Ринат 23сен, Telegram Stars) ═══════════
         // BitLife-модель: ядро бесплатно (Бизнес/Биржа/Недвижимость/бланк), ценные блоки и Зеркало — за звёзды,
         // открываются НАВСЕГДА (в вечном профиле). Счета отчеканены заранее ботом @viaoffbot; токен в код НЕ идёт.
@@ -11380,6 +11396,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           vip_founder:{t:'👑 Основатель клуба VIA',a:3000,link:'https://t.me/$CLiMWW3-mUnjHQAAx-xfP46tu6g',d:'Всё навсегда + статус основателя + весь будущий контент.'}
         };
         const BLOCK_KEYS = {ferma:1,tovarka:1,auction:1,relationships:1,skills:1,lifestyle:1,mirror:1};
+        // 👑 VIP-ГРУППА ОСНОВАТЕЛЕЙ (Ринат 23сен): отдельная закрытая группа, вход = покупка vip_founder (3000⭐).
+        const VIA_VIP_GROUP_URL='https://t.me/+cVxsQHkS_yJlYTUy';
+        function revealVipGroup(){ const wa=(window.Telegram&&window.Telegram.WebApp); if(wa&&typeof wa.openTelegramLink==='function'){ try{ wa.openTelegramLink(VIA_VIP_GROUP_URL); return; }catch(e){} } try{ window.open(VIA_VIP_GROUP_URL,'_blank'); }catch(e){} }
+        window.revealVipGroup=revealVipGroup;
         function viaUnlocked(key){ try{ const u=PROFILE.unlocked||{}; if(u.vip_founder||u.bundle_all) return true; return !!u[key]; }catch(e){ return false; } }
         function viaSetUnlocked(key){ try{ PROFILE.unlocked[key]=true; saveProfile(); }catch(e){} }
         function recordPurchase(key,amt){ try{ PROFILE.purchases.unshift({key:key,amount:amt,ts:Date.now()}); PROFILE.purchases=PROFILE.purchases.slice(0,100); saveProfile(); }catch(e){} }
@@ -11391,7 +11411,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
               if(status==='paid'){
                 if(key==='bundle_all'||key==='vip_founder'||BLOCK_KEYS[key]) viaSetUnlocked(key);
                 recordPurchase(key, it.a); closePaywall();
-                try{ if(typeof toast==='function') toast('✅ Готово! '+it.t); }catch(e){}
+                try{ if(typeof toast==='function') toast(key==='vip_founder'?'👑 Добро пожаловать в клуб Основателей!':'✅ Готово! '+it.t); }catch(e){}
+                if(key==='vip_founder'){ try{ revealVipGroup(); }catch(e){} }   // 👑 сразу веди в закрытую VIP-группу
                 if(typeof onPaid==='function') onPaid();
                 try{ render(); }catch(e){}
               } else if(status==='failed'){ try{ if(typeof toast==='function') toast('Оплата не прошла'); }catch(e){} }
@@ -11417,7 +11438,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           let h='';
           for(const key of order){ const it=SHOP[key], owned=(key!=='extend_turn'&&key!=='extra_card')&&viaUnlocked(key);
             h+='<div class="sh-item"><div class="sh-hd"><span class="sh-t">'+it.t+'</span><span class="sh-a">⭐ '+it.a+'</span></div><div class="sh-d">'+(it.d||'')+'</div>'
-              +(owned?'<div class="sh-owned">✓ Открыто навсегда</div>':'<button class="sh-buy" onclick="viaBuy(\''+key+'\',openShop)">Купить</button>')+'</div>';
+              +(owned?('<div class="sh-owned">✓ Открыто навсегда</div>'+(key==='vip_founder'?'<button class="sh-buy" onclick="revealVipGroup()">👑 Открыть VIP-группу Основателей</button>':'')):'<button class="sh-buy" onclick="viaBuy(\''+key+'\',openShop)">Купить</button>')+'</div>';
           }
           g.innerHTML=h; el.hidden=false;
         }
@@ -11501,6 +11522,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(p.choiceLog.length > CHOICE_LOG_CAP) p.choiceLog.splice(0, p.choiceLog.length - CHOICE_LOG_CAP);
             // лёгкий вечный агрегат — чтобы Зеркало кросс-партий тоже видело развилку (существующий вход)
             try { logSignal('choice', String(situation).slice(0,40), (opts.amt!=null ? Number(opts.amt)||0 : 1)); } catch(e){}
+            // 📜 МОСТ (Ринат 23сен): каждая развилка = одна видимая строка в ленте жизни. Наполняет «Историю» из всех точек разом.
+            try { logAction(p, sphereIcon(opts.sphere), (chose||situation), {sphere:opts.sphere, amt:opts.amt, why:(opts.paid||'')}); } catch(e){}
             return rec;
         }
         window.logChoice = logChoice; // для отладочного просмотра журнала
@@ -11520,11 +11543,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 t: String(text),
                 sph: opts.sphere || '',
                 amt: (opts.amt!=null ? Math.round(Number(opts.amt)||0) : null),
+                ok: (opts.ok===false ? false : true),   // 📜 получилось / ✗ провал — пишем и то, и то (Ринат 23сен)
+                why: opts.why || '',                     // причина провала («не хватило кассы», «отказал»)
                 ts: Date.now()
             });
             if(p.actionLog.length > ACTION_LOG_CAP) p.actionLog.splice(0, p.actionLog.length - ACTION_LOG_CAP);
         }
         window.logAction = logAction;
+        // 📜 Провал — тоже событие жизни. Короткая обёртка: пишет строку с меткой ✗ и причиной.
+        function logFail(p, ic, text, why, opts){ opts=opts||{}; opts.ok=false; if(why) opts.why=why; return logAction(p, ic||'✗', text, opts); }
+        window.logFail = logFail;
+        // Иконка по сфере жизни — чтобы лента читалась глазами, а не текстом.
+        function sphereIcon(s){ const M={'деньги':'💵','дело':'🏢','люди':'🤝','долг':'⛓️','цепи':'⛓️','свобода':'🕊️','образ жизни':'🏡','развитие':'🎓','азарт':'🎰','совесть':'⚖️','доверие':'🤝','тень':'😈','быт':'🔧','осторожность':'🛡️'}; return M[s]||'•'; }
         // ═══════════ конец журнала выборов ═══════════
 
         // ═══════════ 🏡 ОБРАЗ ЖИЗНИ — шаг 1: дом и машина из бланка становятся видимыми ═══════════
@@ -11899,7 +11929,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const cur = (kind === 'watch') ? curWatchLvl(p) : curPhoneLvl(p);
             if (lvl <= cur) return;   // статус только вверх — назад не «продаём»
             const cash = Number(p.savings) || 0;
-            if (cash < item.price) { alert('«' + item.name + '» стоит ' + fmtN(item.price) + '$ — не хватает кассы.'); return; }
+            if (cash < item.price) { try{ logFail(p,'🏡','Хотел купить «'+item.name+'»','не хватило кассы — нужно '+fmtN(item.price)+'$',{sphere:'образ жизни'}); }catch(e){} alert('«' + item.name + '» стоит ' + fmtN(item.price) + '$ — не хватает кассы.'); return; }
             p.savings = cash - item.price;
             if (kind === 'watch') p.watchLvl = lvl; else p.phoneLvl = lvl;
             logSignal('lifestyle', kind === 'watch' ? 'buy_watch' : 'buy_phone', lvl);
@@ -13082,7 +13112,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const feePct=tradeFeePct(p);
             const fee=Math.round(cost*feePct*100)/100;
             const totalCost=Math.round((cost+fee)*100)/100;
-            if(p.savings<totalCost){ alert('Не хватает кассы (цена + комиссия). Нужно '+fmtN(Math.round(totalCost))+'$ (в т.ч. комиссия биржи '+fmtN(fee)+'$), есть '+fmtN(p.savings)+'$.'); return; }
+            if(p.savings<totalCost){ try{ logFail(p,'📉','Хотел купить актив на бирже','не хватило кассы — нужно '+fmtN(Math.round(totalCost))+'$ (с комиссией)',{sphere:'деньги'}); }catch(e){} alert('Не хватает кассы (цена + комиссия). Нужно '+fmtN(Math.round(totalCost))+'$ (в т.ч. комиссия биржи '+fmtN(fee)+'$), есть '+fmtN(p.savings)+'$.'); return; }
             p.savings=Math.round((p.savings-totalCost)*100)/100;
             const bst=pstat(p); bst.buys++; bst.buyAmt=Math.round((bst.buyAmt+cost)*100)/100; bst.feePaid=Math.round(((bst.feePaid||0)+fee)*100)/100;
             p.holdings=p.holdings||{};
@@ -15495,6 +15525,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try{ bizYearTick(p); }catch(e){}                        // 🏢 годовой тик бизнеса: тяготы + закон внимания (износ потока без развития)
             try{ bizReportCheck(p); }catch(e){}                     // 🏢 раз в 3 года — окно отчёта «было→стало» + решение развивать
             p.savings=Math.round((Number(p.savings)+flow)*100)/100;
+            try{ logAction(p, (flow>=0?'💵':'💸'), 'Получка за месяц'+(ev.k!=='plain'?' ('+ev.nm+')':''), {amt:flow, sphere:'деньги'}); }catch(e){}
             p.notify = (flow>=0 ? '💵 Получка: +'+fmtN(flow)+'$ в кассу'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.'
                                 : '💸 Месяц в минус: '+fmtN(flow)+'$'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.');
             state.payslipModal = { pId:id, evk:ev.k, evnm:ev.nm||'', evsay:ev.say||'', sal:f.salary, salDelta:salDelta,
@@ -22597,6 +22628,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       #viaSupport{position:fixed;inset:0;z-index:857;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.12), transparent 60%), #0a0703;}
       html.tg-app.tg-fs #viaSupport{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
       #viaSupport[hidden]{display:none;}
+      #viaHistory{position:fixed;inset:0;z-index:859;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.10), transparent 60%), #0a0703;}
+      html.tg-app.tg-fs #viaHistory{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
+      #viaHistory[hidden]{display:none;}
+      .hx-year{font-family:Georgia,serif;font-size:13px;font-weight:800;color:#efd8a3;letter-spacing:.04em;margin:16px 0 6px;padding-bottom:5px;border-bottom:1px solid rgba(231,189,99,.18);}
+      .hx-row{display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.05);}
+      .hx-ic{flex:0 0 auto;font-size:16px;line-height:1.3;width:22px;text-align:center;}
+      .hx-body{flex:1 1 auto;min-width:0;}
+      .hx-t{font-size:13px;color:#e7e2d6;line-height:1.35;}
+      .hx-why{font-size:11px;color:#8f8a7e;margin-top:1px;}
+      .hx-amt{flex:0 0 auto;font-size:12px;font-weight:800;white-space:nowrap;}
+      .hx-amt.pos{color:#7fd3ad;} .hx-amt.neg{color:#f0a58b;}
+      .hx-row.fail{opacity:.62;} .hx-row.fail .hx-t{color:#c9b3a8;}
+      .hx-empty{font-size:13px;color:#7c776c;text-align:center;padding:26px 10px;line-height:1.5;}
       .vs-tier{display:flex;align-items:center;justify-content:center;gap:6px;padding:16px 10px;border-radius:13px;border:1px solid var(--lx-gold-ln);background:linear-gradient(180deg,rgba(244,212,137,.12),rgba(244,212,137,.03));color:var(--lx-gold-br);font-family:inherit;font-weight:800;font-size:17px;cursor:pointer;}
       .vs-tier:active{transform:scale(.98);}
       /* 💎 пейвол + магазин */
@@ -22668,6 +22712,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       <button class="vf-ipo" id="viIpoOpen">🚀 Размещения — IPO</button>
       <button class="vf-ipo" id="viShopOpen" style="border-color:var(--lx-gold);background:linear-gradient(180deg,rgba(244,212,137,.16),rgba(244,212,137,.04));" onclick="if(window.openShop)openShop()">🛒 Магазин · открыть блоки за ⭐</button>
       <button class="vf-ipo" id="viSupportOpen" style="border-color:var(--lx-gold);background:linear-gradient(180deg,rgba(244,212,137,.16),rgba(244,212,137,.04));">⭐ Поддержать VIA</button>
+      <button class="vf-ipo" id="viChatOpen" style="border-color:#4aa3df;background:linear-gradient(180deg,rgba(74,163,223,.18),rgba(74,163,223,.05));color:#cfe8fb;">💬 Чат VIA — сообщество игроков</button>
       <div id="viaBoard"></div>
       <div class="vf-soulpanel" id="vfSoulPanel" hidden>Нажми клетку Души — раскроется её вопрос.</div>
     </div>
@@ -22710,6 +22755,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       </div>
     </div>
 
+    <div id="viaHistory" hidden>
+      <div class="vi-wrap">
+        <div class="vi-head"><button class="vi-back" onclick="if(window.closeHistory)closeHistory()">← Поле</button><h2>📜 История жизни</h2></div>
+        <div class="vi-heat">Здесь пишется весь твой путь — во что вложился, что купил, что сорвалось. Даже то, что не вышло. Это и есть сырьё твоего Зеркала.</div>
+        <div id="viaHistList" class="vi-mine"></div>
+      </div>
+    </div>
+
     <div id="viaFeedback">
       <div class="vf-fb">
         <h3>Обратная связь</h3>
@@ -22722,6 +22775,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     <div id="viaBottomBar">
       <button id="vbField"><span class="vb-ic">🗺️</span>Поле</button>
       <button id="vbBlank" class="vb-active"><span class="vb-ic">🧾</span>Бланк</button>
+      <button id="vbHist"><span class="vb-ic">📜</span>История</button>
       <button id="vbFb"><span class="vb-ic">✍️</span>Отзыв</button>
     </div>
     <div class="vf-toast" id="viaToast"></div>
@@ -22927,6 +22981,33 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       if(supEl)supEl.addEventListener('click',function(e){ if(e.target===supEl){ closeSupport(); return; } var b=e.target.closest('.vs-tier'); if(b){ var i=+b.getAttribute('data-i'); var t=STAR_TIERS[i]; if(t) buyStars(t[1], t[0]); } });
       var vso=document.getElementById('viSupportOpen'); if(vso)vso.addEventListener('click',openSupport);
       var vsb=document.getElementById('viSupportBack'); if(vsb)vsb.addEventListener('click',closeSupport);
+      // ── 💬 ЧАТ VIA (Ринат 23сен): сообщество игроков. Ссылка живёт одной константой. ──
+      var VIA_CHAT_URL='https://t.me/+5s7lduT4sBs3OGMy';
+      function openViaChat(){ var wa=tgWA();
+        if(wa && typeof wa.openTelegramLink==='function'){ try{ wa.openTelegramLink(VIA_CHAT_URL); return; }catch(e){} }
+        try{ window.open(VIA_CHAT_URL,'_blank'); }catch(e){}
+      }
+      window.openViaChat=openViaChat;
+      var vch=document.getElementById('viChatOpen'); if(vch)vch.addEventListener('click',openViaChat);
+      // ── 📜 ИСТОРИЯ ЖИЗНИ (Ринат 23сен): видимая лента всего, что игрок сделал — с провалами. ──
+      function hxEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
+      function openHistory(){
+        var el=document.getElementById('viaHistory'), box=document.getElementById('viaHistList'); if(!el||!box) return;
+        var p=(state.players||[]).find(function(x){return x.id==state.currentPlayerId;});
+        var log=(p&&Array.isArray(p.actionLog))?p.actionLog:[];
+        if(!log.length){ box.innerHTML='<div class="hx-empty">Пока пусто. Живи — ходи по полю, вкладывай, покупай, рискуй. Каждый шаг и каждый промах лягут сюда.</div>'; el.hidden=false; return; }
+        var h='', curY=null;
+        for(var i=log.length-1;i>=0;i--){ var r=log[i]||{}; var y=(r.y!=null?r.y:0);
+          if(y!==curY){ curY=y; h+='<div class="hx-year">Год '+(y||1)+'</div>'; }
+          var amt=(r.amt!=null&&r.amt!==0)?('<div class="hx-amt '+(r.amt>0?'pos':'neg')+'">'+(r.amt>0?'+':'')+fmtN(r.amt)+'$</div>'):'';
+          var why=r.why?('<div class="hx-why">'+hxEsc(r.why)+'</div>'):'';
+          h+='<div class="hx-row'+(r.ok===false?' fail':'')+'"><div class="hx-ic">'+hxEsc(r.ic||'•')+'</div><div class="hx-body"><div class="hx-t">'+(r.ok===false?'✗ ':'')+hxEsc(r.t)+'</div>'+why+'</div>'+amt+'</div>';
+        }
+        box.innerHTML=h; el.hidden=false;
+      }
+      function closeHistory(){ var el=document.getElementById('viaHistory'); if(el)el.hidden=true; }
+      window.openHistory=openHistory; window.closeHistory=closeHistory;
+      var vhi=document.getElementById('vbHist'); if(vhi)vhi.addEventListener('click',openHistory);
       // обратная связь
       var fb=document.getElementById('viaFeedback');
       document.getElementById('vbFb').addEventListener('click',function(){fb.classList.add('on');var t=document.getElementById('viaFbText');if(t)setTimeout(function(){try{t.focus();}catch(e){}},50);});
@@ -23044,6 +23125,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       var oib=document.getElementById('viIpoOpen');if(oib)oib.addEventListener('click',openIpo);
       var ibk=document.getElementById('viIpoBack');if(ibk)ibk.addEventListener('click',closeIpo);
       if(ipoEl)ipoEl.addEventListener('click',function(e){var b=e.target.closest('.bid');if(b){invest(parseInt(b.getAttribute('data-idx'),10));return;}var x=e.target.closest('.toexch');if(x){ipoToExchange(x.getAttribute('data-hid'));return;}var s=e.target.closest('.sell');if(s&&!s.disabled){sellIpo(s.getAttribute('data-hid'));}});
+      // 🔗 предложить привязку к Telegram — после первого рендера, чтобы подтверждение не всплыло на пустом экране
+      try{ setTimeout(function(){ if(window.viaBindTelegram) window.viaBindTelegram(); }, 1500); }catch(e){}
     })();
     </script>
 </body>
