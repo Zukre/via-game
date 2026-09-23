@@ -11443,7 +11443,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           const u=(typeof viaTgUser==='function')?viaTgUser():null;
           const initData=(wa&&wa.initData)||'';
           if(SERVER_MODE && initData && u && u.id){
-            fetch('/stars/invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:it.a,title:it.t,description:(it.d||''),payload:'key:'+key+'|uid:'+u.id})})
+            fetch('/stars/invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:key,initData:initData})})
               .then(function(r){return r.json();}).then(function(j){ openWith((j&&j.ok&&j.link)?j.link:it.link); })
               .catch(function(){ openWith(it.link); });
           } else { openWith(it.link); }

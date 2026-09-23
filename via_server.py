@@ -1279,6 +1279,20 @@ def stars_create_invoice(title, description, payload, amount):
 # Совпало → user.id НАСТОЯЩИЙ, подделать нельзя. Покупки храним по этому id в DATA['users'].
 BLOCK_KEYS_SRV = ('ferma', 'tovarka', 'auction', 'relationships', 'skills', 'lifestyle', 'mirror')
 VIP_GROUP_URL = 'https://t.me/+cVxsQHkS_yJlYTUy'
+# 💰 АВТОРИТЕТНАЯ таблица цен (звёзды). Сервер НИКОГДА не верит сумме/ключу от клиента —
+# цену берём отсюда по ключу, а зачисляем только если реально уплаченная сумма совпала. Источник истины:
+# 03 ДИЗАЙН-ДОКУМЕНТ/VIA_МОНЕТИЗАЦИЯ_ИСТОЧНИК_ИСТИНЫ.md — держать синхронно с SHOP в via.html.
+SHOP_PRICES = {
+    'mirror': 600, 'relationships': 300, 'ferma': 300, 'tovarka': 300, 'auction': 300,
+    'skills': 125, 'lifestyle': 125, 'extend_turn': 30, 'extra_card': 60,
+    'bundle_all': 1200, 'vip_founder': 3000,
+}
+SHOP_TITLES = {
+    'mirror': '🪞 Зеркало Души', 'relationships': '❤️ Отношения', 'ferma': '🐄 Ферма',
+    'tovarka': '📦 Товарка', 'auction': '🔨 Аукцион', 'skills': '🎓 Развить себя',
+    'lifestyle': '🏡 Образ жизни', 'extend_turn': '⏱️ +1 минута к ходу', 'extra_card': '🃏 Ещё карта сделки',
+    'bundle_all': '🌟 ВСЁ ВКЛЮЧЕНО', 'vip_founder': '👑 Основатель клуба VIA',
+}
 
 def verify_init_data(init_data, max_age=86400):
     if not BOT_TOKEN or not init_data:
@@ -1389,8 +1403,10 @@ def _star_poller():
                     _flush_now()
                 except Exception:
                     pass
-                # 🔗 payload вида "key:vip_founder|uid:12345" → зачисляем покупку на реальный ID
-                pkey, puid = None, frm.get('id')
+                # 🔗 payload вида "key:vip_founder|uid:12345". КЛЮЧ берём из payload, но ДОВЕРЯЕМ ему только если:
+                # (1) ключ известен, (2) реально уплаченная сумма == нашей цене, (3) плательщик == payload.uid.
+                # Зачисляем ВСЕГДА на frm.id (это авторитетный плательщик от Telegram, не из клиента).
+                pkey, puid = None, None
                 for tok in str(sp.get('invoice_payload') or '').split('|'):
                     if tok.startswith('key:'):
                         pkey = tok[4:]
@@ -1399,8 +1415,13 @@ def _star_poller():
                             puid = int(tok[4:])
                         except Exception:
                             pass
-                if pkey:
-                    _credit_unlock(puid, pkey, sp.get('total_amount'), frm.get('first_name'))
+                payer = frm.get('id')
+                paid = int(sp.get('total_amount') or 0)
+                if pkey and pkey in SHOP_PRICES and paid == SHOP_PRICES[pkey] and (puid is None or puid == payer):
+                    _credit_unlock(payer, pkey, paid, frm.get('first_name'))
+                elif pkey:
+                    print('[stars] ⚠️ отклонено зачисление: key=%s paid=%s ожид=%s payer=%s uid=%s' % (
+                        pkey, paid, SHOP_PRICES.get(pkey), payer, puid))
                 print('[stars] оплата: %s %s от %s (key=%s uid=%s)' % (rec['amount'], rec['currency'], rec.get('name'), pkey, puid))
 # ликвидность стакана могла отсутствовать у активов из старого via_data.json — проставляем по типу
 if via_market and DATA.get('market') and DATA['market'].get('assets'):
@@ -1608,15 +1629,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 req = json.loads(raw) if raw else {}
             except Exception:
                 req = {}
-            amount = int(req.get('amount') or 0)
-            title = str(req.get('title') or ('VIA — %s⭐' % amount))
-            desc = str(req.get('description') or 'Оплата в игре VIA')
-            payload = str(req.get('payload') or ('buy_%s' % amount))
-            if amount < 1:
-                out = {'ok': False, 'description': 'amount must be >= 1'}
+            # 💰 БЕЗОПАСНО: клиент называет ТОЛЬКО ключ товара; сумму ставит сервер по SHOP_PRICES,
+            # ID берём из проверенной подписи (не из клиента), payload собираем сами. Сумму от клиента игнорируем.
+            key = str(req.get('key') or '')
+            user = verify_init_data(req.get('initData') or req.get('init_data') or '')
+            if key not in SHOP_PRICES:
+                out = {'ok': False, 'description': 'unknown item'}
+            elif not user:
+                out = {'ok': False, 'description': 'bad initData'}
             elif not BOT_TOKEN:
                 out = {'ok': False, 'description': 'no bot token on server'}
             else:
+                amount = SHOP_PRICES[key]
+                title = SHOP_TITLES.get(key, 'VIA')
+                desc = 'VIA — ' + title
+                payload = 'key:%s|uid:%s' % (key, user['id'])
                 res = stars_create_invoice(title, desc, payload, amount)
                 out = {'ok': bool(res.get('ok')), 'link': res.get('result'), 'description': res.get('description')}
             body = json.dumps(out, ensure_ascii=False).encode('utf-8')
