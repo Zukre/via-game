@@ -22640,9 +22640,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       body{padding-bottom:82px !important;}
       html.tg-app body{padding-bottom:calc(82px + env(safe-area-inset-bottom,0px)) !important;}
       #viaBottomBar{position:fixed;left:0;right:0;bottom:0;z-index:960;display:flex;gap:8px;
-        padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));
+        padding:8px 10px max(calc(10px + env(safe-area-inset-bottom,0px)), 22px);
         background:linear-gradient(180deg,rgba(13,10,6,.82),rgba(13,10,6,.98));
         border-top:1px solid var(--lx-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+      /* 🩹 (Ринат 27сен «кнопки слишком низко в Telegram»): в TG env(safe-area) часто = 0 → даём гарантированный
+         запас снизу, чтобы бар не уходил под полосу-индикатор Телеграма. Больше запаса во fullscreen-режиме TG. */
+      html.tg-app #viaBottomBar{padding-bottom:max(calc(12px + env(safe-area-inset-bottom,0px)), 28px);}
+      html.tg-app.tg-fs #viaBottomBar{padding-bottom:max(calc(16px + env(safe-area-inset-bottom,0px)), 34px);}
       #viaBottomBar button{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
         padding:11px 6px;border-radius:12px;border:1px solid var(--lx-line);background:var(--lx-panel);
         color:var(--lx-text);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s;}
@@ -23036,7 +23040,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         else{toast('Этот раздел сейчас недоступен');}
       }
       var field=document.getElementById('viaField'),bF=document.getElementById('vbField'),bB=document.getElementById('vbBlank');
-      function showField(on){if(field)field.hidden=!on;if(bF)bF.classList.toggle('vb-active',on);if(bB)bB.classList.toggle('vb-active',!on);if(on){try{updMonth();}catch(e){}try{field.scrollTop=0;}catch(e){}}}
+      function showField(on){
+        if(on){
+          // 🩹 (Ринат 27сен «из раздела не перебрасывает в поле»): открытый раздел = полноэкранный слой z900,
+          //    перекрывал поле z850. Закрываем открытые разделы и возвращаем #app к бланку — тогда поле всегда сверху.
+          try{ var od=document.querySelectorAll('details.sec[open]'); for(var i=0;i<od.length;i++){ od[i].open=false; } }catch(e){}
+          try{ if(typeof state!=='undefined' && state && state.view && state.view!=='player'){ state.view='player'; if(typeof render==='function') render(); } }catch(e){}
+        }
+        if(field)field.hidden=!on;
+        if(bF)bF.classList.toggle('vb-active',on);
+        if(bB)bB.classList.toggle('vb-active',!on);
+        if(on){try{updMonth();}catch(e){}try{field.scrollTop=0;}catch(e){}}
+      }
       if(bF)bF.addEventListener('click',function(){showField(true);});
       if(bB)bB.addEventListener('click',function(){showField(false);});
       // ── 🤝 РЫНОК СДЕЛОК: клетка «Сделки» открывает выбор, куда вложить время ──
