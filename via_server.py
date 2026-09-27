@@ -1440,11 +1440,14 @@ if via_market and DATA.get('market') and DATA['market'].get('assets'):
     _by_id = {str(a.get('id')): a for a in _fresh}
     _have = {str(a.get('id')) for a in DATA['market']['assets']}
     _changed = False
-    for _a in DATA['market']['assets']:                     # пересчёт стаканов существующих
+    for _a in DATA['market']['assets']:                     # пересчёт стаканов + добор div/sector существующих
         _src = _by_id.get(str(_a.get('id')))
         _newliq = via_market.asset_liq(_a.get('type'), _a.get('vol'))
         if _a.get('liq') != _newliq:
             _a['liq'] = _newliq; _changed = True
+        if _src is not None:                                # 💰 дивиденды/сектор старым бумагам из CSV
+            if _a.get('div') is None: _a['div'] = _src.get('div', 0.0); _changed = True
+            if _a.get('sector') is None: _a['sector'] = _src.get('sector'); _changed = True
     for _fa in _fresh:                                      # домерж новых активов
         if str(_fa.get('id')) not in _have:
             DATA['market']['assets'].append(_fa); _changed = True

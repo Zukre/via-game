@@ -26,3 +26,10 @@ AssetID,Название,Тип Актива,Минимальная цена ,Т
 25,KAZAX GERLS (KGRL),Crypto,0.002,0.15,0.2,12,58,Chaotic,0.15,0.15,Flat,Range
 26,BLOY (BLOY),Crypto,0.0001,0.003,0.005,2,68,Chaotic,0.003,0.003,Flat,Range
 27,SHIMIR (SHMR),Crypto,0.01,0.5,0.7,40,55,Chaotic,0.5,0.5,Flat,Range
+28,Alphabet (GOOGL),Stock,110,175,185,260,4,Stable,175,175,Flat,Range
+29,Meta (META),Stock,350,580,500,820,5,Stable,580,580,Flat,Range
+30,JPMorgan (JPM),Stock,150,215,200,300,3,Stable,215,215,Flat,Range
+31,Coca-Cola (KO),Stock,55,70,68,92,2,Stable,70,70,Flat,Range
+32,ExxonMobil (XOM),Stock,80,115,105,160,3,Stable,115,115,Flat,Range
+33,Kaspi.kz (KSPI),Stock,55,95,90,150,5,Aggressive,95,95,Flat,Range
+34,Halyk Bank (HSBK),Stock,12,20,18,33,4,Adaptive,20,20,Flat,Range

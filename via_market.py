@@ -109,6 +109,19 @@ def _norm_type(t):
     return "stock"   # пусто -> акция по умолчанию
 
 
+# 💰 дивиденды (годовой %) и сектора — путь инвестора и новости по секторам (Ринат 27сен)
+DIV_YIELD = {
+    "Apple (AAPL)": 0.5, "Microsoft (MSFT)": 0.8, "Nvidia (NVDA)": 0.1,
+    "Alphabet (GOOGL)": 0.5, "Meta (META)": 0.4, "JPMorgan (JPM)": 2.4,
+    "Coca-Cola (KO)": 3.0, "ExxonMobil (XOM)": 3.6, "Kaspi.kz (KSPI)": 5.0, "Halyk Bank (HSBK)": 6.0,
+}
+SECTOR = {
+    "Apple (AAPL)": "Техи", "Microsoft (MSFT)": "Техи", "Nvidia (NVDA)": "Техи·AI",
+    "Amazon (AMZN)": "Потребитель", "Tesla (TSLA)": "Авто", "Alphabet (GOOGL)": "Техи",
+    "Meta (META)": "Техи", "JPMorgan (JPM)": "Банки", "Coca-Cola (KO)": "Потребитель",
+    "ExxonMobil (XOM)": "Энергетика", "Kaspi.kz (KSPI)": "Банки·КЗ", "Halyk Bank (HSBK)": "Банки·КЗ",
+}
+
 def load_assets(path=CSV_PATH):
     assets = []
     if not os.path.exists(path):
@@ -138,6 +151,7 @@ def load_assets(path=CSV_PATH):
             "price": round(cur, 2), "price0": p0, "min": pmin,
             "avg0": pavg, "avg": round(cur, 2), "anchor": round(cur, 2), "cool": 0, "max": pmax,
             "vol": vol, "liq": asset_liq(typ, vol), "history": [round(cur, 2)],
+            "div": DIV_YIELD.get(name, 0.0), "sector": SECTOR.get(name, typ),
             # 🔄 цикл рынка у актива: своя фаза (несинхронный рынок) и длина волны бык↔медведь по типу
             "cyc_ph": round(random.uniform(0, 2 * math.pi), 4),
             "cyc_yrs": round(random.uniform(*CYCLE_YEARS.get(typ, (4.0, 6.0))), 3),
