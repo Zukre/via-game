@@ -23263,7 +23263,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           var vol=(type==='crypto'?38:14), pr=price, hist=[];
           for(var k=0;k<18;k++){ pr=Math.max(price*0.5, pr*(1+(Math.random()-0.5)*0.08)); hist.push(Math.round(pr*100)/100); }
           hist.push(price);
-          state.market.assets.push({id:id,name:hd.nm,type:type,price:price,price0:price,min:Math.round(price*0.2*100)/100,max:Math.round(price*6*100)/100,vol:vol,anchor:price,history:hist});
+          var ipoSector=(type==='crypto'?'Крипта':type==='commodity'?'Сырьё':'Акции')+' · IPO';
+          state.market.assets.push({id:id,name:hd.nm,type:type,price:price,price0:price,min:Math.round(price*0.2*100)/100,max:Math.round(price*6*100)/100,vol:vol,sector:ipoSector,div:0,mom:0,anchor:price,history:hist});
           p.holdings=p.holdings||{}; p.holdings[id]={qty:qty,avg:price,name:hd.nm};
           st.holds.splice(i,1);
           try{ if(typeof persistOfflineMarket==='function') persistOfflineMarket(); }catch(e){}
