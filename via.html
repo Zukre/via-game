@@ -12259,7 +12259,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const farmFeedExp = farmFeed(p) + farmWaterCost(p) + farmAutoFeedCost(p) + farmWorkerCost(p) + farmVetCost(p);   // 🏗️ содержание фермы: корм+вода+авто-корм+фермеры+управляющие+прививки (пассив)
             const _bizP = Math.round(p.assets.reduce((s, a) => s + Number(a.cf || 0), 0) * (p.bottom ? 0.7 : 1) * (_clvl>=2?1.1:1));   // 🪜 рук.отдела: бизнесы +10%
             const passive = Math.round((_bizP + farmInc) * (_clvl>=4?1.15:1));   // 🪜 региональный: весь пассив +15%
-            const income = salary + passive;
+            const divInc = Math.round(marketDividendMonthly(p));   // 💰 дивиденды с акций — отдельной строкой в бланке, но полноценный месячный пассив
+            const income = salary + passive + divInc;
 
             const taxDisc = Math.min(90, Math.max(0, Number(p.taxDiscPct) || 0));   // 🔒 тюрьма: «продавил силой» → скидка к налогам
             const taxes = Math.round((Math.max(0, p.prof.taxes + (Number(p.taxMod) || 0)) + Math.round(income * (Number(p.taxPct) || 0) / 100)) * (1 - taxDisc / 100) * (_clvl>=3?0.85:1));   // 🪜 директор: налоги −15%
@@ -12290,9 +12291,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // с тем, что человек видит на экране. save(me) шлёт p целиком, значение доезжает до сервера.
             if (p) p._flow = flow;
 
-            return { salary, baseSalary, skillBonus, passive, income, taxes, mortgagePay, eduPay, autoPay, ccPay, retailPay,
+            return { salary, baseSalary, skillBonus, passive, divInc, income, taxes, mortgagePay, eduPay, autoPay, ccPay, retailPay,
                      otherExp, childExp, bankPay, farmInc, farmWage, farmFeed: farmFeedExp, tovarkaRent, relAlimony, totalExp, flow, target,
-                     win: passive >= target };
+                     win: (passive + divInc) >= target };
         }
         // 5 УРОВНЕЙ «Путь свободы» (центр поля): по доле пассив/расходы. L5 = свобода (пассив ≥ расходов).
         function playerLevel(f){
@@ -13062,7 +13063,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             await buyAssetQty(id, q);
         }
         function buyEstHtml(q,price,cost,fee,total,cash){
-            if(!q||q<1) return '<span style="color:#6b7280;">Выбери количество кнопкой или впиши вручную.</span>';
+            if(!q||q<1) return '';
             return `Количество: <b>${fmtN(q)} шт</b> × витрина ${fmtPrice(price)}$<br>Ориентир по витрине: <b>${fmtN(Math.round(cost))}$</b> + брокер <b style="color:#fbbf24;">${fmtN(Math.round(fee))}$</b><br><span style="color:#9c988e;font-size:12px;">⬇ Точная сумма со стаканом — ниже, её и спишем.</span>`;
         }
         function renderBuyModal(){
@@ -13088,18 +13089,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:ui-monospace,monospace;font-size:17px;font-weight:800;color:${col};">${fmtPrice(price)} $</span><button onclick="closeBuyModal()" class="btn btn-gray" style="flex:0 0 auto;padding:4px 10px;">✕</button></div>
                     </div>
                     <div style="font-size:12.5px;color:#8492a6;margin:3px 0 14px;">${a.name} · <span style="color:${col};font-weight:700;">${chg>=0?'▲ +':'▼ '}${fmtPct(chg)}</span> · касса <b style="color:var(--lx-gold-br);">${fmtN(p.savings)} $</b> · брокер ${(tradeFeePct(p)*100).toFixed(1)}%</div>
-                    ${riskNote}
-                    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:#5d6b7e;margin-bottom:9px;">Сколько вложить</div>
+                    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:#5d6b7e;margin:2px 0 9px;">Сколько вложить</div>
                     <div style="display:flex;gap:8px;margin-bottom:13px;">
                         <input id="buyAmount" inputmode="numeric" value="${amtVal}" oninput="onBuyAmount(this.value)" placeholder="Своя сумма, $" style="flex:1;min-width:0;border-radius:12px;padding:12px 14px;font-size:16px;font-weight:800;border:1px solid var(--lx-line);background:#0d1420;color:#e4ebf5;font-family:ui-monospace,monospace;">
                         <button onclick="setBuyMin()" style="flex:0 0 auto;min-width:64px;border-radius:12px;padding:12px 10px;font-size:13.5px;font-weight:800;cursor:pointer;border:1px solid var(--lx-line);background:#0d1420;color:#c9d4e4;">Мин</button>
                         <button onclick="setBuyByFrac(1)" style="flex:0 0 auto;min-width:72px;border-radius:12px;padding:12px 10px;font-size:13.5px;font-weight:800;cursor:pointer;border:1px solid rgba(52,224,161,.4);background:rgba(52,224,161,.12);color:#34e0a1;">Макс 💰</button>
                     </div>
-                    <div id="buyEst" style="background:#0b1119;border:1px solid var(--lx-line);border-radius:12px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.8;margin-bottom:8px;">${buyEstHtml(q,price,cost,fee,total,p.savings)}</div>
-                    <div id="slipBox" style="background:#0b1119;border:1px solid var(--lx-line);border-radius:12px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.7;margin-bottom:13px;">Впиши сумму — покажу, по какой цене сделка пройдёт на самом деле.</div>
+                    <div id="buyEst" style="font-size:13px;color:#cbd5e1;line-height:1.7;margin-bottom:3px;">${buyEstHtml(q,price,cost,fee,total,p.savings)}</div>
+                    <div id="slipBox" style="font-size:12.5px;color:#8b95a7;line-height:1.6;margin-bottom:13px;"></div>
                     <button id="buyConfirmBtn" onclick="confirmBuy()" ${q<1?'disabled':''} style="width:100%;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;background:${q>0?'#4f8df7':'#2a3242'};color:${q>0?'#fff':'#8b95a7'};">${q<1?'Впиши сумму':(SERVER_MODE?'⏳ Считаю точную цену со стаканом…':(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`))}</button>
                     <button onclick="buyToMargin()" style="width:100%;margin-top:9px;padding:11px;border-radius:12px;border:1px solid #2a3a4d;background:#111a26;color:#bcd0e6;font-weight:700;font-size:13px;cursor:pointer;">⚡ Или ставка на движение — с плечом / 📉 шорт →</button>
-                    <div style="font-size:11px;text-align:center;color:#5d6b7e;margin-top:11px;line-height:1.5;">Купить — влади активом. Ставка с плечом/шорт — заработок на росте ИЛИ падении (риск выше). Комиссию берут и на покупке, и на продаже.</div>
                 </div>
             </div>`;
         }
@@ -15370,8 +15369,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 }).join(''):'<div style="color:#8b95a7;font-size:13px;padding:10px;text-align:center;">В этой категории пока нет активов.</div>';
                 // ℹ️ Прогноз доходности по вкладке (Ринат 19июл): «сколько даёт в год как в жизни»
                 const CAT_INFO={stock:['#5cb08b','📈 Акции — доли компаний. ~5–10%/год, стабильно. Большие деньги, тихо. Выигрывает терпеливый, кто держит и не дёргается.'],crypto:['#fbbf24','⚡ Крипта — ОПАСНО. Скачки ±50–60% за день, можно всё потерять. Но за 10–20 лет сильно выросла. Может взлететь — а может и нет.'],meme:['#f87171','☠️ Мем — риск потери 80–99%. Почти всегда обнуляются. На свой страх и риск — брокер не отвечает. Один из сотни срывает куш.'],metal:['#efd8a3','🥇 Металлы — тихая гавань. ~2–3%/год, медленно, но почти не падает. Сейф для больших денег.'],comm:['#efd8a3','🌾 Сырьё/нефть — стабильно, глубокий рынок, как золото.']};
-                const ci=CAT_INFO[tab]; const catInfoHtml=ci?`<div style="background:#1b2130;border:none;border-radius:12px;padding:9px 12px;font-size:11px;color:${ci[0]};line-height:1.5;margin-bottom:10px;">${ci[1]}</div>`:'';
-                listHtml=tabBar+catInfoHtml+rows;
+                listHtml=tabBar+rows;   // 🧹 (Ринат 28сен) инлайн-описания категорий убраны — учит опыт/платный агент, не тексты
             }
             return `<div class="card">
                 <div class="block-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -15402,7 +15400,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         ${hist.length>=2?heroSpark(hist,up):''}
                     </div>`;
                 })()}
-                <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">💸 Комиссия <b style="color:#fbbf24;">${(tradeFeePct(p)*100).toFixed(1)}%</b> на сделку <span style="color:#6b7280;">· как торговать — жми ℹ️ вверху</span></div>
+                <div style="font-size:11px;color:#8b95a7;margin-bottom:8px;">💸 Комиссия <b style="color:#4f8df7;">${(tradeFeePct(p)*100).toFixed(1)}%</b></div>
                 <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin:6px 0 6px;border-top:1px solid #1f2937;padding-top:10px;">🛒 Рынок · выбери актив</div>
                 ${listHtml}
                 <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin:10px 0 4px;border-top:1px solid #1f2937;padding-top:10px;">💼 Мои активы (куплено)</div>
@@ -15620,8 +15618,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(ev.k==='bonus'||ev.k==='x13') salDelta = Math.round(f.salary*ev.pct);
             else if(ev.k==='fine'||ev.k==='sick') salDelta = -Math.round(f.salary*ev.pct);
             else if(ev.k==='delay') salDelta = -f.salary;           // оклад не пришёл, расходы остались
-            const divInc = marketDividendMonthly(p);                // 💰 дивиденды с акций в кассу этот месяц
-            const flow = Math.round((f.flow + salDelta + divInc)*100)/100;   // фактический поток в кассу этот месяц
+            const flow = Math.round((f.flow + salDelta)*100)/100;   // поток (дивиденды уже внутри f.flow через бланк)
             const _st=pstat(p); _st.salaryCount++; _st.salaryTotal=Math.round((_st.salaryTotal+flow)*100)/100;
             try{ viaMarketSync(_st.salaryCount); }catch(e){}   // 🏛️ прожит месяц → офлайн-биржа шагает под текущей эпохой (в серверном режиме молчит)
             soulYearTick(p);                                        // 🕯️ прожитый год: чистые годы, висящий долг, отпускает ли дно
@@ -15631,7 +15628,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try{ logAction(p, (flow>=0?'💵':'💸'), 'Получка за месяц'+(ev.k!=='plain'?' ('+ev.nm+')':''), {amt:flow, sphere:'деньги'}); }catch(e){}
             p.notify = (flow>=0 ? '💵 Получка: +'+fmtN(flow)+'$ в кассу'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.'
                                 : '💸 Месяц в минус: '+fmtN(flow)+'$'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.');
-            state.payslipModal = { pId:id, evk:ev.k, evnm:ev.nm||'', evsay:ev.say||'', sal:f.salary, salDelta:salDelta, divInc:divInc,
+            state.payslipModal = { pId:id, evk:ev.k, evnm:ev.nm||'', evsay:ev.say||'', sal:f.salary, salDelta:salDelta, divInc:(f.divInc||0),
                 f:{passive:f.passive, taxes:f.taxes, mortgagePay:f.mortgagePay, eduPay:f.eduPay, autoPay:f.autoPay, ccPay:f.ccPay, retailPay:f.retailPay, otherExp:f.otherExp, childExp:f.childExp, bankPay:f.bankPay}, flow:flow };
             save(id); render();
         }
@@ -17155,7 +17152,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p = state.players.find(x=>x.id==state.currentPlayerId); const a = assetById(m.assetId);
             if(!p || !a) return;
             const q = Math.floor(Number(m.qty)||0);
-            if(q < 1){ box.innerHTML = '<span style="color:#6b7280;">Впиши количество — покажу, по какой цене сделка пройдёт на самом деле.</span>'; return; }
+            if(q < 1){ box.innerHTML = ''; return; }
             box.innerHTML = '<span style="color:#7dd3fc;">⏳ Спрашиваю стакан…</span>';
             const seq = ++_slipSeq;
             const r = await quoteFill(m.assetId, side, q);
