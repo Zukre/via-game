@@ -13097,7 +13097,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     </div>
                     <div id="buyEst" style="background:#0b1119;border:1px solid var(--lx-line);border-radius:12px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.8;margin-bottom:8px;">${buyEstHtml(q,price,cost,fee,total,p.savings)}</div>
                     <div id="slipBox" style="background:#0b1119;border:1px solid var(--lx-line);border-radius:12px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.7;margin-bottom:13px;">Впиши сумму — покажу, по какой цене сделка пройдёт на самом деле.</div>
-                    <button id="buyConfirmBtn" onclick="confirmBuy()" ${q<1?'disabled':''} style="width:100%;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;background:${q>0?'linear-gradient(180deg,#f4dd9c,#d9b877)':'#374151'};color:${q>0?'#20180a':'#9ca3af'};">${q<1?'Впиши сумму':(SERVER_MODE?'⏳ Считаю точную цену со стаканом…':(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`))}</button>
+                    <button id="buyConfirmBtn" onclick="confirmBuy()" ${q<1?'disabled':''} style="width:100%;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;background:${q>0?'#4f8df7':'#2a3242'};color:${q>0?'#fff':'#8b95a7'};">${q<1?'Впиши сумму':(SERVER_MODE?'⏳ Считаю точную цену со стаканом…':(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`))}</button>
                     <button onclick="buyToMargin()" style="width:100%;margin-top:9px;padding:11px;border-radius:12px;border:1px solid #2a3a4d;background:#111a26;color:#bcd0e6;font-weight:700;font-size:13px;cursor:pointer;">⚡ Или ставка на движение — с плечом / 📉 шорт →</button>
                     <div style="font-size:11px;text-align:center;color:#5d6b7e;margin-top:11px;line-height:1.5;">Купить — влади активом. Ставка с плечом/шорт — заработок на росте ИЛИ падении (риск выше). Комиссию берут и на покупке, и на продаже.</div>
                 </div>
@@ -15320,15 +15320,28 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.holdings=p.holdings||{};
             const ownIds=Object.keys(p.holdings);
             let holdHtml = ownIds.length ? ownIds.map(id=>{
-                const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, plPct=h.avg?((pr/h.avg-1)*100):0, plAbs=Math.round((pr-h.avg)*h.qty), c=plPct>=0?'#34e0a1':'#ff5c72';
-                return `<div class="row-item"><div style="flex:1;"><b style="font-family:ui-monospace,monospace;letter-spacing:.02em;">${assetTicker(h.name)}</b> <span style="color:#9ca3af;font-size:12px;">${h.qty} шт</span><div style="font-size:11px;color:#9ca3af;">куплено по <b style="color:#cbd5e1;">${fmtPrice(h.avg)}$</b> · сейчас ${fmtPrice(pr)}$</div><div style="font-size:12px;color:${c};font-weight:700;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div></div><div style="text-align:right;"><b>${fmtN(val)} $</b><br><button onclick="openSellModal('${id}',0.5)" class="btn btn-sell" style="margin-top:4px;" title="Продать половину — сперва покажем цену выхода">½&nbsp;50%</button> <button onclick="openSellModal('${id}')" class="btn btn-sell" style="margin-top:4px;">Продать</button></div></div>`;
-            }).join('') : '<div style="color:#9ca3af;font-size:13px;">пока нет активов — открой биржу ниже и купи</div>';
+                const h=p.holdings[id], pr=curPrice(id)||0, val=pr*h.qty, plPct=h.avg?((pr/h.avg-1)*100):0, plAbs=Math.round((pr-h.avg)*h.qty), c=plPct>=0?'#22c55e':'#ff5c72';
+                return `<div style="display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:16px;background:#1b2130;margin-bottom:9px;">
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-weight:800;font-size:15px;color:#e7ebf3;">${assetTicker(h.name)} <span style="color:#8b95a7;font-size:12px;font-weight:600;">${h.qty} шт</span></div>
+                    <div style="font-size:11px;color:#8b95a7;font-weight:600;">по ${fmtPrice(h.avg)}$ · сейчас ${fmtPrice(pr)}$</div>
+                    <div style="font-size:12.5px;color:${c};font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums;">${plPct>=0?'▲ +':'▼ '}${plPct.toFixed(1)}% (${plAbs>=0?'+':''}${fmtN(plAbs)}$)</div>
+                  </div>
+                  <div style="text-align:right;flex:0 0 auto;">
+                    <div style="font-weight:800;color:#e7ebf3;font-variant-numeric:tabular-nums;">${fmtN(val)} $</div>
+                    <div style="display:flex;gap:6px;margin-top:6px;">
+                      <button onclick="openSellModal('${id}',0.5)" style="background:#2a3242;border:none;border-radius:10px;color:#cbd5e1;font-size:11px;font-weight:800;padding:7px 10px;cursor:pointer;" title="Продать половину">½</button>
+                      <button onclick="openSellModal('${id}')" style="background:#ff5c72;border:none;border-radius:10px;color:#fff;font-size:11px;font-weight:800;padding:7px 12px;cursor:pointer;">Продать</button>
+                    </div>
+                  </div>
+                </div>`;
+            }).join('') : '<div style="color:#8b95a7;font-size:13px;">пока нет активов — купи в списке выше</div>';
             const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
             const alertHtml = ev.length ? ev.map(e=>{const bad=(e.kind==='КРАХ'||e.kind==='ОБВАЛ');return `<div style="background:${bad?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${bad?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`;}).join('') : '';
             let listHtml='';
             {   // 🟢 рынок всегда открыт (Ринат 27сен: без кнопки-стрелки «Открыть торги»)
                 const tab=state.marketTab||'stock';
-                const tabBar=`<div style="display:flex;gap:7px;overflow-x:auto;margin:8px 0 8px;padding-bottom:2px;">${MARKET_TABS.map(([k,lbl])=>`<button onclick="setMarketTab('${k}')" style="flex:0 0 auto;border:1px solid ${tab===k?'#f4dd9c':'var(--lx-line)'};background:${tab===k?'linear-gradient(180deg,#f4dd9c,#d9b877)':'#0d1420'};color:${tab===k?'#20180a':'#9fb0c6'};border-radius:11px;padding:8px 14px;font-size:12.5px;font-weight:${tab===k?'800':'700'};white-space:nowrap;cursor:pointer;">${lbl}</button>`).join('')}</div>`;
+                const tabBar=`<div style="display:flex;gap:8px;overflow-x:auto;margin:10px 0 12px;padding-bottom:2px;">${MARKET_TABS.map(([k,lbl])=>`<button onclick="setMarketTab('${k}')" style="flex:0 0 auto;border:none;background:${tab===k?'#4f8df7':'#1b2130'};color:${tab===k?'#fff':'#8b95a7'};border-radius:13px;padding:9px 16px;font-size:12.5px;font-weight:${tab===k?'800':'700'};white-space:nowrap;cursor:pointer;">${lbl}</button>`).join('')}</div>`;
                 // СОРТИРОВКА (Ринат): где больше всего капитала вложено — та акция/крипта СВЕРХУ. По убыванию.
                 // Капитал = сумма по всем игрокам (кол-во × текущая цена). Ничего не вложено → по цене (крупные выше).
                 const sorted=m.assets.filter(a=>assetCat(a)===tab).map(a=>{
@@ -15337,21 +15350,24 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     return {a, chg, invested: heldQty*a.price};
                 }).sort((x,y)=> (y.invested - x.invested) || (y.a.price - x.a.price));
                 const rows=sorted.length?sorted.map(({a,chg,invested})=>{
-                    const c=chg>=0?'#34e0a1':'#ff5c72', arrow=chg>=0?'▲':'▼';
-                    const cap=invested>0?`<span style="color:var(--lx-gold-br);font-size:10.5px;font-weight:700;white-space:nowrap;">💰 ${fmtN(invested)}$</span>`:'';
-                    return `<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--lx-line);border-radius:12px;background:linear-gradient(180deg,var(--lx-panel2),var(--lx-panel));margin-bottom:6px;">
-                      <div style="flex:0 0 82px;min-width:0;overflow:hidden;">
-                        <div style="font-family:ui-monospace,monospace;font-size:15px;font-weight:800;letter-spacing:.02em;color:#f3efe6;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${assetTicker(a.name)}</div>
-                        ${cap||`<div style="font-size:10px;color:#6d6a62;">—</div>`}
+                    const c=chg>=0?'#22c55e':'#ff5c72', arrow=chg>=0?'▲':'▼';
+                    const AVT={stock:['rgba(79,141,247,.14)','#8fb4ff'],crypto:['rgba(245,184,65,.14)','#f5c451'],metal:['rgba(214,163,83,.16)','#e6c078'],commodity:['rgba(34,197,94,.14)','#5fd08a'],comm:['rgba(34,197,94,.14)','#5fd08a'],meme:['rgba(255,92,114,.14)','#ff8fa0']};
+                    const avc=AVT[assetCat(a)]||['rgba(231,235,243,.10)','#e7ebf3'];
+                    const sub=`${a.sector||assetTicker(a.name)}${invested>0?` · 💰 ${fmtN(invested)}$`:''}`;
+                    return `<div style="display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:16px;background:#1b2130;margin-bottom:9px;">
+                      <div style="flex:0 0 40px;width:40px;height:40px;border-radius:12px;background:${avc[0]};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:${avc[1]};">${assetTicker(a.name).slice(0,1)}</div>
+                      <div style="flex:1;min-width:0;">
+                        <div style="font-weight:800;font-size:15px;color:#e7ebf3;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${assetTicker(a.name)}</div>
+                        <div style="font-size:11px;color:#8b95a7;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div>
                       </div>
                       ${sparkline(a.history, chg>=0)}
-                      <div style="flex:0 0 88px;text-align:right;overflow:hidden;">
-                        <div id="mkp_${a.id}" style="font-family:ui-monospace,monospace;font-size:14px;font-weight:700;color:#efd8a3;line-height:1.15;white-space:nowrap;">${fmtPrice(a.price)}$</div>
-                        <div id="mkc_${a.id}" style="font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:${c};white-space:nowrap;">${arrow} ${fmtPct(chg)}</div>
+                      <div style="flex:0 0 80px;text-align:right;overflow:hidden;">
+                        <div id="mkp_${a.id}" style="font-weight:800;font-size:14px;color:#e7ebf3;line-height:1.15;white-space:nowrap;font-variant-numeric:tabular-nums;">${fmtPrice(a.price)}$</div>
+                        <div id="mkc_${a.id}" style="font-size:11.5px;font-weight:700;color:${c};white-space:nowrap;font-variant-numeric:tabular-nums;">${arrow} ${fmtPct(chg)}</div>
                       </div>
-                      <button onclick="openBuyModal('${a.id}')" style="flex:0 0 62px;background:rgba(217,184,119,.10);border:1px solid var(--lx-gold-ln);border-radius:9px;color:var(--lx-gold-br);font-size:11.5px;font-weight:800;padding:7px 0;cursor:pointer;">Купить</button>
+                      <button onclick="openBuyModal('${a.id}')" style="flex:0 0 60px;background:#4f8df7;border:none;border-radius:12px;color:#fff;font-size:12px;font-weight:800;padding:9px 0;cursor:pointer;">Купить</button>
                     </div>`;
-                }).join(''):'<div style="color:#9ca3af;font-size:13px;padding:10px;text-align:center;">В этой категории пока нет активов.</div>';
+                }).join(''):'<div style="color:#8b95a7;font-size:13px;padding:10px;text-align:center;">В этой категории пока нет активов.</div>';
                 // ℹ️ Прогноз доходности по вкладке (Ринат 19июл): «сколько даёт в год как в жизни»
                 const CAT_INFO={stock:['#5cb08b','📈 Акции — доли компаний. ~5–10%/год, стабильно. Большие деньги, тихо. Выигрывает терпеливый, кто держит и не дёргается.'],crypto:['#fbbf24','⚡ Крипта — ОПАСНО. Скачки ±50–60% за день, можно всё потерять. Но за 10–20 лет сильно выросла. Может взлететь — а может и нет.'],meme:['#f87171','☠️ Мем — риск потери 80–99%. Почти всегда обнуляются. На свой страх и риск — брокер не отвечает. Один из сотни срывает куш.'],metal:['#efd8a3','🥇 Металлы — тихая гавань. ~2–3%/год, медленно, но почти не падает. Сейф для больших денег.'],comm:['#efd8a3','🌾 Сырьё/нефть — стабильно, глубокий рынок, как золото.']};
                 const ci=CAT_INFO[tab]; const catInfoHtml=ci?`<div style="background:#0d1016;border:1px solid #242833;border-radius:9px;padding:8px 10px;font-size:11px;color:${ci[0]};line-height:1.5;margin-bottom:8px;">${ci[1]}</div>`:'';
@@ -15378,11 +15394,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     const hist=portfolioHistory(p), up = hist.length>=2 ? hist[hist.length-1]>=hist[0] : true;
                     let invested=0; for(const _id in (p.holdings||{})){ const hh=p.holdings[_id]; invested += (Number(hh.avg)||0)*(Number(hh.qty)||0); }
                     const pl=port-invested, plPct=invested>0?pl/invested*100:0, c=pl>=0?'#34e0a1':'#ff5c72';
-                    return `<div style="position:relative;border:1px solid var(--lx-gold-ln);border-radius:20px;overflow:hidden;background:radial-gradient(120% 90% at 100% 0,rgba(52,224,161,.08),transparent 55%),radial-gradient(120% 100% at 0 0,rgba(232,200,119,.10),transparent 50%),linear-gradient(180deg,#131a28,#0c121d);padding:16px 17px 8px;margin-bottom:14px;">
-                        <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--lx-gold);font-weight:700;">Портфель</div>
-                        <div style="font-family:ui-monospace,monospace;font-size:32px;font-weight:800;letter-spacing:-.01em;margin-top:2px;line-height:1.05;color:#f3efe6;">${fmtN(port)} $</div>
-                        ${invested>0?`<div style="font-family:ui-monospace,monospace;font-size:13px;font-weight:800;color:${c};margin-top:3px;">${pl>=0?'▲ +':'▼ '}${fmtN(Math.abs(Math.round(pl)))} $ · ${pl>=0?'+':''}${plPct.toFixed(1)}%</div>`:''}
-                        <div style="font-size:12.5px;color:#8492a6;margin-top:3px;">Касса <b style="color:#cbd6e6;font-family:ui-monospace,monospace;font-weight:700;">${fmtN(cash)} $</b> · свободно для покупки</div>
+                    return `<div style="position:relative;border:none;border-radius:20px;overflow:hidden;background:linear-gradient(135deg,#3f6fe0,#5b4bd6);box-shadow:0 14px 30px -16px rgba(79,141,247,.6);padding:17px 18px 10px;margin-bottom:14px;">
+                        <div style="font-size:11px;letter-spacing:.06em;color:rgba(255,255,255,.78);font-weight:700;">Мой портфель</div>
+                        <div style="font-size:34px;font-weight:800;letter-spacing:-.01em;margin-top:3px;line-height:1.05;color:#fff;font-variant-numeric:tabular-nums;">${fmtN(port)} $</div>
+                        ${invested>0?`<div style="display:inline-block;margin-top:8px;font-size:12.5px;font-weight:800;background:${pl>=0?'#eafff3':'#ffe9ec'};color:${pl>=0?'#0b8f3f':'#c0293f'};padding:3px 11px;border-radius:999px;">${pl>=0?'▲ +':'▼ '}${fmtN(Math.abs(Math.round(pl)))} $ · ${pl>=0?'+':''}${plPct.toFixed(1)}%</div>`:''}
+                        <div style="font-size:12.5px;color:rgba(255,255,255,.85);margin-top:8px;font-weight:600;">💰 Касса <b style="font-variant-numeric:tabular-nums;">${fmtN(cash)} $</b> — свободно для покупки</div>
                         ${hist.length>=2?heroSpark(hist,up):''}
                     </div>`;
                 })()}
@@ -17927,7 +17943,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 a.sent=Math.round(sent*1e4)/1e4; a.price=_r2(np);
                 const base=a.price0||a.price, chg=base?((a.price/base-1)*100):0;
                 const pe=document.getElementById('mkp_'+a.id); if(pe) pe.textContent=fmtPrice(a.price)+'$';
-                const ce=document.getElementById('mkc_'+a.id); if(ce){ ce.textContent=(chg>=0?'▲':'▼')+' '+fmtPct(chg); ce.style.color=chg>=0?'#34e0a1':'#ff5c72'; }
+                const ce=document.getElementById('mkc_'+a.id); if(ce){ ce.textContent=(chg>=0?'▲':'▼')+' '+fmtPct(chg); ce.style.color=chg>=0?'#22c55e':'#ff5c72'; }
             }
             if((++_mktPersistN)%5===0){ try{ persistOfflineMarket(); }catch(e){} }       // сохраняем ~раз в 15с
         }
