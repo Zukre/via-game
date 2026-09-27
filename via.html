@@ -12940,6 +12940,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function assetById(id){ const m=state.market; return (m&&m.assets)?m.assets.find(x=>String(x.id)===String(id)):null; }
         function curPrice(id){ const a=assetById(id); return a?a.price:null; }
         function portfolioValue(p){ let v=0; if(p&&p.holdings){for(const id in p.holdings){const pr=curPrice(id); if(pr) v+=pr*p.holdings[id].qty;}} return v; }
+        // 💰 ДИВИДЕНДЫ (путь инвестора): дивидендные акции платят держателю. Годовой % / 12 = месячная выплата.
+        //    Само-защита полем div (у активов без дивидендов и у серверных бумаг без поля — 0), работает в обоих режимах.
+        function marketDividendMonthly(p){
+            if(!p || !p.holdings) return 0;
+            let d=0;
+            for(const id in p.holdings){
+                const a=assetById(id); const dv=a?(Number(a.div)||0):0; if(dv<=0) continue;
+                const qty=Number(p.holdings[id].qty)||0; if(qty<=0) continue;
+                const pr=Number(curPrice(id))||0;
+                d += qty*pr*(dv/100)/12;
+            }
+            return Math.round(d*100)/100;
+        }
         // история стоимости портфеля = сумма (кол-во × история цены) по всем активам — для герой-графика биржи.
         function portfolioHistory(p){
             if(!p||!p.holdings) return [];
@@ -13246,70 +13259,106 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Здесь клиентский движок: те же 27 активов, цены ЖИВУТ и двигаются ПО ПРОЖИТЫМ МЕСЯЦАМ
         // (время=ресурс — хребет VIA), а эпоха (рост/пик/спад/дно + тема) качает весь рынок.
         // Включается ТОЛЬКО когда сервер не дал своего рынка (флаг _offline). Серверный режим не трогаем.
+        // формат строки: [id, name, type, price, vol, min, max, sector, div%(годовой дивиденд)]
+        // sector — для новостей по секторам; div — годовая дивдоходность (путь инвестора, платит держателю).
         const OFFLINE_MARKET_SEED = [
-        ["1", "Apple (AAPL)", "stock", 240.0, 3, 150.0, 340.0],
-        ["2", "Microsoft (MSFT)", "stock", 450.0, 3, 300.0, 620.0],
-        ["3", "Nvidia (NVDA)", "stock", 140.0, 6, 80.0, 240.0],
-        ["4", "Amazon (AMZN)", "stock", 220.0, 4, 140.0, 320.0],
-        ["5", "Tesla (TSLA)", "stock", 400.0, 7, 200.0, 620.0],
-        ["6", "Bitcoin (BTC)", "crypto", 100000.0, 12, 3000.0, 155000.0],
-        ["7", "Ethereum (ETH)", "crypto", 3500.0, 15, 105.0, 5500.0],
-        ["8", "BNB", "crypto", 700.0, 12, 21.0, 1100.0],
-        ["9", "Solana (SOL)", "crypto", 200.0, 20, 6.0, 330.0],
-        ["10", "XRP", "crypto", 2.5, 18, 0.075, 4.2],
-        ["11", "Cardano (ADA)", "crypto", 1.0, 20, 0.03, 1.8],
-        ["12", "Dogecoin (DOGE)", "crypto", 0.35, 30, 0.0105, 0.9],
-        ["13", "Avalanche (AVAX)", "crypto", 40.0, 22, 1.2, 72.0],
-        ["14", "Chainlink (LINK)", "crypto", 25.0, 20, 0.75, 46.0],
-        ["15", "Polkadot (DOT)", "crypto", 8.0, 20, 0.24, 15.0],
-        ["16", "Золото (Gold)", "metal", 2600.0, 1, 2000.0, 3400.0],
-        ["17", "Серебро (Silver)", "metal", 30.0, 2, 20.0, 46.0],
-        ["18", "Платина (Platinum)", "metal", 1000.0, 2, 700.0, 1500.0],
-        ["19", "Нефть (Oil)", "commodity", 75.0, 3, 45.0, 120.0],
-        ["20", "Пшеница (Wheat)", "commodity", 6.0, 2, 4.0, 10.0],
-        ["21", "Кукуруза (Corn)", "commodity", 4.5, 2, 3.0, 8.0],
-        ["22", "Dombra (DMBR)", "crypto", 0.05, 60, 0.001, 8.0],
-        ["23", "KAZAXSTAN (KZT)", "crypto", 0.02, 62, 0.0005, 5.0],
-        ["24", "KAZAX (KZX)", "crypto", 0.01, 65, 0.0002, 3.0],
-        ["25", "KAZAX GERLS (KGRL)", "crypto", 0.15, 58, 0.002, 12.0],
-        ["26", "BLOY (BLOY)", "crypto", 0.005, 68, 0.0001, 2.0],
-        ["27", "SHIMIR (SHMR)", "crypto", 0.5, 55, 0.01, 40.0]
+        ["1", "Apple (AAPL)", "stock", 240.0, 3, 150.0, 340.0, "Техи", 0.5],
+        ["2", "Microsoft (MSFT)", "stock", 450.0, 3, 300.0, 620.0, "Техи", 0.8],
+        ["3", "Nvidia (NVDA)", "stock", 140.0, 6, 80.0, 240.0, "Техи·AI", 0.1],
+        ["4", "Amazon (AMZN)", "stock", 220.0, 4, 140.0, 320.0, "Потребитель", 0.0],
+        ["5", "Tesla (TSLA)", "stock", 400.0, 7, 200.0, 620.0, "Авто", 0.0],
+        ["28", "Alphabet (GOOGL)", "stock", 175.0, 4, 110.0, 260.0, "Техи", 0.5],
+        ["29", "Meta (META)", "stock", 580.0, 5, 350.0, 820.0, "Техи", 0.4],
+        ["30", "JPMorgan (JPM)", "stock", 215.0, 3, 150.0, 300.0, "Банки", 2.4],
+        ["31", "Coca-Cola (KO)", "stock", 70.0, 2, 55.0, 92.0, "Потребитель", 3.0],
+        ["32", "ExxonMobil (XOM)", "stock", 115.0, 3, 80.0, 160.0, "Энергетика", 3.6],
+        ["33", "Kaspi.kz (KSPI)", "stock", 95.0, 5, 55.0, 150.0, "Банки·КЗ", 5.0],
+        ["34", "Halyk Bank (HSBK)", "stock", 20.0, 4, 12.0, 33.0, "Банки·КЗ", 6.0],
+        ["6", "Bitcoin (BTC)", "crypto", 100000.0, 12, 3000.0, 155000.0, "Крипта", 0.0],
+        ["7", "Ethereum (ETH)", "crypto", 3500.0, 15, 105.0, 5500.0, "Крипта", 0.0],
+        ["8", "BNB", "crypto", 700.0, 12, 21.0, 1100.0, "Крипта", 0.0],
+        ["9", "Solana (SOL)", "crypto", 200.0, 20, 6.0, 330.0, "Крипта", 0.0],
+        ["10", "XRP", "crypto", 2.5, 18, 0.075, 4.2, "Крипта", 0.0],
+        ["11", "Cardano (ADA)", "crypto", 1.0, 20, 0.03, 1.8, "Крипта", 0.0],
+        ["12", "Dogecoin (DOGE)", "crypto", 0.35, 30, 0.0105, 0.9, "Крипта", 0.0],
+        ["13", "Avalanche (AVAX)", "crypto", 40.0, 22, 1.2, 72.0, "Крипта", 0.0],
+        ["14", "Chainlink (LINK)", "crypto", 25.0, 20, 0.75, 46.0, "Крипта", 0.0],
+        ["15", "Polkadot (DOT)", "crypto", 8.0, 20, 0.24, 15.0, "Крипта", 0.0],
+        ["16", "Золото (Gold)", "metal", 2600.0, 1, 2000.0, 3400.0, "Металлы", 0.0],
+        ["17", "Серебро (Silver)", "metal", 30.0, 2, 20.0, 46.0, "Металлы", 0.0],
+        ["18", "Платина (Platinum)", "metal", 1000.0, 2, 700.0, 1500.0, "Металлы", 0.0],
+        ["19", "Нефть (Oil)", "commodity", 75.0, 3, 45.0, 120.0, "Сырьё", 0.0],
+        ["20", "Пшеница (Wheat)", "commodity", 6.0, 2, 4.0, 10.0, "Сырьё", 0.0],
+        ["21", "Кукуруза (Corn)", "commodity", 4.5, 2, 3.0, 8.0, "Сырьё", 0.0],
+        ["22", "Dombra (DMBR)", "crypto", 0.05, 60, 0.001, 8.0, "Мем·КЗ", 0.0],
+        ["23", "KAZAXSTAN (KZT)", "crypto", 0.02, 62, 0.0005, 5.0, "Мем·КЗ", 0.0],
+        ["24", "KAZAX (KZX)", "crypto", 0.01, 65, 0.0002, 3.0, "Мем·КЗ", 0.0],
+        ["25", "KAZAX GERLS (KGRL)", "crypto", 0.15, 58, 0.002, 12.0, "Мем·КЗ", 0.0],
+        ["26", "BLOY (BLOY)", "crypto", 0.005, 68, 0.0001, 2.0, "Мем·КЗ", 0.0],
+        ["27", "SHIMIR (SHMR)", "crypto", 0.5, 55, 0.01, 40.0, "Мем·КЗ", 0.0]
       ];
         // округление ПО ЗНАЧИМОСТИ: копеечные монеты (BLOY 0.005, KAZAX 0.0002) не схлопываются в 0.00
         function _r2(n){ n=Number(n)||0; const a=Math.abs(n); if(a>=1000) return Math.round(n); if(a>=1) return Math.round(n*100)/100; if(a>=0.01) return Math.round(n*10000)/10000; return Math.round(n*1e6)/1e6; }
         // тема эпохи → «горячий» сектор (летит сильнее): «то крипта, то акции, то сырьё»
         const EPOCH_HOT_CAT = {'Технологический бум':'stock','Крипто-мания':'crypto','Промышленный век':'comm','Сырьевой цикл':'metal','Эпоха ИИ':'stock'};
+        // построить актив из строки посева (с мягкой предысторией — спарклайн живой сразу)
+        function _mkAsset(s){
+            const id=String(s[0]), name=s[1], type=s[2], price=Number(s[3]), vol=Number(s[4])||3, mn=Number(s[5]), mx=Number(s[6]);
+            const sector=s[7]||type, div=Number(s[8])||0;
+            let pr=price, hist=[];
+            for(let k=0;k<20;k++){ pr=Math.max(mn, Math.min(mx, pr*(1+(Math.random()-0.5)*(vol/100)*1.4))); hist.push(_r2(pr)); }
+            hist.push(_r2(price));
+            return { id:id, name:name, type:type, price:_r2(price), price0:_r2(price), min:mn, max:mx, vol:vol, sector:sector, div:div, mom:0, anchor:_r2(price), history:hist };
+        }
         function seedOfflineMarket(force){
             if(!force && state.market && state.market.assets && state.market.assets.length) return;
-            // 1) поднять сохранённый офлайн-рынок (цены/листинги живут между входами)
-            if(!force){ try{ const raw=localStorage.getItem('v0_market'); if(raw){ const m=JSON.parse(raw); if(m && m.assets && m.assets.length){ m._offline=true; state.market=m; return; } } }catch(e){} }
-            // 2) свежий посев из 27 активов + мягкая предыстория (спарклайн живой с 1-го месяца)
-            const assets = OFFLINE_MARKET_SEED.map(function(s){
-                const id=String(s[0]), name=s[1], type=s[2], price=Number(s[3]), vol=Number(s[4])||3, mn=Number(s[5]), mx=Number(s[6]);
-                let pr=price, hist=[];
-                for(let k=0;k<20;k++){ pr=Math.max(mn, Math.min(mx, pr*(1+(Math.random()-0.5)*(vol/100)*1.4))); hist.push(_r2(pr)); }
-                hist.push(_r2(price));
-                return { id:id, name:name, type:type, price:_r2(price), price0:_r2(price), min:mn, max:mx, vol:vol, anchor:_r2(price), history:hist };
-            });
-            state.market = { assets:assets, game_year:1, _offline:true, _tickMonth:0, events_last:[], started_at:Date.now() };
+            // 1) поднять сохранённый офлайн-рынок (цены/листинги живут между входами) + МИГРАЦИЯ новых бумаг
+            if(!force){ try{ const raw=localStorage.getItem('v0_market'); if(raw){ const m=JSON.parse(raw); if(m && m.assets && m.assets.length){
+                m._offline=true;
+                const have=new Set(m.assets.map(x=>String(x.id)));
+                for(const s of OFFLINE_MARKET_SEED){ if(!have.has(String(s[0]))) m.assets.push(_mkAsset(s)); }   // новые активы подмешиваем, портфель не трогаем
+                for(const a of m.assets){                                                                        // добить недостающие поля у старых сейвов
+                    if(a.sector==null || a.div==null){ const s=OFFLINE_MARKET_SEED.find(r=>String(r[0])===String(a.id)); if(s){ if(a.sector==null)a.sector=s[7]||s[2]; if(a.div==null)a.div=Number(s[8])||0; } }
+                    if(a.sector==null)a.sector=a.type; if(a.div==null)a.div=0;
+                    if(a.anchor==null)a.anchor=a.price; if(a.mom==null)a.mom=0;
+                }
+                state.market=m; try{ persistOfflineMarket(); }catch(e){}
+                return;
+            } } }catch(e){} }
+            // 2) свежий посев из полного списка активов
+            state.market = { assets:OFFLINE_MARKET_SEED.map(_mkAsset), game_year:1, _offline:true, _tickMonth:0, events_last:[], started_at:Date.now() };
             try{ persistOfflineMarket(); }catch(e){}
         }
         function persistOfflineMarket(){ try{ if(state.market && state.market._offline) localStorage.setItem('v0_market', JSON.stringify(state.market)); }catch(e){} }
-        // Один месяц жизни рынка под данной эпохой
+        // Один месяц жизни рынка под данной эпохой.
+        // 🏛️ ЖИВОЙ ДВИЖОК (Ринат/Александр 27сен «биржа как настоящая»): цена = тренд(моментум) + возврат к среднему
+        //    + дрейф эпохи + новостные толчки. Появляются тренды, которые можно ловить, и развороты — но без гарантий
+        //    (баланс как в жизни). Всё ограничено min/max, тот же O(n) цикл — не лагает. Только офлайн, сервер не трогаем.
         function _marketTickOneMonth(ep){
             const hot = EPOCH_HOT_CAT[ep && ep.theme] || null;
-            const mm = (ep && Number(ep.mktMul)) || 1;
+            const mm  = (ep && Number(ep.mktMul)) || 1;
             for(const a of state.market.assets){
                 const cat = assetCat(a);
-                // дрейф от эпохи (mktMul — «настрой рынка», берём мягко, чтобы не улетал за месяц)
-                let drift = 1 + (mm - 1) * 0.5;
-                if(hot && cat===hot) drift += 0.02;                 // горячий сектор эпохи летит сильнее
-                const noise = 1 + (Math.random()-0.5) * ((Number(a.vol)||3)/100) * 2.2;   // волатильность актива = шум
-                let np = a.price * drift * noise;
-                // редкий срыв у мемов/крипты — пусть игрок обжигается (принцип Рината), не глухая стена
-                if((Number(a.vol)||0)>=45 && Math.random()<0.05) np *= (Math.random()<0.5 ? 0.45 : 2.1);
+                const vol = (Number(a.vol)||3)/100;                 // волатильность актива (доля)
+                // 1) МОМЕНТУМ: тренд, что тянется во времени, но со временем гаснет и разворачивается
+                let mom = (Number(a.mom)||0) * 0.8 + (Math.random()-0.5) * vol * 0.9;
+                // 2) ДРЕЙФ ЭПОХИ (мягко) + горячий сектор летит сильнее
+                let drift = (mm - 1) * 0.5;
+                if(hot && cat===hot) drift += 0.015;
+                // 3) ВОЗВРАТ К СРЕДНЕМУ (якорь): дорогое остывает, дешёвое подбирают → циклы «купи низко / продай высоко»
+                const anchor = Number(a.anchor) || a.price;
+                const rev = (anchor>0 && a.price>0) ? Math.log(anchor / a.price) * 0.06 : 0;
+                // 4) ШУМ месяца
+                let ret = drift + mom + rev + (Math.random()-0.5) * vol * 1.2;
+                // 5) НОВОСТНОЙ ТОЛЧОК: ~8% активов в месяц ловят заметное движение (отчёт/новость)
+                if(Math.random() < 0.08) ret += (Math.random()-0.5) * vol * 4;
+                // 6) редкий срыв/памп у мемов и крипты — пусть игрок обжигается (принцип Рината), не глухая стена
+                if(vol*100 >= 45 && Math.random() < 0.05) ret += (Math.random()<0.5 ? -0.6 : 0.9);
+                let np = a.price * (1 + ret);
                 np = Math.max(Number(a.min)||np*0.2, Math.min(Number(a.max)||np*6, np));
-                a.price = _r2(np);
+                a.mom    = Math.round(mom*1e4)/1e4;                 // моментум живёт между входами (в localStorage)
+                a.price  = _r2(np);
+                a.anchor = _r2(anchor * (1 + drift*0.4));           // якорь тихо дрейфует с эпохой → есть и долгий тренд
                 a.history = (a.history||[]).concat([a.price]); if(a.history.length>40) a.history = a.history.slice(-40);
             }
         }
@@ -15286,8 +15335,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                       </div>
                       ${sparkline(a.history, chg>=0)}
                       <div style="flex:0 0 88px;text-align:right;overflow:hidden;">
-                        <div style="font-family:ui-monospace,monospace;font-size:14px;font-weight:700;color:#efd8a3;line-height:1.15;white-space:nowrap;">${fmtPrice(a.price)}$</div>
-                        <div style="font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:${c};white-space:nowrap;">${arrow} ${fmtPct(chg)}</div>
+                        <div id="mkp_${a.id}" style="font-family:ui-monospace,monospace;font-size:14px;font-weight:700;color:#efd8a3;line-height:1.15;white-space:nowrap;">${fmtPrice(a.price)}$</div>
+                        <div id="mkc_${a.id}" style="font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:${c};white-space:nowrap;">${arrow} ${fmtPct(chg)}</div>
                       </div>
                       <button onclick="openBuyModal('${a.id}')" style="flex:0 0 62px;background:rgba(217,184,119,.10);border:1px solid var(--lx-gold-ln);border-radius:9px;color:var(--lx-gold-br);font-size:11.5px;font-weight:800;padding:7px 0;cursor:pointer;">Купить</button>
                     </div>`;
@@ -15325,8 +15374,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         ${hist.length>=2?heroSpark(hist,up):''}
                     </div>`;
                 })()}
-                <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">💸 Комиссия биржи сейчас: <b style="color:#fbbf24;">${(tradeFeePct(p)*100).toFixed(1)}%</b> на сделку <span style="color:#6b7280;">(спред ${(FEE_BASE*100).toFixed(1)}% + надбавка за частоту, до ${(FEE_CAP*100).toFixed(0)}%)</span></div>
-                <div style="font-size:11px;color:#8a8378;background:#0d1016;border:1px solid #242833;border-radius:8px;padding:7px 9px;margin-bottom:8px;line-height:1.5;">🧭 Как в жизни: комиссию берут <b>и на покупке, и на продаже</b> (это спред). Поэтому суета мелкими сделками съедается в ноль. Биржа — не про мелкий пассив, а про <b style="color:#cdc8bd;">поймать момент</b>: в разное время «горит» разный рынок (то крипта, то акции, то сырьё). Кто это видит — тот и зарабатывает.</div>
+                <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">💸 Комиссия <b style="color:#fbbf24;">${(tradeFeePct(p)*100).toFixed(1)}%</b> на сделку <span style="color:#6b7280;">· как торговать — жми ℹ️ вверху</span></div>
                 <button onclick="state.showMarket=!state.showMarket;render();" style="width:100%;margin:2px 0 8px;padding:11px;cursor:pointer;border-radius:11px;font-family:Georgia,serif;font-size:14px;font-weight:700;letter-spacing:.02em;background:${state.showMarket?'var(--lx-ink)':'linear-gradient(180deg,#efd8a3,#d9b877)'};color:${state.showMarket?'var(--lx-gold-br)':'#20180a'};border:1px solid var(--lx-gold-ln);">${state.showMarket?'Свернуть торги ▲':'Открыть торги ▼'}</button>
                 ${listHtml}
                 <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin:10px 0 4px;border-top:1px solid #1f2937;padding-top:10px;">💼 Мои активы (куплено)</div>
@@ -15544,7 +15592,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(ev.k==='bonus'||ev.k==='x13') salDelta = Math.round(f.salary*ev.pct);
             else if(ev.k==='fine'||ev.k==='sick') salDelta = -Math.round(f.salary*ev.pct);
             else if(ev.k==='delay') salDelta = -f.salary;           // оклад не пришёл, расходы остались
-            const flow = Math.round((f.flow + salDelta)*100)/100;   // фактический поток в кассу этот месяц
+            const divInc = marketDividendMonthly(p);                // 💰 дивиденды с акций в кассу этот месяц
+            const flow = Math.round((f.flow + salDelta + divInc)*100)/100;   // фактический поток в кассу этот месяц
             const _st=pstat(p); _st.salaryCount++; _st.salaryTotal=Math.round((_st.salaryTotal+flow)*100)/100;
             try{ viaMarketSync(_st.salaryCount); }catch(e){}   // 🏛️ прожит месяц → офлайн-биржа шагает под текущей эпохой (в серверном режиме молчит)
             soulYearTick(p);                                        // 🕯️ прожитый год: чистые годы, висящий долг, отпускает ли дно
@@ -15554,7 +15603,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try{ logAction(p, (flow>=0?'💵':'💸'), 'Получка за месяц'+(ev.k!=='plain'?' ('+ev.nm+')':''), {amt:flow, sphere:'деньги'}); }catch(e){}
             p.notify = (flow>=0 ? '💵 Получка: +'+fmtN(flow)+'$ в кассу'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.'
                                 : '💸 Месяц в минус: '+fmtN(flow)+'$'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.');
-            state.payslipModal = { pId:id, evk:ev.k, evnm:ev.nm||'', evsay:ev.say||'', sal:f.salary, salDelta:salDelta,
+            state.payslipModal = { pId:id, evk:ev.k, evnm:ev.nm||'', evsay:ev.say||'', sal:f.salary, salDelta:salDelta, divInc:divInc,
                 f:{passive:f.passive, taxes:f.taxes, mortgagePay:f.mortgagePay, eduPay:f.eduPay, autoPay:f.autoPay, ccPay:f.ccPay, retailPay:f.retailPay, otherExp:f.otherExp, childExp:f.childExp, bankPay:f.bankPay}, flow:flow };
             save(id); render();
         }
@@ -15570,6 +15619,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if((m.evk==='fine'||m.evk==='sick') && m.salDelta) rows+=line(m.evnm,'−'+fmtN(Math.abs(m.salDelta))+' $','minus');
             if(m.evk==='raise') rows+=line(m.evnm,'оклад +'+Math.round(0.08*100)+'% навсегда','plus');
             if(f.passive>0) rows+=line('Пассив (бизнес/ферма)','+'+fmtN(f.passive)+' $','plus');
+            if(m.divInc>0) rows+=line('💰 Дивиденды с акций','+'+fmtN(m.divInc)+' $','plus');
             const debts=(f.mortgagePay+f.eduPay+f.autoPay+f.ccPay+f.retailPay+f.bankPay);
             if(f.taxes>0) rows+=line('🏦 Налоги','−'+fmtN(f.taxes)+' $','minus');
             if(debts>0)   rows+=line('💳 Долги и кредиты','−'+fmtN(debts)+' $','minus');
@@ -16256,8 +16306,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
               ? { t:'На тебе — знак демона.', s:'Не за один грех. Так ты прожил: обман, невозвращённые долги, взятое у людей без отдачи, брошенные люди. Это зеркало.' }
               : { t:'Молодец. Ты купил Карту.', s:'Знак был на карте. Ты его не искал.' };
             return `<div style="position:fixed;inset:0;background:rgba(3,1,1,.96);z-index:121;display:flex;
-                align-items:center;justify-content:center;padding:16px;">
-              <div style="max-width:340px;width:100%;text-align:center;">
+                align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+              <button onclick="s5CloseBurn(${p.id})" aria-label="Закрыть" style="position:fixed;top:10px;right:12px;z-index:122;
+                width:40px;height:40px;border-radius:50%;background:rgba(63,20,16,.92);color:#ffb4a2;border:1px solid #6b2018;
+                font-size:20px;font-weight:800;line-height:1;cursor:pointer;">✕</button>
+              <div style="max-width:340px;width:100%;text-align:center;margin:16px auto 32px;">
                 <img src="${D_IMG.burn}" alt="" style="width:min(64vw,220px);aspect-ratio:2/3;object-fit:cover;
                   animation:jailFlip .5s ease-out;">
                 <div style="font-family:Georgia,serif;font-size:23px;color:#ff5c3d;margin:8px 0 10px;">${why.t}</div>
@@ -17839,6 +17892,33 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function boardResetTimer(){ boardStartTimer(); }   // старое имя = запуск (совместимость)
         // ─── ТАЙМЕРЫ (Ф3): ход 2 мин мягкий, окно покупки 1 мин жёсткое ───
         function fmtLeft(endsAtSec){ const s=Math.max(0,Math.round(endsAtSec - Date.now()/1000)); const m=Math.floor(s/60); return m>0 ? (m+':'+String(s%60).padStart(2,'0')) : (s+'с'); }
+        // 🏛️🟢 ЖИВОЙ РЫНОК (Ринат/Александр 27сен «биржа как настоящая, торговать в реальном времени»):
+        //   пока биржа на экране, участники (настроение толпы + редкий «кит») двигают цены мелкой внутримесячной
+        //   волной раз в ~3с, с возвратом к месячному якорю (не уезжает от «настоящей» цены). Патчим ТОЛЬКО ячейки
+        //   цен по id — без полного render, поэтому не лагает и не теряет прокрутку/фокус. Только офлайн.
+        let _mktLiveN=0, _mktPersistN=0;
+        function marketLiveTick(){
+            const m=state.market, mk=document.getElementById('mktTick');
+            if(!mk || !m || !m._offline || !m.assets) return;   // биржа не на экране / серверный режим — не трогаем
+            mk.textContent='🟢 Живой рынок · Год '+(m.game_year||1)+' — цены дышат в реальном времени';
+            mk.style.color='#34d399';
+            if((++_mktLiveN) % 3 !== 0) return;                 // цены двигаем раз в ~3с
+            for(const a of m.assets){
+                const vol=(Number(a.vol)||3)/100;
+                let sent=(Number(a.sent)||0)*0.9 + (Math.random()-0.5)*vol*0.15;       // настроение участников плывёт
+                let move=sent + (Math.random()-0.5)*vol*0.25;                          // мелкая внутримесячная волна
+                if(Math.random()<0.02) move += (Math.random()<0.5?-1:1)*vol*1.2;       // редкий «кит» толкает цену
+                const anch=Number(a.anchor)||a.price;
+                if(anch>0 && a.price>0) move += Math.log(anch/a.price)*0.02;            // возврат к месячному якорю
+                let np=a.price*(1+move);
+                np=Math.max(Number(a.min)||np*0.2, Math.min(Number(a.max)||np*6, np));
+                a.sent=Math.round(sent*1e4)/1e4; a.price=_r2(np);
+                const base=a.price0||a.price, chg=base?((a.price/base-1)*100):0;
+                const pe=document.getElementById('mkp_'+a.id); if(pe) pe.textContent=fmtPrice(a.price)+'$';
+                const ce=document.getElementById('mkc_'+a.id); if(ce){ ce.textContent=(chg>=0?'▲':'▼')+' '+fmtPct(chg); ce.style.color=chg>=0?'#34e0a1':'#ff5c72'; }
+            }
+            if((++_mktPersistN)%5===0){ try{ persistOfflineMarket(); }catch(e){} }       // сохраняем ~раз в 15с
+        }
         let _buyWasOpen=false;
         function tickTimers(){
             // отсчёт до следующего обновления цен на бирже (чтобы успевали купить «в моменте»)
@@ -17848,9 +17928,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 mk.textContent = left>0 ? ('⏳ Цены держатся ещё '+Math.ceil(left)+'с') : '🔄 обновление цен…';
                 mk.style.color = left>0 ? (left<6?'#f59e0b':'#7dd3fc') : '#34d399';
             } else if(mk && state.market && state.market._offline){
-                const ep=(window.viaEpoch&&window.viaEpoch.phaseName)||'—';
-                mk.textContent = '📅 Год '+(state.market.game_year||1)+' · эпоха: '+ep+' — рынок двигается каждый прожитый месяц';
-                mk.style.color = '#c9a961';
+                try{ marketLiveTick(); }catch(e){}   // 🟢 живой рынок: участники двигают цены в реальном времени
             }
             const b=state.board; if(!b) return;
             const tt=document.getElementById('turnTimer');
@@ -18579,8 +18657,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         ? `<button onclick="farmSlaughter('${a.aid}')" class="btn btn-orange" style="width:100%;padding:4px;font-size:11px;margin-top:4px;">🔪 На убой → 🥩 склад (~${Math.round(c.meat*priceIdx('meat'))}$)</button>`
                         : `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">🔪 убой — нужна 🏭 Бойня + 🔪 убойщики</div>`;
                 }
-                // 🧹 УБРАТЬ: культуры (выкосить) и живность без убоя (павлин/рыба/пчёлы) — освободить место
-                if(a.mature && (c.crop || (!c.male && !(c.meat>0)))) s += `<button onclick="farmCull('${a.aid}')" class="btn btn-gray" style="width:100%;padding:4px;font-size:10px;margin-top:4px;">🧹 ${c.crop?'Выкосить / убрать':'Убрать'}</button>`;
+                // 🧹 УБРАТЬ: культуры (выкосить) и любая живность без убоя — павлин/рыба/пчёлы И самцы без мяса
+                //    (Александр 26сен: крокодил-самец meat:0 → раньше не было ни убоя, ни «Убрать» = тупик, жрал ресурс).
+                if(a.mature && (c.crop || !(c.meat>0))) s += `<button onclick="farmCull('${a.aid}')" class="btn btn-gray" style="width:100%;padding:4px;font-size:10px;margin-top:4px;">🧹 ${c.crop?'Выкосить / убрать':'Убрать'}</button>`;
                 return s + `</div>`;
             };
             const gridOf = (arr)=>`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:10px;">${arr.map(cardOf).join('')}</div>`;
