@@ -13098,7 +13098,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div id="buyEst" style="background:#0b1119;border:1px solid var(--lx-line);border-radius:12px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.8;margin-bottom:8px;">${buyEstHtml(q,price,cost,fee,total,p.savings)}</div>
                     <div id="slipBox" style="background:#0b1119;border:1px solid var(--lx-line);border-radius:12px;padding:12px 13px;font-size:13px;color:#cdc8bd;line-height:1.7;margin-bottom:13px;">Впиши сумму — покажу, по какой цене сделка пройдёт на самом деле.</div>
                     <button id="buyConfirmBtn" onclick="confirmBuy()" ${q<1?'disabled':''} style="width:100%;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;background:${q>0?'linear-gradient(180deg,#f4dd9c,#d9b877)':'#374151'};color:${q>0?'#20180a':'#9ca3af'};">${q<1?'Впиши сумму':(SERVER_MODE?'⏳ Считаю точную цену со стаканом…':(enough?`✅ Купить ${fmtN(q)} шт за ${fmtN(Math.round(total))}$`:`Не хватает — нужно ${fmtN(Math.round(total))}$`))}</button>
-                    <div style="font-size:11px;text-align:center;color:#5d6b7e;margin-top:11px;line-height:1.5;">Комиссию берут и на покупке, и на продаже (спред). «Мин» — 1 лот, «Макс» — вся касса.</div>
+                    <button onclick="buyToMargin()" style="width:100%;margin-top:9px;padding:11px;border-radius:12px;border:1px solid #2a3a4d;background:#111a26;color:#bcd0e6;font-weight:700;font-size:13px;cursor:pointer;">⚡ Или ставка на движение — с плечом / 📉 шорт →</button>
+                    <div style="font-size:11px;text-align:center;color:#5d6b7e;margin-top:11px;line-height:1.5;">Купить — влади активом. Ставка с плечом/шорт — заработок на росте ИЛИ падении (риск выше). Комиссию берут и на покупке, и на продаже.</div>
                 </div>
             </div>`;
         }
@@ -15213,6 +15214,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!def){ const cr=m.assets.find(x=>assetCat(x)==='crypto'); def=cr?cr.id:m.assets[0].id; }
             state.marginModal={assetId:String(def), lev:1, amt:0}; paintOverlays();
         }
+        // ⚡ из окна покупки → в сделку с плечом/шорт по ЭТОМУ активу с той же суммой (Ринат 27сен:
+        //    решение о плече принимается при покупке, а не отдельной карточкой на экране биржи).
+        function buyToMargin(){
+            const bm=state.buyModal; if(!bm) return;
+            const a=assetById(bm.assetId); if(!a) return;
+            const amtDollar=Math.round((Number(bm.qty)||0)*(Number(a.price)||0));
+            state.buyModal=null;
+            openMarginModal();
+            const mm=state.marginModal; if(mm){ mm.assetId=String(bm.assetId); if(amtDollar>0) mm.amt=amtDollar; }
+            paintOverlays();
+        }
         function closeMarginModal(){ state.marginModal=null; paintOverlays(); }
         function setMarginAsset(id){ const mm=state.marginModal; if(mm){ mm.assetId=String(id); paintOverlays(); } }
         function setMarginLev(n){ const mm=state.marginModal; if(mm){ mm.lev=n; paintOverlays(); } }
@@ -15266,10 +15278,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                   +'<div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:800;margin:6px 0;color:'+cl+';">'+(pnl>=0?'+':'')+fmtN(pnl)+'$</div>'
                   +'<button onclick="closeMargin(false)" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">Закрыть позицию</button>'+liq;
             } else {
-                inner='<div style="display:flex;gap:8px;">'
-                  +'<button onclick="openMarginModal()" class="btn" style="flex:1;background:linear-gradient(180deg,#12251b,#0e1a13);color:#8ff0b6;border:1px solid #1f6b45;font-weight:800;padding:11px;">📈 На рост</button>'
-                  +'<button onclick="openMarginModal()" class="btn" style="flex:1;background:linear-gradient(180deg,#241315,#180d0e);color:#ffb0b0;border:1px solid #7a2f36;font-weight:800;padding:11px;">📉 На падение</button>'
-                  +'</div>';
+                return '';   // 🩹 нет открытой позиции → карточку не показываем (вход в плечо/шорт теперь из окна покупки)
             }
             const log=p.mposLog?'<div style="font-size:11.5px;color:#9c988e;margin-top:6px;">'+p.mposLog+'</div>':'';
             return '<div style="border:1px solid var(--lx-line);border-radius:12px;padding:11px 13px;margin:8px 0;background:var(--lx-panel2);">'
@@ -15362,6 +15371,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${alertHtml}
                 ${renderAnalystCard(p)}
                 ${renderIpoPosition(p)}
+                <button onclick="if(window.openIpo)window.openIpo()" style="width:100%;margin:2px 0 12px;padding:12px;border-radius:12px;border:1px solid var(--lx-gold-ln);background:linear-gradient(180deg,rgba(231,189,99,.12),rgba(231,189,99,.03));color:var(--lx-gold-br);font-weight:700;font-size:14px;cursor:pointer;">🚀 Размещения — IPO</button>
                 ${renderMarginCard(p)}
                 ${(function(){
                     const port=portfolioValue(p), cash=Number(p.savings)||0;
@@ -22730,6 +22740,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       .vf-epoch .em{font-size:11.5px;color:var(--lx-muted);margin-top:2px;line-height:1.25;}
       .vf-ipo{display:block;margin:0 auto 14px;max-width:540px;width:100%;padding:11px;border-radius:12px;border:1px solid var(--lx-gold-ln);background:linear-gradient(180deg,rgba(231,189,99,.11),rgba(231,189,99,.03));color:var(--lx-gold-br);font-weight:600;font-size:13.5px;cursor:pointer;font-family:inherit;}
       .vf-ipo:active{transform:scale(.99);}
+      /* компактная сетка быстрых кнопок на Поле (Ринат 27сен: не столбиком-во-весь-экран, а аккуратно) */
+      .vf-quick{max-width:540px;margin:0 auto 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+      .vf-quick .vf-ipo{margin:0;max-width:none;width:auto;padding:10px 6px;font-size:12px;line-height:1.2;}
+      @media(max-width:430px){.vf-quick .vf-ipo{font-size:11px;padding:9px 4px;}}
       #viaIpo{position:fixed;inset:0;z-index:855;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.10), transparent 60%), #0a0703;}
       html.tg-app.tg-fs #viaIpo{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
       #viaIpo[hidden]{display:none;}
@@ -22820,17 +22834,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     <div id="viaField" hidden>
       <div class="vf-head"><h2>Поле жизни</h2><p>Брось кубик — фишка идёт по клеткам, круг = месяц, время ведут часы лет. Стоишь на клетке → входишь в её дело.</p></div>
       <div class="vf-epoch" id="viaEpochBar"></div>
-      <button class="vf-ipo" id="viIpoOpen">🚀 Размещения — IPO</button>
-      <button class="vf-ipo" id="viShopOpen" style="border-color:var(--lx-gold);background:linear-gradient(180deg,rgba(244,212,137,.16),rgba(244,212,137,.04));" onclick="if(window.openShop)openShop()">🛒 Магазин · открыть блоки за ⭐</button>
-      <button class="vf-ipo" id="viSupportOpen" style="border-color:var(--lx-gold);background:linear-gradient(180deg,rgba(244,212,137,.16),rgba(244,212,137,.04));">⭐ Поддержать VIA</button>
-      <button class="vf-ipo" id="viChatOpen" style="border-color:#4aa3df;background:linear-gradient(180deg,rgba(74,163,223,.18),rgba(74,163,223,.05));color:#cfe8fb;">💬 Чат VIA — сообщество игроков</button>
+      <div class="vf-quick">
+      <button class="vf-ipo" id="viShopOpen" style="border-color:var(--lx-gold);background:linear-gradient(180deg,rgba(244,212,137,.16),rgba(244,212,137,.04));" onclick="if(window.openShop)openShop()">🛒 Магазин ⭐</button>
+      <button class="vf-ipo" id="viSupportOpen" style="border-color:var(--lx-gold);background:linear-gradient(180deg,rgba(244,212,137,.16),rgba(244,212,137,.04));">⭐ Поддержать</button>
+      <button class="vf-ipo" id="viChatOpen" style="border-color:#4aa3df;background:linear-gradient(180deg,rgba(74,163,223,.18),rgba(74,163,223,.05));color:#cfe8fb;">💬 Чат</button>
+      </div>
       <div id="viaBoard"></div>
       <div class="vf-soulpanel" id="vfSoulPanel" hidden>Нажми клетку Души — раскроется её вопрос.</div>
     </div>
 
     <div id="viaIpo" hidden>
       <div class="vi-wrap">
-        <div class="vi-head"><button class="vi-back" id="viIpoBack">← Поле</button><h2>Размещения · IPO</h2></div>
+        <div class="vi-head"><button class="vi-back" id="viIpoBack">← Назад</button><h2>Размещения · IPO</h2></div>
         <div class="vi-heat" id="viHeat"></div>
         <div class="vi-sec-t">Открытые размещения</div>
         <div class="vi-offers" id="viOffers"></div>
@@ -23243,6 +23258,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
       }
       function openIpo(){curOffers=genOffers();if(ipoEl)ipoEl.hidden=false;renderIpo();}
+      window.openIpo=openIpo;   // 🚀 IPO теперь открывается из биржи (Ринат 27сен: IPO — в ветке биржи, не на Поле)
       function closeIpo(){if(ipoEl)ipoEl.hidden=true;}
       var oib=document.getElementById('viIpoOpen');if(oib)oib.addEventListener('click',openIpo);
       var ibk=document.getElementById('viIpoBack');if(ibk)ibk.addEventListener('click',closeIpo);
