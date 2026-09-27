@@ -13081,8 +13081,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 return '<div style="background:rgba(52,224,161,.08);border:1px solid rgba(52,224,161,.28);border-radius:11px;padding:8px 11px;font-size:12px;color:#8fe6c2;line-height:1.5;margin-bottom:12px;">🛟 Тихая гавань — растёт мало, но стабильно. Большие деньги стоят спокойно.</div>';
             })();
             return `<div style="position:fixed;inset:0;z-index:4200;background:rgba(3,5,9,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)closeBuyModal()">
-                <div style="width:520px;max-width:100%;background:radial-gradient(120% 80% at 50% 0,rgba(232,200,119,.08),transparent 60%),linear-gradient(180deg,#141b28,#0c121d);border:1px solid var(--lx-gold-ln);border-bottom:none;border-radius:22px 22px 0 0;box-shadow:0 -20px 60px rgba(0,0,0,.6);padding:16px 18px calc(20px + env(safe-area-inset-bottom));">
-                    <div style="width:40px;height:4px;border-radius:3px;margin:0 auto 14px;background:var(--lx-gold);opacity:.55;"></div>
+                <div style="width:520px;max-width:100%;background:#131722;border:none;border-radius:24px 24px 0 0;box-shadow:0 -20px 60px rgba(0,0,0,.6);padding:16px 18px calc(20px + env(safe-area-inset-bottom));">
+                    <div style="width:44px;height:4px;border-radius:3px;margin:0 auto 14px;background:#3a4252;"></div>
                     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;">
                         <div style="font-family:ui-monospace,monospace;font-size:21px;font-weight:800;color:#f3efe6;">${assetTicker(a.name)}</div>
                         <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:ui-monospace,monospace;font-size:17px;font-weight:800;color:${col};">${fmtPrice(price)} $</span><button onclick="closeBuyModal()" class="btn btn-gray" style="flex:0 0 auto;padding:4px 10px;">✕</button></div>
@@ -15291,13 +15291,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const a=assetById(mm.assetId)||m.assets[0]; const lev=Number(mm.lev)||1;
             const cats=['stock','crypto','meme','metal','comm'];
             const opts=m.assets.filter(x=>cats.includes(assetCat(x))).map(x=>'<option value="'+x.id+'"'+(String(x.id)===String(mm.assetId)?' selected':'')+'>'+x.name+' · '+fmtPrice(x.price)+'$</option>').join('');
-            const levPills=MLEV_OPTS.map(n=>'<span onclick="setMarginLev('+n+')" style="display:inline-block;padding:7px 12px;margin:3px 3px 3px 0;border-radius:9px;cursor:pointer;font-family:ui-monospace,monospace;font-weight:700;font-size:12px;border:1px solid '+(lev===n?'var(--lx-gold)':'var(--lx-line)')+';color:'+(lev===n?'var(--lx-gold-br)':'#cdc8bd')+';background:'+(lev===n?'#1a160a':'var(--lx-ink)')+';">'+(n===1?'без плеча':'×'+n)+'</span>').join('');
+            const levPills=MLEV_OPTS.map(n=>'<span onclick="setMarginLev('+n+')" style="display:inline-block;padding:8px 13px;margin:3px 3px 3px 0;border-radius:11px;cursor:pointer;font-weight:800;font-size:12px;border:none;color:'+(lev===n?'#fff':'#cbd5e1')+';background:'+(lev===n?'#4f8df7':'#1b2130')+';">'+(n===1?'без плеча':'×'+n)+'</span>').join('');
             return '<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;">'
-              +'<div style="width:420px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6);">'
-              +'<div style="height:4px;background:linear-gradient(90deg,transparent,#efd8a3,transparent);"></div>'
+              +'<div style="width:420px;max-width:100%;background:#131722;border:none;border-radius:20px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6);">'
+              +'<div style="height:4px;background:#4f8df7;"></div>'
               +'<div style="padding:20px;">'
                 +'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-                  +'<div><div style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Ставка на движение цены</div>'
+                  +'<div><div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#8fb4ff;font-weight:800;">Ставка на движение цены</div>'
                   +'<div style="font-family:Georgia,serif;font-size:20px;font-weight:700;color:#f3efe6;">Рост или падение</div></div>'
                   +'<button onclick="closeMarginModal()" class="btn btn-gray" style="flex:0 0 auto;">✕</button></div>'
                 +'<div style="font-size:12px;color:#9c988e;margin:12px 0 6px;">💰 Касса: <b style="color:var(--lx-gold-br);">'+fmtN(p.savings)+'$</b></div>'
@@ -15370,7 +15370,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 }).join(''):'<div style="color:#8b95a7;font-size:13px;padding:10px;text-align:center;">В этой категории пока нет активов.</div>';
                 // ℹ️ Прогноз доходности по вкладке (Ринат 19июл): «сколько даёт в год как в жизни»
                 const CAT_INFO={stock:['#5cb08b','📈 Акции — доли компаний. ~5–10%/год, стабильно. Большие деньги, тихо. Выигрывает терпеливый, кто держит и не дёргается.'],crypto:['#fbbf24','⚡ Крипта — ОПАСНО. Скачки ±50–60% за день, можно всё потерять. Но за 10–20 лет сильно выросла. Может взлететь — а может и нет.'],meme:['#f87171','☠️ Мем — риск потери 80–99%. Почти всегда обнуляются. На свой страх и риск — брокер не отвечает. Один из сотни срывает куш.'],metal:['#efd8a3','🥇 Металлы — тихая гавань. ~2–3%/год, медленно, но почти не падает. Сейф для больших денег.'],comm:['#efd8a3','🌾 Сырьё/нефть — стабильно, глубокий рынок, как золото.']};
-                const ci=CAT_INFO[tab]; const catInfoHtml=ci?`<div style="background:#0d1016;border:1px solid #242833;border-radius:9px;padding:8px 10px;font-size:11px;color:${ci[0]};line-height:1.5;margin-bottom:8px;">${ci[1]}</div>`:'';
+                const ci=CAT_INFO[tab]; const catInfoHtml=ci?`<div style="background:#1b2130;border:none;border-radius:12px;padding:9px 12px;font-size:11px;color:${ci[0]};line-height:1.5;margin-bottom:10px;">${ci[1]}</div>`:'';
                 listHtml=tabBar+catInfoHtml+rows;
             }
             return `<div class="card">
@@ -15378,7 +15378,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <span>📈 Биржа · Год ${m.game_year||1}</span>
                     <span style="display:flex;gap:6px;align-items:center;">${infoBtn('exchange')}<button onclick="state.showHistory=true;paintOverlays();" title="История сделок (всего за игру)" style="background:#0e2a3a;border:1px solid #23324a;border-radius:9px;color:#7dd3fc;font-size:15px;padding:4px 10px;cursor:pointer;font-weight:700;">🧾${(()=>{const n=Number(p.tradeSeq)||((p.trades&&p.trades.length)||0);return n?` ${n}`:'';})()}</button></span>
                 </div>
-                <div id="mktTick" style="text-align:center;font-family:ui-monospace,monospace;font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--lx-gold-br);background:rgba(217,184,119,.07);border:1px solid var(--lx-line);border-radius:8px;padding:5px 0;margin-bottom:8px;">⏳ …</div>
+                <div id="mktTick" style="text-align:center;font-size:11px;font-weight:800;letter-spacing:.04em;color:#8b95a7;background:#1b2130;border:none;border-radius:10px;padding:6px 0;margin-bottom:10px;">⏳ …</div>
                 ${/* 🩹 «дерганная палка» (Ринат 21июл): плашка рождалась СКРЫТОЙ, а показывал её таймер раз
      в секунду. На каждой перерисовке она исчезала — содержимое прыгало вверх, через миг
      таймер возвращал её — прыгало вниз. И только при открытом окне покупки, как он и заметил.
@@ -15387,7 +15387,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${alertHtml}
                 ${renderAnalystCard(p)}
                 ${renderIpoPosition(p)}
-                <button onclick="if(window.openIpo)window.openIpo()" style="width:100%;margin:2px 0 12px;padding:12px;border-radius:12px;border:1px solid var(--lx-gold-ln);background:linear-gradient(180deg,rgba(231,189,99,.12),rgba(231,189,99,.03));color:var(--lx-gold-br);font-weight:700;font-size:14px;cursor:pointer;">🚀 Размещения — IPO</button>
+                <button onclick="if(window.openIpo)window.openIpo()" style="width:100%;margin:2px 0 12px;padding:13px;border-radius:14px;border:none;background:#1b2130;color:#e7ebf3;font-weight:800;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">🚀 Размещения — IPO <span style="color:#8b95a7;font-weight:600;font-size:12px;">→</span></button>
                 ${renderMarginCard(p)}
                 ${(function(){
                     const port=portfolioValue(p), cash=Number(p.savings)||0;
