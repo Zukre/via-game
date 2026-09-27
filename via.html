@@ -15200,7 +15200,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Ставка против «дома» (не двигает стакан). Лонг — на рост, шорт — на падение; плечо множит и то, и то.
         // Позиция живёт на игроке (p.mpos) → синхрится через save(). Убыток ограничен ставкой (ret не уходит в минус).
         // Открытие — ОТДЕЛЬНЫМ ОКНОМ (state.marginModal), т.к. панель биржи целиком перерисовывается на тике рынка.
-        const MLEV_OPTS=[1,2,3,5];
+        const MLEV_OPTS=[1,2,3,5,10];
         function marginPnl(p){ const c=p&&p.mpos; if(!c) return 0; const a=assetById(c.assetId); if(!a||!c.entry) return 0;
             const chg=(a.price-c.entry)/c.entry; const dm=c.dir==='long'?1:-1; return Math.round(c.stake*c.lev*chg*dm); }
         function openMarginModal(){
@@ -15266,12 +15266,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                   +'<div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:800;margin:6px 0;color:'+cl+';">'+(pnl>=0?'+':'')+fmtN(pnl)+'$</div>'
                   +'<button onclick="closeMargin(false)" class="btn" style="width:100%;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">Закрыть позицию</button>'+liq;
             } else {
-                inner='<div style="font-size:12px;color:#8a8378;line-height:1.5;margin-bottom:6px;">Ставка на движение цены. <b style="color:#8ff0b6;">Лонг</b> — заработок на росте, <b style="color:#ffb0b0;">шорт</b> — на падении. Плечо множит и прибыль, и убыток.</div>'
-                  +'<button onclick="openMarginModal()" class="btn" style="width:100%;background:var(--lx-ink);color:var(--lx-gold-br);border:1px solid var(--lx-gold-ln);font-weight:700;">⚡ Открыть сделку с плечом / шорт</button>';
+                inner='<div style="font-size:12px;color:#8a8378;line-height:1.55;margin-bottom:8px;">Здесь зарабатывают и на <b style="color:#8ff0b6;">росте</b>, и на <b style="color:#ffb0b0;">падении</b> цены — <b style="color:#cdc8bd;">с плечом или без</b>. Угадал направление — в плюс.</div>'
+                  +'<div style="display:flex;gap:8px;">'
+                  +'<button onclick="openMarginModal()" class="btn" style="flex:1;background:linear-gradient(180deg,#12251b,#0e1a13);color:#8ff0b6;border:1px solid #1f6b45;font-weight:800;padding:11px;">📈 На рост</button>'
+                  +'<button onclick="openMarginModal()" class="btn" style="flex:1;background:linear-gradient(180deg,#241315,#180d0e);color:#ffb0b0;border:1px solid #7a2f36;font-weight:800;padding:11px;">📉 На падение</button>'
+                  +'</div>';
             }
             const log=p.mposLog?'<div style="font-size:11.5px;color:#9c988e;margin-top:6px;">'+p.mposLog+'</div>':'';
             return '<div style="border:1px solid var(--lx-line);border-radius:12px;padding:11px 13px;margin:8px 0;background:var(--lx-panel2);">'
-              +'<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#9c988e;font-weight:700;margin-bottom:6px;">⚡ Плечо / Шорт</div>'+inner+log+'</div>';
+              +'<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#9c988e;font-weight:700;margin-bottom:6px;">📈📉 Ставка: рост или падение</div>'+inner+log+'</div>';
         }
         function renderMarginModal(){
             const mm=state.marginModal; if(!mm) return '';
@@ -15280,25 +15283,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const a=assetById(mm.assetId)||m.assets[0]; const lev=Number(mm.lev)||1;
             const cats=['stock','crypto','meme','metal','comm'];
             const opts=m.assets.filter(x=>cats.includes(assetCat(x))).map(x=>'<option value="'+x.id+'"'+(String(x.id)===String(mm.assetId)?' selected':'')+'>'+x.name+' · '+fmtPrice(x.price)+'$</option>').join('');
-            const levPills=MLEV_OPTS.map(n=>'<span onclick="setMarginLev('+n+')" style="display:inline-block;padding:7px 14px;margin:3px 3px 3px 0;border-radius:9px;cursor:pointer;font-family:ui-monospace,monospace;font-weight:700;border:1px solid '+(lev===n?'var(--lx-gold)':'var(--lx-line)')+';color:'+(lev===n?'var(--lx-gold-br)':'#cdc8bd')+';background:'+(lev===n?'#1a160a':'var(--lx-ink)')+';">×'+n+'</span>').join('');
+            const levPills=MLEV_OPTS.map(n=>'<span onclick="setMarginLev('+n+')" style="display:inline-block;padding:7px 12px;margin:3px 3px 3px 0;border-radius:9px;cursor:pointer;font-family:ui-monospace,monospace;font-weight:700;font-size:12px;border:1px solid '+(lev===n?'var(--lx-gold)':'var(--lx-line)')+';color:'+(lev===n?'var(--lx-gold-br)':'#cdc8bd')+';background:'+(lev===n?'#1a160a':'var(--lx-ink)')+';">'+(n===1?'без плеча':'×'+n)+'</span>').join('');
             return '<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;">'
               +'<div style="width:420px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6);">'
               +'<div style="height:4px;background:linear-gradient(90deg,transparent,#efd8a3,transparent);"></div>'
               +'<div style="padding:20px;">'
                 +'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-                  +'<div><div style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Сделка с плечом</div>'
-                  +'<div style="font-family:Georgia,serif;font-size:20px;font-weight:700;color:#f3efe6;">Лонг / Шорт</div></div>'
+                  +'<div><div style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Ставка на движение цены</div>'
+                  +'<div style="font-family:Georgia,serif;font-size:20px;font-weight:700;color:#f3efe6;">Рост или падение</div></div>'
                   +'<button onclick="closeMarginModal()" class="btn btn-gray" style="flex:0 0 auto;">✕</button></div>'
                 +'<div style="font-size:12px;color:#9c988e;margin:12px 0 6px;">💰 Касса: <b style="color:var(--lx-gold-br);">'+fmtN(p.savings)+'$</b></div>'
                 +'<div style="font-size:11px;color:#8a8378;margin-bottom:4px;">Актив:</div>'
                 +'<select id="marginAssetSel" onchange="setMarginAsset(this.value)" class="inp" style="width:100%;margin-bottom:10px;background:#0a120d;">'+opts+'</select>'
                 +'<div style="font-size:11px;color:#8a8378;margin-bottom:4px;">Сумма ставки:</div>'
                 +'<input id="marginAmt" type="number" min="1" value="'+(mm.amt||'')+'" placeholder="напр. 2000" oninput="onMarginAmt(this.value)" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:16px;background:#0a120d;margin-bottom:8px;">'
-                +'<div style="font-size:11px;color:#8a8378;margin-bottom:2px;">Плечо:</div><div style="margin-bottom:8px;">'+levPills+'</div>'
+                +'<div style="font-size:11px;color:#8a8378;margin-bottom:4px;">Плечо <span style="color:#6d6a62;">(без плеча — спокойнее; больше — множит и прибыль, и риск)</span>:</div><div style="margin-bottom:8px;">'+levPills+'</div>'
                 +'<div id="marginPrev" style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:11px 12px;font-size:12.5px;color:#cdc8bd;line-height:1.7;margin-bottom:12px;">'+marginPrevHtml(mm.amt,lev,a)+'</div>'
                 +'<div style="display:flex;gap:8px;">'
-                  +'<button onclick="confirmMargin(\'long\')" class="btn" style="flex:1;background:linear-gradient(180deg,#12251b,#0e1a13);color:#8ff0b6;border:1px solid #1f6b45;font-weight:800;padding:12px;">📈 ЛОНГ (рост)</button>'
-                  +'<button onclick="confirmMargin(\'short\')" class="btn" style="flex:1;background:linear-gradient(180deg,#241315,#180d0e);color:#ffb0b0;border:1px solid #7a2f36;font-weight:800;padding:12px;">📉 ШОРТ (падение)</button>'
+                  +'<button onclick="confirmMargin(\'long\')" class="btn" style="flex:1;background:linear-gradient(180deg,#12251b,#0e1a13);color:#8ff0b6;border:1px solid #1f6b45;font-weight:800;padding:13px;">📈 Ставлю на РОСТ</button>'
+                  +'<button onclick="confirmMargin(\'short\')" class="btn" style="flex:1;background:linear-gradient(180deg,#241315,#180d0e);color:#ffb0b0;border:1px solid #7a2f36;font-weight:800;padding:13px;">📉 Ставлю на ПАДЕНИЕ</button>'
                 +'</div>'
               +'</div></div></div>';
         }
@@ -15315,8 +15318,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const ev=(m.events_last||[]).filter(e=>ownIds.includes(String(e.id)));
             const alertHtml = ev.length ? ev.map(e=>{const bad=(e.kind==='КРАХ'||e.kind==='ОБВАЛ');return `<div style="background:${bad?'#7f1d1d':'#064e3b'};color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:6px;">${bad?'💥':'🚀'} ТВОЙ актив «${e.name}»: ${e.kind} ${e.pct>0?'+':''}${e.pct}%!</div>`;}).join('') : '';
             let listHtml='';
-            if(state.showMarket){
-                const tab=state.marketTab||'crypto';
+            {   // 🟢 рынок всегда открыт (Ринат 27сен: без кнопки-стрелки «Открыть торги»)
+                const tab=state.marketTab||'stock';
                 const tabBar=`<div style="display:flex;gap:7px;overflow-x:auto;margin:8px 0 8px;padding-bottom:2px;">${MARKET_TABS.map(([k,lbl])=>`<button onclick="setMarketTab('${k}')" style="flex:0 0 auto;border:1px solid ${tab===k?'#f4dd9c':'var(--lx-line)'};background:${tab===k?'linear-gradient(180deg,#f4dd9c,#d9b877)':'#0d1420'};color:${tab===k?'#20180a':'#9fb0c6'};border-radius:11px;padding:8px 14px;font-size:12.5px;font-weight:${tab===k?'800':'700'};white-space:nowrap;cursor:pointer;">${lbl}</button>`).join('')}</div>`;
                 // СОРТИРОВКА (Ринат): где больше всего капитала вложено — та акция/крипта СВЕРХУ. По убыванию.
                 // Капитал = сумма по всем игрокам (кол-во × текущая цена). Ничего не вложено → по цене (крупные выше).
@@ -15375,7 +15378,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     </div>`;
                 })()}
                 <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">💸 Комиссия <b style="color:#fbbf24;">${(tradeFeePct(p)*100).toFixed(1)}%</b> на сделку <span style="color:#6b7280;">· как торговать — жми ℹ️ вверху</span></div>
-                <button onclick="state.showMarket=!state.showMarket;render();" style="width:100%;margin:2px 0 8px;padding:11px;cursor:pointer;border-radius:11px;font-family:Georgia,serif;font-size:14px;font-weight:700;letter-spacing:.02em;background:${state.showMarket?'var(--lx-ink)':'linear-gradient(180deg,#efd8a3,#d9b877)'};color:${state.showMarket?'var(--lx-gold-br)':'#20180a'};border:1px solid var(--lx-gold-ln);">${state.showMarket?'Свернуть торги ▲':'Открыть торги ▼'}</button>
+                <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin:6px 0 6px;border-top:1px solid #1f2937;padding-top:10px;">🛒 Рынок · выбери актив</div>
                 ${listHtml}
                 <div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin:10px 0 4px;border-top:1px solid #1f2937;padding-top:10px;">💼 Мои активы (куплено)</div>
                 ${holdHtml}
