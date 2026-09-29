@@ -11530,10 +11530,37 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         // situation — что за развилка. chose — что выбрал. opts.declined — что было доступно, но НЕ выбрано.
         // opts.paid — чем заплатил (строкой). opts.amt — сумма (если денежная). opts.sphere — ветка жизни.
+        // 🎯 МОТИВ «РАДИ ЧЕГО» (З2.1, дизайн-док ПУТЬ_ИГРОКА): не только ЧТО сделал, но ЗАЧЕМ — выведено из
+        // состояния в момент выбора (в долг/по средствам) + сферы. Фундамент 4-слойного Зеркала. Метка в choiceLog.
+        function inferMotive(opts, snap){
+            opts=opts||{}; snap=snap||{};
+            const sph=opts.sphere||''; const debt=Number(snap.debt)||0; const cash=Number(snap.cash)||0;
+            const amt=Math.abs(Number(opts.amt)||0);
+            const stretched = debt>0 && amt>0 && amt>cash;   // потратил больше, чем есть на руках — в долг/на разрыв
+            switch(sph){
+                case 'азарт':       return 'быстрый дофамин';
+                case 'тень':        return 'срезать угол';
+                case 'образ жизни':  return stretched ? 'понты не по средствам' : 'награда себе';
+                case 'дело':
+                case 'развитие':     return 'строит будущее';
+                case 'люди':
+                case 'доверие':      return 'ради людей';
+                case 'свобода':      return 'к свободе';
+                case 'осторожность': return 'безопасность';
+                case 'долг':
+                case 'цепи':         return stretched ? 'тушит пожар долгом' : 'берёт ответственность';
+                case 'совесть':      return 'по совести';
+                case 'характер':     return 'проверка характера';
+                case 'деньги':       return 'растит капитал';
+                case 'наследие':     return 'ради наследников';
+                default:             return '';
+            }
+        }
         function logChoice(p, situation, chose, opts){
             if(!p || !situation) return;
             opts = opts || {};
             if(!Array.isArray(p.choiceLog)) p.choiceLog = [];
+            const _snap = lifeSnapshot(p);
             const rec = {
                 sit: situation,
                 chose: chose || '',
@@ -11541,7 +11568,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 paid: opts.paid || '',
                 amt: (opts.amt!=null ? Math.round(Number(opts.amt)||0) : null),
                 sphere: opts.sphere || '',
-                state: lifeSnapshot(p),
+                motive: inferMotive(opts, _snap),   // 🎯 «ради чего» — фундамент Зеркала (З2.1)
+                state: _snap,
                 ts: Date.now()
             };
             p.choiceLog.push(rec);
@@ -12507,6 +12535,44 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(grow>=2) strengths.push('Ты '+grow+' раз вложился в свой рост — самый окупаемый вид смелости, потому что его результат забрать нельзя.');
             return { obs, strengths };
         }
+        // 🔥 СЛОЙ 3 ЗЕРКАЛА — СТИХИЯ (З2.3/10_ЗЕРКАЛО §3): квадрант ТЯГА×СПОСОБНОСТЬ по доменам жизни.
+        // Тяга = сколько раз ДОБРОВОЛЬНО шёл (choiceLog по сфере + вовлечённость). Способность = получается ли (результат
+        // относительно себя). Стихия = тянет И выходит. Ловушка = тянет, но не выходит (азарт — классика). Тон без приговора.
+        function tradeProfitable(p){
+            try{ let inv=0; const h=p.holdings||{}; for(const id in h){ inv+=(Number(h[id].avg)||0)*(Number(h[id].qty)||0); }
+                const pv=(typeof portfolioValue==='function')?portfolioValue(p):0;
+                if(inv<=0 && (p.trades||[]).length<3) return null;   // мало данных — не судим
+                return pv>=inv*0.98;
+            }catch(e){ return null; }
+        }
+        function elementQuadrant(p){
+            if(!p) return null;
+            const s=p.stats||{}, ch=Array.isArray(p.choiceLog)?p.choiceLog:[];
+            const chBy=sph=>ch.filter(r=>r&&r.sphere===sph).length;
+            const trades=(p.trades||[]).length, assetsN=(p.assets||[]).length;
+            const skillsN=(p.skills||[]).length + (p.branches?((p.branches.work||[]).length+(p.branches.free||[]).length+(p.branches.spirit||[]).length):0);
+            const casinoN=_mn(s.casinoPlays);
+            const rel=p.relationship||null, relHeld=!!(rel && !rel.over && (((rel.months||0)>=4)||((rel.warm||0)>=50)));
+            const charity=_mn(p.charity);
+            const D=[
+                {k:'Инвестиции и биржа', pull:trades+chBy('деньги'), able:tradeProfitable(p),
+                 good:'ты чувствуешь рынок — вложения начинают работать на тебя', bad:'рынок тебя пока обыгрывает: тянет, но чаще уносит'},
+                {k:'Своё дело', pull:chBy('дело')+assetsN, able:(assetsN>=2?true:(assetsN===0&&chBy('дело')>=2?false:null)),
+                 good:'ты строишь — дела растут и кормят тебя без твоего труда', bad:'тянет строить, но пока не докручиваешь дело до дохода'},
+                {k:'Люди и связи', pull:chBy('люди')+(rel?2:0), able:((charity>0||relHeld)?true:((rel&&rel.over)?false:null)),
+                 good:'с людьми у тебя выходит — ты вкладываешься, и они отвечают', bad:'тянет к людям, но связи рвутся — здесь твой самый честный материал'},
+                {k:'Рост и мастерство', pull:chBy('развитие')+skillsN, able:(skillsN>=3?true:(chBy('развитие')>=2&&skillsN<=1?false:null)),
+                 good:'ты растёшь — учишься и умнеешь, это самый окупаемый вклад', bad:'тянет учиться, но бросаешь на полпути'},
+                {k:'Азарт', pull:casinoN, able:(casinoN>=3?false:null),
+                 good:'', bad:'тянет к быстрой дрожи — но на дистанции дом всегда в плюсе. Это воронка, не стихия'}
+            ];
+            const active=D.filter(d=>d.pull>0).sort((a,b)=>b.pull-a.pull);
+            if(!active.length) return null;
+            const element=active.find(d=>d.able===true) || null;
+            const trap=active.find(d=>d.able===false) || null;
+            const lane=active.find(d=>d.able===true && d!==element) || null;   // талант, но не самый тянущий — «чужая колея» встречается редко
+            return { element, trap, top:active[0] };
+        }
         function mirrorBuild(p){
             if(!p) return null;
             const s = p.stats || {};
@@ -12646,6 +12712,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 obs,
                 coreText: core ? clusterName[core] : null,
                 aimText: core ? aimByCluster[core] : null,
+                element: elementQuadrant(p),   // 🔥 Слой 3 — Стихия (тяга×способность)
                 strengths, games
             };
         }
@@ -12701,6 +12768,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="font-size:14.5px;line-height:1.65;color:${MID};"><b style="color:${INK};">${o.verdict}</b> <span style="color:${G};font-style:italic;">Потому что</span> ${o.because} <span style="display:inline-block;margin-top:5px;color:${G};font:500 12px/1.4 ui-monospace,monospace;border-bottom:1px dotted ${G};padding-bottom:1px;">${o.sig}</span></div>
                 </div>`).join('');
             const strengthsHtml = M.strengths.map(x=>`<div style="font-size:14px;line-height:1.6;color:${MID};margin:0 0 10px;padding-left:14px;border-left:2px solid #84c4d2;">${x}</div>`).join('');
+            // 🔥 Слой 3 — Стихия (тяга×способность): где ты был собой + ловушка «страсть без таланта»
+            const _E = M.element; let stihiaHtml = '';
+            if(_E && (_E.element || _E.trap)){
+                stihiaHtml = `<div style="border-top:1px solid rgba(150,170,220,.14);margin:28px 0;"></div>
+                    <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:#e0a86a;margin-bottom:12px;">🔥 Твоя стихия — где ты был собой</div>`;
+                if(_E.element){ stihiaHtml += `<div style="background:linear-gradient(160deg,rgba(224,168,106,.12),transparent);border:1px solid rgba(224,168,106,.4);border-radius:14px;padding:16px 17px;margin-bottom:12px;">
+                    <div style="font-family:Georgia,serif;font-size:19px;color:${INK};margin-bottom:6px;">${_E.element.k}</div>
+                    <div style="font-size:14px;line-height:1.6;color:${MID};">Сюда тебя и тянуло, и здесь у тебя выходит — ${_E.element.good}. Вот куда стоит вложить свои 10 000 часов.</div></div>`; }
+                if(_E.trap){ stihiaHtml += `<div style="border-left:2px solid #cf9a6a;padding:6px 0 6px 18px;margin:8px 0;">
+                    <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.2em;text-transform:uppercase;color:#cf9a6a;margin-bottom:6px;">Осторожно — ловушка</div>
+                    <div style="font-size:14px;line-height:1.6;color:${MID};"><b style="color:${INK};">${_E.trap.k}.</b> ${_E.trap.bad}.</div></div>`; }
+            }
             const body = M.enough ? `
                 <div style="background:linear-gradient(160deg,rgba(228,197,131,.10),transparent);border:1px solid ${G}55;border-radius:16px;padding:22px;margin:0 0 26px;text-align:center;">
                     <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:${G};margin-bottom:10px;">Что это всё вместе — одна трещина</div>
@@ -12710,6 +12789,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <div style="border-top:1px solid rgba(150,170,220,.14);margin:28px 0;"></div>
                 <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:#84c4d2;margin-bottom:12px;">Где ты силён</div>
                 ${strengthsHtml}
+                ${stihiaHtml}
                 <div style="border-left:2px solid ${G};padding:6px 0 6px 20px;margin:26px 0 8px;">
                     <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:${G};margin-bottom:10px;">Куда бить точечно — одна точка</div>
                     <div style="font-size:15px;line-height:1.65;color:#d8dfef;">У тебя всё держится на одном мгновении: ${M.aimText}</div>
