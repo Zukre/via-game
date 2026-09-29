@@ -13391,8 +13391,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function setQty(v){ state.qtyPreset=v; render(); }
         function qtyLabel(){ const q=state.qtyPreset; if(q==='max') return ' Макс'; if(q==='min') return ' Мин'; if(typeof q==='number') return ' '+q; return ''; }
         // Вкладки биржи (Ринат): разбить по категориям, не всё подряд.
-        const MARKET_TABS = [['stock','📈 Акции'],['crypto','🪙 Крипта'],['meme','🚀 МЕМ'],['metal','🥇 Металлы'],['comm','🌾 Сырьё']];
-        function assetCat(a){ const t=a.type; if(t==='metal')return'metal'; if(t==='commodity')return'comm'; if(t==='crypto')return (Number(a.vol)||0)>=40?'meme':'crypto'; return 'stock'; }
+        const MARKET_TABS = [['stock','📈 Акции'],['crypto','🪙 Крипта'],['meme','🚀 МЕМ'],['metal','🥇 Металлы'],['comm','🌾 Сырьё'],['forex','💱 Форекс']];
+        function assetCat(a){ const t=a.type; if(t==='forex')return'forex';
+            if(a&&a.name&&/[A-Z]{3}\/[A-Z]{3}/.test(a.name))return'forex';   // 💱 форекс по имени пары (EUR/USD…) — сервер шлёт type=stock, ловим тут
+            if(t==='metal')return'metal'; if(t==='commodity')return'comm'; if(t==='crypto')return (Number(a.vol)||0)>=40?'meme':'crypto'; return 'stock'; }
         // 🏷️ ТИКЕР вместо полного названия (Ринат 3авг: «оставляешь только тикеты, не надо полное название»).
         // Имя в CSV = «Bitcoin (BTC)» → берём BTC. Без скобок («BNB», «XRP») — оставляем как есть.
         function assetTicker(nm){ nm=String(nm||''); const m=/\(([^)]+)\)\s*$/.exec(nm); return (m?m[1]:nm).trim(); }
@@ -13440,7 +13442,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         ["24", "KAZAX (KZX)", "crypto", 0.01, 65, 0.0002, 3.0, "Мем·КЗ", 0.0],
         ["25", "KAZAX GERLS (KGRL)", "crypto", 0.15, 58, 0.002, 12.0, "Мем·КЗ", 0.0],
         ["26", "BLOY (BLOY)", "crypto", 0.005, 68, 0.0001, 2.0, "Мем·КЗ", 0.0],
-        ["27", "SHIMIR (SHMR)", "crypto", 0.5, 55, 0.01, 40.0, "Мем·КЗ", 0.0]
+        ["27", "SHIMIR (SHMR)", "crypto", 0.5, 55, 0.01, 40.0, "Мем·КЗ", 0.0],
+        ["fx1", "EUR/USD", "forex", 1.08, 1, 0.9, 1.25, "Форекс · евро/доллар", 0.0],
+        ["fx2", "GBP/USD", "forex", 1.27, 1, 1.05, 1.45, "Форекс · фунт/доллар", 0.0],
+        ["fx3", "USD/JPY", "forex", 150.0, 1, 120.0, 175.0, "Форекс · доллар/иена", 0.0],
+        ["fx4", "USD/CHF", "forex", 0.90, 1, 0.78, 1.05, "Форекс · доллар/франк", 0.0],
+        ["fx5", "USD/CAD", "forex", 1.36, 1, 1.2, 1.55, "Форекс · доллар/канад.доллар", 0.0],
+        ["fx6", "AUD/USD", "forex", 0.66, 1, 0.55, 0.8, "Форекс · австрал.доллар/доллар", 0.0],
+        ["fx7", "USD/CNY", "forex", 7.2, 1, 6.5, 8.0, "Форекс · доллар/юань", 0.0],
+        ["fx8", "USD/KZT", "forex", 480.0, 2, 400.0, 620.0, "Форекс · доллар/тенге", 0.0],
+        ["fx9", "USD/RUB", "forex", 90.0, 3, 60.0, 140.0, "Форекс · доллар/рубль", 0.0],
+        ["fx10", "USD/TRY", "forex", 34.0, 3, 20.0, 60.0, "Форекс · доллар/лира", 0.0]
       ];
         // округление ПО ЗНАЧИМОСТИ: копеечные монеты (BLOY 0.005, KAZAX 0.0002) не схлопываются в 0.00
         function _r2(n){ n=Number(n)||0; const a=Math.abs(n); if(a>=1000) return Math.round(n); if(a>=1) return Math.round(n*100)/100; if(a>=0.01) return Math.round(n*10000)/10000; return Math.round(n*1e6)/1e6; }
@@ -15436,9 +15448,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p=state.players.find(x=>x.id==state.currentPlayerId); const m=state.market;
             if(!p||!m||!m.assets){ return ''; }
             const a=assetById(mm.assetId)||m.assets[0]; const lev=Number(mm.lev)||1;
-            const cats=['stock','crypto','meme','metal','comm'];
+            const cats=['stock','crypto','meme','metal','comm','forex'];
             const opts=m.assets.filter(x=>cats.includes(assetCat(x))).map(x=>'<option value="'+x.id+'"'+(String(x.id)===String(mm.assetId)?' selected':'')+'>'+x.name+' · '+fmtPrice(x.price)+'$</option>').join('');
-            const levPills=MLEV_OPTS.map(n=>'<span onclick="setMarginLev('+n+')" style="display:inline-block;padding:8px 13px;margin:3px 3px 3px 0;border-radius:11px;cursor:pointer;font-weight:800;font-size:12px;border:none;color:'+(lev===n?'#fff':'#cbd5e1')+';background:'+(lev===n?'#4f8df7':'#1b2130')+';">'+(n===1?'без плеча':'×'+n)+'</span>').join('');
+            const levOpts=(assetCat(a)==='forex')?[1,2,5,10,20]:MLEV_OPTS;   // 💱 форекс — плечо до ×20 (как в реале)
+            const levPills=levOpts.map(n=>'<span onclick="setMarginLev('+n+')" style="display:inline-block;padding:8px 13px;margin:3px 3px 3px 0;border-radius:11px;cursor:pointer;font-weight:800;font-size:12px;border:none;color:'+(lev===n?'#fff':'#cbd5e1')+';background:'+(lev===n?'#4f8df7':'#1b2130')+';">'+(n===1?'без плеча':'×'+n)+'</span>').join('');
             return '<div style="position:fixed;inset:0;z-index:4200;background:rgba(6,8,12,.9);display:flex;align-items:center;justify-content:center;padding:14px;">'
               +'<div style="width:420px;max-width:100%;background:#131722;border:none;border-radius:20px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6);">'
               +'<div style="height:4px;background:#4f8df7;"></div>'
@@ -15498,7 +15511,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 }).sort((x,y)=> (y.invested - x.invested) || (y.a.price - x.a.price));
                 const rows=sorted.length?sorted.map(({a,chg,invested})=>{
                     const c=chg>=0?'#22c55e':'#ff5c72', arrow=chg>=0?'▲':'▼';
-                    const AVT={stock:['rgba(79,141,247,.14)','#8fb4ff'],crypto:['rgba(245,184,65,.14)','#f5c451'],metal:['rgba(214,163,83,.16)','#e6c078'],commodity:['rgba(34,197,94,.14)','#5fd08a'],comm:['rgba(34,197,94,.14)','#5fd08a'],meme:['rgba(255,92,114,.14)','#ff8fa0']};
+                    const AVT={stock:['rgba(79,141,247,.14)','#8fb4ff'],crypto:['rgba(245,184,65,.14)','#f5c451'],metal:['rgba(214,163,83,.16)','#e6c078'],commodity:['rgba(34,197,94,.14)','#5fd08a'],comm:['rgba(34,197,94,.14)','#5fd08a'],meme:['rgba(255,92,114,.14)','#ff8fa0'],forex:['rgba(56,189,248,.14)','#67d3f5']};
                     const avc=AVT[assetCat(a)]||['rgba(231,235,243,.10)','#e7ebf3'];
                     const sub=`${a.sector||assetTicker(a.name)}${invested>0?` · 💰 ${fmtN(invested)}$`:''}`;
                     return `<div style="display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:16px;background:#1b2130;margin-bottom:9px;">
