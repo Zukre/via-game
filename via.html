@@ -23330,7 +23330,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         var cash=Math.max(3000, Math.round(income*6)), passive=Math.max(200, Math.round(exp*0.20));
         window._goldReward={cash:cash, passive:passive};
         window._goldWin=Math.floor(Math.random()*3);   // 🎲 повезёт одной из трёх карт (Ринат 29сен)
-        window._goldDone=false;
+        window._goldDone=false; window._goldTaken=false;
         var o=document.getElementById('viaGold');
         if(!o){ o=document.createElement('div'); o.id='viaGold';
           o.style.cssText='position:fixed;inset:0;z-index:9400;display:flex;align-items:center;justify-content:center;padding:16px;background:radial-gradient(120% 80% at 50% 8%,rgba(231,189,99,.20),transparent 60%),rgba(6,5,3,.95);';
@@ -23366,6 +23366,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       function goldClose(){ var o=document.getElementById('viaGold'); if(o)o.style.display='none'; }
       window.goldPick=goldPick; window.goldClose=goldClose;
       function goldTake(kind){
+        if(window._goldTaken) return; window._goldTaken=true;   // 🛡️ one-shot: защита от двойного тапа = двойной награды
         var o=document.getElementById('viaGold'); if(o)o.style.display='none';
         var p=(typeof me==='function'?me():null)||(state.players||[]).find(function(x){return x.id==state.currentPlayerId;}); if(!p) return;
         var r=window._goldReward||{cash:0,passive:0};
