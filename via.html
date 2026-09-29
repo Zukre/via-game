@@ -11549,7 +11549,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // лёгкий вечный агрегат — чтобы Зеркало кросс-партий тоже видело развилку (существующий вход)
             try { logSignal('choice', String(situation).slice(0,40), (opts.amt!=null ? Number(opts.amt)||0 : 1)); } catch(e){}
             // 📜 МОСТ (Ринат 23сен): каждая развилка = одна видимая строка в ленте жизни. Наполняет «Историю» из всех точек разом.
-            try { logAction(p, sphereIcon(opts.sphere), (chose||situation), {sphere:opts.sphere, amt:opts.amt, why:(opts.paid||'')}); } catch(e){}
+            // opts.noFeed (Ринат 29сен): если действие уже пишет СВОЮ детальную строку (напр. биржа через logTrade) — мост не дублируем.
+            if(!opts.noFeed){ try { logAction(p, sphereIcon(opts.sphere), (chose||situation), {sphere:opts.sphere, amt:opts.amt, why:(opts.paid||'')}); } catch(e){} }
             return rec;
         }
         window.logChoice = logChoice; // для отладочного просмотра журнала
@@ -11579,6 +11580,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 📜 Провал — тоже событие жизни. Короткая обёртка: пишет строку с меткой ✗ и причиной.
         function logFail(p, ic, text, why, opts){ opts=opts||{}; opts.ok=false; if(why) opts.why=why; return logAction(p, ic||'✗', text, opts); }
         window.logFail = logFail;
+        // 🎰📜 СТАВКА-В-ЖУРНАЛ (Ринат 29сен: «История должна писать КАЖДУЮ ставку — сколько в 1-й, 2-й, 10-й раз,
+        // какие суммы, выиграл/проиграл»). Ведём счётчик по каждому столу (betN_<table>) и пишем детальную строку:
+        // стол, номер ставки, сумма, исход, ±$. Сырьё для Зеркала: видно азартный паттерн целиком, а не «зашёл в казино».
+        function logBet(p, table, ic, bet, net, ok, resultText){
+            if(!p) return;
+            let n=1; try{ const st=pstat(p); const key='betN_'+table; st[key]=(Number(st[key])||0)+1; n=st[key]; }catch(e){}
+            logAction(p, ic||'🎰', table+' · ставка #'+n+' на '+fmtN(bet)+'$ → '+(resultText||''), {sphere:'азарт', amt:net, ok:ok, why: ok?'' : 'ставка сгорела'});
+        }
+        window.logBet = logBet;
         // Иконка по сфере жизни — чтобы лента читалась глазами, а не текстом.
         function sphereIcon(s){ const M={'деньги':'💵','дело':'🏢','люди':'🤝','долг':'⛓️','цепи':'⛓️','свобода':'🕊️','образ жизни':'🏡','развитие':'🎓','азарт':'🎰','совесть':'⚖️','доверие':'🤝','тень':'😈','быт':'🔧','осторожность':'🛡️'}; return M[s]||'•'; }
         // ═══════════ конец журнала выборов ═══════════
@@ -11757,7 +11767,6 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:var(--lx-gold-br);margin-bottom:6px;">🏡 Зачем эта ветка</div>
                     <p style="font-size:13px;color:#d8cdb8;line-height:1.6;margin:0;">Это твоя жизнь для себя — как ты живёшь, на чём ездишь, чем себя окружаешь. Здесь ты решаешь: жить скромно и копить или обновлять дом и машину под свой статус. Каждый такой выбор честно бьёт по твоему бланку — платёж, содержание, налоги — и ничего не бесплатно. А ещё каждая покупка запоминается: в финале <b style="color:#efd8a3;">Зеркало</b> покажет твои настоящие отношения с деньгами и статусом — берёшь по средствам или понтуешься в долг. Это не украшение бланка, это часть тебя.</p>
                 </div>
-                <p style="font-size:13px;color:#9c988e;line-height:1.55;margin:0 0 12px;">Вот как ты живёшь прямо сейчас — твой дом и твоя машина. За них ты уже платишь в бланке каждый месяц. Дальше ты сам решишь: обновить, выкупить или жить как есть.</p>
                 <div class="grid-2" style="margin:0;gap:12px;">
                     ${homeCard}
                     ${carCard}
@@ -11958,6 +11967,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (cash < item.price) { try{ logFail(p,'🏡','Хотел купить «'+item.name+'»','не хватило кассы — нужно '+fmtN(item.price)+'$',{sphere:'образ жизни'}); }catch(e){} alert('«' + item.name + '» стоит ' + fmtN(item.price) + '$ — не хватает кассы.'); return; }
             p.savings = cash - item.price;
             if (kind === 'watch') p.watchLvl = lvl; else p.phoneLvl = lvl;
+            try{ logAction(p, (kind==='watch'?'⌚':'📱'), 'Купил «'+item.name+'»', {sphere:'образ жизни', amt:-item.price}); }catch(e){}
             logSignal('lifestyle', kind === 'watch' ? 'buy_watch' : 'buy_phone', lvl);
             // Флаг «понты, которых ещё не заработал»: покупка люкса при непогашенном кредите банка.
             if ((Number(p.bankLoan) || 0) > 0) logSignal('lifestyle', 'status_on_debt', lvl);
@@ -11990,7 +12000,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div style="margin-top:16px;">
                     <div style="font-family:Georgia,serif;font-size:15px;font-weight:700;color:var(--lx-gold-br);margin-bottom:4px;">⌚ Статус — часы и телефон</div>
-                    <p style="font-size:12px;color:#9c988e;line-height:1.5;margin:0 0 10px;">Разовые покупки из кассы — месячных платежей не добавляют. Чистый сигнал: берёшь по средствам или тянешься за понтами. Часы обслуживания не требуют.</p>
+                    <p style="font-size:12px;color:#9c988e;line-height:1.5;margin:0 0 10px;">Разовые покупки из кассы — месячных платежей не добавляют, хода не требуют.</p>
                     <div style="font-size:12px;color:#cdc8bd;font-weight:700;margin:0 0 6px;">Часы</div>
                     <div style="display:grid;grid-template-columns:repeat(2,1fr);margin:0 0 12px;gap:8px;">${strip('watch', LIFESTYLE_WATCHES, curWatchLvl(p), 'watches', 'watch')}</div>
                     <div style="font-size:12px;color:#cdc8bd;font-weight:700;margin:0 0 6px;">Телефон</div>
@@ -12423,7 +12433,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // на любом экране, остальные окна — по-прежнему только в бланке.
             if (state.view !== 'player') return renderWorldShow() + renderPayslipModal();   // 💰 получку видит и ведущий (он её выдаёт)
             const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return renderWorldShow() + renderPayslipModal();
-            return renderWorldShow() + renderPayslipModal() + renderBizReport() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup() + renderHomeUpgradeModal() + renderCarUpgradeModal() + renderMirrorModal() + renderArchiveModal();
+            return renderWorldShow() + renderPayslipModal() + renderBizReport() + renderIpoModal(p) + renderBraceModal(p) + renderBraceResult(p) + renderHistoryModal() + renderBuyModal() + renderMarginModal() + renderCardPreview() + renderMyTurnPopup() + renderHomeUpgradeModal() + renderCarUpgradeModal() + renderMirrorModal() + renderArchiveModal() + renderGambleMirror();
         }
         // 🎲 Личный попап «Твой ход» — показывается тому, чей ход настал, закрывается крестиком/кнопкой.
         function renderMyTurnPopup(){
@@ -12997,7 +13007,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function tradeFeePct(p){ const s=p.stats||{}; const n=(Number(s.buys)||0)+(Number(s.sells)||0); const base=Math.min(FEE_CAP, FEE_BASE + n*FEE_STEP); return base * (hasSkill(p,'free',3)?0.6:1); }   // 💎 МАГНАТ (ветка Фрилансер): комиссия −40%
         // Каждая сделка получает РАСТУЩИЙ номер `no` (Ринат 19июл: «счётчик застыл на 120, не понять какая сделка прошла»).
         // Номер не сбрасывается, даже когда список подрезается. Храним последние 250 записей (было 120).
-        function logTrade(p,side,name,qty,price,gross,fee){ p.trades=p.trades||[]; p.tradeSeq=(Number(p.tradeSeq)||0)+1; p.trades.push({no:p.tradeSeq,t:Date.now(),side,name,qty,price:Math.round((Number(price)||0)*1e6)/1e6,gross:Math.round(gross),fee:Math.round(fee)}); if(p.trades.length>250) p.trades=p.trades.slice(-250); }
+        function logTrade(p,side,name,qty,price,gross,fee,extra){ p.trades=p.trades||[]; p.tradeSeq=(Number(p.tradeSeq)||0)+1; p.trades.push({no:p.tradeSeq,t:Date.now(),side,name,qty,price:Math.round((Number(price)||0)*1e6)/1e6,gross:Math.round(gross),fee:Math.round(fee)}); if(p.trades.length>250) p.trades=p.trades.slice(-250);
+            // 📜 (Ринат 29сен) каждую сделку биржи — и в ленту жизни, не только в «Историю сделок». Сырьё для Зеркала: что купил, на сколько, прибыль/убыток.
+            try{ const _b=(side==='BUY'); logAction(p, _b?'📈':'📉', (_b?'Купил ':'Продал ')+fmtN(qty)+' × '+name+' по '+fmtPrice(price)+'$'+(extra?' — '+extra:''), {sphere:'деньги', amt: _b? -Math.round(gross+fee) : Math.round(gross-fee), ok: (extra&&String(extra).indexOf('убыток')>=0)?false:true}); }catch(e){}
+        }
         // Открыть красивое окно покупки (в стиле игры) для актива id.
         function openBuyModal(id){
             const a=assetById(id); if(!a) return;
@@ -13158,7 +13171,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const h=p.holdings[id]||{qty:0,avg:0,name:a.name};
             h.avg=(h.avg*h.qty + fill*q)/(h.qty+q); h.qty+=q; h.name=a.name;
             p.holdings[id]=h; logTrade(p,'BUY',a.name,q,fill,cost,fee);
-            logChoice(p, 'вложить кассу в актив', a.name, {declined:['оставить деньги в кассе'], paid:'−'+Math.round(totalCost)+'$ из кассы', amt: totalCost, sphere:'деньги'});
+            logChoice(p, 'вложить кассу в актив', a.name, {declined:['оставить деньги в кассе'], paid:'−'+Math.round(totalCost)+'$ из кассы', amt: totalCost, sphere:'деньги', noFeed:true});
             save(); render();
             const moved = Math.abs(fill-p0)>0.0001 ? ('\n📈 Твой объём двинул рынок: витрина была '+p0+'$, ты взял по ~'+fill+'$/шт.') : '';
             const trimmed = q<origQ ? ('\n✂️ Подогнал под кассу: взял '+fmtN(q)+' вместо '+fmtN(origQ)+' шт (у мемов стакан дорогой).') : '';
@@ -13182,8 +13195,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const st=pstat(p); st.sells++; st.sellAmt=Math.round((st.sellAmt+proceeds)*100)/100; st.feePaid=Math.round(((st.feePaid||0)+fee)*100)/100;
             const h=p.holdings[id]; const cost=Math.round(q*(Number(h.avg)||0)*100)/100; const profit=Math.round((net-cost)*100)/100; h.qty-=q; if(h.qty<=0) delete p.holdings[id];
             p.savings=Math.round((p.savings+net)*100)/100;
-            logTrade(p,'SELL',a.name,q,fill,proceeds,fee);
-            logChoice(p, 'продать актив ради кэша', a.name, {declined:['держать актив и поток'], paid:(profit>=0?'фикс прибыли +':'фикс убытка ')+Math.round(profit)+'$', amt: net, sphere:'деньги'});
+            logTrade(p,'SELL',a.name,q,fill,proceeds,fee,(profit>=0?('прибыль +'+fmtN(profit)+'$'):('убыток '+fmtN(profit)+'$')));
+            logChoice(p, 'продать актив ради кэша', a.name, {declined:['держать актив и поток'], paid:(profit>=0?'фикс прибыли +':'фикс убытка ')+Math.round(profit)+'$', amt: net, sphere:'деньги', noFeed:true});
             return {name:a.name,qty:q,fill,p0,proceeds,fee,net,feePct,profit};
         }
         async function sellAsset(id){
@@ -13465,6 +13478,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             p.savings=Math.round((p.savings+payout)*100)/100;
             p.deposits=p.deposits.filter(x=>x.id!==id);
+            try{ logAction(p, '🏦', early?'Снял вклад досрочно (−40% штраф)':'Снял вклад с процентами', {sphere:'осторожность', amt:payout, ok:!early, why: early?'досрочно, штраф 40%':''}); }catch(e){}
             save(); render();
         }
         // Сколько человек заработает, если положит сумму на этот срок.
@@ -13501,7 +13515,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }).join(''):'<div style="color:#9ca3af;font-size:13px;padding:6px 0;">Вкладов нет. Положи свободные деньги — пусть тихо растут без риска.</div>';
             const tierBtns=DEPOSIT_TIERS.map(t=>`<button onclick="placeDeposit('${t.k}')" class="btn" style="flex:1;min-width:66px;padding:8px 4px;font-size:11px;line-height:1.35;background:#0d1016;color:#efd8a3;border:1px solid var(--lx-gold-ln);font-weight:700;">${t.n}<br><span id="depGain_${t.k}" style="color:#5cb08b;">${t.rate}%/год</span></button>`).join('');
             return `<div class="sec-in">
-                <p style="font-size:12px;color:#9c988e;margin:2px 0 10px;line-height:1.5;">Положи деньги в банк — тихо растут без риска. Чем дольше не трогаешь, тем выше процент. Плавающий снимешь когда угодно; срочный снимешь раньше срока — потеряешь 40%.</p>
+                <p style="font-size:12px;color:#9c988e;margin:2px 0 10px;line-height:1.5;">Плавающий снимешь когда угодно; срочный раньше срока — минус 40%.</p>
                 ${list}
                 <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--lx-line);">
                     <input id="depAmt" type="number" min="1" oninput="depPreview()" placeholder="Сумма вклада, $" class="inp" style="width:100%;font-family:ui-monospace,monospace;font-weight:700;font-size:15px;margin-bottom:8px;">
@@ -15066,7 +15080,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         : j.reason==='already' ? 'Ты это уже создал.' : 'Пока закрыто — не хватает навыков.');
                     return;
                 }
-                if(j && j.ok){ state.deckResult = j; render(); }
+                if(j && j.ok){ state.deckResult = j;
+                    try{ logAction(p, j.won?'💡':'💥', j.won?('Создал дело «'+(j.name||'')+'» — взлетело (+'+fmtN(j.cf||0)+'$/мес навсегда)'):('Создал дело «'+(j.name||'')+'» — не взлетело, '+fmtN(j.cost||0)+'$ сгорели'), {sphere:'дело', amt: j.won?null:-(Math.round(Number(j.cost)||0)), ok: !!j.won, why: j.won?'':'дело не взлетело'}); }catch(e){}
+                    render(); }
             }catch(e){ console.warn('self/create:',e); alert('Сеть подвела — попробуй ещё раз.'); }
         }
         async function doDevelop(key){
@@ -15521,11 +15537,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const payout=Math.round(bet*mult*100)/100;   // возврат (включает ставку)
                 p.savings=Math.round((p.savings+payout)*100)/100;   // МГНОВЕННО: выиграл — выиграл
                 st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(payout-bet))*100)/100;
+                logBet(p,'🎲 Кости','🎲',bet, payout-bet, true, 'выпало '+roll+', ×'+mult+', +'+fmtN(payout-bet)+'$');
                 p.notify='🎲🎉 Выпало '+roll+' — ВЫИГРЫШ ×'+mult+'! +'+Math.round(payout-bet)+'$ чистыми.';
                 save(); render();
                 casinoWin([DICE_PIPS[roll]], payout, mult, roll===6);   // 🎉 красивое окно только на выигрыш
             } else {
                 st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
+                logBet(p,'🎲 Кости','🎲',bet, -bet, false, 'выпало '+roll+' — мимо, −'+fmtN(bet)+'$');
                 save(); render();   // проигрыш — молча (Ринат 9авг), кубик и касса сами говорят
             }
         }
@@ -15581,11 +15599,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const payout=Math.round(bet*_m*100)/100;
                 p.savings=Math.round((p.savings+payout)*100)/100;
                 st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(payout-bet))*100)/100;
+                logBet(p,'🎰 Слоты','🎰',bet, payout-bet, true, finals.join('')+' ×'+_m+', +'+fmtN(payout-bet)+'$');
                 p.notify='🎰🎉 '+finals.join(' ')+' ×'+_m+'! +'+Math.round(payout-bet)+'$ чистыми.';
                 save(); render();
                 casinoWin(finals, payout, _m, _m>=100);   // 🎉 красивое окно только на выигрыш
             } else {
                 st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
+                logBet(p,'🎰 Слоты','🎰',bet, -bet, false, finals.join('')+' — мимо, −'+fmtN(bet)+'$');
                 save(); render();
                 // проигрыш — молча (Ринат 9авг: окно не нужно). Барабаны и касса сами показывают итог.
             }
@@ -15761,7 +15781,50 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             render(); }
         function casinoLeave(){ const p=state.players.find(x=>x.id==state.currentPlayerId);
             document.querySelectorAll('.sec-grid>details.sec').forEach(d=>{ const s=d.querySelector('summary'); if(s&&s.textContent.trim().startsWith('🎰 Казино')){ d.open=false; _openSecs.delete(secKey(d)); } });
-            if(p){ p.notify='🕊️ Ты ушёл от казино. Верное решение — спокойствие дороже денег.'; save(); render(); } }
+            if(p){ const _pat=detectGamblePattern(p); p.notify='🕊️ Ты ушёл от казино. Верное решение — спокойствие дороже денег.'; save(); render(); if(_pat){ state.gambleMirror=_pat; try{ paintOverlays(); }catch(e){} } } }
+        // ═══ 🪞 КПТ-ЗЕРКАЛО АЗАРТА (Ринат 29сен · дизайн-док VIA_КАЙДЗЕН_КПТ_СЛОЙ_ПОМОЩИ.md §5.3) ═══
+        // Не мораль и не стена. Когда встаёшь из-за стола, Зеркало по ФАКТУ показывает паттерн (рост ставок
+        // после проигрыша = «догон»), спокойно называет механизм (искажение КПТ) и даёт ОДИН крошечный шаг
+        // (Маурер). Читает детальный actionLog (sph:'азарт'), закрывается, ничего не блокирует. Показывается
+        // ТОЛЬКО когда паттерн реально есть — чистый уход не трогаем (принцип «давать ошибаться»).
+        function detectGamblePattern(p){
+            const log=(p&&Array.isArray(p.actionLog))?p.actionLog:[];
+            const az=log.filter(r=>r&&r.sph==='азарт');
+            if(az.length<4) return null;
+            const recent=az.slice(-14);
+            const losses=recent.filter(r=>r&&r.ok===false);
+            let totalLost=0; for(const r of recent){ if(r&&typeof r.amt==='number'&&r.amt<0) totalLost+=-r.amt; }
+            let chase=0,maxChase=0,prevLossBet=null;
+            for(const r of recent){ if(r&&r.ok===false){ const bet=Math.abs(Number(r.amt)||0);
+                if(prevLossBet!=null && bet>prevLossBet){ chase++; if(chase>maxChase)maxChase=chase; } else chase=0;
+                prevLossBet=bet; } }
+            if((maxChase>=2 || losses.length>=5) && totalLost>0) return {losses:losses.length, totalLost:Math.round(totalLost), chase:maxChase};
+            return null;
+        }
+        function closeGambleMirror(){ state.gambleMirror=null; try{ paintOverlays(); }catch(e){} }
+        window.closeGambleMirror=closeGambleMirror;
+        function renderGambleMirror(){
+            const g=state.gambleMirror; if(!g) return '';
+            return `<div style="position:fixed;inset:0;z-index:5000;background:rgba(6,8,12,.92);display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)closeGambleMirror()">
+                <div style="width:460px;max-width:100%;background:linear-gradient(180deg,#0d1016,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:18px;padding:22px 20px;box-shadow:0 30px 70px rgba(0,0,0,.6);">
+                    <div style="font-size:26px;text-align:center;">🪞</div>
+                    <div style="font-family:Georgia,serif;font-size:20px;font-weight:700;color:#efd8a3;text-align:center;margin:6px 0 14px;">Зеркало заметило</div>
+                    <div style="font-size:13.5px;color:#d8cdb8;line-height:1.6;">
+                        За столом ты поднимал ставку после проигрыша${g.chase>=2?' ('+g.chase+' раза подряд)':''}. Всего в казино ушло <b style="color:#ff8fa0;">${fmtN(g.totalLost)}$</b>.
+                        <br><br>
+                        Это не «невезение». Так мозг шепчет «сейчас отыграюсь всё сразу» — искажения <b>«всё-или-ничего»</b> и <b>«эмоциональное обоснование»</b>. Ровно на них казино и стоит: на дистанции дом всегда в плюсе.
+                        <br><br>
+                        <span style="color:#9c988e;">Ближе к правде:</span> отдельная ставка ничего не «возвращает» — каждая сама по себе, а минус уже случился.
+                    </div>
+                    <div style="margin-top:14px;padding:12px 13px;background:#12271b;border:1px solid #234436;border-radius:12px;font-size:13px;color:#a7f3d0;line-height:1.55;">
+                        <b>🌱 Один крошечный шаг:</b> в следующий раз перед ставкой задай себе один вопрос — «это шаг к тому, кем я хочу быть?». Просто задай. Этого хватит.
+                    </div>
+                    <button onclick="closeGambleMirror()" style="width:100%;margin-top:16px;padding:13px;border:none;border-radius:12px;font-weight:800;font-size:15px;color:#08130f;background:linear-gradient(180deg,#5ff0c2,#28c79a);cursor:pointer;">Понял. Иду дальше</button>
+                    <div style="text-align:center;margin-top:8px;font-size:10.5px;color:#5f6b78;">VIA — зеркало, не приговор. Ошибка — это данные о тебе.</div>
+                </div>
+            </div>`;
+        }
+        window.renderGambleMirror=renderGambleMirror;
 
         function renderLuckPanel(p){
             const ct=state.casinoTab||'slots';
@@ -15903,13 +15966,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(ok){ _hl.streak++; _hl.pot=Math.round(_hl.pot*HL_MULT); save(); render();
                 const c=document.getElementById('hlCard'); if(c) c.style.animation='czFlip .32s ease'; }
             else { const st=pstat(p); st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+_hl.bet)*100)/100;
-                const lost=_hl.pot; _hl=null; save(); render(); toast('🃏 '+shown+' — мимо. Банк '+fmtN(lost)+'$ сгорел.'); }
+                const lost=_hl.pot, _b=_hl.bet, _s=_hl.streak; _hl=null;
+                logBet(p,'🃏 Выше/Ниже','🃏', _b, -_b, false, 'серия '+_s+', '+shown+' — мимо, банк '+fmtN(lost)+'$ сгорел');
+                save(); render(); toast('🃏 '+shown+' — мимо. Банк '+fmtN(lost)+'$ сгорел.'); }
         }
         function hlCash(){
             if(!_hl) return; const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
             const won=_hl.pot, bet=_hl.bet, net=won-bet, streak=_hl.streak; _hl=null;
             p.savings=Math.round((p.savings+won)*100)/100;
             const st=pstat(p); if(net>0){ st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+net)*100)/100; }
+            logBet(p,'🃏 Выше/Ниже','🃏', bet, net, net>0, 'серия '+streak+', забрал '+fmtN(won)+'$'+(net>=0?' (+'+fmtN(net)+'$)':' ('+fmtN(net)+'$)'));
             save(); render();
             if(net>0 && streak>=3) casinoWin(['🃏'], won, +(won/bet).toFixed(1), false);
             else toast('💰 Забрал '+fmtN(won)+'$ (серия '+streak+'). Вовремя встал — умница.');
@@ -15946,8 +16012,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function ldClimb(){
             if(!_ld) return; const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
             const bustP = LADDER_BUST[_ld.step+1] != null ? LADDER_BUST[_ld.step+1] : 0.75;
-            if(Math.random()<bustP){ const bet=_ld.bet; _ld=null;
+            if(Math.random()<bustP){ const bet=_ld.bet, _stp=_ld.step+1; _ld=null;
                 const st=pstat(p); st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
+                logBet(p,'📈 Лесенка','📈', bet, -bet, false, 'срыв на ступени '+_stp+', банк '+fmtN(bet)+'$ сгорел');
                 save(); render(); toast('💥 Срыв! Банк '+fmtN(bet)+'$ сгорел дотла.'); return; }
             _ld.step=Math.min(_ld.step+1, LADDER_RUNGS.length-1); save(); render();
         }
@@ -15956,6 +16023,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const mult=LADDER_RUNGS[_ld.step], bet=_ld.bet, pay=Math.round(bet*mult*100)/100, net=pay-bet, jack=mult>=15; _ld=null;
             p.savings=Math.round((p.savings+pay)*100)/100;
             const st=pstat(p); st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+net)*100)/100;
+            logBet(p,'📈 Лесенка','📈', bet, net, true, 'ступень ×'+mult+', забрал '+fmtN(pay)+'$ (+'+fmtN(net)+'$)');
             save(); render();
             if(jack) casinoWin(['📈'], pay, mult, true);
             else toast('💰 Забрал '+fmtN(pay)+'$ на ×'+mult+'. Вот это и есть — уметь встать.');
@@ -15980,9 +16048,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function wheelResolve(p,st,bet,mult,idx){
             if(mult>0){ const pay=Math.round(bet*mult*100)/100; p.savings=Math.round((p.savings+pay)*100)/100;
                 st.casinoWins++; st.casinoWon=Math.round((st.casinoWon+(pay-bet))*100)/100;
+                logBet(p,'🎡 Колесо','🎡',bet, pay-bet, true, WHEEL_SEGS[idx][0]+', +'+fmtN(pay-bet)+'$');
                 p.notify='🎡🎉 '+WHEEL_SEGS[idx][0]+'! +'+Math.round(pay-bet)+'$ чистыми.'; save(); render();
                 casinoWin([WHEEL_SEGS[idx][0]], pay, mult, mult>=20);
-            } else { st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100; save(); render(); }
+            } else { st.casinoLosses++; st.casinoLost=Math.round((st.casinoLost+bet)*100)/100;
+                logBet(p,'🎡 Колесо','🎡',bet, -bet, false, '×0 — сгорело, −'+fmtN(bet)+'$');
+                save(); render(); }
         }
 
         // ── БРИФИНГ: зачем ты вообще здесь ──
@@ -17104,7 +17175,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function setTurnState(t){ state.turn=t; try{ localStorage.setItem('v0_turn', JSON.stringify(t)); }catch(e){} if(typeof bc!=='undefined'&&bc){ try{ bc.postMessage('updated'); }catch(e){} } }
         function ensureTurn(){ const ord=turnOrder(); if(!ord.length) return null; let t=getTurnState(); if(!t||!ord.some(x=>x.id===t.curId)){ t={curId:ord[0].id, endsAt:Date.now()+TURN_MS}; setTurnState(t); } else { state.turn=t; } return t; }
         function isMyTurn(){ const ord=turnOrder(); if(ord.length<=1) return true; const t=ensureTurn(); return !!(t && String(t.curId)===String(state.currentPlayerId)); }
-        function passTurn(){ const ord=turnOrder(); if(ord.length<=1) return; const t=ensureTurn(); if(!t) return; let i=ord.findIndex(x=>x.id===t.curId); if(i<0)i=0; i=(i+1)%ord.length; setTurnState({curId:ord[i].id, endsAt:Date.now()+TURN_MS}); try{ if(typeof render==='function') render(); }catch(e){} }
+        function passTurn(auto){ const ord=turnOrder(); if(ord.length<=1) return; const t=ensureTurn(); if(!t) return; let i=ord.findIndex(x=>x.id===t.curId); if(i<0)i=0; const prevId=t.curId; i=(i+1)%ord.length;
+            // 📜 не успел за ход → это тоже поведение (пассивность): пишем в Историю тому, у кого вышло время
+            if(auto){ try{ const pv=(state.players||[]).find(x=>x.id===prevId); if(pv) logAction(pv,'⏳','Не успел за ход — время вышло, ход ушёл дальше',{sphere:'осторожность',ok:false,why:'время хода истекло'}); }catch(e){} }
+            setTurnState({curId:ord[i].id, endsAt:Date.now()+TURN_MS});
+            // 🎲 (Ринат 29сен) ЭКРАН СЛЕДУЕТ ЗА ХОДОМ: следующий игрок активен сразу, без ожидания и ручного переключения (хот-сит на одном устройстве)
+            state.currentPlayerId=ord[i].id; state.casinoUnlocked=false; _hl=null; _ld=null;
+            try{ if(typeof render==='function') render(); }catch(e){} }
         function turnMMSS(endsAt){ const s=Math.max(0,Math.round((endsAt-Date.now())/1000)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
         window.isMyTurn=isMyTurn; window.passTurn=passTurn;
         function turnPlateHtml(p){
@@ -17468,7 +17545,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_tovarka.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">📦 Товарка <span class="sec-hint">— товарный бизнес</span></summary><div class="sec-in">${winCover('win_tovarka')}
                     <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">${infoBtn('tovarka')}</div>
-                    <p style="font-size:13px;color:#9c988e;line-height:1.55;margin:0 0 12px;">Закупаешь партию — она приходит мёртвым грузом и сама не продаётся. Продажи вытаскиваешь руками: запускаешь рекламные кампании по каналам. Таргет-скилл качается от практики.</p>
+                    <p style="font-size:13px;color:#9c988e;line-height:1.55;margin:0 0 12px;">Партия сама не продаётся — продажи вытаскиваешь рекламой по каналам.</p>
                     <button onclick="openTovarka()" class="btn" style="width:100%;background:linear-gradient(180deg,#f4dd9c,#d9b877);color:#20180a;font-weight:800;padding:13px;border-radius:12px;">📦 Открыть Товарку</button>
                 </div></details>
 
@@ -17982,7 +18059,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const ord=turnOrder(); if(ord.length<=1) return;
                 const t=state.turn||getTurnState(); if(!t) return;
                 const cl=document.getElementById('turnClock'); if(cl) cl.textContent=turnMMSS(t.endsAt);
-                if(Date.now()>t.endsAt+400 && String(t.curId)===String(state.currentPlayerId)) passTurn();
+                if(Date.now()>t.endsAt) passTurn(true);   // ⏱ время вышло → ход сразу уходит следующему (любое устройство), без ожидания
             }catch(e){}
         }, 1000);
 
@@ -18324,7 +18401,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     if(fr&&fr.contentWindow) fr.contentWindow.postMessage({type:'tv_init', cash:Number(p.savings)||0, state:p.tovarka||null}, '*');
                 } else {
                     let ch=false;
-                    if(typeof d.cash==='number' && isFinite(d.cash) && Math.abs((Number(p.savings)||0)-d.cash)>0.001){ p.savings=Math.round(d.cash*100)/100; ch=true; }
+                    if(typeof d.cash==='number' && isFinite(d.cash) && Math.abs((Number(p.savings)||0)-d.cash)>0.001){
+                        const _delta=Math.round((d.cash-(Number(p.savings)||0))*100)/100;
+                        p.savings=Math.round(d.cash*100)/100; ch=true;
+                        // 📜 движение денег в товарке → в ленту жизни (вложил в партию/рекламу или выручка). Детальные «кинули» — правкой самого модуля via_tovarka.html.
+                        try{ if(Math.abs(_delta)>=1) logAction(p, '📦', _delta<0?'Товарка: вложил в партию/рекламу':'Товарка: выручка с продаж', {sphere:'дело', amt:_delta}); }catch(e){}
+                    }
                     if(d.state){
                         // 📦 Счётчик товарных сделок для карты «Рискованный»: в state лежат только
                         // ТЕКУЩИЕ партии, распроданные исчезают — поэтому копим кумулятивно по дельте
@@ -18399,12 +18481,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         // 😈 серия разрывов без построенного дела → маркер тьмы для знака демона.
                         // Считаем на переходе «была пара → ушла». Если дела за это время не выросли — серия растёт.
                         const wasOver = !!(p.relationship && p.relationship.over);
+                        const hadPartner = !!(p.relationship && p.relationship.name);
                         if(d.state.over && !wasOver){
                             const assetsNow = (p.assets||[]).length;
                             if(assetsNow <= (Number(p.relAssetsMark)||0)) p.relLostStreak = (Number(p.relLostStreak)||0)+1;
                             else p.relLostStreak = 1;   // дела росли между разрывами — серия «без роста» обрывается
                             p.relAssetsMark = assetsNow;
+                            // 📜 расставание — событие жизни (сырьё Зеркала: как ты обходишься с людьми)
+                            try{ const _rr={rival:'ушёл(ла) к другому',left:'устал(а) ждать внимания',betrayal:'узнал(а) об измене'}[d.state.overReason]||'отдалились по капле'; logAction(p,'💔','Отношения закончились с '+(d.state.name||'партнёром')+' — '+_rr,{sphere:'люди',ok:false,why:_rr}); }catch(e){}
                         }
+                        // 📜 начало отношений — когда партнёр впервые появился
+                        if(!hadPartner && !d.state.over && d.state.name){ try{ logAction(p,'❤️','Начались отношения: '+d.state.name,{sphere:'люди'}); }catch(e){} }
                         p.relationship=d.state; ch=true;
                     }
                     if(ch) save(p.id);
@@ -18475,7 +18562,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function relSpendReport(s){
             if(!s || !s.spend) return;
             const seq=s.spend.seq||0;
-            if(seq > (window._relSpendSeq||0)){ window._relSpendSeq=seq; relShowSpend(s.spend); }
+            if(seq > (window._relSpendSeq||0)){ window._relSpendSeq=seq; relShowSpend(s.spend);
+                // 📜 трата/пополнение по карте партнёра — в ленту жизни (сырьё Зеркала: вкладываешь в человека или он в тебя)
+                try{ const sp=s.spend, give=(sp.dir>0), p=me(); if(p) logAction(p, give?'💗':'💸', (s.name||'Партнёр')+': '+(sp.item||(give?'пополнение':'трата')), {sphere:'люди', amt: give?Math.abs(Number(sp.amount)||0):-Math.abs(Number(sp.amount)||0)}); }catch(e){}
+            }
         }
         function relShowSpend(sp){
             if(!sp) return;
@@ -18528,7 +18618,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <div class="card flex-between" style="background:#1f2937;">
                     <div><h2 style="font-size:20px;font-weight:800;">🐄 Рынок скота и ферма</h2>
                     <p style="color:#fcd34d;font-size:12px;margin-top:2px;">💰 Касса: <b>${Math.round(p.savings)} $</b>${L?` · 🌾 ${L.name} (${Object.keys(p.farm.buildings||{}).length}/${L.slots} строений · ${farmHeads(p)} гол · корм −${farmFeed(p)}$/мес)`:''}</p>
-                    ${L?`<p style="color:#9c988e;font-size:11px;margin-top:3px;">🕰️ Год ${curYear()} · время идёт само (≈10 мин = 1 год): скот взрослеет, стадо плодится, цены качаются по циклам. Терпение кормит.</p>`:''}</div>
+                    ${L?`<p style="color:#9c988e;font-size:11px;margin-top:3px;">🕰️ Год ${curYear()} · время идёт само</p>`:''}</div>
                     <button onclick="state.view='player';render();" class="btn btn-gray">← Назад в бланк</button>
                 </div>
                 ${p.farm ? `<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">${tabBtn('mine','🌾 Ферма')}${tabBtn('buy','🛒 Купить')}${tabBtn('learn','🎓 Учёба')}${tabBtn('prod','⚗️ Производство')}${tabBtn('deals','🍽️ Контракты')}${tabBtn('sklad','📦 Склад')}${tabBtn('market','📈 Рынок')}</div>` : ''}
@@ -18540,7 +18630,6 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function renderFarmBuy(p){
             if(!p.farm){
                 return `<div class="card"><div class="block-title">🌍 Купи землю — начни хозяйство</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Земля не для бродяги. Чем больше берёшь — тем дороже, но и вмещает больше живого.</p>
                     ${farmImg('farm_land',180)}
                     <div style="display:grid;gap:10px;margin-top:12px;">
                     ${Object.keys(FARM_CFG.land).map(k=>{const L=FARM_CFG.land[k];return `<div class="row-item"><div style="flex:1;"><b>${L.name}</b><div style="font-size:12px;color:#9ca3af;">${L.slots} мест под строения</div></div><button onclick="farmBuyLand('${k}')" class="btn btn-green">${fmtN(L.price)}$</button></div>`;}).join('')}
@@ -18548,11 +18637,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             let out='';
             if(!p.farm.barn){
-                out += `<div class="card"><div class="block-title">🏡 Построй ферму (амбар)</div>${farmImg('farm_barn',180)}<p style="font-size:12px;color:#9ca3af;margin:10px 0;">Без амбара скот держать негде.</p><button onclick="farmBuildBarn()" class="btn btn-amber" style="width:100%;">Построить за ${FARM_CFG.barn}$</button></div>`;
+                out += `<div class="card"><div class="block-title">🏡 Построй ферму (амбар)</div>${farmImg('farm_barn',180)}<button onclick="farmBuildBarn()" class="btn btn-amber" style="width:100%;">Построить за ${FARM_CFG.barn}$</button></div>`;
             }
             if(p.farm.barn){
                 const _bl=p.farm.buildings||{}; const _bn=Object.keys(_bl).length; const _L=FARM_CFG.land[p.farm.land];
-                out += `<div class="card"><div class="block-title">🏗️ Строения</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Каждый вид живёт в своём строении, и туда влезает лишь столько-то — не тысячи. Мест на земле: <b style="color:#fcd34d;">${_bn}/${_L.slots}</b> (большая земля вмещает больше строений).</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">`;
+                out += `<div class="card"><div class="block-title">🏗️ Строения</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Мест на земле: <b style="color:#fcd34d;">${_bn}/${_L.slots}</b></p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">`;
                 for(const _bk in FARM_BUILDINGS){ const B=FARM_BUILDINGS[_bk]; const has=!!_bl[_bk]; const cap=has?farmBuildingCap(p,_bk):B.cap; const used=has?farmBuildingUsed(p,_bk):0;
                     out += `<div class="card" style="padding:8px;margin:0;">${farmImg(B.img)}<div style="font-weight:800;margin-top:6px;">${B.name}</div><div style="font-size:11px;color:#9ca3af;">${B.note}</div>`;
                     if(has){ out += `<div style="font-size:11px;color:#fcd34d;margin-top:3px;">вмещает ${used}/${cap}${_bl[_bk].lvl>=2?' · макс':''}</div>`;
@@ -18574,7 +18663,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 // ⬆️ Улучшить землю (доплата разницы) — если есть куда расти
                 const _order=Object.keys(FARM_CFG.land); const _ci=_order.indexOf(p.farm.land); const _bigger=_order.slice(_ci+1);
                 if(_bigger.length){
-                    out += `<div class="card"><div class="block-title">🌍 Расширить землю</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Доплачиваешь только разницу — всё хозяйство остаётся, слотов под строения становится больше.</p><div style="display:grid;gap:8px;">`;
+                    out += `<div class="card"><div class="block-title">🌍 Расширить землю</div><div style="display:grid;gap:8px;">`;
                     for(const _s of _bigger){ const NL=FARM_CFG.land[_s]; const diff=NL.price-_L.price;
                         out += `<div class="row-item"><div style="flex:1;"><b>${NL.name}</b><div style="font-size:11px;color:#9ca3af;">${NL.slots} слотов · было ${_L.slots}</div></div><button onclick="farmUpgradeLand('${_s}')" class="btn btn-amber">доплата ${fmtN(diff)}$</button></div>`;
                     }
@@ -18602,15 +18691,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!p.farm.barn) out += `<p style="color:#f59e0b;font-size:13px;">Сначала построй амбар ↑</p>`;
             else if(!hasBase) out += `<p style="color:#f59e0b;font-size:13px;">Сначала выучи «Фермерство» на вкладке 🎓 Учёба.</p>`;
             out += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:10px;">${livestockKinds.map(buyCard).join('')}</div></div>`;
-            out += `<div class="card"><div class="block-title">🌱 Посадить культуры</div><p style="font-size:12px;color:#9ca3af;">Нужен курс «🌱 Растениеводство». Дают доход по живой цене, без разведения и убоя.</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:10px;">${cropKinds.map(buyCard).join('')}</div></div>`;
+            out += `<div class="card"><div class="block-title">🌱 Посадить культуры</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:10px;">${cropKinds.map(buyCard).join('')}</div></div>`;
             return out;
         }
 
         function renderFarmLearn(p){
             const learned = p.farm.courses||[];
             const hasBase = learned.includes('base');
-            return `<div class="card"><div class="block-title">🎓 Учёба — всё надо изучать</div>
-                <p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Каждое ремесло — отдельный курс. Стоит денег, хода НЕ отнимает. Сначала «Фермерство».</p>
+            return `<div class="card"><div class="block-title">🎓 Учёба</div>
+                <p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Курс стоит денег, хода не отнимает.</p>
                 ${farmImg('farm_skill',160)}
                 <div style="display:grid;gap:8px;margin-top:12px;">
                 ${Object.keys(FARM_CFG.courses).map(k=>{
@@ -18625,7 +18714,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const all = p.farm.animals||[];
             const livestock = all.filter(a=>{const c=FARM_CFG.animals[a.kind]; return c && !c.crop;});
             const crops     = all.filter(a=>{const c=FARM_CFG.animals[a.kind]; return c && c.crop;});
-            let out = `<div class="card"><div class="block-title">🌾 Моё хозяйство</div><p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Здесь всё, что держит ферму: люди (управляющие/фермеры), корм и вода, техника, авто-подача. Корм жми «Купить…» и впиши количество. Продукт и продажа — во вкладке 📦 Склад.</p><div class="farm-grid2">`;
+            let out = `<div class="card"><div class="block-title">🌾 Моё хозяйство</div><div class="farm-grid2">`;
             const _mgr=Number(p.farm.managers)||0, _mgrNeed=farmManagersNeeded(p), _mgrWage=((FARM_CFG.manager&&FARM_CFG.manager.wage)||600);
             out += `<div class="row-item" style="border-color:${_mgr<_mgrNeed?'#b45309':'#6366f1'};">${farmThumb('farm_worker')}<div style="flex:1;"><b>👔 Управляющие</b><div style="font-size:11px;color:#9ca3af;">нанято ${_mgr}${_mgrNeed>0?`/${_mgrNeed} нужно`:''} (+ты сам) · каждый ведёт ${FARM_CFG.farmersPerManager} фермеров · −${_mgr*_mgrWage}$/мес${_mgr<_mgrNeed?' <b style="color:#f87171;">⚠️ фермеры без управления не работают</b>':''}</div></div><div style="display:flex;gap:4px;"><button onclick="farmFireManager()" class="btn btn-gray" style="padding:4px 10px;">−</button><button onclick="farmHireManager()" class="btn btn-amber" style="padding:4px 10px;">Нанять</button></div></div>`;
             const _mk=farmMilkers(p), _cows=farmCowHeads(p);
@@ -18692,7 +18781,6 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(crops.length){ out += `<div style="font-size:12px;color:#9ca3af;font-weight:700;text-transform:uppercase;margin-top:12px;">🌱 Культуры</div>` + gridOf(crops); }
             if(!livestock.length && !crops.length){ out += `<p style="color:#9ca3af;font-size:13px;margin-top:10px;">Пусто — загляни в 🛒 Купить.</p>`; }
             out += `</div>`;
-            out += `<p style="font-size:11px;color:#6b7280;margin-top:10px;">🥛 Молоко и 🍇 виноград копятся сами — переработать их в сыр/вино/виски можно во вкладке ⚗️ Производство.</p>`;
             return out;
         }
 
@@ -18701,8 +18789,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!p.farm) return '';
             const _stk = p.farm.stock||{};
             const _milk=Math.floor(Number(_stk.milk)||0), _fruit=Math.floor(Number(_stk.fruits)||0);
-            let out = `<div class="card"><div class="block-title">⚗️ Производство</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Из своего сырья делаешь передел: 🥛 молоко → 🧀 сыр, 🍇 виноград → 🍷 вино и 🥃 виски. Заложил → годами дорожает. Терпение кормит.</p>`;
-            out += `<div style="font-size:13px;color:#fcd34d;margin-bottom:10px;background:#14251b;border:1px solid #234436;border-radius:9px;padding:9px 11px;">📦 Склад сырья: 🥛 молоко <b>${_milk}</b> · 🍇 виноград <b>${_fruit}</b> · погреб <b>${(p.farm.batches||[]).length}/${FARM_CELLAR_CAP}</b><br><span style="font-size:11px;color:#9ca3af;">Молоко копят коровы, виноград — виноградники. Сырьё набегает с годами само.</span></div>`;
+            let out = `<div class="card"><div class="block-title">⚗️ Производство</div>`;
+            out += `<div style="font-size:13px;color:#fcd34d;margin-bottom:10px;background:#14251b;border:1px solid #234436;border-radius:9px;padding:9px 11px;">📦 Склад сырья: 🥛 молоко <b>${_milk}</b> · 🍇 виноград <b>${_fruit}</b> · погреб <b>${(p.farm.batches||[]).length}/${FARM_CELLAR_CAP}</b></div>`;
             out += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">`;
             for(const k in FARM_CFG.aging){ const cfg=FARM_CFG.aging[k];
                 const okC=(p.farm.courses||[]).includes(cfg.need);
@@ -18724,7 +18812,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const _canBag=Math.floor(_leather/FARM_LEATHER.perBag);
             const _bagVal=Math.round(FARM_LEATHER.bagValue*priceIdx('bag'));
             const _bags=Math.floor(Number((p.farm.stock||{}).bag)||0);
-            out += `<div class="card"><div class="block-title">👜 Кожевенная мастерская</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Кожа крокодила — сырьё. Сшей из неё сумку: <b>${FARM_LEATHER.perBag}</b> ед. кожи → одна сумка ценой <b>~${fmtN(_bagVal)}$</b> (в разы дороже сырья). Готовые сумки копятся на 📦 Склад и продаются там.</p>`;
+            out += `<div class="card"><div class="block-title">👜 Кожевенная мастерская</div>`;
             out += `<div class="row-item">${farmThumb('farm_crocleather')||farmThumb('farm_crocodile')}<div style="flex:1;"><b>🐊 Кожа на складе</b><div style="font-size:11px;color:#9ca3af;">${fmtN(_leather)} ед. · хватит на <b style="color:${_canBag>0?'#10b981':'#f59e0b'};">${_canBag}</b> сумок (${FARM_LEATHER.perBag} ед./сумка)</div></div><button onclick="farmMakeBag()" ${_canBag>0?'':'disabled'} class="btn ${_canBag>0?'btn-amber':'btn-gray'}" style="white-space:nowrap;">🧵 Сшить сумку</button></div>`;
             if(_bags>0) out += `<div class="row-item">${farmThumb('farm_crocbag')||farmThumb('farm_crocleather')}<div style="flex:1;"><b>👜 Готовые сумки</b><div style="font-size:11px;color:#10b981;">на складе ~${fmtN(_bags)}$ товара · продать в 📦 Склад</div></div></div>`;
             else if(_leather<FARM_LEATHER.perBag) out += `<p style="font-size:11px;color:#6b7280;margin-top:6px;">Заведи 🐊 крокодилов (озеро крокодилов) — они едят мясо/рыбу со склада и дают кожу. Накопится ${FARM_LEATHER.perBag} ед. — сошьёшь первую сумку.</p>`;
@@ -18737,13 +18825,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const labels = {milk:'🥛 Молоко',eggs:'🥚 Яйца',honey:'🍯 Мёд',wool:'🧶 Шерсть',feath:'🪶 Перья',fish:'🐟 Форель',meat:'🥩 Мясо (за убой)',flowers:'🌹 Цветы',fruits:'🍎 Фрукты',micro:'🌱 Микрозелень',fert:'💩 Удобрения'};
             const rows = Object.keys(labels).map(k=>{const idx=priceIdx(k);const chg=(idx-1)*100;const col=chg>=0?'#10b981':'#f43f5e';const hot=idx>=1.15?' 🔥':(idx<=0.85?' 🧊':'');return `<div class="row-item"><span>${labels[k]}${hot}</span><b style="color:${col};">${idx.toFixed(2)}× · ${chg>=0?'+':''}${chg.toFixed(0)}%</b></div>`;}).join('');
             return `<div class="card"><div class="block-title">📈 Рынок продуктов (живая цена)</div>
-                <p style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Цены качаются по годам ЦИКЛАМИ — у каждого продукта свой пик. 🔥 сейчас дорого (продавай/режь), 🧊 дёшево (придержи). Твой доход умножается на этот индекс.</p>
+                <div style="font-size:11px;color:#9ca3af;margin-bottom:10px;">🔥 дорого · 🧊 дёшево</div>
                 ${rows}
-                <p style="font-size:11px;color:#6b7280;margin-top:12px;">Кто ловит момент — тот и зарабатывает. Это цены-ориентир: сам товар копится и продаётся во вкладке 📦 Склад. 🥛 молоко и 🍇 виноград можно вместо продажи пустить на сыр/вино в ⚗️ Производство.</p>
             </div>`;
         }
 
-        function farmBuyLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||p.farm) return; if(p.savings<L.price){ alert('Не хватает кассы. Нужно '+L.price+'$'); return; } farmSpend(p,L.price); p.farm={land:size,barn:false,capUsed:0,courses:[],animals:[],batches:[],manager:false,buildings:{}}; state.farmTab='buy'; save(p.id); render(); alert('🌍 Куплена земля: '+L.name+'! Теперь построй амбар.'); }
+        function farmBuyLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||p.farm) return; if(p.savings<L.price){ alert('Не хватает кассы. Нужно '+L.price+'$'); return; } farmSpend(p,L.price); try{logAction(p,'🌾','Купил землю: '+L.name,{sphere:'дело',amt:-L.price});}catch(e){} p.farm={land:size,barn:false,capUsed:0,courses:[],animals:[],batches:[],manager:false,buildings:{}}; state.farmTab='buy'; save(p.id); render(); alert('🌍 Куплена земля: '+L.name+'! Теперь построй амбар.'); }
         // ⬆️ Улучшить землю с ДОПЛАТОЙ РАЗНИЦЫ (Александр 27июл): всё хозяйство остаётся, просто больше слотов.
         function farmUpgradeLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||!p.farm) return; const cur=FARM_CFG.land[p.farm.land]; if(!cur){ return; } const diff=L.price-cur.price; if(diff<=0){ alert('Это не больше текущей земли.'); return; } if(p.savings<diff){ alert('Не хватает кассы. Доплата разницы: '+fmtN(diff)+'$ (было '+fmtN(cur.price)+', станет '+fmtN(L.price)+').'); return; } farmSpend(p,diff); p.farm.land=size; save(p.id); render(); alert('🌍 Земля расширена до «'+L.name+'» за доплату '+fmtN(diff)+'$! Теперь мест под строения: '+L.slots+'. Всё хозяйство на месте.'); }
         function farmBuildStructure(bkey){ const _sy=window.scrollY; const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } p.farm.buildings=p.farm.buildings||{}; if(p.farm.buildings[bkey]){ alert('«'+B.name+'» уже построено.'); return; } const L=FARM_CFG.land[p.farm.land]; const built=Object.keys(p.farm.buildings).length; if(built>=L.slots){ alert('🌍 На этой земле мест под строения нет ('+built+'/'+L.slots+'). Купи землю больше — большие территории дороже.'); return; } if(p.savings<B.price){ alert('Не хватает кассы. «'+B.name+'» стоит '+B.price+'$.'); return; } farmSpend(p,B.price); p.farm.buildings[bkey]={lvl:1}; save(p.id); render(); alert('🏗️ Построено: «'+B.name+'» — вмещает '+B.cap+'. Теперь заводи туда живность.'); farmKeepScroll(_sy); }
@@ -18754,7 +18841,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmLearn(key){ const _sy=window.scrollY; const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); farmToast('🎓 Изучено: '+FARM_CFG.courseName[key]); }
         function farmBuyAnimal(kind){ const _sy=window.scrollY; const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const isPast=(bkey==='pasture'); const B=isPast?{name:'🐄 Пастбище (выгул)'}:FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(isPast ? farmPastureTier(p)<=0 : (!p.farm.buildings || !p.farm.buildings[bkey])){ alert(isPast?'🐄 Сначала купи ПАСТБИЩЕ для ангусов — отдельная земля-выгул (раздел «Строения» на вкладке 🛒 Купить). На нём только выгул, строить нельзя.':('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).')); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert(isPast?('🐄 Пастбище заполнено: '+_used+'/'+_cap+'. Расширь площадь или продай/зарежь часть.'):('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.')); return; } farmAskQty({ title:'Купить «'+c.name+'»', note:'Цена '+fmtN(farmBuyPrice(c))+'$/'+(c.crop?'шт':'гол')+' · свободно '+_room+' в «'+B.name+'»', def:1, min:1, max:_room, okLabel:'Купить',
                 preview:(q)=>{ const cost=farmBuyPrice(c)*q; const pp=farmMe(); return 'Итого <b>'+fmtN(cost)+'$</b>'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
-                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=farmBuyPrice(c)*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } const ex=(pp.farm.animals||[]).find(x=>x.kind===kind); farmSpend(pp,cost); if(ex){ ex.count=(ex.count||1)+qty; } else { pp.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,by:curYear(),count:qty}); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); const tot=((pp.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; farmToast('✅ Куплено '+qty+' «'+c.name+'» — всего '+tot); } }); }
+                onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=farmBuyPrice(c)*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } const ex=(pp.farm.animals||[]).find(x=>x.kind===kind); farmSpend(pp,cost); try{logAction(pp,'🐮','Купил '+qty+' × '+c.name,{sphere:'дело',amt:-cost});}catch(e){} if(ex){ ex.count=(ex.count||1)+qty; } else { pp.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,by:curYear(),count:qty}); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); const tot=((pp.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; farmToast('✅ Куплено '+qty+' «'+c.name+'» — всего '+tot); } }); }
         // 🧹 УБРАТЬ / УТИЛИЗИРОВАТЬ (Ринат 27июл): культуры и живность без убоя — выкосить/убрать, освободить место. Возврат 30% цены.
         function farmCull(aid){ const p=farmMe(); if(!p||!p.farm) return; const a=(p.farm.animals||[]).find(x=>x.aid===aid); if(!a) return; const c=FARM_CFG.animals[a.kind]; if(!c) return; const have=a.count||1; const per=Math.max(1,Math.round(farmBuyPrice(c)*0.3)); const word=c.crop?'Выкосить/убрать':'Убрать';
             farmAskQty({ title:word+' «'+c.name+'»', note:'Есть '+have+'. Вернётся ~'+fmtN(per)+'$/шт (30% цены).', def:have, min:1, max:have, okLabel:'Убрать',
@@ -18796,11 +18883,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.farm.batches.push({bid:'b'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,years:0,layY:curYear()});
             save(p.id); render();
         }
-        function farmSellBatch(bid){ const p=farmMe(); if(!p||!p.farm) return; const b=(p.farm.batches||[]).find(x=>x.bid===bid); if(!b) return; const cfg=FARM_CFG.aging[b.kind]; const val=batchValue(b); farmSpend(p,-val); p.farm.batches=p.farm.batches.filter(x=>x.bid!==bid); save(p.id); render(); alert('💰 Продано: '+cfg.name+' выдержки '+(b.years||0)+' лет — +'+val+'$ в кассу!'); }
+        function farmSellBatch(bid){ const p=farmMe(); if(!p||!p.farm) return; const b=(p.farm.batches||[]).find(x=>x.bid===bid); if(!b) return; const cfg=FARM_CFG.aging[b.kind]; const val=batchValue(b); farmSpend(p,-val); try{logAction(p,'🌾','Продал выдержку: '+cfg.name+' ('+(b.years||0)+' лет)',{sphere:'дело',amt:val});}catch(e){} p.farm.batches=p.farm.batches.filter(x=>x.bid!==bid); save(p.id); render(); alert('💰 Продано: '+cfg.name+' выдержки '+(b.years||0)+' лет — +'+val+'$ в кассу!'); }
 
         // ─── 📦 СКЛАД: продажа товара (всё сразу или по отдельности), холодильник, запас корма ───
-        function farmSellProduct(prod){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; const units=Math.floor(Number(st[prod])||0); if(units<=0){ alert('Этого товара на складе нет.'); return; } const val=Math.round(units*farmUnitPrice(prod)); st[prod]=0; if(prod==='meat') p.farm.meatFreshY=null; farmSpend(p,-val); save(p.id); render(); alert('💰 Продано со склада: '+(FARM_STOCK_LABELS[prod]||prod)+' — +'+fmtN(val)+'$ по живой цене.'); }
-        function farmSellAllStock(){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; let total=0, any=false; for(const prod in FARM_STOCK_LABELS){ const units=Math.floor(Number(st[prod])||0); if(units>0){ total+=Math.round(units*farmUnitPrice(prod)); st[prod]=0; any=true; } } if(!any){ alert('Склад пуст — продавать нечего.'); return; } p.farm.meatFreshY=null; farmSpend(p,-total); save(p.id); render(); alert('💰 Продан весь склад — +'+fmtN(total)+'$ в кассу!'); }
+        function farmSellProduct(prod){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; const units=Math.floor(Number(st[prod])||0); if(units<=0){ alert('Этого товара на складе нет.'); return; } const val=Math.round(units*farmUnitPrice(prod)); st[prod]=0; if(prod==='meat') p.farm.meatFreshY=null; farmSpend(p,-val); try{logAction(p,'🌾','Продал со склада: '+units+' × '+(FARM_STOCK_LABELS[prod]||prod),{sphere:'дело',amt:val});}catch(e){} save(p.id); render(); alert('💰 Продано со склада: '+(FARM_STOCK_LABELS[prod]||prod)+' — +'+fmtN(val)+'$ по живой цене.'); }
+        function farmSellAllStock(){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; let total=0, any=false; for(const prod in FARM_STOCK_LABELS){ const units=Math.floor(Number(st[prod])||0); if(units>0){ total+=Math.round(units*farmUnitPrice(prod)); st[prod]=0; any=true; } } if(!any){ alert('Склад пуст — продавать нечего.'); return; } p.farm.meatFreshY=null; farmSpend(p,-total); try{logAction(p,'🌾','Продал весь склад фермы',{sphere:'дело',amt:total});}catch(e){} save(p.id); render(); alert('💰 Продан весь склад — +'+fmtN(total)+'$ в кассу!'); }
         // 🌾 ОКНО КОЛИЧЕСТВА корма (Ринат 28июл): впиши, сколько купить; видно цену и на сколько лет хватит.
         function farmCloseModal(){ const m=document.getElementById('farmModal'); if(m) m.remove(); }
         // 🩹 (Ринат 28июл «покупаешь животных — кидает вверх»): нативные prompt/alert сбрасывают прокрутку,
@@ -18875,7 +18962,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             farmClock(p);
             const signed=farmContracts(p); const signedIds=signed.map(c=>c.id);
             const rep=repScore(p).rep;
-            let out=`<div class="card"><div class="block-title">🍽️ Контракты с заказчиками</div>${farmImg('farm_warehouse',130)}<p style="font-size:12px;color:#9ca3af;margin:10px 0;">Договорись с рестораном, сыроварней, икорным домом — и поставляй им продукцию фермы. Контракт = <b>постоянный покупатель</b>: пока склад покрывает годовой объём, капает <b>ровный пассив</b> каждый месяц (не разовая продажа). Не потянул объём два года подряд — заказчик уходит, и репутация просядет. Чем крупнее ферма и выше репутация — тем жирнее контракты (сети, экспорт).</p></div>`;
+            let out=`<div class="card"><div class="block-title">🍽️ Контракты с заказчиками</div>${farmImg('farm_warehouse',130)}<p style="font-size:12px;color:#9ca3af;margin:10px 0;">Контракт = постоянный покупатель: пока склад покрывает годовой объём — <b>ровный пассив</b> каждый месяц. Не потянул 2 года — уходит, репутация просядет.</p></div>`;
             // активные
             if(signed.length){
                 let cards='', totalMo=0;
@@ -18928,13 +19015,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         </div>
                     </div>${foot}
                 </div>`; }
-            out+=`<div class="card"><div class="block-title">🤝 Доступные заказчики</div><p style="font-size:11.5px;color:#9ca3af;margin-bottom:10px;">Репутация растёт от добрых дел за столом (её видит ведущий). Подписывай, когда ферма реально тянет объём — иначе разрыв и минус к репутации.</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">${av}</div></div>`;
+            out+=`<div class="card"><div class="block-title">🤝 Доступные заказчики</div><p style="font-size:11.5px;color:#9ca3af;margin-bottom:10px;">Подписывай, когда ферма тянет объём — иначе разрыв и минус к репутации.</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">${av}</div></div>`;
             return out;
         }
         function renderFarmWarehouse(p){
             if(!p.farm) return '';
             const st=p.farm.stock||{};
-            let out = `<div class="card"><div class="block-title">📦 Склад — товар и продажа</div>${farmImg('farm_warehouse',150)}<p style="font-size:12px;color:#9ca3af;margin:10px 0;">Тут копится всё, что даёт ферма: яйца, молоко, мясо, рыба, мёд, шерсть, цветы. Продавай по живой цене — <b>всё сразу</b> или <b>по отдельности</b>. 🥛 молоко и 🍇 виноград можно вместо продажи пустить на переработку (сыр/вино) во вкладке ⚗️ Производство.</p>`;
+            let out = `<div class="card"><div class="block-title">📦 Склад — товар и продажа</div>${farmImg('farm_warehouse',150)}`;
             let cards='', totalVal=0;
             for(const prod in FARM_STOCK_LABELS){ const units=Math.floor(Number(st[prod])||0); if(units<=0) continue; const unitP=farmUnitPrice(prod); const val=Math.round(units*unitP); totalVal+=val;
                 const meatWarn=(prod==='meat'&&!p.farm.fridge)?`<div style="font-size:10px;color:#f87171;margin-top:3px;line-height:1.3;">⚠️ протухнет за год без 🧊</div>`:'';
@@ -18950,11 +19037,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else out += `<p style="font-size:12px;color:#6b7280;">Пока пусто. Заведи скот, птицу или рыбу — продукт начнёт копиться сам.</p>`;
             out += `</div>`;
             const _ft=farmFridgeTier(p), _fcap=farmFridgeCap(p), _meat=Math.floor(Number((p.farm.stock||{}).meat)||0), _fnx=_ft<FRIDGE_TIERS.length?FRIDGE_TIERS[_ft]:null;
-            out += `<div class="card"><div class="block-title">🧊 Холодильник для мяса</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Мясо без холодильника портится за год. Холодильник хранит долго, но ёмкость КОНЕЧНАЯ — расширяй до огромных за доплату.</p><div class="row-item">${farmThumb('farm_fridge')}<div style="flex:1;"><b>🧊 ${_ft>0?FRIDGE_TIERS[_ft-1].name+' холодильник':'Нет холодильника'}</b><div style="font-size:11px;color:#9ca3af;">${_ft>0?`вмещает <b style="color:#10b981;">${fmtN(_fcap)}</b> мяса · сейчас ${fmtN(_meat)}${_meat>=_fcap?' <b style="color:#f87171;">⚠️ ПОЛОН</b>':''}`:'мясо тухнет за год — купи холодильник'}</div></div>${_fnx?`<button onclick="farmBuyFridge()" class="btn btn-amber" style="white-space:nowrap;">${_ft>0?'Расширить':'Купить'} · ${fmtN(_fnx.cost)}$</button>`:'<b style="color:#10b981;font-size:12px;">✅ макс</b>'}</div>${_fnx?`<div style="font-size:10.5px;color:#6d6a62;margin-top:6px;">${_ft>0?'След.':'Первый'} уровень «${_fnx.name}»: вмещает ${fmtN(_fnx.cap)} мяса за ${fmtN(_fnx.cost)}$.</div>`:''}</div>`;
+            out += `<div class="card"><div class="block-title">🧊 Холодильник для мяса</div><div class="row-item">${farmThumb('farm_fridge')}<div style="flex:1;"><b>🧊 ${_ft>0?FRIDGE_TIERS[_ft-1].name+' холодильник':'Нет холодильника'}</b><div style="font-size:11px;color:#9ca3af;">${_ft>0?`вмещает <b style="color:#10b981;">${fmtN(_fcap)}</b> мяса · сейчас ${fmtN(_meat)}${_meat>=_fcap?' <b style="color:#f87171;">⚠️ ПОЛОН</b>':''}`:'мясо тухнет за год — купи холодильник'}</div></div>${_fnx?`<button onclick="farmBuyFridge()" class="btn btn-amber" style="white-space:nowrap;">${_ft>0?'Расширить':'Купить'} · ${fmtN(_fnx.cost)}$</button>`:'<b style="color:#10b981;font-size:12px;">✅ макс</b>'}</div>${_fnx?`<div style="font-size:10.5px;color:#6d6a62;margin-top:6px;">${_ft>0?'След.':'Первый'} уровень «${_fnx.name}»: вмещает ${fmtN(_fnx.cap)} мяса за ${fmtN(_fnx.cost)}$.</div>`:''}</div>`;
             const _needBy={}; for(const a of (p.farm.animals||[])){ const ft=farmFeedType(a.kind); if(ft) _needBy[ft]=(_needBy[ft]||0)+(Number(a.count)||1)*(FARM_CFG.usePerHeadYr||12); }
             let feedRows='';
             for(const ft in FARM_CFG.feedTypes){ const T=FARM_CFG.feedTypes[ft]; const have=Math.floor(Number((p.farm.feedStores||{})[ft])||0); const need=_needBy[ft]||0; const lasts=need>0?(have/need):null; const low=need>0 && !p.farm.autoFeed && have<need; feedRows += `<div class="row-item" style="border-color:${low?'#b45309':'#242833'};">${farmThumb(T.img)}<div style="flex:1;"><b>${T.name}</b><div style="font-size:11px;color:#9ca3af;">запас <b style="color:${low?'#f87171':'#10b981'};">${fmtN(have)}</b>${need>0?` · нужно ~${Math.round(need)}/год · хватит на ~${lasts.toFixed(1)} лет`+(low?' <b style="color:#f87171;">⚠️ голод!</b>':''):' · этому корму пока некого кормить'}</div></div><button onclick="farmFeedBuyWindow('${ft}')" class="btn btn-amber" style="white-space:nowrap;">Купить…</button></div>`; }
-            out += `<div class="card"><div class="block-title">🌾 Запас корма</div><p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Сколько корма закуплено и на сколько лет хватит стаду. Кончится — скот голодает: сперва даёт мало продукта, потом болеет и дохнет. Жми «Купить…» и впиши количество.</p>${feedRows}</div>`;
+            out += `<div class="card"><div class="block-title">🌾 Запас корма</div>${feedRows}</div>`;
             return out;
         }
 
@@ -19337,7 +19424,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <div class="card" style="border-color:#6366f1;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#a5b4fc;margin:0;">🎯 КАРЬЕРА (клетка после Зарплаты)</div>${infoBtn('career')}</div>
                     ${p.unemployed?`<div style="background:rgba(255,106,106,.10);border:1px solid #7a2f36;border-radius:9px;padding:9px 11px;margin-bottom:8px;font-size:12.5px;color:#ffb0b0;line-height:1.5;">🔓 <b>Ты уволен</b> — оклада нет, живёшь только на пассив. Пройди собеседование, чтобы снова устроиться и вернуть зарплату.</div>`:''}
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на «Карьеру» → тебя ждёт СОБЕСЕДОВАНИЕ: наниматель задаёт 5 вопросов, ответы решают — возьмут ли и на какой оклад. Хорошо пройдёшь — прибавка к зарплате (кап +20%); отлично — ещё и шанс сменить работу. Навык «Переговоры» даёт фору.</p>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Собеседование: 5 вопросов решают оклад. Навык «Переговоры» даёт фору.</p>
                     <div style="margin-bottom:8px;">Бонус навыков: <b style="color:${capped?'#fbbf24':'#10b981'};">+${bonusPct}%${capped?' (кап)':''}</b> · база ${p.prof.salary}$ → <b style="color:#10b981;">${f.salary}$</b></div>
                     <div style="margin-bottom:10px;">${skillsHtml}</div>
                     <button onclick="openInterview(${p.id})" class="btn" style="width:100%;background:#4f46e5;color:#fff;font-weight:800;font-size:14px;">💼 ПОЙТИ НА СОБЕСЕДОВАНИЕ</button>
@@ -19558,7 +19645,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#0ea5e9;">
                     <div class="block-title" style="color:#7dd3fc;">🧠 НАВЫК (3 ветки развития)</div>
-                    <p style="font-size:12px;color:#9ca3af;margin:6px 0 8px;">Клетка «Навык» даёт очко. Тратишь его в дереве из трёх веток — каждый навык реально меняет другую клетку. Очков: <b style="color:#4fd1ff;">${pts}</b>${n?` · открыто навыков: ${n}`:''}.</p>
+                    <p style="font-size:12px;color:#9ca3af;margin:6px 0 8px;">Очков: <b style="color:#4fd1ff;">${pts}</b>${n?` · открыто навыков: ${n}`:''}.</p>
                     <button onclick="openSkillTree(${p.id})" class="btn" style="width:100%;background:#0284c7;color:#fff;font-weight:800;font-size:14px;">🧠 ОТКРЫТЬ ДЕРЕВО НАВЫКОВ</button>
                 </div>
             `;
@@ -19623,7 +19710,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#f59e0b;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#fcd34d;margin:0;">🏛️ ГОСУДАРСТВО (зеркало поведения)</div>${infoBtn('gov')}</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Государство смотрит на твоё досье — репутацию, тень, долги — и ведёт себя соответственно. Сейчас оно <b style="color:${stW[1]}">${stW[0]}</b>. Чистому — субсидии и контракты, теневику — проверки и суд. Попал на клетку → зайди.</p>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Государство сейчас <b style="color:${stW[1]}">${stW[0]}</b>. Чистому — субсидии, теневику — проверки.</p>
                     <button onclick="openGovModal(${p.id})" class="btn" style="width:100%;background:#d97706;color:#fff;font-weight:800;font-size:14px;">🏛️ ОБРАТИТЬСЯ В ГОСУДАРСТВО</button>
                 </div>
             `;
@@ -19894,6 +19981,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             ev.apply(state.players);                      // ГЛОБАЛЬНО — на всех игроков
             const id = Date.now();
             state.world = { id, emoji:ev.emoji, title:ev.title, text:ev.text };
+            // 📜 событие случилось САМО — пишем в ленту жизни каждому (сырьё Зеркала: как мир качнул и что ты сделал в ответ)
+            try{ for(const _p of (state.players||[])) logAction(_p, ev.emoji||'🌍', 'Мировое событие: '+ev.title, {sphere:'быт', why:ev.text}); }catch(e){}
             try { localStorage.setItem('v0_world_seen', String(id)); } catch(e){}  // тянущий уже видит
             m.done = true; m.result = state.world;
             save(); render();
@@ -19991,7 +20080,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#22d3ee;">
                     <div class="block-title" style="color:#5eead4;">🌍 РЫНОК / МИРОВЫЕ СОБЫТИЯ</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Глобальное событие: касается ВСЕХ игроков, карту видят все мониторы. Кризисы, бумы, технологии, пандемии. Попал на клетку → вытяни карту.</p>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Событие касается всех: кризисы, бумы, технологии, пандемии.</p>
                     ${w ? `<div style="margin-bottom:10px;font-size:12px;color:#cbd5e1;">Последнее: ${w.emoji} <b>${w.title}</b>${w.fxtext?` <span style="color:#7dd3fc;">· 📊 ${w.fxtext}</span>`:''}</div>` : ''}
                     <button onclick="openWorldModal(${p.id})" class="btn" style="width:100%;background:#0891b2;color:#fff;font-weight:800;font-size:14px;">🌍 ВЫТЯНУТЬ МИРОВОЕ СОБЫТИЕ</button>
                 </div>
@@ -20078,7 +20167,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#fb7185;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#fca5a5;margin:0;">💼 РАБОТА</div>${infoBtn('work')}</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Попал на клетку → вытяни карту. Обычно работа как работа, но может выпасть повышение, премия, предложение новой работы (выбор) или увольнение — и работа сменится.</p>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Может выпасть повышение, премия, новая работа или увольнение.</p>
                     <button onclick="openWorkModal(${p.id})" class="btn" style="width:100%;background:#be123c;color:#fff;font-weight:800;font-size:14px;">💼 ВЫТЯНУТЬ КАРТУ РАБОТЫ</button>
                 </div>
             `;
@@ -20166,7 +20255,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#fb923c;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#fdba74;margin:0;">💸 РАСХОДЫ (неожиданные)</div>${infoBtn('expense')}</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Жизнь подкидывает траты — но это не тихий минус, а ВЫБОР: дёшево-рискнуть / дорого-надёжно / забить. Каждый путь аукается по-своему. Попал на клетку → зайди и реши.</p>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Трата — это выбор: дёшево-рискнуть / дорого-надёжно / забить.</p>
                     <button onclick="openExpenseModal(${p.id})" class="btn" style="width:100%;background:#c2410c;color:#fff;font-weight:800;font-size:14px;">💸 ОТКРЫТЬ РАСХОД</button>
                 </div>
             `;
@@ -20305,7 +20394,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#a78bfa;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#c4b5fd;margin:0;">🏦 НАЛОГИ ГОСУДАРСТВУ</div>${infoBtn('tax')}</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Платишь налог государству. 20 видов, лёгкие (не давят). Попал на клетку → вытяни карту, спишется с кассы (нехватка — в долг).</p>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Налог спишется с кассы (нехватка — в долг).</p>
                     <button onclick="openTaxModal(${p.id})" class="btn" style="width:100%;background:#6d28d9;color:#fff;font-weight:800;font-size:14px;">🏦 ВЫТЯНУТЬ КАРТУ НАЛОГА</button>
                 </div>
             `;
@@ -20406,7 +20495,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#34d399;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#6ee7b7;margin:0;">🌐 СВЯЗИ (записная книжка)</div>${infoBtn('svyaz')}</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Знакомишься, читаешь человека (стоящий или пиявка) и вкладываешься — хороший садится в книжку и выручает деньгами, делом или репутацией. Пиявка вытянет. В книжке: <b style="color:#6ee7b7;">${cn}</b> — ${book}</p>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">В книжке: <b style="color:#6ee7b7;">${cn}</b> — ${book}</p>
                     <button onclick="openSvyazModal(${p.id})" class="btn" style="width:100%;background:#047857;color:#fff;font-weight:800;font-size:14px;">🌐 ПОЗНАКОМИТЬСЯ</button>
                 </div>
             `;
@@ -20704,7 +20793,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#f472b6;">
                     <div class="block-title" style="color:#f9a8d4;">🤝 СДЕЛКИ (от людей)</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Мелкие — быстро и по мелочи (мошенники чаще). Крупные — бизнесы за цену с доходом и обязательствами.</p>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Мелкие — по мелочи (мошенники чаще). Крупные — бизнесы с доходом и обязательствами.</p>
                     <div style="display:flex;gap:8px;">
                         <button onclick="openSdelkaModal(${p.id},'small')" class="btn" style="flex:1;background:#be185d;color:#fff;font-weight:800;font-size:14px;">🤝 Мелкая сделка</button>
                         <button onclick="openSdelkaModal(${p.id},'big')" class="btn" style="flex:1;background:#9d174d;color:#fff;font-weight:800;font-size:14px;">🏢 Крупная (бизнес)</button>
@@ -20809,7 +20898,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `
                 <div class="card" style="border-color:#f87171;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#fca5a5;margin:0;">⚕️ МЕДИЦИНА (здоровье)</div>${infoBtn('med')}</div>
-                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">У тебя скрытая шкала здоровья — судишь по самочувствию (${band.e} ${band.t}). Проверяйся на чек-апе или рискуешь слечь: болезнь бьёт чаще, когда здоровье низкое. Попал на клетку → зайди.</p>
+                    <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Самочувствие: ${band.e} ${band.t}. Проверяйся на чек-апе — низкое здоровье = болезни чаще.</p>
                     <button onclick="openMedModal(${p.id})" class="btn" style="width:100%;background:#b91c1c;color:#fff;font-weight:800;font-size:14px;">⚕️ ЗАЙТИ К ВРАЧУ</button>
                 </div>
             `;
@@ -22586,7 +22675,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }).join('');
             app.innerHTML=`<div style="max-width:1120px;margin:16px auto;padding:0 8px;">
                 <div class="card flex-between">
-                    <div><h2 style="font-weight:900;">📊 Аналитика игроков</h2><p style="font-size:12px;color:#9ca3af;">Вся статистика копится в игре. Капитал = касса + портфель + активы − кредит. Стрелка — рост/просадка к прошлому срезу.</p></div>
+                    <div><h2 style="font-weight:900;">📊 Аналитика игроков</h2><p style="font-size:12px;color:#9ca3af;">Капитал = касса + портфель + активы − кредит. Стрелка — рост/просадка к прошлому срезу.</p></div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
                         <button onclick="saveSnapshot(false)" class="btn" style="background:#4c1d95;color:#ddd6fe;" title="Зафиксировать текущие итоги — сравнивать игры между собой">📸 Снять срез</button>
                         ${back}
@@ -22769,6 +22858,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       #viaHistory{position:fixed;inset:0;z-index:859;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.10), transparent 60%), #0a0703;}
       html.tg-app.tg-fs #viaHistory{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
       #viaHistory[hidden]{display:none;}
+      #viaLeaders{position:fixed;inset:0;z-index:859;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 96px;background:radial-gradient(900px 480px at 50% -10%, rgba(231,189,99,.14), transparent 60%), #0a0703;}
+      html.tg-app.tg-fs #viaLeaders{padding-top:max(calc(env(safe-area-inset-top,0px) + 16px),96px);}
+      #viaLeaders[hidden]{display:none;}
+      .lb-champ{margin:2px 0 14px;padding:11px 13px;border-radius:12px;border:1px solid #e7bd63;background:linear-gradient(180deg,rgba(231,189,99,.12),transparent);font-size:12.5px;color:#efd8a3;line-height:1.5;}
+      .lb-row{display:flex;align-items:center;gap:12px;padding:12px 13px;border-radius:14px;border:1px solid var(--lx-line);background:var(--lx-panel);}
+      .lb-row.me{border-color:var(--lx-gold);box-shadow:0 0 16px -7px var(--lx-gold);}
+      .lb-row.top1{border-color:#e7bd63;background:linear-gradient(180deg,rgba(231,189,99,.15),var(--lx-panel));}
+      .lb-rank{font-size:18px;font-weight:800;min-width:36px;text-align:center;color:var(--lx-gold-br);}
+      .lb-body{flex:1;min-width:0;}
+      .lb-name{font-weight:700;color:var(--lx-text);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .lb-sub{font-size:11.5px;color:var(--lx-muted);margin-top:2px;}
+      .lb-val{text-align:right;white-space:nowrap;}
+      .lb-val b{color:#5cd6a0;font-size:14px;}
+      .lb-val span{display:block;font-size:11px;color:var(--lx-muted);}
+      .lb-empty{color:var(--lx-muted);font-size:13px;text-align:center;padding:24px;line-height:1.5;}
       .hx-year{font-family:Georgia,serif;font-size:13px;font-weight:800;color:#efd8a3;letter-spacing:.04em;margin:16px 0 6px;padding-bottom:5px;border-bottom:1px solid rgba(231,189,99,.18);}
       .hx-row{display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.05);}
       .hx-ic{flex:0 0 auto;font-size:16px;line-height:1.3;width:22px;text-align:center;}
@@ -22902,6 +23006,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       </div>
     </div>
 
+    <div id="viaLeaders" hidden>
+      <div class="vi-wrap">
+        <div class="vi-head"><button class="vi-back" onclick="if(window.closeLeaders)closeLeaders()">← Поле</button><h2>🏆 Лучшие игроки</h2></div>
+        <div class="vi-heat">Кто ближе всех к свободе — у кого больше пассива, дохода, что работает без тебя. Виден чужой путь — виден и твой. Обгоняй себя вчерашнего.</div>
+        <div id="viaLeadList" class="vi-mine"></div>
+      </div>
+    </div>
+
     <div id="viaFeedback">
       <div class="vf-fb">
         <h3>Обратная связь</h3>
@@ -22915,6 +23027,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       <button id="vbField"><span class="vb-ic">🗺️</span>Поле</button>
       <button id="vbBlank" class="vb-active"><span class="vb-ic">🧾</span>Бланк</button>
       <button id="vbHist"><span class="vb-ic">📜</span>История</button>
+      <button id="vbLead"><span class="vb-ic">🏆</span>Топ</button>
       <button id="vbFb"><span class="vb-ic">✍️</span>Отзыв</button>
     </div>
     <div class="vf-toast" id="viaToast"></div>
@@ -23052,7 +23165,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       // ── Душевная доска (Акт II) — просмотр вопросов ──
       function buildSoul(){var n=SOUL.length,s='<svg viewBox="0 0 '+BW+' '+BW+'" class="vf-svg">';for(var i=0;i<n;i++){var c=SOUL[i];if(c[0]==='ЗЕРКАЛО'){s+='<g class="vf-c" data-i="'+i+'"><circle cx="'+(BW/2)+'" cy="'+(BW/2)+'" r="30" fill="rgba(180,220,240,.10)" stroke="#dff2fb" stroke-width="2"/><text x="'+(BW/2)+'" y="'+(BW/2-2)+'" text-anchor="middle" class="vf-ci">🪞</text><text x="'+(BW/2)+'" y="'+(BW/2+13)+'" text-anchor="middle" class="vf-cn" style="fill:#dff2fb">ЗЕРКАЛО</text></g>';continue;}var p=ringXY(i/(n-1)),x=p[0],y=p[1];s+='<g class="vf-c" data-i="'+i+'"><rect x="'+x+'" y="'+y+'" width="'+CS+'" height="'+CS+'" rx="8" fill="rgba(12,30,44,.9)" stroke="#a9d4e6" stroke-width="1.2"/><text x="'+(x+CS/2)+'" y="'+(y+CS/2+2)+'" text-anchor="middle" class="vf-cn" style="fill:#dff2fb;font-size:7px">'+shortName(c[0])+'</text></g>';}s+='</svg>';return s;}
       function renderField(){if(!board)return;var sp=document.getElementById('vfSoulPanel');
-        if(BOARD_VIEW==='money'){if(sp)sp.hidden=true;board.innerHTML=buildMoney()+'<div class="vf-controls"><div class="vf-die" id="vfDie">🎲</div><button class="vf-roll" id="vfRoll">Бросить кубик</button><div class="vf-landed" id="vfLanded"></div></div>';var rb=document.getElementById('vfRoll');if(rb)rb.addEventListener('click',rollDie);var gs=board.querySelectorAll('.vf-c2');for(var i=0;i<gs.length;i++){(function(g){g.addEventListener('click',function(){var idx=+g.getAttribute('data-i');if(idx===pawnIdx){enterCell(MONEY[idx][2]);}else{toast('🎲 Дойди кубиком — вход в дело стоит хода');}});})(gs[i]);}paintPawn();drawClock();landed();}
+        if(BOARD_VIEW==='money'){if(sp)sp.hidden=true;board.innerHTML=buildMoney()+'<div class="vf-controls"><div class="vf-die" id="vfDie">🎲</div><button class="vf-roll" id="vfRoll">Бросить кубик</button><div class="vf-landed" id="vfLanded"></div></div>';var rb=document.getElementById('vfRoll');if(rb)rb.addEventListener('click',rollDie);var gs=board.querySelectorAll('.vf-c2');for(var i=0;i<gs.length;i++){(function(g){g.addEventListener('click',function(){var idx=+g.getAttribute('data-i');if(idx===pawnIdx){ if(MONEY[idx]&&MONEY[idx][3]==='шанс'){ goldTicket(); } else { enterCell(MONEY[idx][2]); } }else{toast('🎲 Дойди кубиком — вход в дело стоит хода');}});})(gs[i]);}paintPawn();drawClock();landed();}
         else if(BOARD_VIEW==='soul'){if(sp){sp.hidden=false;sp.innerHTML='Нажми клетку Души — раскроется её вопрос.';}board.innerHTML='<div class="vf-boardwrap">'+buildSoul()+'</div>';var gs2=board.querySelectorAll('.vf-c');for(var j=0;j<gs2.length;j++){(function(g){g.addEventListener('click',function(){var idx=+g.getAttribute('data-i'),c=SOUL[idx];if(sp){sp.hidden=false;sp.innerHTML='<div class="ll"><b>'+c[0]+'</b> · '+c[1]+'</div><div class="sq">«'+c[2]+'»</div>';}});})(gs2[j]);}}
         else{if(sp)sp.hidden=true;board.innerHTML=buildDoors();}}
       (function(){var tabs=document.getElementById('vfTabs');if(!tabs)return;tabs.addEventListener('click',function(e){var b=e.target.closest('button[data-view]');if(!b)return;BOARD_VIEW=b.getAttribute('data-view');var bs=tabs.querySelectorAll('button');for(var i=0;i<bs.length;i++)bs[i].classList.toggle('on',bs[i]===b);var ipoBtn=document.getElementById('viIpoOpen');if(ipoBtn)ipoBtn.style.display=(BOARD_VIEW==='money')?'block':'none';renderField();});})();
@@ -23066,6 +23179,70 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         if(found){try{found.open=true;}catch(e){}setTimeout(function(){try{found.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}},70);}
         else{toast('Этот раздел сейчас недоступен');}
       }
+      // ── 🎫 ЗОЛОТОЙ БИЛЕТ (Ринат 29сен): редкая клетка «шанс» даёт ВЫБОР — деньги сейчас или вечный пассив.
+      //    Сам выбор = проба импульс/терпение для Зеркала (logChoice). Числа: cash≈6 доходов, пассив≈20% расходов.
+      function goldTicket(){
+        var p=(typeof me==='function'?me():null)||(state.players||[]).find(function(x){return x.id==state.currentPlayerId;}); if(!p) return;
+        var c={}; try{ c=(typeof calc==='function')?calc(p):{}; }catch(e){}
+        var income=Math.max(0,Math.round(Number(c.income)||0)), exp=Math.max(0,Math.round(Number(c.totalExp)||0));
+        var cash=Math.max(3000, Math.round(income*6)), passive=Math.max(200, Math.round(exp*0.20));
+        window._goldReward={cash:cash, passive:passive};
+        window._goldWin=Math.floor(Math.random()*3);   // 🎲 повезёт одной из трёх карт (Ринат 29сен)
+        window._goldDone=false;
+        var o=document.getElementById('viaGold');
+        if(!o){ o=document.createElement('div'); o.id='viaGold';
+          o.style.cssText='position:fixed;inset:0;z-index:9400;display:flex;align-items:center;justify-content:center;padding:16px;background:radial-gradient(120% 80% at 50% 8%,rgba(231,189,99,.20),transparent 60%),rgba(6,5,3,.95);';
+          document.body.appendChild(o); }
+        var cardsHtml=''; for(var i=0;i<3;i++){ cardsHtml+='<button class="gcard" data-i="'+i+'" onclick="window.goldPick('+i+')" style="width:92px;height:124px;border:2px solid #6b5a2a;border-radius:14px;background:linear-gradient(180deg,#241a09,#120c04);color:#e7bd63;font-size:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.18s;font-family:inherit;">🎴</button>'; }
+        o.innerHTML='<div style="width:440px;max-width:100%;background:linear-gradient(180deg,#171208,#0b0905);border:1px solid #e7bd63;border-radius:20px;padding:24px 20px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,.7);">'
+          +'<div style="font-size:40px;">🎫</div>'
+          +'<div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#efd8a3;margin:6px 0 4px;">Золотой билет</div>'
+          +'<div style="font-size:13px;color:#c9bfa6;line-height:1.5;margin-bottom:16px;">Судьба редко улыбается. Выбери одну из трёх карт — повезёт только одной, две пусты.</div>'
+          +'<div id="goldCards" style="display:flex;gap:12px;justify-content:center;margin-bottom:12px;">'+cardsHtml+'</div>'
+          +'<div id="goldMsg" style="font-size:13.5px;line-height:1.5;min-height:20px;color:#c9bfa6;"></div>'
+          +'<div id="goldChoice" hidden style="margin-top:14px;">'
+            +'<button onclick="window.goldTake(\'cash\')" style="display:block;width:100%;margin-bottom:11px;padding:15px;border:1px solid #6b5a2a;border-radius:14px;background:#1c1408;color:#f4e6c4;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">💰 Взять деньгами сейчас<br><span style="font-weight:600;font-size:12.5px;color:#bfa76a;">+'+fmtN(cash)+'$ в кассу прямо сейчас</span></button>'
+            +'<button onclick="window.goldTake(\'passive\')" style="display:block;width:100%;padding:15px;border:1px solid #2a6b4a;border-radius:14px;background:#0c1c14;color:#bff0d6;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">🏛️ Вложить в вечное<br><span style="font-weight:600;font-size:12.5px;color:#7fcaa2;">+'+fmtN(passive)+'$/мес пассива НАВСЕГДА</span></button>'
+            +'<div style="font-size:10.5px;color:#6d6a62;margin-top:12px;line-height:1.5;">Деньги сейчас — быстро и приятно. Вечное — медленно строит свободу. Что выберешь — Зеркало запомнит.</div>'
+          +'</div>'
+          +'<button id="goldClose" hidden onclick="window.goldClose()" style="width:100%;margin-top:12px;padding:12px;border:1px solid #3a2f1e;border-radius:12px;background:#140f08;color:#c9bfa6;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Закрыть</button>'
+          +'</div>';
+        o.style.display='flex';
+      }
+      function goldPick(i){
+        if(window._goldDone) return; window._goldDone=true;
+        var win=window._goldWin;
+        var cards=document.querySelectorAll('#goldCards .gcard');
+        for(var k=0;k<cards.length;k++){ cards[k].disabled=true; cards[k].innerHTML=(k===win?'🎫':'✖'); cards[k].style.borderColor=(k===win?'#e7bd63':'#3a2f1e'); cards[k].style.color=(k===win?'#efd8a3':'#6b5a52'); cards[k].style.opacity=(k===i?'1':'.45'); if(k===i)cards[k].style.transform='translateY(-6px)'; }
+        var msg=document.getElementById('goldMsg');
+        var p=(typeof me==='function'?me():null)||(state.players||[]).find(function(x){return x.id==state.currentPlayerId;});
+        if(i===win){ if(msg){ msg.innerHTML='🎉 <b style="color:#efd8a3;">Золотой билет твой!</b> Выбери награду:'; } var ch=document.getElementById('goldChoice'); if(ch)ch.hidden=false; }
+        else { if(msg){ msg.innerHTML='Пусто. Билет был на другой карте — в другой раз повезёт.'; } var cl=document.getElementById('goldClose'); if(cl)cl.hidden=false;
+          try{ if(p&&typeof logAction==='function') logAction(p,'🎫','Золотой билет — не выпало (выбрал пустую карту)',{sphere:'быт',ok:false,why:'повезло другой карте'}); }catch(e){}
+          try{ if(typeof save==='function'&&p) save(p.id); }catch(e){} }
+      }
+      function goldClose(){ var o=document.getElementById('viaGold'); if(o)o.style.display='none'; }
+      window.goldPick=goldPick; window.goldClose=goldClose;
+      function goldTake(kind){
+        var o=document.getElementById('viaGold'); if(o)o.style.display='none';
+        var p=(typeof me==='function'?me():null)||(state.players||[]).find(function(x){return x.id==state.currentPlayerId;}); if(!p) return;
+        var r=window._goldReward||{cash:0,passive:0};
+        try{
+          if(kind==='cash'){ p.savings=Math.round(((Number(p.savings)||0)+r.cash)*100)/100;
+            if(typeof logChoice==='function') logChoice(p,'золотой билет: деньги сейчас или вечное','взял деньгами сейчас',{declined:['вложить в вечный пассив'],paid:'+'+fmtN(r.cash)+'$ сразу, импульс',amt:r.cash,sphere:'характер',noFeed:true});
+            if(typeof logAction==='function') logAction(p,'🎫','Золотой билет: взял деньгами сейчас',{sphere:'характер',amt:r.cash});
+            toast('🎫 +'+fmtN(r.cash)+'$ в кассу!');
+          } else {
+            p.assets=p.assets||[]; p.assets.push({id:Date.now()+Math.floor(Math.random()*1000),type:'BUSINESS',title:'🎫 Золотой билет (вечный пассив)',cf:r.passive,price:0,down:0});
+            if(typeof logChoice==='function') logChoice(p,'золотой билет: деньги сейчас или вечное','вложил в вечное (пассив навсегда)',{declined:['взять деньгами сейчас'],paid:'+'+fmtN(r.passive)+'$/мес навсегда, терпение',amt:r.passive,sphere:'свобода',noFeed:true});
+            if(typeof logAction==='function') logAction(p,'🎫','Золотой билет: вложил в вечное (+'+fmtN(r.passive)+'$/мес навсегда)',{sphere:'свобода',amt:r.passive});
+            toast('🏛️ Вечный пассив +'+fmtN(r.passive)+'$/мес!');
+          }
+          if(typeof save==='function') save(p.id);
+          if(typeof render==='function') render();
+        }catch(e){}
+      }
+      window.goldTicket=goldTicket; window.goldTake=goldTake;
       var field=document.getElementById('viaField'),bF=document.getElementById('vbField'),bB=document.getElementById('vbBlank');
       function showField(on){
         if(on){
@@ -23146,7 +23323,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         var p=(state.players||[]).find(function(x){return x.id==state.currentPlayerId;});
         var log=(p&&Array.isArray(p.actionLog))?p.actionLog:[];
         if(!log.length){ box.innerHTML='<div class="hx-empty">Пока пусто. Живи — ходи по полю, вкладывай, покупай, рискуй. Каждый шаг и каждый промах лягут сюда.</div>'; el.hidden=false; return; }
-        var h='', curY=null;
+        // 🪞 СВОДКА «Зеркало заметило» (Ринат 29сен: собранные данные должны окупаться видимым прогрессом) — только сухие факты.
+        var fails=0, azN=0, azLost=0, ppl=0, worstAmt=0, worstT='';
+        for(var s=0;s<log.length;s++){ var e=log[s]||{};
+          if(e.ok===false) fails++;
+          if(e.sph==='азарт'){ azN++; if(typeof e.amt==='number'&&e.amt<0) azLost+=-e.amt; }
+          if(e.sph==='люди') ppl++;
+          if(typeof e.amt==='number'&&e.amt<worstAmt){ worstAmt=e.amt; worstT=e.t||''; }
+        }
+        var chipCss='display:inline-block;font-size:11.5px;font-weight:700;color:#d8cdb8;background:rgba(231,189,99,.10);border:1px solid rgba(231,189,99,.22);border-radius:999px;padding:4px 10px;';
+        var chips='<span style="'+chipCss+'">📜 '+log.length+' событий</span>';
+        if(fails) chips+=' <span style="'+chipCss+'">✗ '+fails+' провалов</span>';
+        if(azN) chips+=' <span style="'+chipCss+'color:#e6b3b3;">🎰 азарт: '+azN+' раз, −'+fmtN(azLost)+'$</span>';
+        if(ppl) chips+=' <span style="'+chipCss+'">🤝 люди: '+ppl+'</span>';
+        var summary='<div style="border:1px solid #2a2016;background:linear-gradient(180deg,rgba(231,189,99,.07),transparent);border-radius:12px;padding:12px 13px;margin-bottom:14px;">'
+          +'<div style="font-size:12px;letter-spacing:.04em;color:#e7bd63;font-weight:800;margin-bottom:9px;">🪞 ЗЕРКАЛО ЗАМЕТИЛО</div>'
+          +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'+chips+'</div>'
+          +(worstAmt<0?('<div style="font-size:11.5px;color:#c9967f;margin-top:10px;line-height:1.4;">Самый крупный удар: «'+hxEsc(worstT)+'» <b>−'+fmtN(-worstAmt)+'$</b></div>'):'')
+          +'</div>';
+        var h=summary, curY=null;
         for(var i=log.length-1;i>=0;i--){ var r=log[i]||{}; var y=(r.y!=null?r.y:0);
           if(y!==curY){ curY=y; h+='<div class="hx-year">Год '+(y||1)+'</div>'; }
           var amt=(r.amt!=null&&r.amt!==0)?('<div class="hx-amt '+(r.amt>0?'pos':'neg')+'">'+(r.amt>0?'+':'')+fmtN(r.amt)+'$</div>'):'';
@@ -23158,6 +23353,32 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       function closeHistory(){ var el=document.getElementById('viaHistory'); if(el)el.hidden=true; }
       window.openHistory=openHistory; window.closeHistory=closeHistory;
       var vhi=document.getElementById('vbHist'); if(vhi)vhi.addEventListener('click',openHistory);
+      // ── 🏆 ЛЕДБОРД ЛУЧШИХ (Ринат 29сен): прогресс виден → человек возвращается. Метрика = пассив/мес (доход,
+      //    что работает без тебя = путь к свободе), капитал — тайбрейк. «Без проигравших»: показываем топ, не дно.
+      //    В соло подмешиваем ПРОШЛЫЕ жизни (PROFILE.runs) — обгоняй себя вчерашнего. Глобальный топ всех игроков
+      //    мира = следующий шаг (нужен сервер via_server.py + Telegram-ID; тут — локальный, работает и офлайн).
+      function lbScore(p){ try{ var c=(typeof calc==='function')?calc(p):{}; var passive=Math.round(Number(c.passive)||0); var target=Math.round(Number(c.target)||0); var nw=(typeof pnetWorth==='function')?pnetWorth(p):0; var freedom=target>0?Math.min(100,Math.round(passive/target*100)):(passive>0?100:0); return {passive:passive,target:target,nw:nw,freedom:freedom}; }catch(e){ return {passive:0,target:0,nw:0,freedom:0}; } }
+      function openLeaders(){
+        var el=document.getElementById('viaLeaders'), box=document.getElementById('viaLeadList'); if(!el||!box) return;
+        var rows=[];
+        (state.players||[]).forEach(function(p){ var s=lbScore(p); rows.push({name:p.name||'Игрок', live:true, me:(p.id==state.currentPlayerId), passive:s.passive, nw:s.nw, freedom:s.freedom}); });
+        try{ var runs=(typeof PROFILE!=='undefined'&&Array.isArray(PROFILE.runs))?PROFILE.runs:[]; runs.forEach(function(r){ rows.push({name:(r.name||'Игрок')+' · жизнь '+(r.game||'?'), live:false, me:false, passive:Math.round(Number(r.passive)||0), nw:Math.round(Number(r.worth)||0), freedom:null}); }); }catch(e){}
+        rows.sort(function(a,b){ return (b.passive-a.passive) || (b.nw-a.nw); });
+        rows=rows.slice(0,30);
+        if(!rows.length){ box.innerHTML='<div class="lb-empty">Пока пусто. Играй — и ты появишься в топе. Чем больше пассива (дохода без твоего труда), тем выше на пути к свободе.</div>'; el.hidden=false; return; }
+        var champ=rows[0];
+        var h='<div class="lb-champ">👑 <b>'+hxEsc(champ.name)+'</b> — впереди всех: пассив <b>'+fmtN(champ.passive)+'$/мес</b>. Лучший носит корону, и её видят все. Догоняй.</div>';
+        var medal=function(i){ return i===0?'👑':i===1?'🥈':i===2?'🥉':('#'+(i+1)); };
+        rows.forEach(function(r,i){
+          var cls='lb-row'+(i===0?' top1':'')+(r.me?' me':'');
+          var sub=(r.freedom!=null?('🔥 '+r.freedom+'% к свободе'):'прошлая жизнь')+(r.me?' · это ты':'');
+          h+='<div class="'+cls+'"><div class="lb-rank">'+medal(i)+'</div><div class="lb-body"><div class="lb-name">'+hxEsc(r.name)+'</div><div class="lb-sub">'+sub+'</div></div><div class="lb-val"><b>'+fmtN(r.passive)+'$/мес</b><span>капитал '+fmtN(r.nw)+'$</span></div></div>';
+        });
+        box.innerHTML=h; el.hidden=false;
+      }
+      function closeLeaders(){ var el=document.getElementById('viaLeaders'); if(el)el.hidden=true; }
+      window.openLeaders=openLeaders; window.closeLeaders=closeLeaders;
+      var vld=document.getElementById('vbLead'); if(vld)vld.addEventListener('click',openLeaders);
       // обратная связь
       var fb=document.getElementById('viaFeedback');
       document.getElementById('vbFb').addEventListener('click',function(){fb.classList.add('on');var t=document.getElementById('viaFbText');if(t)setTimeout(function(){try{t.focus();}catch(e){}},50);});
