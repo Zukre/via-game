@@ -12706,6 +12706,23 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             for(const k in votes){ if(k.charAt(0)==='_') continue; if(votes[k]>best){best=votes[k]; core=k;} }
             if(!strengths.length) strengths.push('Ты дошёл до Зеркала и смотришь на себя честно — это само по себе редкость и твоя опора.');
 
+            // 🎯 СЛОЙ 4 — РАЗРЫВ (З2.4): сверяем НАМЕРЕНИЕ, заявленное в ПРОШЛОЙ жизни, с тем, куда реально вложил в этой.
+            let gap = null;
+            try{
+                const it = (typeof PROFILE!=='undefined' && PROFILE.intention) ? PROFILE.intention : null;
+                const curGame = (typeof PROFILE!=='undefined') ? _mn(PROFILE.games) : 0;
+                if(it && it.focus && _mn(it.setGame) < curGame && top && top[1]>0){
+                    const declLabel = it.focus==='freedom'?'свободу' : it.focus==='people'?'людей' : 'вырваться из ямы (долги/распад)';
+                    const actual = top[0];   // 'свободу'|'цепи'|'распад'|'людей'
+                    let kept;
+                    if(it.focus==='freedom') kept = (actual==='свободу');
+                    else if(it.focus==='people') kept = (actual==='людей');
+                    else kept = (actual!=='цепи' && actual!=='распад');   // 'escape'
+                    gap = { kept:!!kept, decl:declLabel, actual:actual, text:(it.text||'') };
+                    if(kept){ strengths.push('Ты сдержал слово: в прошлый раз сказал «'+declLabel+'» — и в этот раз реально вложил жизнь туда. Намерение стало делом.'); vote('_build',1); }
+                }
+            }catch(e){}
+
             return {
                 name: p.name || 'Игрок',
                 enough: (obs.length>=2 && !!core),
@@ -12713,6 +12730,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 coreText: core ? clusterName[core] : null,
                 aimText: core ? aimByCluster[core] : null,
                 element: elementQuadrant(p),   // 🔥 Слой 3 — Стихия (тяга×способность)
+                gap,                            // 🎯 Слой 4 — разрыв намерения и поступка
                 strengths, games
             };
         }
@@ -12756,6 +12774,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function openMirror(){ recordMirrorReached(me()); if(typeof viaUnlocked==='function' && !viaUnlocked('mirror')){ showPaywall('mirror'); return; } state.mirrorModal = true; paintOverlays(); }
         function closeMirror(){ state.mirrorModal = false; paintOverlays(); }
+        // 🎯 СЛОЙ 4 — записать НАМЕРЕНИЕ на следующую жизнь (метод Барбары Шер: цель + цена слова). Живёт в PROFILE, переживает жизни.
+        function setIntention(focus){
+            try{
+                const t=document.getElementById('viaIntentText'); const text=t?String(t.value||'').trim().slice(0,120):'';
+                if(typeof PROFILE==='undefined') return;
+                PROFILE.intention = { focus:focus, text:text, setGame:_mn(PROFILE.games), ts:Date.now() };
+                if(typeof saveProfile==='function') saveProfile();
+                if(typeof toast==='function') toast('🎯 Намерение записано. Следующая жизнь покажет, сдержал ли ты слово.');
+                paintOverlays();
+            }catch(e){}
+        }
+        window.setIntention=setIntention;
         function renderMirrorModal(){
             if(!state.mirrorModal) return '';
             const p = me(); const M = mirrorBuild(p);
@@ -12780,6 +12810,26 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.2em;text-transform:uppercase;color:#cf9a6a;margin-bottom:6px;">Осторожно — ловушка</div>
                     <div style="font-size:14px;line-height:1.6;color:${MID};"><b style="color:${INK};">${_E.trap.k}.</b> ${_E.trap.bad}.</div></div>`; }
             }
+            // 🎯 Слой 4 — РАЗРЫВ намерения и поступка + сеттер намерения (метод Шер, тон Браун)
+            const _escI = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+            let gapHtml='';
+            if(M.gap){
+                gapHtml = `<div style="border-top:1px solid rgba(150,170,220,.14);margin:28px 0;"></div>
+                    <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:#e0a86a;margin-bottom:12px;">🎯 Намерение и правда</div>`;
+                if(M.gap.kept){ gapHtml += `<div style="background:linear-gradient(160deg,rgba(132,196,210,.12),transparent);border:1px solid rgba(132,196,210,.4);border-radius:14px;padding:16px 17px;">
+                    <div style="font-size:14.5px;line-height:1.65;color:${MID};">В прошлый раз ты сказал себе «${M.gap.decl}» — и в этой жизни вложил именно туда. <b style="color:${INK};">Слово стало делом.</b> Это и есть изменение, а не просто знание о себе.</div></div>`; }
+                else { gapHtml += `<div style="border-left:2px solid ${G};padding:6px 0 6px 18px;">
+                    <div style="font-size:14.5px;line-height:1.65;color:${MID};">Ты обещал себе «${M.gap.decl}», а больше всего вложил в <b style="color:${INK};">«${M.gap.actual}»</b>. ${M.gap.text?('Твои слова были: <span style="color:'+G+';font-style:italic;">«'+_escI(M.gap.text)+'»</span>. '):''}Это не приговор — это самый честный зазор между тем, чего ты хочешь, и тем, что делаешь. Здесь и живёт настоящая работа над собой.</div></div>`; }
+            }
+            const _curFocus=(typeof PROFILE!=='undefined'&&PROFILE.intention)?PROFILE.intention.focus:'';
+            const _curText=(typeof PROFILE!=='undefined'&&PROFILE.intention)?(PROFILE.intention.text||''):'';
+            const _ib=(f,label)=>`<button onclick="setIntention('${f}')" style="flex:1;min-width:118px;padding:11px 8px;border-radius:12px;cursor:pointer;font-family:inherit;font-weight:700;font-size:13px;border:1px solid ${_curFocus===f?G:'rgba(150,170,220,.24)'};background:${_curFocus===f?'rgba(228,197,131,.16)':'rgba(20,26,42,.6)'};color:${_curFocus===f?INK:MID};">${label}</button>`;
+            const intentHtml = `<div style="border-top:1px solid rgba(150,170,220,.14);margin:28px 0;"></div>
+                <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:${G};margin-bottom:10px;">🎯 Намерение на следующую жизнь</div>
+                <div style="font-size:14px;line-height:1.6;color:${MID};margin-bottom:12px;">Выбери, куда хочешь вложить следующую жизнь. Зеркало запомнит и в следующий раз честно сверит — сдержал ли ты слово.</div>
+                <input id="viaIntentText" maxlength="120" placeholder="одной строкой: чего именно ты хочешь…" value="${_escI(_curText)}" style="width:100%;box-sizing:border-box;background:rgba(9,13,26,.7);border:1px solid rgba(150,170,220,.24);border-radius:11px;color:${INK};font-family:inherit;font-size:14px;padding:11px 13px;margin-bottom:10px;">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">${_ib('freedom','🕊️ Свобода')}${_ib('people','❤️ Люди')}${_ib('escape','⛓️→🕊️ Выбраться из ямы')}</div>
+                ${_curFocus?`<div style="font-size:12px;color:#84c4d2;margin-top:9px;">✅ Записано: «${_curFocus==='freedom'?'свобода':_curFocus==='people'?'люди':'выбраться из ямы'}». Слово дано — следующая жизнь покажет.</div>`:''}`;
             const body = M.enough ? `
                 <div style="background:linear-gradient(160deg,rgba(228,197,131,.10),transparent);border:1px solid ${G}55;border-radius:16px;padding:22px;margin:0 0 26px;text-align:center;">
                     <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:${G};margin-bottom:10px;">Что это всё вместе — одна трещина</div>
@@ -12790,10 +12840,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:#84c4d2;margin-bottom:12px;">Где ты силён</div>
                 ${strengthsHtml}
                 ${stihiaHtml}
+                ${gapHtml}
                 <div style="border-left:2px solid ${G};padding:6px 0 6px 20px;margin:26px 0 8px;">
                     <div style="font:600 11px/1 ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;color:${G};margin-bottom:10px;">Куда бить точечно — одна точка</div>
                     <div style="font-size:15px;line-height:1.65;color:#d8dfef;">У тебя всё держится на одном мгновении: ${M.aimText}</div>
                 </div>
+                ${intentHtml}
                 <div style="text-align:center;font-family:Georgia,serif;font-style:italic;color:${LOW};font-size:14px;margin-top:24px;line-height:1.5;">Чем больше играешь, тем чётче Зеркало. Сыграй ещё — оно сравнит тебя с тобой прошлым.</div>
             ` : `
                 <div style="text-align:center;padding:10px 0 4px;">
