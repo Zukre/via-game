@@ -23476,9 +23476,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           toast('Открой игру в Telegram, чтобы платить звёздами');
         }
       }
-      function openSupport(){ var g=document.getElementById('viStarTiers'); if(g){ var h=''; for(var i=0;i<STAR_TIERS.length;i++){ h+='<button class="vs-tier" data-i="'+i+'">⭐ '+STAR_TIERS[i][0]+'</button>'; } g.innerHTML=h; } renderStarHistory(); if(supEl)supEl.hidden=false; }
+      // 💛 СВОЯ СУММА ПОДДЕРЖКИ (Ринат 30сен): человек сам решает, сколько задонатить. Сервер чеканит счёт на любую сумму.
+      function buyCustomStars(){
+        var inp=document.getElementById('viStarCustom'); var amt=Math.floor(+((inp&&inp.value)||0));
+        if(!(amt>=1)){ toast('Введи сумму от 1⭐'); return; }
+        var wa=tgWA(); var initData=(wa&&wa.initData)||'';
+        if(typeof SERVER_MODE!=='undefined' && SERVER_MODE && initData){
+          fetch('/stars/invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'support',amount:amt,title:'Поддержка VIA — '+amt+'⭐',description:'Спасибо за поддержку VIA',payload:'support_'+amt})})
+            .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok&&j.link){ buyStars(j.link, amt); } else { toast('Не удалось создать счёт — попробуй готовую сумму'); } })
+            .catch(function(){ toast('Нет связи с сервером — попробуй готовую сумму'); });
+        } else { toast('Своя сумма — только онлайн в Telegram. Пока выбери готовую сумму ⭐'); }
+      }
+      window.buyCustomStars=buyCustomStars;
+      function openSupport(){ var g=document.getElementById('viStarTiers'); if(g){ var h=''; for(var i=0;i<STAR_TIERS.length;i++){ h+='<button class="vs-tier" data-i="'+i+'">⭐ '+STAR_TIERS[i][0]+'</button>'; } h+='<div style="grid-column:1/-1;display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap;"><input id="viStarCustom" type="number" min="1" step="1" inputmode="numeric" placeholder="Своя сумма ⭐" style="flex:1;min-width:130px;padding:11px 13px;border-radius:10px;border:1px solid var(--lx-line,#3a3320);background:var(--lx-ink,#1a1610);color:#efe7d6;font-size:15px;"><button id="viStarCustomBtn" class="btn btn-green" style="white-space:nowrap;">Поддержать ⭐</button></div>'; g.innerHTML=h; } renderStarHistory(); if(supEl)supEl.hidden=false; }
       function closeSupport(){ if(supEl)supEl.hidden=true; }
-      if(supEl)supEl.addEventListener('click',function(e){ if(e.target===supEl){ closeSupport(); return; } var b=e.target.closest('.vs-tier'); if(b){ var i=+b.getAttribute('data-i'); var t=STAR_TIERS[i]; if(t) buyStars(t[1], t[0]); } });
+      if(supEl)supEl.addEventListener('click',function(e){ if(e.target===supEl){ closeSupport(); return; } if(e.target.id==='viStarCustomBtn'||(e.target.closest&&e.target.closest('#viStarCustomBtn'))){ buyCustomStars(); return; } var b=e.target.closest('.vs-tier'); if(b){ var i=+b.getAttribute('data-i'); var t=STAR_TIERS[i]; if(t) buyStars(t[1], t[0]); } });
       var vso=document.getElementById('viSupportOpen'); if(vso)vso.addEventListener('click',openSupport);
       var vsb=document.getElementById('viSupportBack'); if(vsb)vsb.addEventListener('click',closeSupport);
       // ── 💬 ЧАТ VIA (Ринат 23сен): сообщество игроков. Ссылка живёт одной константой. ──
