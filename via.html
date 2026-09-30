@@ -11407,7 +11407,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           lifestyle:{t:'🏡 Образ жизни',a:125,link:'https://t.me/$M-Ttpm3-mUnfHQAAyZRYzpE1deA',d:'Покупки, статус, апгрейды жизни.'},
           extend_turn:{t:'⏱️ +1 минута к ходу',a:30,link:'https://t.me/$sdEckG3-mUngHQAApORU4Xd1Ewo',d:'Разово продлить свой ход.'},
           extra_card:{t:'🃏 Ещё карта сделки',a:60,link:'https://t.me/$H-SEtG3-mUnhHQAASSO1CqfJhMI',d:'Разово вытянуть ещё одну карту.'},
-          bundle_all:{t:'🌟 ВСЁ ВКЛЮЧЕНО',a:1200,link:'https://t.me/$ASCCXG3-mUniHQAA9DORfOKectM',d:'Все блоки + Зеркало навсегда. Дешевле, чем по отдельности.'},
+          bundle_all:{t:'🌟 ВСЁ ВКЛЮЧЕНО',a:1845,link:'https://t.me/$ASCCXG3-mUniHQAA9DORfOKectM',d:'Все 7 блоков + Зеркало навсегда. На 10% дешевле, чем покупать по отдельности.'},
           vip_founder:{t:'👑 Основатель клуба VIA',a:3000,link:'https://t.me/$CLiMWW3-mUnjHQAAx-xfP46tu6g',d:'Всё навсегда + статус основателя + весь будущий контент.'}
         };
         const BLOCK_KEYS = {ferma:1,tovarka:1,auction:1,relationships:1,skills:1,lifestyle:1,mirror:1};
@@ -11443,7 +11443,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
           const u=(typeof viaTgUser==='function')?viaTgUser():null;
           const initData=(wa&&wa.initData)||'';
           if(SERVER_MODE && initData && u && u.id){
-            fetch('/stars/invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:key,initData:initData})})
+            fetch('/stars/invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:key,amount:it.a,title:it.t,description:(it.d||it.t),payload:('buy_'+key+'_'+((u&&u.id)||0)),initData:initData})})
               .then(function(r){return r.json();}).then(function(j){ openWith((j&&j.ok&&j.link)?j.link:it.link); })
               .catch(function(){ openWith(it.link); });
           } else { openWith(it.link); }
@@ -11460,7 +11460,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function closePaywall(){ const el=document.getElementById('viaPaywall'); if(el) el.hidden=true; }
         function openShop(){
           const el=document.getElementById('viaShop'), g=document.getElementById('viaShopGrid'); if(!el||!g) return;
-          const order=['bundle_all','vip_founder','mirror','relationships','ferma','tovarka','auction','skills','lifestyle'];
+          const order=['bundle_all','mirror','relationships','ferma','tovarka','auction','skills','lifestyle'];  // Основатель/Легенда убраны из звёзд — теперь крипта (Ринат 30сен)
           let h='';
           for(const key of order){ const it=SHOP[key], owned=(key!=='extend_turn'&&key!=='extra_card')&&viaUnlocked(key);
             h+='<div class="sh-item"><div class="sh-hd"><span class="sh-t">'+it.t+'</span><span class="sh-a">⭐ '+it.a+'</span></div><div class="sh-d">'+(it.d||'')+'</div>'
