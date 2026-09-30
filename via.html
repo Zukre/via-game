@@ -11504,6 +11504,30 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function closeVoices(){ const el=document.getElementById('viaVoices'); if(el) el.style.display='none'; }
         window.openVoices=openVoices; window.closeVoices=closeVoices;
+        // 🎡 КОЛЕСО ЖИЗНИ (Ринат 30сен): стартовый замер 8 сфер → личное электрическое колесо, сохраняется в профиль (точка старта ДО игры, set-once).
+        const WHEEL_AREAS=[
+          ['💰','Деньги','доволен финансами?'],
+          ['💼','Дело','дело наполняет?'],
+          ['❤️','Любовь','наполнена личная жизнь?'],
+          ['👨‍👩‍👧','Семья','доволен связью с родными?'],
+          ['🧑‍🤝','Окружение','есть круг «своих»?'],
+          ['🩺','Здоровье','хватает энергии, как тело?'],
+          ['🌱','Рост','развиваешься, растёшь?'],
+          ['🎨','Отдых/смысл','есть отдых, радость, смысл?']
+        ];
+        function drawWheel(cv, vals){
+          var ctx=cv.getContext('2d'); var W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=Math.min(W,H)/2-40,N=WHEEL_AREAS.length,i,g,a,r,x,y;
+          ctx.clearRect(0,0,W,H);
+          for(g=1;g<=5;g++){ ctx.beginPath(); for(i=0;i<=N;i++){ a=(i%N)/N*6.2832-1.5708; r=R*g/5; x=cx+r*Math.cos(a); y=cy+r*Math.sin(a); if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.strokeStyle='rgba(200,162,74,0.16)'; ctx.stroke(); }
+          for(i=0;i<N;i++){ a=i/N*6.2832-1.5708; x=cx+R*Math.cos(a); y=cy+R*Math.sin(a); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x,y); ctx.strokeStyle='rgba(200,162,74,0.13)'; ctx.stroke(); ctx.fillStyle='#c8a24a'; ctx.font='16px serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(WHEEL_AREAS[i][0], cx+(R+20)*Math.cos(a), cy+(R+20)*Math.sin(a)); }
+          ctx.beginPath(); for(i=0;i<=N;i++){ var idx=i%N; a=idx/N*6.2832-1.5708; r=R*(vals[idx]||0)/10; x=cx+r*Math.cos(a); y=cy+r*Math.sin(a); if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.closePath(); ctx.fillStyle='rgba(200,162,74,0.30)'; ctx.fill(); ctx.strokeStyle='#c8a24a'; ctx.lineWidth=2; ctx.stroke();
+        }
+        function wheelObservation(vals){ var arr=WHEEL_AREAS.map(function(a,i){return {n:a[1],v:vals[i]};}); arr.sort(function(a,b){return a.v-b.v;}); var low=arr.slice(0,2).map(function(x){return x.n;}), high=arr[arr.length-1].n; return 'Выше всего — <b>'+high+'</b>, а в провале — <b>'+low.join('</b> и <b>')+'</b>. Во что-то ты вложился сильно, а другое ждёт. Игра покажет, куда сдвинется.'; }
+        function renderWheelResult(el, vals, ts){ var when=''; try{ when=new Date(ts).toLocaleDateString('ru-RU'); }catch(e){} el.innerHTML='<div style="max-width:520px;margin:0 auto;text-align:center;"><div style="font-family:Georgia,serif;font-size:24px;color:#c8a24a;">🎡 Твоё колесо жизни</div><div style="color:#8a8272;font-size:13px;margin:6px 0 14px;">Точка старта'+(when?(' · '+when):'')+' — сохранена навсегда</div><canvas id="viaWheelCv" width="360" height="360" style="max-width:100%;"></canvas><div style="background:rgba(200,162,74,0.1);border:1px solid rgba(200,162,74,0.3);border-radius:12px;padding:14px 16px;margin-top:14px;font-size:14.5px;color:#efe7d6;line-height:1.5;">'+wheelObservation(vals)+'</div><button onclick="closeWheel()" class="btn btn-gray" style="margin-top:16px;">← Назад</button></div>'; var cv=document.getElementById('viaWheelCv'); if(cv) drawWheel(cv, vals); }
+        function submitWheel(){ var vals=[],i; for(i=0;i<WHEEL_AREAS.length;i++){ var q=document.getElementById('wq'+i); vals.push(q?Math.round(+q.value):5); } if(!PROFILE.baselineWheel){ PROFILE.baselineWheel={vals:vals,ts:Date.now()}; } else { PROFILE.wheelHistory=PROFILE.wheelHistory||[]; PROFILE.wheelHistory.unshift({vals:vals,ts:Date.now()}); PROFILE.wheelHistory=PROFILE.wheelHistory.slice(0,20); } try{ saveProfile(); }catch(e){} var el=document.getElementById('viaWheel'); if(el) renderWheelResult(el, vals, (PROFILE.baselineWheel&&PROFILE.baselineWheel.ts)||Date.now()); }
+        function openWheel(){ var el=document.getElementById('viaWheel'); if(!el){ el=document.createElement('div'); el.id='viaWheel'; document.body.appendChild(el); } el.style.cssText='position:fixed;inset:0;z-index:3000;background:rgba(10,8,4,0.97);overflow-y:auto;padding:24px 16px;display:block;'; if(PROFILE.baselineWheel&&PROFILE.baselineWheel.vals){ renderWheelResult(el, PROFILE.baselineWheel.vals, PROFILE.baselineWheel.ts); return; } var rows='',i; for(i=0;i<WHEEL_AREAS.length;i++){ var a=WHEEL_AREAS[i]; rows+='<div style="margin-bottom:15px;"><div style="display:flex;justify-content:space-between;font-size:13.5px;color:#efe7d6;margin-bottom:4px;"><span>'+a[0]+' <b>'+a[1]+'</b> — '+a[2]+'</span><span id="wv'+i+'" style="color:#c8a24a;font-weight:700;">5</span></div><input id="wq'+i+'" type="range" min="0" max="10" step="1" value="5" oninput="var e=document.getElementById(\'wv'+i+'\');if(e)e.textContent=this.value;" style="width:100%;accent-color:#c8a24a;"></div>'; } el.innerHTML='<div style="max-width:520px;margin:0 auto;"><div style="text-align:center;font-family:Georgia,serif;font-size:24px;color:#c8a24a;">🎡 Колесо жизни</div><div style="text-align:center;color:#8a8272;font-size:13.5px;margin:6px 0 18px;line-height:1.5;">Оцени честно (0–10), где ты сейчас. Это твоя точка старта — сохранится навсегда. Через игру увидишь, как сдвинулось.</div>'+rows+'<button onclick="submitWheel()" class="btn btn-green" style="width:100%;margin-top:6px;">Собрать моё колесо →</button><button onclick="closeWheel()" class="btn btn-gray" style="width:100%;margin-top:10px;">← Назад</button></div>'; }
+        function closeWheel(){ var el=document.getElementById('viaWheel'); if(el) el.style.display='none'; }
+        window.openWheel=openWheel; window.closeWheel=closeWheel; window.submitWheel=submitWheel;
         // ЕДИНЫЙ ВХОД. Любая сфера зовёт это, а не пишет в профиль напрямую.
         // Копит: count (сколько раз), sum/avg/max/min (если value число), last, first, ts.
         function logSignal(sphere, key, value) {
@@ -13046,6 +13070,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         </div>
                         <button onclick="reg()" class="btn btn-green">Вступить в игру →</button>
                         <button onclick="openVoices()" class="btn btn-gray" style="margin-top:10px;">💬 Голоса тех, кто уже играл</button>
+                        <button onclick="openWheel()" class="btn btn-gray" style="margin-top:10px;">🎡 Колесо жизни — твоя точка старта</button>
                     </div>
 
                     <div style="margin-bottom:20px;">
