@@ -15866,6 +15866,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try{ viaMarketSync(_st.salaryCount); }catch(e){}   // 🏛️ прожит месяц → офлайн-биржа шагает под текущей эпохой (в серверном режиме молчит)
             soulYearTick(p);                                        // 🕯️ прожитый год: чистые годы, висящий долг, отпускает ли дно
             try{ bizYearTick(p); }catch(e){}                        // 🏢 годовой тик бизнеса: тяготы + закон внимания (износ потока без развития)
+            try{ realtyYearTick(p); }catch(e){}                     // 📈 годовой тик недвижимости: капитализация, созревание котлована, жизнь арендатора
             try{ bizReportCheck(p); }catch(e){}                     // 🏢 раз в 3 года — окно отчёта «было→стало» + решение развивать
             p.savings=Math.round((Number(p.savings)+flow)*100)/100;
             try{ logAction(p, (flow>=0?'💵':'💸'), 'Получка за месяц'+(ev.k!=='plain'?' ('+ev.nm+')':''), {amt:flow, sphere:'деньги'}); }catch(e){}
@@ -17616,7 +17617,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             {key:'com_office', rung:6, emoji:'🏢', title:'Мини-офисный центр',         val:400000, rent:5400,downPct:0.35},
             {key:'com_wh',     rung:6, emoji:'📦', title:'Склад под логистику',        val:250000, rent:3300,downPct:0.35},
             {key:'dev_land',   rung:7, emoji:'🧱', title:'Участок под застройку',      val:300000, rent:0,   downPct:0.40, flip:true},
-            {key:'dev_recon',  rung:7, emoji:'🏛️', title:'Реконструкция здания',       val:500000, rent:0,   downPct:0.40, flip:true}
+            {key:'dev_recon',  rung:7, emoji:'🏛️', title:'Реконструкция здания',       val:500000, rent:0,   downPct:0.40, flip:true},
+            {key:'park_spot',  rung:2, emoji:'🅿️', title:'Парковочное место',          val:9000,   rent:95,  downPct:0.30},
+            {key:'flat_elite', rung:2, emoji:'💠', title:'Элитная квартира в центре',  val:85000,  rent:750, downPct:0.25},
+            {key:'resort_apt', rung:4, emoji:'🏖️', title:'Курортные апартаменты у моря',val:70000,  rent:1200,downPct:0.30},
+            {key:'com_street', rung:6, emoji:'🏪', title:'Стрит-ритейл помещение',     val:180000, rent:2500,downPct:0.35},
+            {key:'dev_village',rung:7, emoji:'🏡', title:'Коттеджный посёлок',          val:800000, rent:0,   downPct:0.40, flip:true}
         ];
         function realtyRungUnlocked(p, rung){
             if(rung<=2) return true;
@@ -17647,6 +17653,62 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.notify='🏠 Твой объект: «'+o.title+'». '+(how==='ипотека'?'Ипотека '+fmtN(liab)+'$. ':'')+(cf>=0?'Рента +'+fmtN(cf)+'$/мес.':'Поток '+fmtN(cf)+'$/мес — ремонтируй в «Развивать» и продай дороже.');
             save(pId); render();
         }
+        // 📈 КАПИТАЛИЗАЦИЯ + жизнь арендатора — ГОДОВОЙ ТИК (зовётся из giveSalary раз в круг-год).
+        // Второй рычаг заработка: стоимость объектов дышит с рынком и эпохой (рост/падение), поэтому
+        // «купил и держишь», флип и переуступка на котловане реально приносят на цене — не только рента.
+        // Плюс жизнь: простой/неплатёж бьют по кассе, спрос поднимает ренту навсегда, котлован сдаётся.
+        const REALTY_RUNG_GROWTH = {
+            1:{base:0,    vol:0,    epk:0  },   // субаренда — не владеешь, стоимости нет
+            2:{base:0.04, vol:0.04, epk:0.8},   // жильё под сдачу — умеренный ровный рост
+            3:{base:0.03, vol:0.08, epk:1.0},   // флип — рынок качает сильнее
+            4:{base:0.04, vol:0.05, epk:0.9},   // посуточка
+            5:{base:0.10, vol:0.10, epk:1.2},   // котлован — премия за рост стройготовности
+            6:{base:0.05, vol:0.04, epk:1.1},   // коммерция — чувствительна к экономике, но стабильнее
+            7:{base:0.08, vol:0.12, epk:1.3}    // девелопмент — максимум роста и разброса
+        };
+        function realtyYearTick(p){
+            if(!p || !Array.isArray(p.assets)) return;
+            const mkt=(window.viaEpoch && Number(window.viaEpoch.mktMul)) || 1;   // 0.93..1.06 по эпохе
+            const epTilt=mkt-1;
+            for(const a of p.assets){
+                if(!a || a.type!=='ESTATE') continue;
+                const g=REALTY_RUNG_GROWTH[a.rung] || {base:0.04,vol:0.05,epk:1};
+                const old=Number(a.price)||0;
+                if(old>0 && (g.base||g.vol)){
+                    const drift=g.base + epTilt*g.epk + (Math.random()*2-1)*g.vol;   // рост = тип + эпоха + разброс
+                    const np=Math.max(0, Math.round(old*(1+drift)));
+                    a.price=np;
+                    const liab=Number(a.liab)||0;   // отрицательный капитал на плече — честный риск падения
+                    if(liab>0 && np<liab && !a._uwarn){ a._uwarn=1; p.notify='🏚️ «'+(a.title||'объект')+'»: рынок просел НИЖЕ ипотеки — ты в отрицательном капитале. Держать и ждать или резать убыток?'; }
+                    else if(liab>0 && np>=liab){ a._uwarn=0; }
+                }
+                // 🏗️ котлован созревает → сдача через ~3 года: из стройки в доходный объект по выросшей цене
+                if(a.flip && a.rung===5){
+                    a.ageY=(Number(a.ageY)||0)+1;
+                    if(a.ageY>=3){ a.flip=false; a.cf=Math.round((Number(a.price)||0)*0.006);
+                        p.notify='🏁 «'+(a.title||'котлован')+'» сдан! Можно сдавать (+'+fmtN(a.cf)+'$/мес) или продать по выросшей цене.';
+                        try{logAction(p,'🏁','Новостройка сдана: «'+(a.title||'')+'» → рента +'+fmtN(a.cf)+'$/мес',{sphere:'деньги',ok:true});}catch(e){} }
+                }
+                // 🎲 жизнь арендатора — только у доходных объектов
+                const rent=Number(a.cf)||0;
+                if(rent>0){
+                    const r=Math.random();
+                    if(r<0.12){ const hit=Math.round(rent*(2+Math.floor(Math.random()*4)));   // простой 2-5 мес
+                        p.savings=Math.round((Number(p.savings)||0)-hit);
+                        p.notify='🏚️ «'+(a.title||'объект')+'»: арендатор съехал, простой — минус '+fmtN(hit)+'$, пока ищешь нового.';
+                        try{logAction(p,'🏚️','Простой аренды «'+(a.title||'')+'»: −'+fmtN(hit)+'$',{sphere:'деньги',amt:-hit,ok:false});}catch(e){}
+                    } else if(r<0.20){ const hit=Math.round(rent*(1+Math.floor(Math.random()*2)));   // неплатёж/ремонт
+                        p.savings=Math.round((Number(p.savings)||0)-hit);
+                        p.notify='🔧 «'+(a.title||'объект')+'»: неплатёж или внеплановый ремонт — минус '+fmtN(hit)+'$.';
+                        try{logAction(p,'🔧','Ремонт/неплатёж «'+(a.title||'')+'»: −'+fmtN(hit)+'$',{sphere:'деньги',amt:-hit,ok:false});}catch(e){}
+                    } else if(r>0.90){ const up=Math.max(1,Math.round(rent*0.08));   // спрос подрос навсегда
+                        a.cf=rent+up; a.price=Math.round((Number(a.price)||0)*1.05);
+                        p.notify='📈 «'+(a.title||'объект')+'»: район ожил, спрос вырос — рента +'+fmtN(up)+'$/мес и цена вверх.';
+                        try{logAction(p,'📈','Спрос вырос «'+(a.title||'')+'»: рента +'+fmtN(up)+'$/мес',{sphere:'деньги',ok:true});}catch(e){}
+                    }
+                }
+            }
+        }
         function renderRealtyMarket(p){
             const sav=Math.round(Number(p.savings)||0);
             let html='';
@@ -17667,10 +17729,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     const cashBtn=`<button onclick="buyRealty(${p.id},'${o.key}','cash')" ${sav<cashNeed?'disabled':''} class="btn" style="flex:1;padding:7px 10px;font-size:11px;background:${sav>=cashNeed?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'};color:${sav>=cashNeed?'#20180a':'#9ca3af'};font-weight:800;">${o.sub?'🔑 Взять':'💵 Наличными'} (${fmtN(cashNeed)}$)</button>`;
                     const mortBtn=(!o.sub && m)?`<button onclick="buyRealty(${p.id},'${o.key}','mortgage')" ${sav<m.down?'disabled':''} class="btn" style="flex:1;padding:7px 10px;font-size:11px;background:${sav>=m.down?'#0d2b1a':'#374151'};color:${sav>=m.down?'#6ee7b7':'#9ca3af'};font-weight:800;border:1px solid ${sav>=m.down?'#157347':'#374151'};">🏦 В ипотеку (взнос ${fmtN(m.down)}$)</button>`:'';
                     const mortHint=(!o.sub && m)?`<div style="font-size:10.5px;color:#9ca3af;margin-top:4px;">🏦 Плечо: взнос ${fmtN(m.down)}$, ипотека ${fmtN(m.liab)}$, рента после платежа <b style="color:${m.net>=0?'#10b981':'#f87171'};">${m.net>=0?'+':''}${fmtN(m.net)}$/мес</b></div>`:'';
+                    // 💰 Сколько можно заработать: рост стоимости за 10 лет (по типу) + рента за 10 лет
+                    const gr=REALTY_RUNG_GROWTH[o.rung]||{base:0.04};
+                    let earn='';
+                    if(o.val>0){
+                        const v10=Math.round(o.val*Math.pow(1+(gr.base||0),10));
+                        const rent10=o.rent>0?o.rent*12*10:0;
+                        const gain=(v10-o.val)+rent10;
+                        earn=`<div style="font-size:10.5px;color:#8bd3a0;margin-top:5px;">💰 За 10 лет ≈ рост цены до <b>${fmtN(v10)}$</b>${o.rent>0?` + рента <b>${fmtN(rent10)}$</b>`:''} → <b>+${fmtN(gain)}$</b> сверху${o.flip?' (а с ремонтом/перепродажей — быстрее)':''}</div>`;
+                    }
                     html+=`<div style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
                         <div style="font-size:13px;font-weight:700;margin-bottom:3px;">${o.emoji} ${o.title}</div>
-                        <div style="font-size:12px;color:#9ca3af;margin-bottom:8px;line-height:1.5;">${line}</div>
-                        <div style="display:flex;gap:7px;">${cashBtn}${mortBtn}</div>${mortHint}
+                        <div style="font-size:12px;color:#9ca3af;margin-bottom:6px;line-height:1.5;">${line}</div>
+                        <div style="display:flex;gap:7px;">${cashBtn}${mortBtn}</div>${mortHint}${earn}
                     </div>`;
                 }
             }
@@ -17679,11 +17750,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function renderRealtyBranch(p, hasP){
             const est=(p.assets||[]).filter(a=>a&&a.type==='ESTATE');
             const tot=est.reduce((s,a)=>s+(Number(a.cf)||0),0);
+            const val=est.reduce((s,a)=>s+(Number(a.price)||0),0);
+            const debt=est.reduce((s,a)=>s+(Number(a.liab)||0),0);
+            const eq=val-debt;
             const owned = est.length
-                ? `<div style="font-size:12px;color:#9ca3af;margin:4px 0 10px;">Твоя недвижимость (${est.length}): поток <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot)}$/мес</b>. «Развивать» = ремонт: растут и стоимость, и рента. Флип — отремонтируй и продай дороже.</div>`
+                ? `<div style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:#9ca3af;line-height:1.7;">
+                       Объектов: <b style="color:#e5e7eb;">${est.length}</b> · стоимость портфеля <b style="color:#efd8a3;">${fmtN(val)}$</b>${debt>0?` · ипотеки <b style="color:#f87171;">${fmtN(debt)}$</b> · твой капитал <b style="color:#8bd3a0;">${fmtN(eq)}$</b>`:''}<br>
+                       Рента: <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot)}$/мес</b> = <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot*12)}$/год</b>. Стоимость растёт каждый год с рынком — продашь дороже. «Развивать» = ремонт (растут и цена, и рента), флип — отремонтируй и продай.
+                   </div>`
                     + est.map(a=>assetMgmtCard(a,p,hasP)).join('')
                 : '<p style="font-size:12px;color:#9ca3af;padding:2px 2px 8px;">Пока ни одного объекта. Поднимись по лестнице ниже — от субаренды до девелопмента.</p>';
-            const market=`<details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:800;color:#efd8a3;padding:9px 11px;background:#12161d;border:1px solid #242833;border-radius:10px;list-style:none;">🏗️ Купить объект — лестница инвестора</summary><div style="padding:4px 2px;"><div style="font-size:11.5px;color:#9ca3af;line-height:1.5;margin:6px 0;">От простого к сложному: доход, сложность и риск растут вместе. Плечо (ипотека) умножает и доходность, и риск — на росте разгоняет, на простое и падении бьёт по кассе.</div>${renderRealtyMarket(p)}</div></details>`;
+            const market=`<details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:800;color:#efd8a3;padding:9px 11px;background:#12161d;border:1px solid #242833;border-radius:10px;list-style:none;">🏗️ Купить объект — лестница инвестора</summary><div style="padding:4px 2px;"><div style="font-size:11.5px;color:#9ca3af;line-height:1.6;margin:6px 0;"><b style="color:#efd8a3;">Как здесь зарабатывают:</b> рента каждый месяц · рост стоимости со временем (продал дороже) · флип (купил дёшево → ремонт → продал) · переуступка на котловане · посуточка дороже долгосрочной · плечо (ипотека) умножает и доход, и риск. От простого к сложному — доход, сложность и риск растут вместе.</div>${renderRealtyMarket(p)}</div></details>`;
             return owned + market;
         }
 
