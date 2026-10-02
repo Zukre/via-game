@@ -17767,7 +17767,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             4:{base:0.04, vol:0.05, epk:0.9},   // посуточка
             5:{base:0.10, vol:0.10, epk:1.2},   // котлован — премия за рост стройготовности
             6:{base:0.05, vol:0.04, epk:1.1},   // коммерция — чувствительна к экономике, но стабильнее
-            7:{base:0.08, vol:0.12, epk:1.3}    // девелопмент — максимум роста и разброса
+            7:{base:0.06, vol:0.12, epk:1.3}    // девелопмент — максимум роста и разброса
         };
         function realtyYearTick(p){
             if(!p || !Array.isArray(p.assets)) return;
@@ -17775,7 +17775,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const epTilt=mkt-1;
             for(const a of p.assets){
                 if(!a || a.type!=='ESTATE') continue;
-                const g=REALTY_RUNG_GROWTH[a.rung] || {base:0.04,vol:0.05,epk:1};
+                // сданный котлован (rung 5, уже не стройка) дорожает как обычное жильё, а не по премии стройготовности
+                const _matured = (a.rung===5 && !a.flip);
+                const g=(_matured ? REALTY_RUNG_GROWTH[2] : REALTY_RUNG_GROWTH[a.rung]) || {base:0.04,vol:0.05,epk:1};
                 const old=Number(a.price)||0;
                 if(old>0 && (g.base||g.vol)){
                     const drift=g.base + epTilt*g.epk + (Math.random()*2-1)*g.vol;   // рост = тип + эпоха + разброс
