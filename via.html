@@ -11315,6 +11315,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             deals: JSON.parse(localStorage.getItem('v0_deals') || 'null') || [],
             currentPlayerId: null,
             chosenProf: null,
+            // 🪞 РЕАЛЬНЫЙ БЛАНК (Ринат 1окт): выдуманные профессии уходят — человек заполняет СВОИ настоящие
+            // цифры (доход + расходы, как в жизни), и VIA меряет его настоящий уровень, а не чужую роль.
+            // Эти черновики → строят prof-объект в reg() с теми же ключами, что читает calc() — движок цел.
+            blankDraft: { role:'', income:'', taxes:'', housing:'', auto:'', credit:'', other:'', savings:'' },
             nameDraft: '',
             sexDraft: 'm',   // 👤 пол создаваемого персонажа: 'm' мужчина (ветка — девушки) / 'f' женщина (ветка — парни)
             err: '',
@@ -13063,12 +13067,33 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                             <button onclick="state.sexDraft='f'; render();" class="btn ${(state.sexDraft||'m')==='f'?'btn-green':'btn-gray'}" style="flex:1;">👩 Женщина</button>
                         </div>
                         <p style="font-size:11px; color:var(--lx-muted); margin:-8px 0 15px; line-height:1.5;">В отношениях тебе будет открыт только противоположный пол: мужчине — девушки, женщине — парни.</p>
-                        <div style="display:flex; gap:10px; align-items:stretch; margin-bottom:15px;">
-                            <button onclick="roll()" class="btn btn-gray" style="flex:0 0 auto; white-space:nowrap;">🎲 Роль</button>
-                            <div style="flex:1; min-width:0; background:var(--lx-ink); border:1px solid ${state.chosenProf?'var(--lx-gold-ln)':'var(--lx-line)'}; border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:10px;">
-                                ${state.chosenProf ? `<span style="font-size:20px;">💼</span><span style="min-width:0;"><b style="font-family:Georgia,serif; font-size:15px;">${state.chosenProf.name}</b><br><span style="font-size:11px; color:var(--lx-gold);">Уровень 1 · Работник · з/п ${state.chosenProf.salary}$</span></span>` : '<span style="color:var(--lx-muted); font-size:12.5px;">Нажми «Роль» — профессия выпадет картой</span>'}
-                            </div>
+                        <p style="font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--lx-muted); font-weight:700; margin-bottom:4px;">Твой реальный бланк</p>
+                        <p style="font-size:11.5px; color:var(--lx-muted); margin:0 0 12px; line-height:1.5;">Впиши свои настоящие цифры в месяц — как в жизни. VIA меряет <b style="color:var(--lx-gold);">твой</b> уровень, а не чужую роль. Не знаешь точно — ставь примерно, потом поправишь.</p>
+                        <input type="text" id="bRole" placeholder="Чем занимаешься (например: маркетолог) — по желанию" class="inp" style="margin-bottom:10px; font-size:14px;" value="${state.blankDraft.role||''}" oninput="state.blankDraft.role=this.value;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:6px;">
+                            <label style="font-size:11px; color:var(--lx-gold);">Доход в месяц, $
+                                <input type="number" inputmode="numeric" min="0" id="bIncome" class="inp" style="margin-top:4px; font-size:14px;" value="${state.blankDraft.income}" oninput="state.blankDraft.income=this.value; updateBlankPreview();" placeholder="напр. 2000">
+                            </label>
+                            <label style="font-size:11px; color:var(--lx-muted);">Налоги в месяц, $
+                                <input type="number" inputmode="numeric" min="0" id="bTaxes" class="inp" style="margin-top:4px; font-size:14px;" value="${state.blankDraft.taxes}" oninput="state.blankDraft.taxes=this.value; updateBlankPreview();" placeholder="0 если не знаешь">
+                            </label>
+                            <label style="font-size:11px; color:var(--lx-muted);">Жильё / ипотека / аренда, $
+                                <input type="number" inputmode="numeric" min="0" id="bHousing" class="inp" style="margin-top:4px; font-size:14px;" value="${state.blankDraft.housing}" oninput="state.blankDraft.housing=this.value; updateBlankPreview();" placeholder="платёж/мес">
+                            </label>
+                            <label style="font-size:11px; color:var(--lx-muted);">Авто (платёж/бензин), $
+                                <input type="number" inputmode="numeric" min="0" id="bAuto" class="inp" style="margin-top:4px; font-size:14px;" value="${state.blankDraft.auto}" oninput="state.blankDraft.auto=this.value; updateBlankPreview();" placeholder="0 если нет">
+                            </label>
+                            <label style="font-size:11px; color:var(--lx-muted);">Кредиты / рассрочки, $
+                                <input type="number" inputmode="numeric" min="0" id="bCredit" class="inp" style="margin-top:4px; font-size:14px;" value="${state.blankDraft.credit}" oninput="state.blankDraft.credit=this.value; updateBlankPreview();" placeholder="платёж/мес">
+                            </label>
+                            <label style="font-size:11px; color:var(--lx-muted);">Остальное (еда, быт…), $
+                                <input type="number" inputmode="numeric" min="0" id="bOther" class="inp" style="margin-top:4px; font-size:14px;" value="${state.blankDraft.other}" oninput="state.blankDraft.other=this.value; updateBlankPreview();" placeholder="всё прочее">
+                            </label>
                         </div>
+                        <label style="font-size:11px; color:var(--lx-muted); display:block; margin-bottom:12px;">Накопления / стартовая касса, $
+                            <input type="number" inputmode="numeric" min="0" id="bSavings" class="inp" style="margin-top:4px; font-size:14px;" value="${state.blankDraft.savings}" oninput="state.blankDraft.savings=this.value; updateBlankPreview();" placeholder="сколько денег сейчас на руках">
+                        </label>
+                        <div id="blankPreview" style="background:var(--lx-ink); border:1px solid var(--lx-gold-ln); border-radius:10px; padding:10px 12px; margin-bottom:15px; font-size:13px; color:var(--lx-muted);">${blankPreviewText()}</div>
                         <button onclick="reg()" class="btn btn-green">Вступить в игру →</button>
                         <button onclick="openVoices()" class="btn btn-gray" style="margin-top:10px;">💬 Голоса тех, кто уже играл</button>
                         <button onclick="openWheel()" class="btn btn-gray" style="margin-top:10px;">🎡 Колесо жизни — твоя точка старта</button>
@@ -17547,7 +17572,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <div style="display:flex;gap:7px;">
                 ${a.partnerOf
                   ? `<div style="flex:1;font-size:11px;color:#9c988e;line-height:1.4;padding:3px 0;">🤝 Твоя доля в чужом деле. Развивает владелец — поток растёт и тебе.</div>`
-                  : `${(a.type==='BUSINESS'||_cf>0)?`<button onclick="openBizModal(${p.id},${p.assets.indexOf(a)})" class="btn" style="flex:1;padding:6px 12px;font-size:11px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">🏗️ Развивать</button>`:''}
+                  : `${(a.type==='BUSINESS'||a.type==='ESTATE'||_cf>0)?`<button onclick="openBizModal(${p.id},${p.assets.indexOf(a)})" class="btn" style="flex:1;padding:6px 12px;font-size:11px;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;font-weight:800;">${a.type==='ESTATE'?(a.flip||_cf<=0?'🔨 Ремонт':'🏗️ Улучшить'):'🏗️ Развивать'}</button>`:''}
                   <button onclick="send('SELL_ASSET', {aId:${a.id}, sale:${_sale}, title:'${(a.title||'').replace(/'/g,"\\'")}'})" ${hasP?'disabled':''} class="btn btn-sell" style="flex:0 0 auto;padding:6px 12px; font-size:11px;">📤 Продать (${fmtN(_sale)}$)</button>`}
                 </div>
             </div>`;
@@ -17559,12 +17584,107 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             return `<div style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Твои дела: <b style="color:#10b981;">+${fmtN(tot)}$/мес</b> пассива. Развивай — растёт поток; забросишь — тает (следи за отчётом раз в 3 года).</div>`
                 + biz.map(a=>assetMgmtCard(a,p,hasP)).join('');
         }
+        // ══════════ 🏠 ЛЕСТНИЦА ИНВЕСТОРА В НЕДВИЖИМОСТЬ (Ринат 3окт: оживить блок) ══════════
+        // Соло-режим: ведущего/скана нет → объект нужно покупать В приложении. Лестница из дорожной
+        // карты «02 — НЕДВИЖИМОСТЬ»: от субаренды до девелопмента. Два рычага — рента (поток) и
+        // стоимость (капитализация). Плечо (ипотека) честное: меньше кассы на входе, но ипотека съедает
+        // ренту и висит долгом при продаже. Купленный объект = обычный ESTATE-актив → развитие (ремонт)
+        // и продажа уже работают; флип = купи дёшево → «Развивать» (ремонт поднимает стоимость) → продай.
+        const REALTY_RUNGS = {
+            1:{t:'Субаренда',              d:'Снял дешевле — пересдал дороже. Капитал почти не нужен, учишься работать с потоком и арендатором.'},
+            2:{t:'Квартира под сдачу',     d:'Покупаешь (можно в ипотеку), сдаёшь — арендатор фактически гасит кредит, объект растёт к тебе.'},
+            3:{t:'Флип',                   d:'Купи убитую вторичку дёшево → «Развивать» (ремонт поднимает стоимость) → продай дороже. Маржа ~20%, но смета и рынок могут её съесть.'},
+            4:{t:'Посуточная аренда',      d:'Доход выше долгосрочной, но это мини-бизнес: уборка, заселение, отзывы, простои.'},
+            5:{t:'Новостройка (котлован)', d:'Купил дёшево на раннем этапе стройки → продал по переуступке ближе к сдаче дороже. Риск — застройщик и сроки.'},
+            6:{t:'Коммерция',              d:'Магазины, офисы, склады. Выше чек, длинные договоры, доход стабильнее — но выше порог входа.'},
+            7:{t:'Девелопмент',            d:'Строишь или реконструируешь сам под продажу/аренду. Максимальная маржа и максимальная сложность.'}
+        };
+        // val = полная рыночная стоимость объекта; rent = валовая рента/мес; downPct = первый взнос по ипотеке.
+        // sub:true — субаренда (не владеешь, только депозит + спред ренты); flip:true — объект под ремонт/перепродажу (rent 0).
+        const REALTY_LADDER = [
+            {key:'sub_studio', rung:1, emoji:'🔑', title:'Субаренда студии',          val:0,      rent:120, sub:true, deposit:700},
+            {key:'sub_room',   rung:1, emoji:'🚪', title:'Субаренда комнаты',          val:0,      rent:70,  sub:true, deposit:400},
+            {key:'flat_studio',rung:2, emoji:'🏢', title:'Студия под сдачу',           val:22000,  rent:240, downPct:0.25},
+            {key:'flat_metro', rung:2, emoji:'🏙️', title:'Однушка у метро',            val:32000,  rent:320, downPct:0.25},
+            {key:'flat_new',   rung:2, emoji:'🏘️', title:'Двушка в новостройке',       val:45000,  rent:430, downPct:0.25},
+            {key:'flip_sec',   rung:3, emoji:'🔨', title:'Убитая вторичка',            val:24000,  rent:0,   downPct:0.30, flip:true},
+            {key:'flip_fire',  rung:3, emoji:'🧯', title:'Квартира после пожара',      val:16000,  rent:0,   downPct:0.30, flip:true},
+            {key:'daily_apt',  rung:4, emoji:'🛎️', title:'Апартаменты посуточно',      val:40000,  rent:720, downPct:0.30},
+            {key:'daily_ctr',  rung:4, emoji:'🌃', title:'Студия в центре посуточно',  val:30000,  rent:560, downPct:0.30},
+            {key:'offplan',    rung:5, emoji:'🏗️', title:'Квартира на котловане',      val:28000,  rent:0,   downPct:0.20, flip:true},
+            {key:'com_shop',   rung:6, emoji:'🏬', title:'Торговое помещение',         val:120000, rent:1700,downPct:0.35},
+            {key:'com_office', rung:6, emoji:'🏢', title:'Мини-офисный центр',         val:400000, rent:5400,downPct:0.35},
+            {key:'com_wh',     rung:6, emoji:'📦', title:'Склад под логистику',        val:250000, rent:3300,downPct:0.35},
+            {key:'dev_land',   rung:7, emoji:'🧱', title:'Участок под застройку',      val:300000, rent:0,   downPct:0.40, flip:true},
+            {key:'dev_recon',  rung:7, emoji:'🏛️', title:'Реконструкция здания',       val:500000, rent:0,   downPct:0.40, flip:true}
+        ];
+        function realtyRungUnlocked(p, rung){
+            if(rung<=2) return true;
+            const owned=(p.assets||[]).filter(a=>a&&a.type==='ESTATE').length;
+            return owned >= (rung-2);   // лестница: каждая следующая ступень — за один уже взятый объект
+        }
+        function realtyMortgage(o){
+            const down=Math.round(o.val*(o.downPct||0.25));
+            const liab=o.val-down;
+            const service=Math.round(liab*0.009);   // обслуживание ипотеки ≈0.9%/мес от остатка — честно съедает ренту
+            return {down, liab, service, net:(Number(o.rent)||0)-service};
+        }
+        function buyRealty(pId, key, mode){
+            const p=state.players.find(x=>x.id==pId); if(!p) return;
+            const o=REALTY_LADDER.find(x=>x.key===key); if(!o) return;
+            if(!realtyRungUnlocked(p,o.rung)){ p.notify='🔒 Ступень «'+REALTY_RUNGS[o.rung].t+'» откроется, когда у тебя будет '+(o.rung-2)+' объект(а) недвижимости.'; render(); return; }
+            const sav=Math.round(Number(p.savings)||0);
+            let need, liab=0, cf=Number(o.rent)||0, how;
+            if(o.sub){ need=o.deposit; cf=o.rent; how='субаренда'; }
+            else if(mode==='mortgage' && o.val>0){ const m=realtyMortgage(o); need=m.down; liab=m.liab; cf=m.net; how='ипотека'; }
+            else { need=o.val; cf=o.rent; how='наличными'; }
+            if(sav<need){ p.notify='💸 Не хватает кассы: нужно '+fmtN(need)+'$, у тебя '+fmtN(sav)+'$.'; render(); return; }
+            if(cf<0 && !confirm('⚠️ Объект «'+o.title+'»: аренда не покроет ипотеку — минус '+fmtN(-cf)+'$/мес из твоего потока. На флипе/котловане это нормально: цель — отремонтировать и продать дороже. Берём?')) return;
+            p.savings=Math.round(sav-need);
+            p.assets=p.assets||[];
+            p.assets.push({ id:Date.now()+Math.floor(Math.random()*1000), type:'ESTATE', title:o.emoji+' '+o.title, price:(o.val>0?o.val:o.deposit), down:need, liab, cf, rung:o.rung, flip:!!o.flip, bought:true });
+            try{ logAction(p,'🏠','Купил недвижимость «'+o.title+'» ('+how+') за '+fmtN(need)+'$'+(cf>=0?', рента +'+fmtN(cf)+'$/мес':', пока минус '+fmtN(-cf)+'$/мес — на ремонт и перепродажу'), {sphere:'деньги', amt:-need, ok:cf>=0}); }catch(e){}
+            p.notify='🏠 Твой объект: «'+o.title+'». '+(how==='ипотека'?'Ипотека '+fmtN(liab)+'$. ':'')+(cf>=0?'Рента +'+fmtN(cf)+'$/мес.':'Поток '+fmtN(cf)+'$/мес — ремонтируй в «Развивать» и продай дороже.');
+            save(pId); render();
+        }
+        function renderRealtyMarket(p){
+            const sav=Math.round(Number(p.savings)||0);
+            let html='';
+            for(let r=1;r<=7;r++){
+                const meta=REALTY_RUNGS[r]; const objs=REALTY_LADDER.filter(o=>o.rung===r);
+                const open=realtyRungUnlocked(p,r);
+                html+=`<div style="margin:12px 0 4px;"><b style="font-family:Georgia,serif;font-size:14px;color:#efd8a3;">Ступень ${r} · ${meta.t}</b>${open?'':` <span style="font-size:11px;color:#f87171;">🔒 нужно ${r-2} объект(а)</span>`}<div style="font-size:11px;color:#9ca3af;line-height:1.5;margin-top:2px;">${meta.d}</div></div>`;
+                if(!open) continue;
+                for(const o of objs){
+                    const yieldPct=(o.val>0 && o.rent>0)?` · доходность ${(o.rent*12/o.val*100).toFixed(1)}%/год`:'';
+                    const m=(o.val>0)?realtyMortgage(o):null;
+                    const cashNeed=o.sub?o.deposit:o.val;
+                    const line=o.sub
+                        ? `Депозит <b>${fmtN(o.deposit)}$</b> · рента <b style="color:#10b981;">+${fmtN(o.rent)}$/мес</b> (не владеешь — чистый поток)`
+                        : o.rent>0
+                            ? `Стоимость <b>${fmtN(o.val)}$</b> · рента <b style="color:#10b981;">+${fmtN(o.rent)}$/мес</b>${yieldPct}`
+                            : `Стоимость <b>${fmtN(o.val)}$</b> · ренты нет — ставка на рост стоимости (ремонт/переуступка)`;
+                    const cashBtn=`<button onclick="buyRealty(${p.id},'${o.key}','cash')" ${sav<cashNeed?'disabled':''} class="btn" style="flex:1;padding:7px 10px;font-size:11px;background:${sav>=cashNeed?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'};color:${sav>=cashNeed?'#20180a':'#9ca3af'};font-weight:800;">${o.sub?'🔑 Взять':'💵 Наличными'} (${fmtN(cashNeed)}$)</button>`;
+                    const mortBtn=(!o.sub && m)?`<button onclick="buyRealty(${p.id},'${o.key}','mortgage')" ${sav<m.down?'disabled':''} class="btn" style="flex:1;padding:7px 10px;font-size:11px;background:${sav>=m.down?'#0d2b1a':'#374151'};color:${sav>=m.down?'#6ee7b7':'#9ca3af'};font-weight:800;border:1px solid ${sav>=m.down?'#157347':'#374151'};">🏦 В ипотеку (взнос ${fmtN(m.down)}$)</button>`:'';
+                    const mortHint=(!o.sub && m)?`<div style="font-size:10.5px;color:#9ca3af;margin-top:4px;">🏦 Плечо: взнос ${fmtN(m.down)}$, ипотека ${fmtN(m.liab)}$, рента после платежа <b style="color:${m.net>=0?'#10b981':'#f87171'};">${m.net>=0?'+':''}${fmtN(m.net)}$/мес</b></div>`:'';
+                    html+=`<div style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+                        <div style="font-size:13px;font-weight:700;margin-bottom:3px;">${o.emoji} ${o.title}</div>
+                        <div style="font-size:12px;color:#9ca3af;margin-bottom:8px;line-height:1.5;">${line}</div>
+                        <div style="display:flex;gap:7px;">${cashBtn}${mortBtn}</div>${mortHint}
+                    </div>`;
+                }
+            }
+            return html;
+        }
         function renderRealtyBranch(p, hasP){
             const est=(p.assets||[]).filter(a=>a&&a.type==='ESTATE');
-            if(!est.length) return '<p style="font-size:12px;color:#9ca3af;padding:4px 2px;">Недвижимости пока нет. Отсканируй карту недвижимости (📷) — объект появится здесь <b style="color:#22d3ee;">автоматически</b> и его можно будет улучшать и продавать.</p>';
             const tot=est.reduce((s,a)=>s+(Number(a.cf)||0),0);
-            return `<div style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Твоя недвижимость: <b style="color:#10b981;">+${fmtN(tot)}$/мес</b> ренты. Улучшай объект — растёт стоимость и рента.</div>`
-                + est.map(a=>assetMgmtCard(a,p,hasP)).join('');
+            const owned = est.length
+                ? `<div style="font-size:12px;color:#9ca3af;margin:4px 0 10px;">Твоя недвижимость (${est.length}): поток <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot)}$/мес</b>. «Развивать» = ремонт: растут и стоимость, и рента. Флип — отремонтируй и продай дороже.</div>`
+                    + est.map(a=>assetMgmtCard(a,p,hasP)).join('')
+                : '<p style="font-size:12px;color:#9ca3af;padding:2px 2px 8px;">Пока ни одного объекта. Поднимись по лестнице ниже — от субаренды до девелопмента.</p>';
+            const market=`<details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:800;color:#efd8a3;padding:9px 11px;background:#12161d;border:1px solid #242833;border-radius:10px;list-style:none;">🏗️ Купить объект — лестница инвестора</summary><div style="padding:4px 2px;"><div style="font-size:11.5px;color:#9ca3af;line-height:1.5;margin:6px 0;">От простого к сложному: доход, сложность и риск растут вместе. Плечо (ипотека) умножает и доходность, и риск — на росте разгоняет, на простое и падении бьёт по кассе.</div>${renderRealtyMarket(p)}</div></details>`;
+            return owned + market;
         }
 
         function renderPlayer(app) {
@@ -19569,6 +19689,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function offerProfessionChange(id) {
             const p = state.players.find(x => x.id === id);
             if (!p) return;
+            // 🪞 Реальный бланк — это твоя настоящая жизнь, его не меняем на выдуманную карту (Ринат 1окт).
+            // Рост даёт собес/навыки на ТВОИХ цифрах, а не прыжок в чужую профессию.
+            if (p.prof && p.prof.real) { p.notify = '🪞 Твой бланк — это твоя реальная жизнь. Растёшь на своих цифрах: собес, навыки, активы.'; save(); render(); return; }
             const opts = professionsDB.filter(pr => pr.name !== p.prof.name);
             const np = opts[Math.floor(Math.random()*opts.length)];
             const ok = confirm(`🔀 ШАНС СМЕНИТЬ ПРОФЕССИЮ!\n\nНовая: ${np.name} · з/п ${np.salary}$ (налог ${np.taxes}$)\nТекущая: ${p.prof.name} · з/п ${p.prof.salary}$\n\nПоменять? Касса, активы, долги и дети остаются — меняются зарплата и ставки расходов профессии.`);
@@ -20304,7 +20427,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const total = WORK_EVENTS.reduce((s,e)=>s+e.w,0);
             let rr = Math.random()*total, ev = WORK_EVENTS[0];
             for (const e of WORK_EVENTS) { if ((rr -= e.w) < 0) { ev = e; break; } }
-            if (ev.kind === 'offer') {
+            const _real = !!(p.prof && p.prof.real);   // 🪞 реальный бланк не подменяем на выдуманную карту (Ринат 1окт)
+            if (ev.kind === 'offer' && _real) {
+                // На реальном бланке «предложение» = обычный день: чужую профессию не навязываем.
+                m.drawn = { kind:'simple', emoji:'🛠️', title:'Обычный день', text:'Работа как работа — без изменений. Свой рост ты строишь сам: навыки, активы, собес.' };
+                p.notify = `💼 Работа: обычный день.`;
+            } else if (ev.kind === 'fire' && _real) {
+                // Увольнение на реальном бланке = потеря оклада (unemployed), а не прыжок в фейковую профессию.
+                // Оклад вернётся через собес (Карьера), бланк остаётся твой.
+                p.unemployed = true;
+                m.drawn = { kind:'simple', emoji:'🚪', title:'Тебя сократили',
+                    text:'Работу потерял — оклада нет, живёшь на пассив. Пройди собеседование (Карьера), чтобы снова устроиться. Касса, активы и долги остались.' };
+                p.notify = `🔓 Работа: тебя сократили — пройди собес, чтобы вернуть оклад.`;
+            } else if (ev.kind === 'offer') {
                 const opts = professionsDB.filter(pr => pr.name !== p.prof.name);
                 const np = opts[Math.floor(Math.random()*opts.length)];
                 m.drawn = { kind:'offer', emoji:'🔀', title:'Предложение новой работы', np,
@@ -21102,12 +21237,59 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             `;
         }
 
+        // 🪞 РЕАЛЬНЫЙ БЛАНК → профессия. Выдуманные карты ушли (Ринат 1окт): из СВОИХ цифр игрока
+        // строим prof-объект с теми же ключами, что читает calc()/curHomePay/curCarPay — весь движок цел.
+        function blankNum(v){ const n = Math.round(Number(v)); return isFinite(n) && n>0 ? n : 0; }
+        function blankToProf(bd){
+            bd = bd || state.blankDraft || {};
+            const income  = blankNum(bd.income);
+            const housing = blankNum(bd.housing);
+            const auto    = blankNum(bd.auto);
+            const credit  = blankNum(bd.credit);
+            const role    = (bd.role || '').trim();
+            return {
+                id: 0, real: true,
+                name: (role ? role : 'Мой бланк') + ' 🪞',
+                salary: income,
+                taxes: blankNum(bd.taxes),
+                mortgagePay: housing,
+                eduPay: 0,
+                autoPay: auto,
+                ccPay: credit,
+                retailPay: 0,
+                otherExp: blankNum(bd.other),
+                childCost: 200,
+                savings: blankNum(bd.savings),
+                // 💳 Балансы долгов для клеток «выкупить дом/авто/кредит» — оценка от платежа
+                // (ипотека ≈ ×60 мес, авто ≈ ×36, кредит ≈ ×20). Замер строится на реальных
+                // доходе/расходах; выкуп долга остаётся живой механикой на поле.
+                initMortgage: housing*60, initEdu: 0, initAuto: auto*36, initCC: credit*20, initRetail: 0
+            };
+        }
+        function blankFlowPreview(bd){
+            const p = blankToProf(bd);
+            const exp = p.taxes + p.mortgagePay + p.autoPay + p.ccPay + p.retailPay + p.otherExp;
+            return { inc: p.salary, exp, flow: p.salary - exp };
+        }
+        function blankPreviewText(){
+            const f = blankFlowPreview(state.blankDraft);
+            if (f.inc<=0 && f.exp<=0) return 'Впиши доход и расходы — покажу твой денежный поток.';
+            const sign = f.flow>=0 ? '+' : '−';
+            const col  = f.flow>=0 ? 'var(--lx-gold)' : '#ef4444';
+            return `Доход <b>${f.inc}$</b> · Расходы <b>${f.exp}$</b> · Поток <b style="color:${col};">${sign}${Math.abs(f.flow)}$</b> в месяц`;
+        }
+        function updateBlankPreview(){
+            const el = document.getElementById('blankPreview');
+            if (el) el.innerHTML = blankPreviewText();
+        }
+
         function reg() {
             const name = (document.getElementById('pName').value || state.nameDraft || '').trim();
-            if (!name || !state.chosenProf) { alert('Укажи имя и вытяни роль!'); return; }
+            if (!name) { alert('Напиши, как тебя зовут.'); return; }
+            const pr = blankToProf(state.blankDraft);
+            if (pr.salary <= 0) { alert('Впиши свой реальный доход в месяц — с него начинается твой бланк.'); return; }
             const pin = (prompt('Придумай свой PIN (3 или 4 цифры) — чтобы быстро заходить ТОЛЬКО в свой бланк:') || '').trim();
             if (!/^\d{3,4}$/.test(pin)) { alert('PIN должен быть из 3 или 4 цифр. Регистрация отменена.'); return; }
-            const pr = state.chosenProf;
             const newId = Date.now();
             try { localStorage.setItem('via_me', JSON.stringify({id:newId, pin})); } catch(e){}
             state.players.push({
@@ -21126,7 +21308,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             });
             // ВОРОНКА (гипотеза Astana Hub): новый бланк = новый проход. Растим вечный счётчик карточки.
             try { PROFILE.games = (PROFILE.games || 0) + 1; saveProfile(); } catch(e){ console.warn('PROFILE games++', e); }
-            state.chosenProf = null; state.nameDraft = ''; state.sexDraft = 'm'; save(newId); render();
+            state.chosenProf = null; state.blankDraft = { role:'', income:'', taxes:'', housing:'', auto:'', credit:'', other:'', savings:'' }; state.nameDraft = ''; state.sexDraft = 'm'; save(newId); render();
         }
 
         // ─── ИНВЕСТИЦИИ (карты Рината: депозиты 🟩 / облигации 🟦 / рискованные 🟥) — вкладываешь сумму, получаешь % каждый круг ───
