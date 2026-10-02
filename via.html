@@ -15869,6 +15869,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try{ realtyYearTick(p); }catch(e){}                     // 📈 годовой тик недвижимости: капитализация, созревание котлована, жизнь арендатора
             try{ bizReportCheck(p); }catch(e){}                     // 🏢 раз в 3 года — окно отчёта «было→стало» + решение развивать
             p.savings=Math.round((Number(p.savings)+flow)*100)/100;
+            try{ bizCashGapCheck(p); }catch(e){}                    // 🧨 касса в минус при живом деле → кассовый разрыв (аварийный кредит)
             try{ logAction(p, (flow>=0?'💵':'💸'), 'Получка за месяц'+(ev.k!=='plain'?' ('+ev.nm+')':''), {amt:flow, sphere:'деньги'}); }catch(e){}
             p.notify = (flow>=0 ? '💵 Получка: +'+fmtN(flow)+'$ в кассу'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.'
                                 : '💸 Месяц в минус: '+fmtN(flow)+'$'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.');
@@ -17578,12 +17579,114 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div>
             </div>`;
         }
+        // ══════════ 🏢 ПУТЬ ПРЕДПРИНИМАТЕЛЯ — ОТКРЫТЬ БИЗНЕС В ПРИЛОЖЕНИИ (Ринат 3окт) ══════════
+        // Соло-режим: ведущего/скана нет → бизнес нужно открывать В приложении. Лестница жизненного
+        // цикла из дорожной карты «03 — БИЗНЕС»: микро-дело (MVP) → точка → сервис/производство →
+        // сеть → производство/франшиза. Купленный = обычный BUSINESS-актив → развитие (4 ступени, вплоть
+        // до франшизы-роялти), годовой тик тягот, отчёт раз в 3 года и продажа уже работают. Это ПУТЬ
+        // «купить готовое дело»; «построить своё с нуля» живёт в «Развивать себя» (учись → создай).
+        const BIZ_STAGES = {
+            1:{t:'Микро-дело (MVP)',        d:'Идея и проверка: почти без команды, ешь время, денег мало — так и должно быть. Дёшево проверяешь спрос, не утопив капитал.'},
+            2:{t:'Точка',                   d:'Одна точка, держится на тебе (ты ещё оператор). Учишься марже и не попадать в кассовый разрыв.'},
+            3:{t:'Сервис · производство',   d:'Процессы и первая команда. Выводишь юнит-экономику в плюс, проходишь точку безубыточности.'},
+            4:{t:'Сеть',                    d:'Систематизировал — работает без тебя. Масштабируешь: вторая, третья точка.'},
+            5:{t:'Производство · франшиза', d:'Капитал и тиражирование. Ты владелец системы и капитала, а не оператор.'}
+        };
+        const BIZ_LADDER = [
+            {key:'vending',   stage:1, emoji:'🥤', title:'Вендинговый автомат',       cost:2000,    cf:200},
+            {key:'coffee_go', stage:1, emoji:'☕', title:'Кофе с собой (стойка)',      cost:3000,    cf:250},
+            {key:'online',    stage:1, emoji:'🛒', title:'Онлайн-магазин',            cost:2500,    cf:220},
+            {key:'barber',    stage:2, emoji:'💈', title:'Барбершоп',                 cost:15000,   cf:900},
+            {key:'cafe',      stage:2, emoji:'🍽️', title:'Кофейня',                   cost:25000,   cf:1400},
+            {key:'carwash',   stage:2, emoji:'🚿', title:'Автомойка (3 поста)',       cost:30000,   cf:1600},
+            {key:'bakery',    stage:3, emoji:'🥐', title:'Пекарня-цех',               cost:60000,   cf:2800},
+            {key:'autoserv',  stage:3, emoji:'🔧', title:'Автосервис',                cost:50000,   cf:2200},
+            {key:'beauty',    stage:3, emoji:'💄', title:'Студия красоты (сеть мастеров)',cost:70000,cf:3000},
+            {key:'coffee_net',stage:4, emoji:'🏪', title:'Сеть кофеен (3 точки)',     cost:160000,  cf:6500},
+            {key:'clinic',    stage:4, emoji:'🏥', title:'Клиника Health+',           cost:150000,  cf:5500},
+            {key:'hotel',     stage:4, emoji:'🏨', title:'Гостиница 20 номеров',      cost:300000,  cf:9000},
+            {key:'plant',     stage:5, emoji:'🏭', title:'Завод напитков',            cost:800000,  cf:40000},
+            {key:'franchise', stage:5, emoji:'🌐', title:'Франшизная сеть (50 точек)',cost:1200000, cf:70000}
+        ];
+        function bizStageUnlocked(p, st){
+            if(st<=2) return true;
+            const n=(p.assets||[]).filter(a=>a&&a.type==='BUSINESS').length;
+            return n>=(st-2);
+        }
+        function bizLoan(o){ const down=Math.round(o.cost*0.40); const liab=o.cost-down; const service=Math.round(liab*0.012); return {down, liab, service, net:(Number(o.cf)||0)-service}; }
+        // 🪜 Стадия жизни дела по ступени развития — главный урок «система ↔ купил себе работу».
+        function bizStageLabel(a){ const l=bizLevel(a); if(l>=3) return 'Мастер · система/франшиза'; if(l===2) return 'Творец · сеть'; if(l===1) return 'Практик · нанял команду'; return 'Ученик · держится на тебе'; }
+        function buyBiz(pId, key, mode){
+            const p=state.players.find(x=>x.id==pId); if(!p) return;
+            const o=BIZ_LADDER.find(x=>x.key===key); if(!o) return;
+            if(!bizStageUnlocked(p,o.stage)){ p.notify='🔒 Стадия «'+BIZ_STAGES[o.stage].t+'» откроется, когда у тебя будет '+(o.stage-2)+' бизнес(а).'; render(); return; }
+            const sav=Math.round(Number(p.savings)||0);
+            let need, liab=0, cf=Number(o.cf)||0, how;
+            if(mode==='loan'){ const m=bizLoan(o); need=m.down; liab=m.liab; cf=m.net; how='в кредит'; }
+            else { need=o.cost; how='наличными'; }
+            if(sav<need){ p.notify='💸 Не хватает кассы: нужно '+fmtN(need)+'$, у тебя '+fmtN(sav)+'$.'; render(); return; }
+            if(cf<0 && !confirm('⚠️ «'+o.title+'»: платёж по кредиту больше потока — минус '+fmtN(-cf)+'$/мес. Разовьёшь дело (поток вырастет) или попадёшь в кассовый разрыв. Берём?')) return;
+            p.savings=Math.round(sav-need);
+            p.assets=p.assets||[];
+            p.assets.push({ id:Date.now()+Math.floor(Math.random()*1000), type:'BUSINESS', title:o.emoji+' '+o.title, price:o.cost, down:need, liab, cf, stage:o.stage, bizLvl:0, bought:true });
+            try{ logAction(p,'🏢','Открыл бизнес «'+o.title+'» ('+how+') за '+fmtN(need)+'$'+(cf>=0?', пассив +'+fmtN(cf)+'$/мес':', пока минус '+fmtN(-cf)+'$/мес — развивай') , {sphere:'деньги', amt:-need, ok:cf>=0}); }catch(e){}
+            p.notify='🏢 Твоё дело: «'+o.title+'». '+(how==='в кредит'?'Кредит '+fmtN(liab)+'$. ':'')+(cf>=0?'Пассив +'+fmtN(cf)+'$/мес. Развивай — ступени удваивают поток.':'Поток '+fmtN(cf)+'$/мес — развивай, пока не съел кассу.');
+            save(pId); render();
+        }
+        // 🧨 КАССОВЫЙ РАЗРЫВ — главный урок бизнеса: гибнут не от убытка, а когда нечем платить СЕГОДНЯ.
+        // Зовётся из giveSalary ПОСЛЕ начисления потока: если у тебя есть дело, а касса ушла в минус —
+        // дыру закрываешь дорогим аварийным кредитом. Скрытая шкала cashGapSpells → в Зеркало.
+        function bizCashGapCheck(p){
+            if(!p || !Array.isArray(p.assets)) return;
+            if(!p.assets.some(a=>a&&a.type==='BUSINESS'&&(Number(a.cf)||0)>0)) return;
+            const sav=Math.round(Number(p.savings)||0);
+            if(sav>=0) return;
+            const gap=-sav;
+            p.bankLoan=Math.round((Number(p.bankLoan)||0)+gap);
+            p.savings=0;
+            p.cashGapSpells=(Number(p.cashGapSpells)||0)+1;
+            p.notify='🧨 КАССОВЫЙ РАЗРЫВ: на бумаге прибыль есть, а денег заплатить сегодня — нет. Дыру '+fmtN(gap)+'$ закрыл дорогим кредитом. Поток важнее красивой прибыли — держи запас кассы.';
+            try{logAction(p,'🧨','Кассовый разрыв: аварийный кредит +'+fmtN(gap)+'$',{sphere:'деньги',amt:-gap,ok:false});}catch(e){}
+        }
+        function renderBizMarket(p){
+            const sav=Math.round(Number(p.savings)||0);
+            let html='';
+            for(let s=1;s<=5;s++){
+                const meta=BIZ_STAGES[s]; const objs=BIZ_LADDER.filter(o=>o.stage===s);
+                const open=bizStageUnlocked(p,s);
+                html+=`<div style="margin:12px 0 4px;"><b style="font-family:Georgia,serif;font-size:14px;color:#efd8a3;">Стадия ${s} · ${meta.t}</b>${open?'':` <span style="font-size:11px;color:#f87171;">🔒 нужно ${s-2} дела</span>`}<div style="font-size:11px;color:#9ca3af;line-height:1.5;margin-top:2px;">${meta.d}</div></div>`;
+                if(!open) continue;
+                for(const o of objs){
+                    const yieldPct=` · окупаемость ~${Math.max(1,Math.round(o.cost/(o.cf*12)))} лет`;
+                    const m=bizLoan(o);
+                    const resale=Math.round(o.cf*WIN_MULT);
+                    const earn10=o.cf*12*10;
+                    const cashBtn=`<button onclick="buyBiz(${p.id},'${o.key}','cash')" ${sav<o.cost?'disabled':''} class="btn" style="flex:1;padding:7px 10px;font-size:11px;background:${sav>=o.cost?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'};color:${sav>=o.cost?'#20180a':'#9ca3af'};font-weight:800;">💵 Наличными (${fmtN(o.cost)}$)</button>`;
+                    const loanBtn=`<button onclick="buyBiz(${p.id},'${o.key}','loan')" ${sav<m.down?'disabled':''} class="btn" style="flex:1;padding:7px 10px;font-size:11px;background:${sav>=m.down?'#0d2b1a':'#374151'};color:${sav>=m.down?'#6ee7b7':'#9ca3af'};font-weight:800;border:1px solid ${sav>=m.down?'#157347':'#374151'};">🏦 В кредит (взнос ${fmtN(m.down)}$)</button>`;
+                    const loanHint=`<div style="font-size:10.5px;color:#9ca3af;margin-top:4px;">🏦 Кредит: взнос ${fmtN(m.down)}$, долг ${fmtN(m.liab)}$, поток после платежа <b style="color:${m.net>=0?'#10b981':'#f87171'};">${m.net>=0?'+':''}${fmtN(m.net)}$/мес</b></div>`;
+                    const earn=`<div style="font-size:10.5px;color:#8bd3a0;margin-top:5px;">💰 За 10 лет ≈ пассив <b>${fmtN(earn10)}$</b> + развив и продав дело как актив ~<b>${fmtN(resale)}$</b> (растёт со ступенями развития)</div>`;
+                    html+=`<div style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+                        <div style="font-size:13px;font-weight:700;margin-bottom:3px;">${o.emoji} ${o.title}</div>
+                        <div style="font-size:12px;color:#9ca3af;margin-bottom:6px;line-height:1.5;">Вход <b>${fmtN(o.cost)}$</b> · пассив <b style="color:#10b981;">+${fmtN(o.cf)}$/мес</b>${yieldPct}</div>
+                        <div style="display:flex;gap:7px;">${cashBtn}${loanBtn}</div>${loanHint}${earn}
+                    </div>`;
+                }
+            }
+            return html;
+        }
         function renderBizBranch(p, hasP){
             const biz=(p.assets||[]).filter(a=>a&&a.type==='BUSINESS');
-            if(!biz.length) return '<p style="font-size:12px;color:#9ca3af;padding:4px 2px;">Бизнесов пока нет. Отсканируй карту бизнеса (📷) или создай своё в «Развивать себя» — дело появится здесь <b style="color:#22d3ee;">автоматически</b>.</p>';
             const tot=biz.reduce((s,a)=>s+(Number(a.cf)||0),0);
-            return `<div style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Твои дела: <b style="color:#10b981;">+${fmtN(tot)}$/мес</b> пассива. Развивай — растёт поток; забросишь — тает (следи за отчётом раз в 3 года).</div>`
-                + biz.map(a=>assetMgmtCard(a,p,hasP)).join('');
+            const sys=biz.filter(a=>bizLevel(a)>=1).length;
+            const owned = biz.length
+                ? `<div style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:#9ca3af;line-height:1.7;">
+                       Дел: <b style="color:#e5e7eb;">${biz.length}</b> · пассив <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot)}$/мес</b> = <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot*12)}$/год</b>.<br>
+                       Система: <b style="color:#8bd3a0;">${sys}</b> из ${biz.length} работают с командой, остальные держатся на тебе. Развивай — пройдёшь путь Ученик → Мастер; пока незаменим — это работа, а не бизнес.
+                   </div>`
+                    + biz.map(a=>assetMgmtCard(a,p,hasP)).join('')
+                : '<p style="font-size:12px;color:#9ca3af;padding:2px 2px 8px;">Пока ни одного дела. Открой первое ниже — от микро-дела до франшизы. (Или построй своё с нуля в «Развивать себя».)</p>';
+            const market=`<details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:800;color:#efd8a3;padding:9px 11px;background:#12161d;border:1px solid #242833;border-radius:10px;list-style:none;">🏢 Открыть бизнес — путь предпринимателя</summary><div style="padding:4px 2px;"><div style="font-size:11.5px;color:#9ca3af;line-height:1.6;margin:6px 0;"><b style="color:#efd8a3;">Как здесь зарабатывают:</b> пассив каждый месяц · развитие (каждая ступень удваивает поток) · сеть и франшиза (роялти) · продажа дела как актива. Бизнес — самая долгая ставка времени: сначала ест, потом кормит всю жизнь. <b style="color:#ff9a76;">Главный риск — кассовый разрыв:</b> гибнут не от убытка, а когда нечем платить сегодня. Держи запас кассы.</div>${renderBizMarket(p)}</div></details>`;
+            return owned + market;
         }
         // ══════════ 🏠 ЛЕСТНИЦА ИНВЕСТОРА В НЕДВИЖИМОСТЬ (Ринат 3окт: оживить блок) ══════════
         // Соло-режим: ведущего/скана нет → объект нужно покупать В приложении. Лестница из дорожной
