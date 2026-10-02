@@ -14116,9 +14116,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,.2),rgba(11,14,20,.92));"></div>
                         <div style="position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--lx-gold);font-weight:800;">Аукционный дом VIA</div>
                     </div>
-                    <div style="font-size:12.5px;color:#cdc8bd;line-height:1.6;text-align:center;">Молоток спит. Торги открывает <b style="color:#efd8a3;">ведущий</b> — и это праздник: живые ставки на 60 секунд, перебивание на флажке, вещи, которых в мире по одной.</div>
+                    <div style="font-size:12.5px;color:#cdc8bd;line-height:1.6;text-align:center;">Молоток спит. ${SOLO_APP?'Открой торги сам — живые ставки на 60 секунд, перебивание на флажке, а таинственный коллекционер торгуется против тебя за вещи, которых в мире по одной.':'Торги открывает <b style="color:#efd8a3;">ведущий</b> — и это праздник: живые ставки на 60 секунд, перебивание на флажке, вещи, которых в мире по одной.'}</div>
                     <div style="font-size:11px;color:#6d6a62;line-height:1.5;text-align:center;margin-top:7px;">Свою вещь можно выставить заранее — кнопка «🔨 На торги» в коллекции.</div>
-                    ${state.isAdmin?`<button onclick="aucOpenTorgi()" class="btn" style="width:100%;margin-top:11px;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">🔨 ОТКРЫТЬ ТОРГИ</button>`:''}
+                    ${(state.isAdmin||SOLO_APP)?`<button onclick="aucOpenTorgi()" class="btn" style="width:100%;margin-top:11px;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">🔨 ОТКРЫТЬ ТОРГИ</button>`:''}
                     ${logHtml}
                 </div>`;
             }
@@ -14247,11 +14247,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div></div>`;
         }
         async function aucOpenTorgi(){
-            if(!confirm('Открыть аукцион всему столу?\nИгра выставит лоты, следом пойдут вещи игроков.')) return;
+            if(!confirm(SOLO_APP?'Открыть торги?\nВыйдут редкие лоты, таинственный коллекционер будет торговаться против тебя. Можно выставить и свои вещи.':'Открыть аукцион всему столу?\nИгра выставит лоты, следом пойдут вещи игроков.')) return;
             let j=null;
             try{
                 const r = await fetch('/auction/open',{method:'POST',headers:{'Content-Type':'application/json'},
-                                                       body:JSON.stringify({by:'ведущий'})});
+                                                       body:JSON.stringify({by:(SOLO_APP?'игрок':'ведущий')})});
                 j = await r.json();
             }catch(e){ alert('Сервер не ответил — попробуй ещё раз.'); return; }
             if(j && j.ok===false){
