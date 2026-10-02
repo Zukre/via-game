@@ -19214,7 +19214,25 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const all = p.farm.animals||[];
             const livestock = all.filter(a=>{const c=FARM_CFG.animals[a.kind]; return c && !c.crop;});
             const crops     = all.filter(a=>{const c=FARM_CFG.animals[a.kind]; return c && c.crop;});
-            let out = `<div class="card"><div class="block-title">🌾 Моё хозяйство</div><div class="farm-grid2">`;
+            // 📊 P&L ФЕРМЫ (Ринат 3окт, Кусок 2): явная операционная прибыль — урок «богатый фермер — миф».
+            // Доход контрактов × укомплектованность − содержание (корма/вода/авто-корм/зарплаты/ветеринария).
+            // Мясо/молоко с рынка — разовый спот сверху (в помесячном P&L не стоит, он про устойчивый поток).
+            const _pnlInc=Math.round(farmIncome(p)*farmStaffedFrac(p));
+            const _pFeed=Math.round(farmFeed(p)), _pWater=Math.round(farmWaterCost(p)), _pAuto=Math.round(farmAutoFeedCost(p)), _pWork=Math.round(farmWorkerCost(p)), _pVet=Math.round(farmVetCost(p));
+            const _pUp=_pFeed+_pWater+_pAuto+_pWork+_pVet;
+            const _pNet=_pnlInc-_pUp;
+            const _costLine=(lbl,v)=> v>0 ? `<div style="display:flex;justify-content:space-between;"><span style="color:#9c988e;">${lbl}</span><span style="color:#f87171;">−${fmtN(v)}$</span></div>` : '';
+            let out = `<div class="card" style="border-color:${_pNet>=0?'#157347':'#7f1d1d'};">
+                <div class="block-title">📊 Прибыль / убыток фермы — в месяц</div>
+                <div style="font-size:12.5px;line-height:1.75;">
+                    <div style="display:flex;justify-content:space-between;"><span style="color:#cbd5e1;">Доход (контракты × укомплектованность)</span><span style="color:#10b981;">+${fmtN(_pnlInc)}$</span></div>
+                    ${_costLine('Корма',_pFeed)}${_costLine('Вода',_pWater)}${_costLine('Авто-корм',_pAuto)}${_costLine('Зарплаты (фермеры/ковбои/убойщики/управляющие)',_pWork)}${_costLine('Ветеринария',_pVet)}
+                    <div style="border-top:1px solid var(--lx-line);margin:7px 0 5px;"></div>
+                    <div style="display:flex;justify-content:space-between;font-weight:800;"><span style="color:#e6edf3;">Чистыми</span><span style="color:${_pNet>=0?'#10b981':'#f87171'};">${_pNet>=0?'+':''}${fmtN(_pNet)}$/мес · ${_pNet>=0?'+':''}${fmtN(_pNet*12)}$/год</span></div>
+                </div>
+                <div style="font-size:10.5px;color:#8a8378;margin-top:8px;line-height:1.5;">Мясо и молоко с рынка — разовый доход сверху. Содержание (корма, вода, люди, ветеринария) съедает маржу: поэтому «богатый фермер» чаще миф — считай операционку.</div>
+            </div>
+            <div class="card"><div class="block-title">🌾 Моё хозяйство</div><div class="farm-grid2">`;
             const _mgr=Number(p.farm.managers)||0, _mgrNeed=farmManagersNeeded(p), _mgrWage=((FARM_CFG.manager&&FARM_CFG.manager.wage)||600);
             out += `<div class="row-item" style="border-color:${_mgr<_mgrNeed?'#b45309':'#6366f1'};">${farmThumb('farm_worker')}<div style="flex:1;"><b>👔 Управляющие</b><div style="font-size:11px;color:#9ca3af;">нанято ${_mgr}${_mgrNeed>0?`/${_mgrNeed} нужно`:''} (+ты сам) · каждый ведёт ${FARM_CFG.farmersPerManager} фермеров · −${_mgr*_mgrWage}$/мес${_mgr<_mgrNeed?' <b style="color:#f87171;">⚠️ фермеры без управления не работают</b>':''}</div></div><div style="display:flex;gap:4px;"><button onclick="farmFireManager()" class="btn btn-gray" style="padding:4px 10px;">−</button><button onclick="farmHireManager()" class="btn btn-amber" style="padding:4px 10px;">Нанять</button></div></div>`;
             const _mk=farmMilkers(p), _cows=farmCowHeads(p);
