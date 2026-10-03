@@ -21484,7 +21484,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <button onclick="doHobby(${p.id},'${o.key}')" ${aff?'':'disabled'} class="btn" style="width:100%;padding:7px;font-size:12px;font-weight:700;background:${aff?'linear-gradient(180deg,#7fd1a8,#3f9e78)':'#374151'};color:${aff?'#06220f':'#9ca3af'};">${o.cost>0?(aff?'Отдохнуть · '+fmtN(o.cost)+'$':'не хватает · '+fmtN(o.cost)+'$'):'Отдохнуть · бесплатно'}</button>
                 </div>`;
             }).join('');
-            return `<div style="font-size:12px;color:#9c988e;line-height:1.6;margin-bottom:10px;">Самочувствие: <b style="color:${band.c};">${band.e} ${band.t}</b> · ${burn}.<br>Отдых и хобби восстанавливают здоровье и остужают выгорание. Без передышки гонка за деньгами выжигает — радость и отдых тоже вклад в жизнь, и Зеркало это видит.</div>${cards}`;
+            const penPct=Math.round((Number(p.voidPenalty)||0)*100);
+            const warn = penPct>0 ? `<div style="background:rgba(185,28,28,.12);border:1px solid #7f1d1d;border-radius:10px;padding:9px 11px;margin-bottom:10px;font-size:12px;color:#ffb0b0;line-height:1.5;">⚠️ <b>Выгорание режет твой активный доход на −${penPct}%.</b> Гонка без передышки выжигает — отдохни (хобби ниже снимают выгорание), и силы вернутся.</div>` : '';
+            return `${warn}<div style="font-size:12px;color:#9c988e;line-height:1.6;margin-bottom:10px;">Самочувствие: <b style="color:${band.c};">${band.e} ${band.t}</b> · ${burn}.<br>Отдых и хобби восстанавливают здоровье и остужают выгорание. Без передышки гонка за деньгами выжигает — радость и отдых тоже вклад в жизнь, и Зеркало это видит.</div>${cards}`;
         }
         function renderMedModal(){
             const m = state.medModal; if (!m) return '';
