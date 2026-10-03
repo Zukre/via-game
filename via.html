@@ -13918,6 +13918,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     ${owe>0?`<div style="background:var(--lx-ink);border:1px solid rgba(217,184,119,.28);border-radius:12px;padding:11px 13px;margin-bottom:12px;">
                         <div style="font-size:12.5px;font-weight:700;color:var(--lx-gold);">Кредит банка · 10% в месяц</div>
                         <div style="font-size:11px;color:#9c988e;margin:2px 0 8px;">платёж ${fmtN(Math.round(owe*0.10))}$/мес с остатка · можно гасить частями</div>
+                        ${(Number(p.bankInterestPaid)||0)>0?`<div style="font-size:11px;color:#fca5a5;margin:-4px 0 8px;">💸 Процентами банку уже отдано: <b>${fmtN(Math.round(Number(p.bankInterestPaid)||0))}$</b> — вот настоящая цена долга, помимо остатка.</div>`:''}
                         ${p.autoDebtFlag?`<div style="font-size:11px;color:#fca5a5;background:rgba(207,154,154,.08);border:1px solid #7f1d1d;border-radius:8px;padding:7px 9px;margin-bottom:9px;line-height:1.5;">⚠️ Часть долга набежала сама: на клетках не хватило кассы, и недостающее ушло в кредит под 10%/мес. Гаси, как появятся деньги.</div>`:''}
                         ${payPending?`<div style="font-size:12px;color:#efd8a3;background:rgba(217,184,119,.08);border:1px solid var(--lx-gold-ln);border-radius:10px;padding:9px 11px;">⏳ Платёж у ведущего — спишется после одобрения.</div>`:`
                         <div style="display:grid;grid-template-columns:1fr auto;gap:8px;">
@@ -15879,6 +15880,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try{ realtyYearTick(p); }catch(e){}                     // 📈 годовой тик недвижимости: капитализация, созревание котлована, жизнь арендатора
             try{ bizReportCheck(p); }catch(e){}                     // 🏢 раз в 3 года — окно отчёта «было→стало» + решение развивать
             p.savings=Math.round((Number(p.savings)+flow)*100)/100;
+            if((f.bankPay||0)>0) p.bankInterestPaid=Math.round(((Number(p.bankInterestPaid)||0)+f.bankPay)*100)/100;   // 🏦 копим «переплату» — сколько всего отдал банку процентами (урок цены долга)
             try{ bizCashGapCheck(p); }catch(e){}                    // 🧨 касса в минус при живом деле → кассовый разрыв (аварийный кредит)
             try{ logAction(p, (flow>=0?'💵':'💸'), 'Получка за месяц'+(ev.k!=='plain'?' ('+ev.nm+')':''), {amt:flow, sphere:'деньги'}); }catch(e){}
             p.notify = (flow>=0 ? '💵 Получка: +'+fmtN(flow)+'$ в кассу'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.'
