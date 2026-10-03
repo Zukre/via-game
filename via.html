@@ -18034,6 +18034,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${/* 🏡 ОБРАЗ ЖИЗНИ — шаг 1: показать текущий дом и машину из бланка (только зеркало) */''}
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.45),rgba(8,10,14,.82)),url('cat_imgs/win_obraz.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏡 Образ жизни <span class="sec-hint">— дом и машина</span></summary><div class="sec-in">${winCover('win_assets')}<div class="card"><div class="block-title">🏡 Как ты живёшь</div>${renderLifestylePanel(p)}</div></div></details>
 
+                ${/* 🎨 ХОББИ · ОТДЫХ — восстановление здоровья и остужение выгорания (новая ветка, 3окт) */''}
+                <details class="sec"><summary style="background:linear-gradient(135deg,#17241b,#0d1512);min-height:84px;border-radius:12px;display:flex;align-items:center;padding:0 16px;color:#aef0c8;font-family:Georgia,serif;font-size:17px;font-weight:700;">🎨 Хобби и отдых <span class="sec-hint" style="color:#7fae92;margin-left:8px;">— восстановление и радость</span></summary><div class="sec-in"><div class="card"><div class="block-title">🎨 Отдых · восстановление</div>${renderHobbyPanel(p)}</div></div></details>
+
                 ${/* плитки у депозитов нет — открывается кнопкой у кассы, а окно то же самое */''}
                 <details class="sec tile-hidden"><summary style="background-image:linear-gradient(rgba(8,10,14,.5),rgba(8,10,14,.82)),url('cat_imgs/win_deposit.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏦 Депозиты <span class="sec-hint">— тихий рост без риска</span></summary><div class="sec-in">${winCover('win_deposit')}${renderDepositPanel(p)}</div></details>
 
@@ -21395,6 +21398,51 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else { p.health=Math.max(0,pHealth(p)-9*d.sev); ok=false; text='Забил на «'+d.t+'» — 0$ сейчас, но здоровье просело сильно'+(d.sev>=3?', еле на ногах':'')+'. Дальше лечить дороже.'; }
             if(pHealth(p)<=0){ const c=medPay(p,sal*0.8); p.health=15; text+=' Здоровье рухнуло в ноль — экстренно спасли за −'+fmtN(c)+'$.'; }
             m.result={ok,text}; m.phase='result'; m.done=true; p.notify='⚕️ Медицина: '+text; save(); render();
+        }
+        // ══════════ 🎨 ХОББИ · ОТДЫХ · ВОССТАНОВЛЕНИЕ (Ринат 30сен — новая ветка; построено 3окт) ══════════
+        // Недостающий противовес гонке: трата денег+хода на отдых/хобби ВОССТАНАВЛИВАЕТ здоровье и
+        // ОСТУЖАЕТ выгорание (−voidYears → меньше voidPenalty в soulYearTick). Баланс тело/смысл:
+        // без отдыха погоня за цифрами выжигает, с отдыхом — держишься. Радость/отдых — тоже вклад жизни.
+        const HOBBIES = [
+            {key:'walk',    emoji:'🚶', title:'Прогулка в парке',       cost:0,    heal:3,  calm:1, note:'Бесплатно. Воздух и шаги — голова яснее.'},
+            {key:'read',    emoji:'📚', title:'Книги для души',         cost:400,  heal:4,  calm:2, note:'Отдых для ума, пища смыслу.'},
+            {key:'meditate',emoji:'🧘', title:'Медитация / тишина',     cost:300,  heal:5,  calm:3, note:'Учишься быть, а не только делать.'},
+            {key:'sport',   emoji:'🏋️', title:'Спорт / зал',            cost:600,  heal:9,  calm:1, note:'Тело крепнет, энергии больше.'},
+            {key:'fish',    emoji:'🎣', title:'Рыбалка',                cost:1200, heal:7,  calm:2, note:'Тишина и природа — выдох от суеты.'},
+            {key:'music',   emoji:'🎸', title:'Музыка / творчество',    cost:1500, heal:6,  calm:3, note:'Создаёшь ради радости, не ради денег.'},
+            {key:'spa',     emoji:'🧖', title:'Санаторий / СПА',        cost:5000, heal:14, calm:4, note:'Полное восстановление тела и нервов.'},
+            {key:'trip',    emoji:'✈️', title:'Путешествие',            cost:8000, heal:16, calm:5, note:'Смена мест перезагружает целиком.'}
+        ];
+        function doHobby(pid, key){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            const h=HOBBIES.find(x=>x.key===key); if(!h) return;
+            const cash=Math.floor(Number(p.savings)||0);
+            if(cash < h.cost){ p.notify='💸 Не хватает кассы на «'+h.title+'»: нужно '+fmtN(h.cost)+'$.'; render(); return; }
+            p.savings=Math.round((cash - h.cost)*100)/100;
+            p.health=Math.min(100, pHealth(p) + h.heal);
+            if(h.calm) p.voidYears=Math.max(0, (Number(p.voidYears)||0) - h.calm);   // отдых остужает выгорание
+            try{ logAction(p,'🎨','Отдых: «'+h.title+'»'+(h.cost>0?' −'+fmtN(h.cost)+'$':'')+' → здоровье +'+h.heal+(h.calm?', выгорание остыло':''), {sphere:'отдых', amt:-h.cost, ok:true}); }catch(e){}
+            try{ logChoice(p, 'выделить время на отдых?', 'отдохнул — «'+h.title+'»', {declined:['гнать дальше без передышки'], paid:(h.cost>0?'−'+fmtN(h.cost)+'$ на себя':'бесплатно, потратил время'), sphere:'отдых'}); }catch(e){}
+            p.notify='🎨 «'+h.title+'»: здоровье +'+h.heal+(h.calm?', стало легче — выгорание отступило.':'.');
+            save(p.id); render();
+        }
+        function renderHobbyPanel(p){
+            const h=pHealth(p), band=(typeof healthBand==='function')?healthBand(h):{t:'',c:'#9ca3af',e:'🙂'};
+            const vy=Number(p.voidYears)||0;
+            const burn = vy<=0 ? '<span style="color:#8bd3a0;">выгорания нет</span>' : (vy>=3?'<span style="color:#f87171;">сильное выгорание — гонишься без отдыха</span>':'<span style="color:#fbbf24;">копится усталость</span>');
+            const cash=Math.floor(Number(p.savings)||0);
+            const cards=HOBBIES.map(o=>{
+                const aff=cash>=o.cost;
+                return `<div style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:9px 11px;margin-bottom:7px;">
+                    <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">
+                        <b style="font-size:13px;">${o.emoji} ${o.title}</b>
+                        <span style="font-size:11px;color:#8bd3a0;white-space:nowrap;">+${o.heal}❤️${o.calm?' · −выгорание':''}</span>
+                    </div>
+                    <div style="font-size:11px;color:#9c988e;margin:3px 0 7px;line-height:1.45;">${o.note}</div>
+                    <button onclick="doHobby(${p.id},'${o.key}')" ${aff?'':'disabled'} class="btn" style="width:100%;padding:7px;font-size:12px;font-weight:700;background:${aff?'linear-gradient(180deg,#7fd1a8,#3f9e78)':'#374151'};color:${aff?'#06220f':'#9ca3af'};">${o.cost>0?(aff?'Отдохнуть · '+fmtN(o.cost)+'$':'не хватает · '+fmtN(o.cost)+'$'):'Отдохнуть · бесплатно'}</button>
+                </div>`;
+            }).join('');
+            return `<div style="font-size:12px;color:#9c988e;line-height:1.6;margin-bottom:10px;">Самочувствие: <b style="color:${band.c};">${band.e} ${band.t}</b> · ${burn}.<br>Отдых и хобби восстанавливают здоровье и остужают выгорание. Без передышки гонка за деньгами выжигает — радость и отдых тоже вклад в жизнь, и Зеркало это видит.</div>${cards}`;
         }
         function renderMedModal(){
             const m = state.medModal; if (!m) return '';
