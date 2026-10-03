@@ -18050,6 +18050,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <div style="height:8px;border-radius:99px;background:#0a0c10;border:1px solid #23272f;overflow:hidden;"><div style="height:100%;width:${pct}%;border-radius:99px;background:linear-gradient(90deg,#b48f4e,#d9b877 60%,#efd8a3);box-shadow:0 0 12px rgba(217,184,119,.4);"></div></div>
                     ${free?`<div style="font-size:11px;color:#5cb08b;margin-top:7px;font-weight:700;">Пассив в ${WIN_MULT}× перекрыл расходы — ты СВОБОДЕН! 🎉</div>`:`<div style="font-size:11px;color:#9c988e;margin-top:7px;">До свободы ещё <b style="color:#efd8a3;">${fmtN(need)}$/мес</b> пассива.</div>`}
                   </div>
+                  ${(()=>{
+                    const cash=Math.round(Number(p.savings)||0);
+                    const est=(p.assets||[]).filter(a=>a&&a.type==='ESTATE').reduce((s,a)=>s+(bizValue(a)-(Number(a.liab)||0)),0);
+                    const biz=(p.assets||[]).filter(a=>a&&a.type==='BUSINESS').reduce((s,a)=>s+(bizValue(a)-(Number(a.liab)||0)),0);
+                    const stk=Math.round(portfolioValue(p)||0);
+                    const home=Math.max(0,(Number(p.homeBody)||0)-(Number(p.mLeft)||0));
+                    const loan=Math.round(Number(p.bankLoan)||0);
+                    const nw=pnetWorth(p);
+                    const row=(l,v,c)=> (Math.round(v)!==0)?`<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;"><span style="color:#9c988e;">${l}</span><span style="font-family:ui-monospace,monospace;color:${c||'#cdc8bd'};">${v<0?'−':''}${fmtN(Math.abs(Math.round(v)))}$</span></div>`:'';
+                    return `<div style="background:#0d1016;border:1px solid #242833;border-radius:11px;padding:10px 12px;margin-top:10px;">
+                      <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#9c988e;font-weight:700;margin-bottom:5px;">💎 Мой капитал</div>
+                      ${row('💰 Касса',cash)}${row('🏠 Недвижимость (доля)',est,'#8bd3a0')}${row('🏢 Дела',biz,'#8bd3a0')}${row('📈 Акции',stk,'#8bd3a0')}${row('🏡 Жильё (доля)',home,'#8bd3a0')}${row('🏦 Кредит банка',-loan,'#cf9a9a')}
+                      <div style="border-top:1px solid var(--lx-line);margin:6px 0 4px;"></div>
+                      <div style="display:flex;justify-content:space-between;font-weight:800;font-size:13px;"><span style="color:#e6edf3;">Чистый капитал</span><span style="font-family:ui-monospace,monospace;color:${nw>=0?'#efd8a3':'#cf9a9a'};">${nw<0?'−':''}${fmtN(Math.abs(nw))}$</span></div>
+                    </div>`;
+                  })()}
                   <div style="margin-top:13px;padding-top:13px;border-top:1px solid var(--lx-line);">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:9px;">
                       <span style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:var(--lx-gold-br);">🎴 Карты души — дверь на 2-й круг</span>
