@@ -17775,6 +17775,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const epTilt=mkt-1;
             for(const a of p.assets){
                 if(!a || a.type!=='ESTATE') continue;
+                // 🛡️ СТРАХОВКА ОБЪЕКТА: премия 0.6%/год от стоимости; взамен простои/смета покрываются (см. ниже).
+                if(a.insured && (Number(a.price)||0)>0){ p.savings=Math.round((Number(p.savings)||0)-Math.round((Number(a.price)||0)*0.006)); }
                 // сданный котлован (rung 5, уже не стройка) дорожает как обычное жильё, а не по премии стройготовности
                 const _matured = (a.rung===5 && !a.flip);
                 const g=(_matured ? REALTY_RUNG_GROWTH[2] : REALTY_RUNG_GROWTH[a.rung]) || {base:0.04,vol:0.05,epk:1};
@@ -17807,9 +17809,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 // смета может превысить план — честный риск, съедающий маржу (рост не бесплатный). ~15%/год.
                 if(a.flip && (Number(a.price)||0)>0 && Math.random()<0.15){
                     const over=Math.round((Number(a.price)||0)*(0.03+Math.random()*0.05));   // перерасход 3–8% стоимости
-                    p.savings=Math.round((Number(p.savings)||0)-over);
-                    p.notify='🔨 «'+(a.title||'объект')+'»: смета ремонта/стройки превышена — минус '+fmtN(over)+'$. На флипе так бывает — считай маржу.';
-                    try{logAction(p,'🔨','Перерасход сметы «'+(a.title||'')+'»: −'+fmtN(over)+'$',{sphere:'деньги',amt:-over,ok:false});}catch(e){}
+                    if(a.insured){ p.notify='🛡️ «'+(a.title||'объект')+'»: смета превышена, но страховка покрыла перерасход.'; }
+                    else {
+                        p.savings=Math.round((Number(p.savings)||0)-over);
+                        p.notify='🔨 «'+(a.title||'объект')+'»: смета ремонта/стройки превышена — минус '+fmtN(over)+'$. На флипе так бывает — считай маржу.';
+                        try{logAction(p,'🔨','Перерасход сметы «'+(a.title||'')+'»: −'+fmtN(over)+'$',{sphere:'деньги',amt:-over,ok:false});}catch(e){}
+                    }
                 }
                 // 🎲 жизнь арендатора — только у доходных объектов
                 const rent=Number(a.cf)||0;
@@ -17818,13 +17823,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     // 🛎️ ПОСУТОЧКА (ступень 4) = мини-бизнес: дохода больше, но и простоев больше (уборка/заселение/сезон).
                     const _vac = (a.rung===4) ? 0.22 : 0.12;   // шанс простоя
                     const _def = _vac + 0.08;                   // дальше — неплатёж/ремонт
-                    if(r<_vac){ const hit=Math.round(rent*(2+Math.floor(Math.random()*4)));   // простой 2-5 мес
+                    if(r<_vac){ const hit=Math.round(rent*(2+Math.floor(Math.random()*4))*(a.insured?0.5:1));   // простой 2-5 мес (страховка смягчает вдвое)
                         p.savings=Math.round((Number(p.savings)||0)-hit);
-                        p.notify='🏚️ «'+(a.title||'объект')+'»: '+(a.rung===4?'простой между гостями':'арендатор съехал, простой')+' — минус '+fmtN(hit)+'$.';
+                        p.notify='🏚️ «'+(a.title||'объект')+'»: '+(a.rung===4?'простой между гостями':'арендатор съехал, простой')+' — минус '+fmtN(hit)+'$'+(a.insured?' (страховка смягчила)':'')+'.';
                         try{logAction(p,'🏚️','Простой аренды «'+(a.title||'')+'»: −'+fmtN(hit)+'$',{sphere:'деньги',amt:-hit,ok:false});}catch(e){}
-                    } else if(r<_def){ const hit=Math.round(rent*(1+Math.floor(Math.random()*2)));   // неплатёж/ремонт
+                    } else if(r<_def){ const hit=Math.round(rent*(1+Math.floor(Math.random()*2))*(a.insured?0.5:1));   // неплатёж/ремонт
                         p.savings=Math.round((Number(p.savings)||0)-hit);
-                        p.notify='🔧 «'+(a.title||'объект')+'»: неплатёж или внеплановый ремонт — минус '+fmtN(hit)+'$.';
+                        p.notify='🔧 «'+(a.title||'объект')+'»: неплатёж или внеплановый ремонт — минус '+fmtN(hit)+'$'+(a.insured?' (страховка смягчила)':'')+'.';
                         try{logAction(p,'🔧','Ремонт/неплатёж «'+(a.title||'')+'»: −'+fmtN(hit)+'$',{sphere:'деньги',amt:-hit,ok:false});}catch(e){}
                     } else if(r>0.90){ const up=Math.max(1,Math.round(rent*0.08));   // спрос подрос навсегда
                         a.cf=rent+up; a.price=Math.round((Number(a.price)||0)*1.05);
@@ -17872,6 +17877,23 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             return html;
         }
+        // 🛡️ Страховка объекта (Ринат 3окт, Недвиж Кусок 3): премия 0.6%/год, взамен простои/смета смягчены/покрыты.
+        function realtyToggleInsure(pId, aId){
+            const p=state.players.find(x=>x.id==pId); if(!p) return;
+            const a=(p.assets||[]).find(x=>x&&x.id==aId); if(!a) return;
+            a.insured=!a.insured;
+            p.notify=a.insured?('🛡️ «'+(a.title||'объект')+'» застрахован — премия ~'+fmtN(Math.round((Number(a.price)||0)*0.006))+'$/год, зато простои и смета больше не бьют в полную силу.'):('🛡️ Страховка с «'+(a.title||'объект')+'» снята.');
+            save(pId); render();
+        }
+        function realtyInsureControl(a,p){
+            if(!a || a.type!=='ESTATE') return '';
+            const price=Number(a.price)||0; if(price<=0) return '';
+            const prem=Math.round(price*0.006);
+            return `<div style="margin:-4px 0 10px;padding:7px 11px;background:#0c130f;border:1px solid ${a.insured?'#157347':'#242833'};border-radius:0 0 10px 10px;font-size:11px;color:#9c988e;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <span>🛡️ ${a.insured?`<b style="color:#6ee7b7;">Застраховано</b> · премия ${fmtN(prem)}$/год · простои и смета смягчены`:`Без страховки · простои и перерасход бьют полностью (премия была бы ${fmtN(prem)}$/год)`}</span>
+                <button onclick="realtyToggleInsure(${p.id},${a.id})" class="btn" style="flex:0 0 auto;padding:5px 10px;font-size:11px;background:${a.insured?'#374151':'#0d2b1a'};color:${a.insured?'#9ca3af':'#6ee7b7'};border:1px solid ${a.insured?'#374151':'#157347'};">${a.insured?'Отключить':'Застраховать'}</button>
+            </div>`;
+        }
         function renderRealtyBranch(p, hasP){
             const est=(p.assets||[]).filter(a=>a&&a.type==='ESTATE');
             const tot=est.reduce((s,a)=>s+(Number(a.cf)||0),0);
@@ -17883,7 +17905,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                        Объектов: <b style="color:#e5e7eb;">${est.length}</b> · стоимость портфеля <b style="color:#efd8a3;">${fmtN(val)}$</b>${debt>0?` · ипотеки <b style="color:#f87171;">${fmtN(debt)}$</b> · твой капитал <b style="color:#8bd3a0;">${fmtN(eq)}$</b>`:''}<br>
                        Рента: <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot)}$/мес</b> = <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot*12)}$/год</b>. Стоимость растёт каждый год с рынком — продашь дороже. «Развивать» = ремонт (растут и цена, и рента), флип — отремонтируй и продай.
                    </div>`
-                    + est.map(a=>assetMgmtCard(a,p,hasP)).join('')
+                    + est.map(a=>assetMgmtCard(a,p,hasP)+realtyInsureControl(a,p)).join('')
                 : '<p style="font-size:12px;color:#9ca3af;padding:2px 2px 8px;">Пока ни одного объекта. Поднимись по лестнице ниже — от субаренды до девелопмента.</p>';
             const market=`<details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:800;color:#efd8a3;padding:9px 11px;background:#12161d;border:1px solid #242833;border-radius:10px;list-style:none;">🏗️ Купить объект — лестница инвестора</summary><div style="padding:4px 2px;"><div style="font-size:11.5px;color:#9ca3af;line-height:1.6;margin:6px 0;"><b style="color:#efd8a3;">Как здесь зарабатывают:</b> рента каждый месяц · рост стоимости со временем (продал дороже) · флип (купил дёшево → ремонт → продал) · переуступка на котловане · посуточка дороже долгосрочной · плечо (ипотека) умножает и доход, и риск. От простого к сложному — доход, сложность и риск растут вместе.</div>${renderRealtyMarket(p)}</div></details>`;
             return owned + market;
