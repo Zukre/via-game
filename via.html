@@ -17806,11 +17806,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const rent=Number(a.cf)||0;
                 if(rent>0){
                     const r=Math.random();
-                    if(r<0.12){ const hit=Math.round(rent*(2+Math.floor(Math.random()*4)));   // простой 2-5 мес
+                    // 🛎️ ПОСУТОЧКА (ступень 4) = мини-бизнес: дохода больше, но и простоев больше (уборка/заселение/сезон).
+                    const _vac = (a.rung===4) ? 0.22 : 0.12;   // шанс простоя
+                    const _def = _vac + 0.08;                   // дальше — неплатёж/ремонт
+                    if(r<_vac){ const hit=Math.round(rent*(2+Math.floor(Math.random()*4)));   // простой 2-5 мес
                         p.savings=Math.round((Number(p.savings)||0)-hit);
-                        p.notify='🏚️ «'+(a.title||'объект')+'»: арендатор съехал, простой — минус '+fmtN(hit)+'$, пока ищешь нового.';
+                        p.notify='🏚️ «'+(a.title||'объект')+'»: '+(a.rung===4?'простой между гостями':'арендатор съехал, простой')+' — минус '+fmtN(hit)+'$.';
                         try{logAction(p,'🏚️','Простой аренды «'+(a.title||'')+'»: −'+fmtN(hit)+'$',{sphere:'деньги',amt:-hit,ok:false});}catch(e){}
-                    } else if(r<0.20){ const hit=Math.round(rent*(1+Math.floor(Math.random()*2)));   // неплатёж/ремонт
+                    } else if(r<_def){ const hit=Math.round(rent*(1+Math.floor(Math.random()*2)));   // неплатёж/ремонт
                         p.savings=Math.round((Number(p.savings)||0)-hit);
                         p.notify='🔧 «'+(a.title||'объект')+'»: неплатёж или внеплановый ремонт — минус '+fmtN(hit)+'$.';
                         try{logAction(p,'🔧','Ремонт/неплатёж «'+(a.title||'')+'»: −'+fmtN(hit)+'$',{sphere:'деньги',amt:-hit,ok:false});}catch(e){}
