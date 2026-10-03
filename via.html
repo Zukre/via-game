@@ -15881,6 +15881,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try{ bizReportCheck(p); }catch(e){}                     // 🏢 раз в 3 года — окно отчёта «было→стало» + решение развивать
             p.savings=Math.round((Number(p.savings)+flow)*100)/100;
             if((f.bankPay||0)>0) p.bankInterestPaid=Math.round(((Number(p.bankInterestPaid)||0)+f.bankPay)*100)/100;   // 🏦 копим «переплату» — сколько всего отдал банку процентами (урок цены долга)
+            if(p.medInsured){ const _mp=Math.round((Number(p.prof&&p.prof.salary)||0)*0.015); if(_mp>0) p.savings=Math.round((p.savings-_mp)*100)/100; }   // 🛡️ премия медстраховки (ровный расход, зато лечение дешевле)
             try{ bizCashGapCheck(p); }catch(e){}                    // 🧨 касса в минус при живом деле → кассовый разрыв (аварийный кредит)
             try{ logAction(p, (flow>=0?'💵':'💸'), 'Получка за месяц'+(ev.k!=='plain'?' ('+ev.nm+')':''), {amt:flow, sphere:'деньги'}); }catch(e){}
             p.notify = (flow>=0 ? '💵 Получка: +'+fmtN(flow)+'$ в кассу'+(ev.k!=='plain'?' ('+ev.nm+')':'')+'.'
@@ -21460,15 +21461,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             render();
         }
-        function medTreat(kind){ const m=state.medModal; if(!m||!m.disease||m.done) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return; const sal=p.prof.salary||3000; const d=m.disease; let text,ok=true;
+        function medTreat(kind){ const m=state.medModal; if(!m||!m.disease||m.done) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return; const sal=p.prof.salary||3000; const d=m.disease; let text,ok=true; const _ins=(p.medInsured?0.4:1);   // 🛡️ страховка покрывает ~60% счёта
             { const _mo={dear:'лечиться дорого и наверняка',cheap:'лечиться дёшево, как повезёт',ignore:'забить — 0$ сейчас'};
               logChoice(p, 'болезнь «'+(d.t||'')+'»: как лечить', _mo[kind]||kind,
                 { declined:Object.keys(_mo).filter(k=>k!==kind).map(k=>_mo[k]),
                   paid:(kind==='ignore'?'сэкономил деньги, платит тело':'заплатил деньгами за тело'), sphere:'здоровье' }); }
-            if(kind==='dear'){ const c=medPay(p,sal*0.4*d.sev); p.health=Math.min(100,pHealth(p)+8); text='Лечился дорого −'+fmtN(c)+'$ — вылечился наверняка, здоровье подросло.'; }
-            else if(kind==='cheap'){ const c=medPay(p,sal*0.15*d.sev); if(Math.random()<0.55){ p.health=Math.min(100,pHealth(p)+4); text='Лечился дёшево −'+fmtN(c)+'$ — повезло, помогло.'; } else { p.health=Math.max(0,pHealth(p)-6*d.sev); ok=false; text='Лечился дёшево −'+fmtN(c)+'$ — не помогло, стало хуже.'; } }
+            if(kind==='dear'){ const c=medPay(p,sal*0.4*d.sev*_ins); p.health=Math.min(100,pHealth(p)+8); text='Лечился дорого −'+fmtN(c)+'$ — вылечился наверняка, здоровье подросло.'; }
+            else if(kind==='cheap'){ const c=medPay(p,sal*0.15*d.sev*_ins); if(Math.random()<0.55){ p.health=Math.min(100,pHealth(p)+4); text='Лечился дёшево −'+fmtN(c)+'$ — повезло, помогло.'; } else { p.health=Math.max(0,pHealth(p)-6*d.sev); ok=false; text='Лечился дёшево −'+fmtN(c)+'$ — не помогло, стало хуже.'; } }
             else { p.health=Math.max(0,pHealth(p)-9*d.sev); ok=false; text='Забил на «'+d.t+'» — 0$ сейчас, но здоровье просело сильно'+(d.sev>=3?', еле на ногах':'')+'. Дальше лечить дороже.'; }
-            if(pHealth(p)<=0){ const c=medPay(p,sal*0.8); p.health=15; text+=' Здоровье рухнуло в ноль — экстренно спасли за −'+fmtN(c)+'$.'; }
+            if(pHealth(p)<=0){ const c=medPay(p,sal*0.8*_ins); p.health=15; text+=' Здоровье рухнуло в ноль — экстренно спасли за −'+fmtN(c)+'$.'; }
+            if(p.medInsured && kind!=='ignore') text+=' 🛡️ Страховка покрыла часть счёта.';
             m.result={ok,text}; m.phase='result'; m.done=true; p.notify='⚕️ Медицина: '+text; save(); render();
         }
         // ══════════ 🎨 ХОББИ · ОТДЫХ · ВОССТАНОВЛЕНИЕ (Ринат 30сен — новая ветка; построено 3окт) ══════════
@@ -21557,9 +21559,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <div class="card" style="border-color:#f87171;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="block-title" style="color:#fca5a5;margin:0;">⚕️ МЕДИЦИНА (здоровье)</div>${infoBtn('med')}</div>
                     <p style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Самочувствие: ${band.e} ${band.t}. Проверяйся на чек-апе — низкое здоровье = болезни чаще.</p>
+                    ${(()=>{ const prem=Math.round((Number(p.prof&&p.prof.salary)||0)*0.015); const ins=!!p.medInsured; return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;padding:7px 10px;background:#0c0f14;border:1px solid ${ins?'#1f6b45':'#334155'};border-radius:9px;font-size:11px;color:#9ca3af;line-height:1.4;"><span>🛡️ ${ins?`<b style="color:#6ee7b7;">Полис есть</b> · премия ${fmtN(prem)}$/мес · лечение обойдётся дешевле`:`Без полиса · стоил бы ${fmtN(prem)}$/мес и гасил бы счёт за лечение в худший момент`}</span><button onclick="medInsure(${p.id})" class="btn" style="flex:0 0 auto;padding:5px 10px;font-size:11px;background:${ins?'#374151':'#0d2b1a'};color:${ins?'#9ca3af':'#6ee7b7'};border:1px solid ${ins?'#374151':'#157347'};">${ins?'Отключить':'Оформить'}</button></div>`; })()}
                     <button onclick="openMedModal(${p.id})" class="btn" style="width:100%;background:#b91c1c;color:#fff;font-weight:800;font-size:14px;">⚕️ ЗАЙТИ К ВРАЧУ</button>
                 </div>
             `;
+        }
+        // 🛡️ МЕДСТРАХОВКА (Ринат 3окт, Здоровье Кусок 3): полис — платишь премию, страховка гасит счёт
+        // за лечение в худший момент. Зеркалит приём страховки недвижимости. Числа тюнит Ринат.
+        function medInsure(pid){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            p.medInsured=!p.medInsured;
+            const prem=Math.round((Number(p.prof&&p.prof.salary)||0)*0.015);
+            p.notify = p.medInsured ? ('🛡️ Оформил медстраховку — премия '+fmtN(prem)+'$/мес, зато лечение обойдётся заметно дешевле.') : '🛡️ Медстраховка отключена.';
+            try{ logAction(p,'🛡️', p.medInsured?('Оформил медстраховку (премия '+fmtN(prem)+'$/мес)'):'Снял медстраховку', {sphere:'здоровье', ok:true}); }catch(e){}
+            save(p.id); render();
         }
 
         // 🪞 РЕАЛЬНЫЙ БЛАНК → профессия. Выдуманные карты ушли (Ринат 1окт): из СВОИХ цифр игрока
