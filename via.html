@@ -17725,7 +17725,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             {key:'flat_elite', rung:2, emoji:'💠', title:'Элитная квартира в центре',  val:85000,  rent:750, downPct:0.25},
             {key:'resort_apt', rung:4, emoji:'🏖️', title:'Курортные апартаменты у моря',val:70000,  rent:1200,downPct:0.30},
             {key:'com_street', rung:6, emoji:'🏪', title:'Стрит-ритейл помещение',     val:180000, rent:2500,downPct:0.35},
-            {key:'dev_village',rung:7, emoji:'🏡', title:'Коттеджный посёлок',          val:800000, rent:0,   downPct:0.40, flip:true}
+            {key:'dev_village',rung:7, emoji:'🏡', title:'Коттеджный посёлок',          val:800000, rent:0,   downPct:0.40, flip:true},
+            {key:'reit_fund',  rung:2, emoji:'📜', title:'Доля в фонде недвижимости (REIT)', val:10000, rent:65, reit:true, note:'Бумажная недвижимость: доля фонда, рента-дивиденд без управления — ниже доход, зато без простоев, ремонта и ипотеки. Ликвидно, для диверсификации.'}
         ];
         function realtyRungUnlocked(p, rung){
             if(rung<=2) return true;
@@ -17745,13 +17746,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const sav=Math.round(Number(p.savings)||0);
             let need, liab=0, cf=Number(o.rent)||0, how;
             if(o.sub){ need=o.deposit; cf=o.rent; how='субаренда'; }
-            else if(mode==='mortgage' && o.val>0){ const m=realtyMortgage(o); need=m.down; liab=m.liab; cf=m.net; how='ипотека'; }
+            else if(mode==='mortgage' && o.val>0 && !o.reit){ const m=realtyMortgage(o); need=m.down; liab=m.liab; cf=m.net; how='ипотека'; }
             else { need=o.val; cf=o.rent; how='наличными'; }
             if(sav<need){ p.notify='💸 Не хватает кассы: нужно '+fmtN(need)+'$, у тебя '+fmtN(sav)+'$.'; render(); return; }
             if(cf<0 && !confirm('⚠️ Объект «'+o.title+'»: аренда не покроет ипотеку — минус '+fmtN(-cf)+'$/мес из твоего потока. На флипе/котловане это нормально: цель — отремонтировать и продать дороже. Берём?')) return;
             p.savings=Math.round(sav-need);
             p.assets=p.assets||[];
-            p.assets.push({ id:Date.now()+Math.floor(Math.random()*1000), type:'ESTATE', title:o.emoji+' '+o.title, price:(o.val>0?o.val:o.deposit), down:need, liab, cf, rung:o.rung, flip:!!o.flip, bought:true });
+            p.assets.push({ id:Date.now()+Math.floor(Math.random()*1000), type:'ESTATE', title:o.emoji+' '+o.title, price:(o.val>0?o.val:o.deposit), down:need, liab, cf, rung:o.rung, flip:!!o.flip, reit:!!o.reit, bought:true });
             try{ logAction(p,'🏠','Купил недвижимость «'+o.title+'» ('+how+') за '+fmtN(need)+'$'+(cf>=0?', рента +'+fmtN(cf)+'$/мес':', пока минус '+fmtN(-cf)+'$/мес — на ремонт и перепродажу'), {sphere:'деньги', amt:-need, ok:cf>=0}); }catch(e){}
             p.notify='🏠 Твой объект: «'+o.title+'». '+(how==='ипотека'?'Ипотека '+fmtN(liab)+'$. ':'')+(cf>=0?'Рента +'+fmtN(cf)+'$/мес.':'Поток '+fmtN(cf)+'$/мес — ремонтируй в «Развивать» и продай дороже.');
             save(pId); render();
@@ -17779,7 +17780,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 if(a.insured && (Number(a.price)||0)>0){ p.savings=Math.round((Number(p.savings)||0)-Math.round((Number(a.price)||0)*0.006)); }
                 // сданный котлован (rung 5, уже не стройка) дорожает как обычное жильё, а не по премии стройготовности
                 const _matured = (a.rung===5 && !a.flip);
-                const g=(_matured ? REALTY_RUNG_GROWTH[2] : REALTY_RUNG_GROWTH[a.rung]) || {base:0.04,vol:0.05,epk:1};
+                const g = a.reit ? {base:0.03,vol:0.02,epk:0.5} : ((_matured ? REALTY_RUNG_GROWTH[2] : REALTY_RUNG_GROWTH[a.rung]) || {base:0.04,vol:0.05,epk:1});
                 const old=Number(a.price)||0;
                 if(old>0 && (g.base||g.vol)){
                     const drift=g.base + epTilt*g.epk + (Math.random()*2-1)*g.vol;   // рост = тип + эпоха + разброс
@@ -17816,9 +17817,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         try{logAction(p,'🔨','Перерасход сметы «'+(a.title||'')+'»: −'+fmtN(over)+'$',{sphere:'деньги',amt:-over,ok:false});}catch(e){}
                     }
                 }
-                // 🎲 жизнь арендатора — только у доходных объектов
+                // 🎲 жизнь арендатора — только у доходных ФИЗИЧЕСКИХ объектов (REIT-фонд без простоев/ремонта)
                 const rent=Number(a.cf)||0;
-                if(rent>0){
+                if(rent>0 && !a.reit){
                     const r=Math.random();
                     // 🛎️ ПОСУТОЧКА (ступень 4) = мини-бизнес: дохода больше, но и простоев больше (уборка/заселение/сезон).
                     const _vac = (a.rung===4) ? 0.22 : 0.12;   // шанс простоя
@@ -17857,7 +17858,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                             ? `Стоимость <b>${fmtN(o.val)}$</b> · рента <b style="color:#10b981;">+${fmtN(o.rent)}$/мес</b>${yieldPct}`
                             : `Стоимость <b>${fmtN(o.val)}$</b> · ренты нет — ставка на рост стоимости (ремонт/переуступка)`;
                     const cashBtn=`<button onclick="buyRealty(${p.id},'${o.key}','cash')" ${sav<cashNeed?'disabled':''} class="btn" style="flex:1;padding:7px 10px;font-size:11px;background:${sav>=cashNeed?'linear-gradient(180deg,#efd8a3,#d9b877)':'#374151'};color:${sav>=cashNeed?'#20180a':'#9ca3af'};font-weight:800;">${o.sub?'🔑 Взять':'💵 Наличными'} (${fmtN(cashNeed)}$)</button>`;
-                    const mortBtn=(!o.sub && m)?`<button onclick="buyRealty(${p.id},'${o.key}','mortgage')" ${sav<m.down?'disabled':''} class="btn" style="flex:1;padding:7px 10px;font-size:11px;background:${sav>=m.down?'#0d2b1a':'#374151'};color:${sav>=m.down?'#6ee7b7':'#9ca3af'};font-weight:800;border:1px solid ${sav>=m.down?'#157347':'#374151'};">🏦 В ипотеку (взнос ${fmtN(m.down)}$)</button>`:'';
+                    const mortBtn=(!o.sub && m && !o.reit)?`<button onclick="buyRealty(${p.id},'${o.key}','mortgage')" ${sav<m.down?'disabled':''} class="btn" style="flex:1;padding:7px 10px;font-size:11px;background:${sav>=m.down?'#0d2b1a':'#374151'};color:${sav>=m.down?'#6ee7b7':'#9ca3af'};font-weight:800;border:1px solid ${sav>=m.down?'#157347':'#374151'};">🏦 В ипотеку (взнос ${fmtN(m.down)}$)</button>`:'';
                     const mortHint=(!o.sub && m)?`<div style="font-size:10.5px;color:#9ca3af;margin-top:4px;">🏦 Плечо: взнос ${fmtN(m.down)}$, ипотека ${fmtN(m.liab)}$, рента после платежа <b style="color:${m.net>=0?'#10b981':'#f87171'};">${m.net>=0?'+':''}${fmtN(m.net)}$/мес</b></div>`:'';
                     // 💰 Сколько можно заработать: рост стоимости за 10 лет (по типу) + рента за 10 лет
                     const gr=REALTY_RUNG_GROWTH[o.rung]||{base:0.04};
