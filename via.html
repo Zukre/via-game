@@ -17794,6 +17794,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         p.notify='🏁 «'+(a.title||'котлован')+'» сдан! Можно сдавать (+'+fmtN(a.cf)+'$/мес) или продать по выросшей цене.';
                         try{logAction(p,'🏁','Новостройка сдана: «'+(a.title||'')+'» → рента +'+fmtN(a.cf)+'$/мес',{sphere:'деньги',ok:true});}catch(e){} }
                 }
+                // 🔨 РИСК СМЕТЫ на флипе/стройке (Ринат 3окт, Кусок 3): пока объект в ремонте/стройке (flip),
+                // смета может превысить план — честный риск, съедающий маржу (рост не бесплатный). ~15%/год.
+                if(a.flip && (Number(a.price)||0)>0 && Math.random()<0.15){
+                    const over=Math.round((Number(a.price)||0)*(0.03+Math.random()*0.05));   // перерасход 3–8% стоимости
+                    p.savings=Math.round((Number(p.savings)||0)-over);
+                    p.notify='🔨 «'+(a.title||'объект')+'»: смета ремонта/стройки превышена — минус '+fmtN(over)+'$. На флипе так бывает — считай маржу.';
+                    try{logAction(p,'🔨','Перерасход сметы «'+(a.title||'')+'»: −'+fmtN(over)+'$',{sphere:'деньги',amt:-over,ok:false});}catch(e){}
+                }
                 // 🎲 жизнь арендатора — только у доходных объектов
                 const rent=Number(a.cf)||0;
                 if(rent>0){
