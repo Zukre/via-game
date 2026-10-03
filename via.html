@@ -11872,11 +11872,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const H = LIFESTYLE_HOMES[lvl]; if(!H) return;
             const cash = Number(p.savings) || 0;
             const curLvl = curHomeLvl(p);
+            // 🏠 ВОЗВРАТ ДОЛИ при даунгрейде (Ринат 3окт, Образ жизни Кусок 3): продаёшь старое жильё —
+            // возвращаешь ~70% накопленной доли (30% — издержки сделки). Ужался → высвободил капитал.
+            const _oldEq = Math.max(0, (Number(p.homeBody)||0) - (Number(p.mLeft)||0));
             if (lvl === 0) {
                 // Съезд на аренду: не владеешь телом, платишь только аренду в поток.
+                const _ref = Math.round(_oldEq*0.7);
                 p.homeLvl = 0; p.homeBody = 0; p.homePay = H.pay; p.mLeft = 0; p.isM = false;
+                if(_ref>0) p.savings = Math.round((cash + _ref)*100)/100;
                 logSignal('lifestyle', 'home_downgrade', 0);
-                p.notify = '🏠 Ты переехал на съём: аренда ' + fmtN(H.pay) + '$/мес, жильём не владеешь.';
+                p.notify = '🏠 Ты переехал на съём: аренда ' + fmtN(H.pay) + '$/мес, жильём не владеешь.' + (_ref>0?' Продал старое — вернул '+fmtN(_ref)+'$ за свою долю.':'');
             } else if (mode === 'buyout') {
                 if (cash < H.body) { alert('Выкупить «' + H.name + '» стоит ' + fmtN(H.body) + '$ — не хватает кассы.'); return; }
                 p.savings = cash - H.body;
@@ -11884,10 +11889,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 logSignal('lifestyle', 'home_buyout', lvl);
                 p.notify = '🏠 «' + H.name + '» выкуплен целиком за ' + fmtN(H.body) + '$. Ипотеки нет — остаётся только содержание ' + fmtN(H.upkeep) + '$/мес.';
             } else if (mode === 'move') {
-                // Переезд в жильё ПОПРОЩЕ: без доплаты и пока без возврата (продажа с возвратом — позже).
+                // Переезд в жильё ПОПРОЩЕ: продаёшь старое (возврат ~70% доли), въезжаешь в новое с ипотекой.
+                const _ref = Math.round(_oldEq*0.7);
                 p.homeLvl = lvl; p.homeBody = H.body; p.homePay = H.pay; p.mLeft = H.body; p.isM = false;
+                if(_ref>0) p.savings = Math.round((cash + _ref)*100)/100;
                 logSignal('lifestyle', 'home_downgrade', lvl);
-                p.notify = '🏠 Переехал в «' + H.name + '»: платёж ' + fmtN(H.pay) + '$/мес.';
+                p.notify = '🏠 Переехал в «' + H.name + '»: платёж ' + fmtN(H.pay) + '$/мес.' + (_ref>0?' Продал прежнее — вернул '+fmtN(_ref)+'$ за долю.':'');
             } else { // credit — апгрейд в кредит: аванс из кассы, месячный платёж замещает старый
                 if (cash < H.down) { alert('Аванс за «' + H.name + '» — ' + fmtN(H.down) + '$ — не хватает кассы.'); return; }
                 p.savings = cash - H.down;
@@ -11975,10 +11982,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 logSignal('lifestyle', 'car_buyout', lvl);
                 p.notify = '🚗 «' + C.name + '» выкуплен целиком за ' + fmtN(C.body) + '$. Платежа по авто больше нет.';
             } else if (mode === 'move') {
-                // Пересесть на машину ПОПРОЩЕ: без доплаты и пока без возврата (продажа с возвратом — позже).
+                // Пересесть на машину ПОПРОЩЕ: продаёшь старую (возврат ~70% доли), берёшь дешевле.
+                const _carEq = Math.max(0, (Number(p.carBody)||0) - (Number(p.aLeft)||0));
+                const _ref = Math.round(_carEq*0.7);
                 p.carLvl = lvl; p.carBody = C.body; p.carPay = C.pay; p.aLeft = C.body; p.isA = false;
+                if(_ref>0) p.savings = Math.round((cash + _ref)*100)/100;
                 logSignal('lifestyle', 'car_downgrade', lvl);
-                p.notify = '🚗 Пересел на «' + C.name + '»: платёж ' + fmtN(C.pay) + '$/мес.';
+                p.notify = '🚗 Пересел на «' + C.name + '»: платёж ' + fmtN(C.pay) + '$/мес.' + (_ref>0?' Продал прежнюю — вернул '+fmtN(_ref)+'$.':'');
             } else { // credit — апгрейд в кредит: аванс из кассы, месячный платёж замещает старый
                 if (cash < C.down) { alert('Аванс за «' + C.name + '» — ' + fmtN(C.down) + '$ — не хватает кассы.'); return; }
                 p.savings = cash - C.down;
