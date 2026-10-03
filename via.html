@@ -13919,7 +13919,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                             <button onclick="var el=document.getElementById('bankPayAmt'); if(el) el.value=${Math.round(owe)};" class="btn btn-gray" style="flex:1;padding:5px;font-size:11px;">Весь долг · ${fmtN(owe)}$</button>
                         </div>`}
                     </div>`:''}
-                    <p style="font-size:12px;color:var(--lx-muted);line-height:1.55;margin:0 2px 10px;">Занимать кратно 1000$. Каждый занятый доллар просит 10 центов в месяц — 5000$ превращаются в 500$ платежа. Деньги придут в кассу после одобрения ведущим.</p>
+                    <p style="font-size:12px;color:var(--lx-muted);line-height:1.55;margin:0 2px 10px;">Занимать кратно 1000$. Каждый занятый доллар просит 10 центов в месяц — 5000$ превращаются в 500$ платежа. ${SOLO_APP?'Деньги придут в кассу сразу.':'Деньги придут в кассу после одобрения ведущим.'}</p>
                     ${(()=>{ const cap=bankCap(p), fl=Math.round(calc(p).flow);
                        return `<div style="display:flex;justify-content:space-between;align-items:baseline;background:#0d1016;border:1px solid #242833;border-radius:10px;padding:8px 11px;margin-bottom:10px;">
                         <span style="font-size:11px;color:#9c988e;">Банк смотрит на твой поток: <b style="color:${fl>0?'#5cb08b':'#cf9a9a'};">${fl>0?'+':''}${fmtN(fl)}$/мес</b> × 10</span>
@@ -22296,6 +22296,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const cap = bankCap(p);
             if (cap < 1000) { alert('🏦 Банк отказал: твой месячный поток ' + fmtN(Math.round(calc(p).flow)) + '$ — платить нечем. Подними поток и приходи.'); return; }
             if (amt > cap) { alert('🏦 Банк смотрит на поток: ' + fmtN(Math.round(calc(p).flow)) + '$/мес × 10 = максимум ' + fmtN(cap) + '$. Больше не дадут.'); return; }
+            // 🎮 СОЛО (Ринат 3окт, фикс): ведущего нет → кредит выдаём СРАЗУ (та же логика, что в appr()).
+            // Раньше заявка висела PENDING и ждала одобрения, которого в SOLO_APP не будет — банк не работал.
+            if (SOLO_APP) {
+                p.bankLoan = (Number(p.bankLoan)||0) + amt;
+                p.savings = Math.round(((Number(p.savings)||0) + amt) * 100) / 100;
+                logChoice(p, 'взять кредит в банке?', 'взял кредит', {declined:['обойтись без долга'], paid:'+'+fmtN(amt)+'$ сейчас, долг на шее', amt:amt, sphere:'цепи'});
+                try{ logAction(p,'🏦','Взял кредит в банке +'+fmtN(amt)+'$ (платёж '+fmtN(Math.round(amt*0.10))+'$/мес)', {sphere:'деньги', amt:amt, ok:false}); }catch(e){}
+                if (state.bankModal) state.bankModal = null;
+                p.notify = '🏦 Кредит '+fmtN(amt)+'$ в кассе. Платёж '+fmtN(Math.round(amt*0.10))+'$/мес — гаси, как появятся деньги.';
+                save(p.id); render(); return;
+            }
             if (state.deals.some(d => d.pId == p.id && d.type === 'TAKE_LOAN' && d.status === 'PENDING')) {
                 alert('⏳ Заявка на кредит уже у ведущего — не дублируй, он вот-вот одобрит.'); return;
             }
@@ -22321,6 +22332,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             }
             const full = amt >= owe;
             if (!confirm((full ? 'Закрыть кредит банка полностью за ' : 'Погасить часть кредита — ')+fmtN(amt)+'$? Спишется с кассы (у тебя '+fmtN(cash)+'$).'+(full?'':' Остаток '+fmtN(owe-amt)+'$ продолжит капать 10%/мес.'))) return;
+            // 🎮 СОЛО: гасим СРАЗУ (та же логика, что в appr() PAY_BANK) — ведущего нет.
+            if (SOLO_APP) {
+                const pay = Math.min(amt, owe, Math.floor(Number(p.savings)||0));
+                if (pay < 1) { alert('🏦 В кассе не хватило — гасить нечем.'); return; }
+                p.savings = Math.round(((Number(p.savings)||0) - pay)*100)/100;
+                p.bankLoan = Math.round((owe - pay)*100)/100;
+                if (p.bankLoan<=0){ p.bankLoan=0; p.autoDebtFlag=false; logChoice(p,'закрыть кредит банка?','закрыл долг',{declined:['тянуть долг дальше'],paid:'−'+fmtN(pay)+'$, снял цепь',amt:pay,sphere:'свобода'}); }
+                try{ logAction(p,'🏦', p.bankLoan>0?('Погасил часть кредита −'+fmtN(pay)+'$'):('Закрыл кредит банка −'+fmtN(pay)+'$'), {sphere:'деньги', amt:-pay, ok:true}); }catch(e){}
+                p.notify = p.bankLoan>0 ? ('🏦 Погашено '+fmtN(pay)+'$ · остаток долга '+fmtN(p.bankLoan)+'$ (10%/мес).') : ('🏦 Кредит банка закрыт: −'+fmtN(pay)+'$ с кассы.');
+                if (state.bankModal) state.bankModal = null;
+                save(p.id); render(); return;
+            }
             state.deals.push({ id: uid(), pId: p.id, pName: p.name, type:'PAY_BANK', details:{amount: amt}, status:'PENDING' });
             if (state.bankModal) state.bankModal = null;
             save(); render();
@@ -22341,7 +22364,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 if (owe > 0 && cash < owe) { alert('🚫 Не хватает кассы, чтобы закрыть этот долг: нужно '+fmtN(owe)+'$, а у тебя '+fmtN(cash)+'$. Заработай и погаси.'); return; }
                 if (owe > 0 && !confirm('Закрыть долг за '+fmtN(owe)+'$? Спишется с кассы (у тебя '+fmtN(cash)+'$). Ежемесячный платёж исчезнет.')) return;
             }
-            state.deals.push({ id: uid(), pId: p.id, pName: p.name, type, details, status:'PENDING' });
+            const _id = uid();
+            state.deals.push({ id: _id, pId: p.id, pName: p.name, type, details, status:'PENDING' });
+            if (SOLO_APP) { appr(_id); return; }   // 🎮 соло (Ринат 3окт): ведущего нет → применяем сразу тем же кодом appr() (продажа активов/акций, погашение долгов)
             save(); render();
         }
 
@@ -22352,12 +22377,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const sellQty = Number(document.getElementById('sellQty_'+aId).value);
             if (!sellQty || sellQty < 1) { alert('Введи количество для продажи!'); return; }
             if (sellQty > asset.qty) { alert(`Можно продать максимум ${asset.qty} шт!`); return; }
+            const _id = uid();
             state.deals.push({
-                id: uid(), pId: p.id, pName: p.name,
+                id: _id, pId: p.id, pName: p.name,
                 type: 'SELL_STOCK',
                 details: { aId, title, sellQty, totalQty: asset.qty, price: asset.now || asset.price, buyPrice: asset.price },
                 status: 'PENDING'
             });
+            if (SOLO_APP) { appr(_id); return; }   // 🎮 соло: продаём сразу
             save(); render();
         }
 
