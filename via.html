@@ -21488,11 +21488,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function doHobby(pid, key){
             const p=state.players.find(x=>x.id==pid); if(!p) return;
             const h=HOBBIES.find(x=>x.key===key); if(!h) return;
+            const _y = (typeof curYear==='function') ? curYear() : 0;   // 🎨 кап-целостность (Ринат 3окт): настоящий отдых раз в год-круг — иначе спам-отдых обнулял выгорание и качал здоровье даром
+            if(p.lastHobbyY === _y){ p.notify='🎨 В этом году ты уже восстанавливался. Настоящий отдых — раз в круг: вернись за ним в следующем году.'; render(); return; }
             const cash=Math.floor(Number(p.savings)||0);
             if(cash < h.cost){ p.notify='💸 Не хватает кассы на «'+h.title+'»: нужно '+fmtN(h.cost)+'$.'; render(); return; }
             p.savings=Math.round((cash - h.cost)*100)/100;
             p.health=Math.min(100, pHealth(p) + h.heal);
             if(h.calm) p.voidYears=Math.max(0, (Number(p.voidYears)||0) - h.calm);   // отдых остужает выгорание
+            p.lastHobbyY = _y;   // отметили: в этом круге уже отдыхал (кап — раз в год-круг)
             try{ logAction(p,'🎨','Отдых: «'+h.title+'»'+(h.cost>0?' −'+fmtN(h.cost)+'$':'')+' → здоровье +'+h.heal+(h.calm?', выгорание остыло':''), {sphere:'отдых', amt:-h.cost, ok:true}); }catch(e){}
             try{ logChoice(p, 'выделить время на отдых?', 'отдохнул — «'+h.title+'»', {declined:['гнать дальше без передышки'], paid:(h.cost>0?'−'+fmtN(h.cost)+'$ на себя':'бесплатно, потратил время'), sphere:'отдых'}); }catch(e){}
             p.notify='🎨 «'+h.title+'»: здоровье +'+h.heal+(h.calm?', стало легче — выгорание отступило.':'.');
