@@ -288,6 +288,8 @@
         <div class="step">
           <div class="q"><i>4</i> Логистика</div>
           <div class="opts" id="optLog"></div>
+          <div class="q" style="margin-top:12px"><i>4·</i> Растаможка <span class="qs">· серое карго дешевле, белая даёт документы</span></div>
+          <div class="opts" id="optCust"></div>
         </div>
 
         <div class="step">
@@ -445,11 +447,13 @@ let cash = 18000; // живая касса дела
 // ── Партии ──
 // phase: transit → selling(мёртвый груз/в работе) → done | scam
 function priceScale(p){ return clamp(Math.sqrt(p.sell/25), 0.7, 15); }
-function buyPrice(p,c){ return p.buy * c.mult * (1+c.duty); }
-function landedOf(p,c,l){ return buyPrice(p,c) + p.sell*l.pct; }
+// cust: 'white' (по умолчанию) — пошлина как было; 'grey' (карго) — без пошлины, дешевле
+function buyPrice(p,c,cust){ return cust==='grey' ? p.buy * c.mult : p.buy * c.mult * (1+c.duty); }
+function landedOf(p,c,l,cust){ return buyPrice(p,c,cust) + p.sell*l.pct; }
+function transitDays(c,l,cust){ let d=c.days+l.days; if(cust==='grey') d*=0.7; return Math.max(3, Math.round(d)); }
 function mkBatch(p,q,c,l,m,wh,st){
   const landed=landedOf(p,c,l);
-  const b={p,q,c,l,m,wh, landed, invest:landed*q, qLeft:q, daysLeft:0,
+  const b={p,q,c,l,m,wh, landed, invest:landed*q, qLeft:q, daysLeft:0, cust:'white', defectPct:0,
            realized:0, adSpent:0, campN:0, age:0, phase:'selling', lastCamp:null};
   return Object.assign(b, st||{});
 }
@@ -487,11 +491,33 @@ function stepMonth(){
   if(wizOpen){ renderProds(); renderCountry(); renderWh(); recompute(); }
   if(campOpen){ renderChan(); renderBud(); recompute2(); }
 }
+// ── Приёмка партии: брак (и конфискат на сером карго). База 4–9%, хуже на сером, легче с ростом скилла.
+// Возвращает {defect, lost, seized} для тоста, либо null. Числа — стартовые, тюнит Ринат на живом прогоне.
+function receiveBatch(a){
+  let rate = 0.04 + Math.random()*0.05;              // 4–9% базовый брак/пересорт
+  if(a.cust==='grey') rate += 0.02 + Math.random()*0.04; // серое карго — выше брак
+  rate *= (1 - skill/100*0.5);                        // мастер теряет меньше (приёмка/образец)
+  rate = clamp(rate, 0.01, 0.30);
+  const defect = Math.min(a.qLeft, Math.round(a.qLeft*rate));
+  a.defectPct = rate;
+  let seized = 0;
+  if(a.cust==='grey' && Math.random()<0.08){          // редко: таможня тормознула серую партию
+    seized = Math.min(a.qLeft-defect, Math.round(a.qLeft*(0.10+Math.random()*0.15)));
+  }
+  const removed = defect + seized;
+  if(removed<=0) return null;
+  const lost = removed*a.landed;
+  a.qLeft -= removed; a.realized -= lost;             // списанное бьёт по P&L (деньги уже ушли при закупе)
+  return {defect, lost, seized};
+}
 // Только УДЕРЖАНИЕ. Никаких авто-продаж — доход только руками.
 function tickHold(){
   active.forEach(a=>{
     if(a.phase!=='selling') { if(a.phase==='transit'){ a.age++; a.daysLeft-=30;
-        if(a.daysLeft<=0){ a.phase='selling'; toast('🚢 Пришла партия «'+a.p.nm+'» '+a.qLeft+' шт — легла мёртвым грузом. Пускай рекламу.'); } }
+        if(a.daysLeft<=0){ a.phase='selling'; const di=receiveBatch(a);
+          toast('🚢 Пришла «'+a.p.nm+'» · '+a.qLeft+' шт в продажу'+
+            (di?' · брак '+di.defect+(di.seized?'+конфискат '+di.seized:'')+' шт −'+money(di.lost):'')+
+            '. Легла мёртвым грузом — пускай рекламу.'); } }
       return; }
     a.age++;
     const hold = a.wh.rent + (a.m.rent||0);
@@ -506,10 +532,12 @@ function campProject(a, ch, budget){
   const cpl = ch.cpl * ps * (1.5 - fit*0.35) * (1.3 - skill/100*0.6);   // дешевле при скилле и фите
   const leads = budget / cpl;
   const priceAttr = clamp(1.2 - (p.sell/p.base.sell - 1)*0.9, 0.45, 1.35);
-  const conv = ch.conv * fit * priceAttr * a.m.convMult;
+  let conv = ch.conv * fit * priceAttr * a.m.convMult;
+  const greyBlock = (a.cust==='grey' && a.m.id==='kaspi');
+  if(greyBlock) conv *= 0.45;                          // серый товар без документов — Kaspi режет листинги
   const grossPU = p.sell*(1-a.m.fee);
   const expSold = Math.min(a.qLeft, leads*conv);
-  return {ps, fit, cpl, leads, priceAttr, conv, grossPU, expSold};
+  return {ps, fit, cpl, leads, priceAttr, conv, grossPU, expSold, greyBlock};
 }
 function luckRoll(){
   let base = 0.45 + Math.random()*Math.random()*1.3;      // право-скошенный: чаще средне, редко высоко
@@ -618,11 +646,13 @@ function renderList(){
          (a.lastCamp.luck>1.4?' · 🔥 попал в волну':a.lastCamp.luck<0.7?' · холодная аудитория':'')+'</div>';
     }
 
+    const custTag = a.cust==='grey' ? ' <span style="color:var(--warn)">· 📦 карго</span>' : '';
+    const defTag = (a.defectPct>0 && (a.phase==='selling'||a.phase==='done')) ? ' <span style="color:var(--down)">· брак '+Math.round(a.defectPct*100)+'%</span>' : '';
     const d=document.createElement('div'); d.className='card'+dim;
     d.innerHTML=badge+
       '<div class="top">'+
         '<div class="ic">'+a.p.e+'</div>'+
-        '<div class="nm"><b>'+a.p.nm+'</b><span>'+sub+'</span></div>'+
+        '<div class="nm"><b>'+a.p.nm+'</b><span>'+sub+custTag+defTag+'</span></div>'+
         '<div class="pr"><b style="color:'+prColor+'" class="mono">'+prSign+' '+prVal+'</b><span>'+a.p.niche+'</span></div>'+
       '</div>'+
       '<div class="grow"><i style="width:'+barW+'%;background:'+barColor+'"></i></div>'+
@@ -655,7 +685,20 @@ function refreshHero(){
 }
 
 // ══════════ МАСТЕР: завести товар ══════════
-let sel={p:null, q:0, c:COUNTRY[0], l:LOG[0], m:MP[0], wh:WH[1]}, wizOpen=false;
+let sel={p:null, q:0, c:COUNTRY[0], l:LOG[0], m:MP[0], wh:WH[1], cust:'white'}, wizOpen=false;
+const CUSTOMS=[
+  {id:'white', nm:'📄 Белая растаможка', note:'платишь пошлину — есть документы: открыты Kaspi/WB, нет конфиската на приёмке'},
+  {id:'grey',  nm:'📦 Серое карго',      note:'без пошлины и на ⅓ быстрее, НО без документов: Kaspi режет продажи, выше брак и риск конфиската'},
+];
+function renderCust(){
+  const el=document.getElementById('optCust'); if(!el) return; el.innerHTML='';
+  CUSTOMS.forEach(o=>{
+    const d=document.createElement('div'); d.className='opt'+(sel.cust===o.id?' on':'');
+    d.innerHTML='<b>'+o.nm+'</b><span>'+o.note+'</span>';
+    d.onclick=()=>{ sel.cust=o.id; renderCust(); renderCountry(); syncQty(); recompute(); };
+    el.appendChild(d);
+  });
+}
 function selectProduct(o){
   sel.p=o; sel.q=o.moq;
   sel.wh = o.big ? WH[1] : (o.moq<=WH[0].cap ? WH[0] : WH[1]);
@@ -677,7 +720,7 @@ function renderCountry(){
   const el=document.getElementById('optCountry'); el.innerHTML='';
   COUNTRY.forEach(o=>{
     const d=document.createElement('div'); d.className='opt'+(sel.c.id===o.id?' on':'');
-    const priceLine = sel.p ? '<div class="price">закуп '+money(buyPrice(sel.p,o))+' /шт</div>' : '';
+    const priceLine = sel.p ? '<div class="price">закуп '+money(buyPrice(sel.p,o,sel.cust))+' /шт</div>' : '';
     d.innerHTML='<b>'+o.nm+'</b>'+priceLine+'<span>'+o.note+'</span>';
     d.onclick=()=>{ sel.c=o; renderCountry(); syncQty(); recompute(); };
     el.appendChild(d);
@@ -704,7 +747,7 @@ function renderMp(){
     el.appendChild(d);
   });
 }
-function landedNow(){ return sel.p ? landedOf(sel.p,sel.c,sel.l) : 0; }
+function landedNow(){ return sel.p ? landedOf(sel.p,sel.c,sel.l,sel.cust) : 0; }
 function syncQty(){ const inp=document.getElementById('qtyInput'); if(sel.p&&inp) inp.value=sel.q; updateQtyInfo(); }
 function onQty(){ if(!sel.p) return; const v=parseInt(document.getElementById('qtyInput').value,10)||0;
   sel.q=Math.max(sel.p.moq, v||sel.p.moq); updateQtyInfo(); recompute(); }
@@ -732,7 +775,7 @@ function recompute(){
   if(!sel.p){ document.getElementById('pInvest').textContent='—'; document.getElementById('pMargin').textContent='—';
     document.getElementById('pMeta').textContent='Выбери товар, чтобы увидеть расклад.'; btn.disabled=true; return; }
   const landed=landedNow(), perUnit=sel.p.sell*(1-sel.m.fee)-landed, invest=sel.q*landed;
-  const days=Math.max(3, sel.c.days+sel.l.days);
+  const days=transitDays(sel.c,sel.l,sel.cust);
   const valid = !( !sel.wh.big && (sel.p.big || sel.q>sel.wh.cap) );
   const overCap=invest>cash;
   document.getElementById('pInvest').innerHTML='<span style="color:'+(overCap?'var(--down)':'var(--ink)')+'">'+money(invest)+'</span>';
@@ -740,6 +783,7 @@ function recompute(){
   document.getElementById('pMeta').innerHTML=
     'Партия <b>'+sel.q+' шт</b> из <b>'+sel.c.nm.replace(/^..\s/,'')+'</b> · закуп <b>'+money(landed)+'/шт</b>, продаём по <b>'+money(sel.p.sell)+'</b> · маржа <b>'+money(perUnit)+'</b> с шт после комиссии.<br>'+
     'Придёт через <b>'+days+' дн.</b> · ляжет мёртвым грузом на <b>'+sel.wh.nm.replace(/^..\s/,'')+'</b> · склад −'+money(sel.wh.rent+(sel.m.rent||0))+'/мес · риск кидка <b>'+sel.c.scam+'%</b>. Продавать — рекламой, руками.'+
+    (sel.cust==='grey'?'<br><span style="color:var(--warn)">📦 Серое карго: без пошлины и быстрее, но выше брак и риск конфиската'+(sel.m.id==='kaspi'?', а Kaspi без документов режет продажи — бери свой профиль/точку':'')+'.</span>':'')+
     (!valid?'<br><span style="color:var(--down)">🏠 Дома не влезет габарит/большая партия — арендуй склад или фулфилмент.</span>':'')+
     (perUnit<=0?'<br><span style="color:var(--down)">Маржа в минус ещё до рекламы — смени страну/площадку.</span>':'')+
     (overCap?'<br><span style="color:var(--down)">Не хватает капитала: свободно '+money(cash)+'. Уменьши партию.</span>':'');
@@ -747,17 +791,17 @@ function recompute(){
 }
 function openWiz(){
   selectProduct(PRODUCTS[13]);
-  renderOpts('optLog',LOG,'l'); renderMp();
+  renderOpts('optLog',LOG,'l'); renderMp(); renderCust();
   wizOpen=true; document.getElementById('sw').classList.add('open'); document.getElementById('shScroll').scrollTop=0;
 }
 function closeWiz(){ wizOpen=false; document.getElementById('sw').classList.remove('open'); }
 function launch(){
   if(!sel.p) return;
-  const landed=landedNow(), invest=sel.q*landed, days=Math.max(3, sel.c.days+sel.l.days);
+  const landed=landedNow(), invest=sel.q*landed, days=transitDays(sel.c,sel.l,sel.cust);
   const valid = !( !sel.wh.big && (sel.p.big || sel.q>sel.wh.cap) );
   if(!valid || invest>cash) return;
   cash-=invest;
-  const b=mkBatch(sel.p,sel.q,sel.c,sel.l,sel.m,sel.wh);
+  const b=mkBatch(sel.p,sel.q,sel.c,sel.l,sel.m,sel.wh); b.cust=sel.cust;
   const scammed=Math.random()*100<sel.c.scam;
   if(scammed){ b.phase='scam'; b.realized=-invest; }
   else { b.phase='transit'; b.daysLeft=days; }
@@ -818,6 +862,7 @@ function recompute2(){
     'Канал <b>'+cSel.ch.nm.replace(/^..\s/,'')+'</b> · фит под «'+a.p.niche+'» <b>×'+FIT[a.p.niche][cSel.ch.id].toFixed(2)+'</b> · твой таргет <b>'+Math.round(skill)+'/100</b>.<br>'+
     'Прогноз <b>≈'+Math.round(exp)+' шт</b> (разброс от удачи) · чистыми с кампании <b style="color:'+(midProfit>=0?'var(--up)':'var(--down)')+'">'+signed(midProfit)+'</b> в среднем.<br>'+
     '<span style="color:var(--dim)">Исход решают: попадание канала, цена товара сейчас, скилл и удача. Может залететь виралом, может слиться впустую.</span>'+
+    (pr.greyBlock?'<br><span style="color:var(--down)">📦 Серое карго без документов: Kaspi режет листинги (×0.45 конверсии). В белую или на свой профиль — продажи выше.</span>':'')+
     (over?'<br><span style="color:var(--down)">Бюджет больше свободной кассы '+money(cash)+'.</span>':'');
   btn.disabled=over;
 }
@@ -852,8 +897,8 @@ let tT; function toast(t){ const el=document.getElementById('toast'); el.textCon
 
 // ══════════ МОСТ С ИГРОЙ: касса товарки = баланс игрока в бланке ══════════
 let BRIDGED=false, _tickId=null;
-function serBatch(a){ return {pid:a.p.id,q:a.q,qLeft:a.qLeft,cid:a.c.id,lid:a.l.id,mid:a.m.id,wid:a.wh.id,landed:a.landed,invest:a.invest,phase:a.phase,daysLeft:a.daysLeft,realized:a.realized,adSpent:a.adSpent,campN:a.campN,age:a.age,lastCamp:a.lastCamp,dumped:a.dumped}; }
-function deserBatch(s){ const p=PRODUCTS.find(x=>x.id===s.pid),c=COUNTRY.find(x=>x.id===s.cid),l=LOG.find(x=>x.id===s.lid),m=MP.find(x=>x.id===s.mid),wh=WH.find(x=>x.id===s.wid); if(!p||!c||!l||!m||!wh) return null; return {p,q:s.q,c,l,m,wh,landed:s.landed,invest:s.invest,qLeft:s.qLeft,daysLeft:s.daysLeft||0,realized:s.realized||0,adSpent:s.adSpent||0,campN:s.campN||0,age:s.age||0,phase:s.phase||'selling',lastCamp:s.lastCamp||null,dumped:s.dumped}; }
+function serBatch(a){ return {pid:a.p.id,q:a.q,qLeft:a.qLeft,cid:a.c.id,lid:a.l.id,mid:a.m.id,wid:a.wh.id,landed:a.landed,invest:a.invest,phase:a.phase,daysLeft:a.daysLeft,realized:a.realized,adSpent:a.adSpent,campN:a.campN,age:a.age,lastCamp:a.lastCamp,dumped:a.dumped,cust:a.cust,defectPct:a.defectPct}; }
+function deserBatch(s){ const p=PRODUCTS.find(x=>x.id===s.pid),c=COUNTRY.find(x=>x.id===s.cid),l=LOG.find(x=>x.id===s.lid),m=MP.find(x=>x.id===s.mid),wh=WH.find(x=>x.id===s.wid); if(!p||!c||!l||!m||!wh) return null; return {p,q:s.q,c,l,m,wh,landed:s.landed,invest:s.invest,qLeft:s.qLeft,daysLeft:s.daysLeft||0,realized:s.realized||0,adSpent:s.adSpent||0,campN:s.campN||0,age:s.age||0,phase:s.phase||'selling',lastCamp:s.lastCamp||null,dumped:s.dumped,cust:s.cust||'white',defectPct:s.defectPct||0}; }
 function tvSnapshot(){
   // месячный расход держания: аренда склада+точки по всем лежащим партиям → в поток бланка
   const rent = active.reduce((s,a)=> s + (a.phase==='selling' ? (a.wh.rent + (a.m.rent||0)) : 0), 0);
