@@ -11364,6 +11364,39 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function saveProfile() {
             try { PROFILE.updated = Date.now(); localStorage.setItem('v0_profile', JSON.stringify(PROFILE)); }
             catch(e) { console.warn('PROFILE save fail', e); }
+            viaPushProfile();   // 💾 и в durable-стор на сервере (по Telegram-ID), чтобы прогресс жил всегда
+        }
+        // 💾 ОТПРАВКА ПРОФИЛЯ НА СЕРВЕР (дебаунс ~2.5с): прогресс привязан к Telegram-ID и переживает
+        // переустановку, смену устройства, рестарт сервера. Вне Telegram/без сервера — тихо выходим.
+        let _pushT=null, _lastPush=0;
+        function viaPushProfile(){
+            try{
+                const u=viaTgUser(); if(!u) return;
+                const wa=window.Telegram&&window.Telegram.WebApp; const initData=(wa&&wa.initData)||'';
+                if(!SERVER_MODE || !initData) return;
+                if(_pushT) clearTimeout(_pushT);
+                _pushT=setTimeout(function(){
+                    _lastPush=Date.now();
+                    fetch('/profile/save',{method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({initData:initData, profile:PROFILE})})
+                      .then(function(r){return r.json();})
+                      .then(function(j){ if(j&&j.ok){ try{ viaShowSaved(); }catch(e){} } })
+                      .catch(function(){});
+                }, 2500);
+            }catch(e){}
+        }
+        window.viaPushProfile=viaPushProfile;
+        // 💾 ВИДИМЫЙ ЗНАК «прогресс сохранён» — человек ВИДИТ, что его не потеряют (наказ Рината).
+        function viaShowSaved(){
+            try{
+                let b=document.getElementById('viaSavedTag');
+                if(!b){ b=document.createElement('div'); b.id='viaSavedTag';
+                    b.style.cssText='position:fixed;right:10px;bottom:10px;z-index:99999;background:#1c7a4a;color:#fff;'
+                        +'font:600 12px system-ui;padding:6px 10px;border-radius:10px;opacity:0;transition:opacity .3s;pointer-events:none';
+                    document.body.appendChild(b); }
+                b.textContent='💾 Прогресс сохранён';
+                b.style.opacity='1'; setTimeout(function(){ b.style.opacity='0'; }, 1600);
+            }catch(e){}
         }
         // 🔗 ПРИВЯЗКА К TELEGRAM (Ринат 23сен). Внутри Telegram у нас УЖЕ есть стабильный ID аккаунта
         // (initDataUnsafe.user.id) — не телефон и не IP, а именно ID. Человеку остаётся только подтвердить,
@@ -11381,21 +11414,49 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             doBind(true);   // вне поддержки showConfirm — привязываем сразу (вход через Telegram сам подтверждает аккаунт)
         }
         window.viaBindTelegram=viaBindTelegram; window.viaTgUser=viaTgUser;
-        // 🔗 ВОССТАНОВЛЕНИЕ ПОКУПОК С СЕРВЕРА: шлём подпись → сервер отдаёт вечные покупки этого ID → вливаем в профиль.
-        // Так купленное на одном устройстве открывается на любом другом, где вошёл тот же Telegram.
+        // 🔗💾 ВОССТАНОВЛЕНИЕ ПРОГРЕССА С СЕРВЕРА: шлём подпись → сервер отдаёт ВЕСЬ вечный профиль
+        // этого Telegram-ID (прогресс + покупки + архив жизней) → сливаем без потери. Так человек
+        // заходит с любого устройства / после переустановки и видит, где остановился.
         function viaSyncPurchases(){
             const u=viaTgUser(); if(!u) return;
             const wa=window.Telegram&&window.Telegram.WebApp; const initData=(wa&&wa.initData)||'';
             if(!SERVER_MODE || !initData) return;
             fetch('/me',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:initData})})
               .then(function(r){return r.json();}).then(function(j){
-                if(!j||!j.ok||!j.unlocked) return;
-                let changed=false; PROFILE.unlocked=PROFILE.unlocked||{};
-                for(const k in j.unlocked){ if(j.unlocked[k] && !PROFILE.unlocked[k]){ PROFILE.unlocked[k]=true; changed=true; } }
-                if(changed){ saveProfile(); try{ if(typeof toast==='function') toast('🔗 Твои покупки восстановлены'); }catch(e){} try{ render(); }catch(e){} }
+                if(!j||!j.ok) return;
+                const srv=j.profile||{}; let changed=false;
+                PROFILE.unlocked=PROFILE.unlocked||{};
+                // покупки — союз (навсегда)
+                const srvUn=j.unlocked||srv.unlocked||{};
+                for(const k in srvUn){ if(srvUn[k] && !PROFILE.unlocked[k]){ PROFILE.unlocked[k]=true; changed=true; } }
+                // счётчики воронки — берём больший (сервер мог видеть больше проходов)
+                if((srv.games||0)>(PROFILE.games||0)){ PROFILE.games=srv.games; changed=true; }
+                if((srv.reachedMirror||0)>(PROFILE.reachedMirror||0)){ PROFILE.reachedMirror=srv.reachedMirror; changed=true; }
+                // архив прожитых жизней — берём более длинный (кросс-устройство)
+                if(Array.isArray(srv.runs) && srv.runs.length>((PROFILE.runs||[]).length)){ PROFILE.runs=srv.runs; changed=true; }
+                // колесо/сигналы — восстанавливаем, если локально пусто (первый вход на этом устройстве)
+                if(srv.baselineWheel && !PROFILE.baselineWheel){ PROFILE.baselineWheel=srv.baselineWheel; changed=true; }
+                if(srv.signals && (!PROFILE.signals || !Object.keys(PROFILE.signals).length)){ PROFILE.signals=srv.signals; changed=true; }
+                if(changed){
+                    saveProfile();
+                    try{ if(typeof render==='function') render(); }catch(e){}
+                    try{ viaWhereYouStopped(); }catch(e){}
+                } else {
+                    try{ if(j.store) console.log('[VIA] профиль синхронизирован, store:', j.store); }catch(e){}
+                }
               }).catch(function(){});
         }
-        window.viaSyncPurchases=viaSyncPurchases;
+        window.viaSyncPurchases=viaSyncPurchases; window.viaSyncProfile=viaSyncPurchases;
+        // 💾 «ГДЕ ТЫ ОСТАНОВИЛСЯ» — тёплое возвращение: сколько жизней прожито, дошёл ли до Зеркала.
+        function viaWhereYouStopped(){
+            const runs=(PROFILE.runs||[]).length, games=PROFILE.games||0;
+            if(!games && !runs) return;
+            let msg='👋 С возвращением! ';
+            if(runs>0) msg+='Ты уже прожил '+runs+' '+(runs===1?'жизнь':(runs<5?'жизни':'жизней'))+' в VIA — прогресс на месте.';
+            else msg+='Твой прогресс восстановлен — продолжай с того же места.';
+            try{ if(typeof toast==='function'){ toast(msg); return; } }catch(e){}
+            try{ viaShowSaved(); }catch(e){}
+        }
         // ═══════════ 💎 МОНЕТИЗАЦИЯ: замки блоков + магазин (Ринат 23сен, Telegram Stars) ═══════════
         // BitLife-модель: ядро бесплатно (Бизнес/Биржа/Недвижимость/бланк), ценные блоки и Зеркало — за звёзды,
         // открываются НАВСЕГДА (в вечном профиле). Счета отчеканены заранее ботом @viaoffbot; токен в код НЕ идёт.

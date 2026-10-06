@@ -29,6 +29,11 @@ try:
 except Exception:
     via_market = None
 
+try:
+    import via_kv       # durable-хранилище прогресса+покупок (переживает рестарт Render)
+except Exception:
+    via_kv = None
+
 # ── Мировые события: идут ПО КРУГУ ХОДОВ (раз за круг у «якоря»), НЕ авто ──
 # Каждое мировое событие РЕАЛЬНО двигает биржу И БИЗНЕСЫ у ВСЕХ (4-й элемент = эффект).
 # Ключи-типы биржи: stock (акции), crypto (крипта), metal (металлы), commodity (сырьё).
@@ -1350,12 +1355,67 @@ def _credit_unlock(uid, key, amount=None, name=None):
         _flush_now()
     except Exception:
         pass
+    profile_kv_mark_unlock(uid, key)   # 💾 покупка в durable — переживёт рестарт сервера
     if key == 'vip_founder':   # 👑 сразу шлём вход в закрытую VIP-группу (если юзер стартовал бота)
         try:
             _tg_api('sendMessage', {'chat_id': uid,
                 'text': '👑 Добро пожаловать в Клуб Основателей VIA!\nВот вход в закрытую VIP-группу: ' + VIP_GROUP_URL})
         except Exception:
             pass
+
+# ═══════════ 💾 DURABLE-ПРОФИЛЬ по Telegram-ID (переживает рестарт Render) ═══════════
+# via_data.json лежит на ЭФЕМЕРНОМ диске Render → при рестарте/деплое стирается, и покупки,
+# и прогресс пропадают. Дублируем всё в durable-стор (via_kv → Upstash), ключ profile:<uid>.
+def profile_kv_get(uid):
+    if via_kv is None or not uid:
+        return {}
+    try:
+        return via_kv.kv_get('profile:' + str(uid)) or {}
+    except Exception:
+        return {}
+
+def profile_kv_save(uid, incoming):
+    """Слить присланный клиентом вечный профиль с durable без потери и сохранить.
+    unlocked — союз (покупку нельзя потерять); games/reachedMirror — максимум; runs — длиннее."""
+    if via_kv is None or not uid or not isinstance(incoming, dict):
+        return incoming or {}
+    cur = profile_kv_get(uid)
+    merged = dict(cur); merged.update(incoming)
+    un = {}; un.update(cur.get('unlocked') or {})
+    for k, v in (incoming.get('unlocked') or {}).items():
+        if v:
+            un[k] = True
+    merged['unlocked'] = un
+    for f in ('games', 'reachedMirror'):
+        try:
+            merged[f] = max(int(cur.get(f) or 0), int(incoming.get(f) or 0))
+        except Exception:
+            pass
+    cr, ir = cur.get('runs') or [], incoming.get('runs') or []
+    if isinstance(cr, list) and isinstance(ir, list) and len(cr) > len(ir):
+        merged['runs'] = cr
+    merged['uid'] = str(uid); merged['srv_updated'] = int(time.time())
+    try:
+        via_kv.kv_set('profile:' + str(uid), merged)
+    except Exception:
+        pass
+    return merged
+
+def profile_kv_mark_unlock(uid, key):
+    """Отметить покупку в durable-профиле (покупка идёт с сервера через _credit_unlock)."""
+    if via_kv is None or not uid or not key:
+        return
+    p = profile_kv_get(uid)
+    un = p.get('unlocked') or {}
+    keys = list(BLOCK_KEYS_SRV) if key in ('bundle_all', 'vip_founder') else [key]
+    for k in keys:
+        un[k] = True
+    p['unlocked'] = un; p['uid'] = str(uid); p['srv_updated'] = int(time.time())
+    try:
+        via_kv.kv_set('profile:' + str(uid), p)
+    except Exception:
+        pass
+
 
 def _star_ledger():
     return DATA.setdefault('star_ledger', [])
@@ -1493,6 +1553,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        if self.path == '/kv/health':
+            # 💾 Проверка durable-стора: достаёт ли сервер до Upstash (без данных игроков).
+            info = {'backend': via_kv.backend_name() if via_kv else 'none', 'write': False, 'read': False}
+            if via_kv is not None:
+                try:
+                    tv = str(int(time.time()))
+                    info['write'] = bool(via_kv.kv_set('__health__', {'t': tv}))
+                    got = via_kv.kv_get('__health__')
+                    info['read'] = bool(got and got.get('t') == tv)
+                except Exception as e:
+                    info['error'] = str(e)[:120]
+            info['ok'] = info['write'] and info['read']
+            body = json.dumps(info, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store')
+            self._cors()
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path == '/events':
             # SSE — открытый провод: сервер сам толкает стейт браузеру мгновенно.
             q = queue.Queue(maxsize=20)
@@ -1607,17 +1687,46 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if not user:
                 out = {'ok': False, 'description': 'bad initData'}
             else:
+                pk = profile_kv_get(user['id'])          # 💾 durable-профиль (прогресс+покупки, пережил рестарт)
                 with LOCK:
                     u = _user(user['id'])
                     nm = (str(user.get('first_name', '')) + (' ' + str(user.get('last_name', '')) if user.get('last_name') else '')).strip() or str(user.get('username', ''))
                     if nm:
                         u['name'] = nm
+                    # восстановление покупок после рестарта: союз durable + память
+                    for k, v in (pk.get('unlocked') or {}).items():
+                        if v:
+                            u['unlocked'][k] = True
                     out = {'ok': True, 'uid': user['id'], 'name': u.get('name', ''),
-                           'unlocked': u.get('unlocked', {}), 'purchases': u.get('purchases', [])}
+                           'unlocked': u.get('unlocked', {}), 'purchases': u.get('purchases', []),
+                           'profile': pk, 'store': (via_kv.backend_name() if via_kv else 'none')}
                 try:
                     _flush_now()
                 except Exception:
                     pass
+            body = json.dumps(out, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self._cors()
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if self.path == '/profile/save':
+            # 💾 Клиент шлёт свой вечный профиль (прогресс+покупки) → durable-стор по Telegram-ID
+            n = int(self.headers.get('Content-Length', 0) or 0)
+            raw = self.rfile.read(n).decode('utf-8') if n else '{}'
+            try:
+                req = json.loads(raw) if raw else {}
+            except Exception:
+                req = {}
+            user = verify_init_data(req.get('initData') or req.get('init_data') or '')
+            if not user:
+                out = {'ok': False, 'description': 'bad initData'}
+            else:
+                merged = profile_kv_save(user['id'], req.get('profile') or {})
+                out = {'ok': True, 'uid': user['id'],
+                       'games': merged.get('games', 0), 'reachedMirror': merged.get('reachedMirror', 0),
+                       'store': (via_kv.backend_name() if via_kv else 'none')}
             body = json.dumps(out, ensure_ascii=False).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')

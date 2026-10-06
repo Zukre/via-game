@@ -4,3 +4,4 @@ token.txt
 .bot_token
 *.token
 .env
+__pycache__/
