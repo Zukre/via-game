@@ -1555,7 +1555,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/kv/health':
             # 💾 Проверка durable-стора: достаёт ли сервер до Upstash (без данных игроков).
-            info = {'backend': via_kv.backend_name() if via_kv else 'none', 'write': False, 'read': False}
+            info = {'backend': via_kv.backend_name() if via_kv else 'none', 'write': False, 'read': False,
+                    'env_url': bool(os.environ.get('UPSTASH_REDIS_REST_URL')),
+                    'env_token': bool(os.environ.get('UPSTASH_REDIS_REST_TOKEN')),
+                    'env_keys_seen': sorted(k for k in os.environ if 'UPSTASH' in k.upper())}
             if via_kv is not None:
                 try:
                     tv = str(int(time.time()))
