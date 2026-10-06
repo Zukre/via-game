@@ -1558,6 +1558,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             info = {'backend': via_kv.backend_name() if via_kv else 'none', 'write': False, 'read': False,
                     'env_url': bool(os.environ.get('UPSTASH_REDIS_REST_URL')),
                     'env_token': bool(os.environ.get('UPSTASH_REDIS_REST_TOKEN')),
+                    'env_bot': bool(os.environ.get('BOT_TOKEN')),
+                    'env_total': len(os.environ),
                     'env_keys_seen': sorted(k for k in os.environ if 'UPSTASH' in k.upper())}
             if via_kv is not None:
                 try:
