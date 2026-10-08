@@ -237,6 +237,16 @@
       <div class="skbar"><i id="skFill" style="width:12%"></i></div>
       <div class="sk-hint">Растёт с каждой кампанией — чем больше пускаешь рекламу, тем дешевле лиды и точнее попадание.</div>
     </div>
+
+    <div class="skill" id="brandBox" style="display:none;margin-top:8px;">
+      <div class="sk-top">
+        <div class="nm">🏷️ Свой бренд <em id="brandRank">—</em></div>
+        <div class="val mono" id="brandVal">—</div>
+      </div>
+      <div class="skbar"><i id="brandFill" style="width:0%"></i></div>
+      <div class="sk-hint" id="brandHint">Выход из ценовой войны: своя цена и повторные покупки.</div>
+      <button class="cta" id="brandBtn" onclick="brandInvest()" style="margin-top:8px;">🏷️ Запустить свой бренд</button>
+    </div>
   </div>
 
   <button class="cta" onclick="openWiz()">＋ Завести новый товар</button>
@@ -442,6 +452,16 @@ let skill = 12;
 const SK_RANKS = [[0,'новичок'],[20,'практик'],[40,'уверенный'],[60,'таргетолог'],[80,'мастер'],[92,'гуру']];
 function skRank(){ let r='новичок'; SK_RANKS.forEach(x=>{ if(skill>=x[0]) r=x[1]; }); return r; }
 
+// ── 🏷️ СВОЙ БРЕНД (D) — выход из ценовой войны. Открывается на «мастере» (skill≥80). Поверх перепродажи:
+//    премия к цене (своя цена) + лояльность (повторный спрос → выше конверсия), но держится на ОБОРОТЕ
+//    (без продаж лояльность тает) и требует вложений. Числа ⚖️ — финалит Ринат на живом прогоне.
+let brand = { active:false, level:0, loyalty:0 };
+const BRAND_MAX_LEVEL = 5;
+function brandMaster(){ return skill >= 80; }
+function brandSellMul(){ return brand.active ? 1 + brand.level*0.06 : 1; }          // ⚖️ +6% к цене за уровень (до +30%)
+function brandConvMul(){ return brand.active ? 1 + (brand.loyalty/100)*0.30 : 1; }   // ⚖️ лояльность растит конверсию (повтор)
+function brandCost(){ return brand.active ? 4000 + brand.level*4000 : 5000; }        // ⚖️ запуск 5000, апгрейд дорожает
+
 let cash = 18000; // живая касса дела
 
 // ── Партии ──
@@ -486,6 +506,7 @@ function stepMonth(){
     p.dem = clamp(p.dem*(1+dd), p.base.dem*0.4, p.base.dem*2.0);
   });
   if(Math.random()<0.35){ const p=PRODUCTS[(Math.random()*PRODUCTS.length)|0]; p.mom += (Math.random()<0.5?1:-1)*0.12; }
+  if(brand.active) brand.loyalty = Math.max(0, brand.loyalty - 2);   // 🏷️ бренд держится на обороте — без продаж лояльность тает
   tickHold();                                   // склад/точка ест деньги — товар сам не продаётся
   renderClock(); renderStrip(); renderList(); refreshHero();
   if(wizOpen){ renderProds(); renderCountry(); renderWh(); recompute(); }
@@ -532,10 +553,10 @@ function campProject(a, ch, budget){
   const cpl = ch.cpl * ps * (1.5 - fit*0.35) * (1.3 - skill/100*0.6);   // дешевле при скилле и фите
   const leads = budget / cpl;
   const priceAttr = clamp(1.2 - (p.sell/p.base.sell - 1)*0.9, 0.45, 1.35);
-  let conv = ch.conv * fit * priceAttr * a.m.convMult;
+  let conv = ch.conv * fit * priceAttr * a.m.convMult * brandConvMul();   // 🏷️ бренд: лояльность = повторный спрос
   const greyBlock = (a.cust==='grey' && a.m.id==='kaspi');
   if(greyBlock) conv *= 0.45;                          // серый товар без документов — Kaspi режет листинги
-  const grossPU = p.sell*(1-a.m.fee);
+  const grossPU = p.sell*brandSellMul()*(1-a.m.fee);   // 🏷️ бренд: своя цена выше (премия за уровень)
   const expSold = Math.min(a.qLeft, leads*conv);
   return {ps, fit, cpl, leads, priceAttr, conv, grossPU, expSold, greyBlock};
 }
@@ -563,6 +584,7 @@ function fireCampaign(){
   // скилл от практики (затухает к потолку)
   const gain = (0.9 + (profit>0?1.0:0.35) + Math.random()*0.7) * (1 - skill/130);
   skill = clamp(skill + gain, 0, 100);
+  if(brand.active && sold>0) brand.loyalty = clamp(brand.loyalty + Math.min(8, sold/20), 0, 100);   // 🏷️ оборот растит лояльность
   if(a.qLeft<=0){ a.phase='done'; }
   renderList(); refreshHero(); closeCamp();
   const hit = sold>0 && profit>0;
@@ -581,6 +603,23 @@ function dumpBatch(i){
   renderList(); refreshHero();
 }
 function clearBatch(i){ active.splice(i,1); renderList(); refreshHero(); }
+
+// 🏷️ Запуск/усиление своего бренда (D). Открыто на «мастере». Тратит кассу, даёт премию+лояльность.
+function brandInvest(){
+  if(!brandMaster()){ toast('🏷️ Свой бренд открывается на ранге «мастер» (скилл ≥80). Сейчас '+Math.round(skill)+'.'); return; }
+  const cost=brandCost();
+  if(cost>cash){ toast('Не хватает капитала на бренд: нужно '+money(cost)+'.'); return; }
+  if(!brand.active){
+    cash-=cost; brand.active=true; brand.level=1; brand.loyalty=Math.max(brand.loyalty,10);
+    toast('🏷️ Запущен свой бренд! −'+money(cost)+'. Теперь цена выше и покупатели возвращаются — но бренд держится на обороте.');
+  } else if(brand.level>=BRAND_MAX_LEVEL){
+    toast('🏷️ Бренд уже на максимуме (ур.'+BRAND_MAX_LEVEL+'). Держи оборот, чтобы не терять лояльность.'); return;
+  } else {
+    cash-=cost; brand.level++; brand.loyalty=clamp(brand.loyalty+12,0,100);
+    toast('🏷️ Бренд усилен до ур.'+brand.level+' −'+money(cost)+'. Премия к цене и лояльность выросли.');
+  }
+  refreshHero(); renderList();
+}
 
 // ── Горячее сейчас ──
 function renderStrip(){
@@ -681,6 +720,21 @@ function refreshHero(){
   document.getElementById('skVal').textContent=Math.round(skill);
   document.getElementById('skFill').style.width=clamp(skill,2,100)+'%';
   document.getElementById('skRank').textContent=skRank();
+  // 🏷️ панель бренда — видна на «мастере» или если бренд уже запущен
+  const bb=document.getElementById('brandBox');
+  if(bb){
+    if(brandMaster() || brand.active){
+      bb.style.display='';
+      const premium=Math.round((brandSellMul()-1)*100);
+      document.getElementById('brandRank').textContent = brand.active ? ('ур.'+brand.level+' · лояльность '+Math.round(brand.loyalty)) : 'доступен';
+      document.getElementById('brandVal').textContent = brand.active ? ('+'+premium+'% цена') : '🔓';
+      document.getElementById('brandFill').style.width = (brand.active ? clamp(brand.loyalty,2,100) : 0)+'%';
+      const btn=document.getElementById('brandBtn'), hint=document.getElementById('brandHint');
+      if(!brand.active){ hint.textContent='Выход из ценовой войны: своя цена и повторные покупки. Но нужны вложения и оборот.'; btn.style.display=''; btn.textContent='🏷️ Запустить свой бренд · '+money(brandCost()); }
+      else if(brand.level>=BRAND_MAX_LEVEL){ hint.textContent='Бренд на максимуме. Держи оборот — без продаж лояльность тает.'; btn.style.display='none'; }
+      else { hint.textContent='Премия к цене +'+premium+'%, лояльность растит конверсию (повтор). Усиливай — но держи оборот.'; btn.style.display=''; btn.textContent='🏷️ Усилить до ур.'+(brand.level+1)+' · '+money(brandCost()); }
+    } else { bb.style.display='none'; }
+  }
   tvSync();   // ← пишем кассу и партии обратно в бланк игрока (если мост подключён)
 }
 
@@ -902,7 +956,7 @@ function deserBatch(s){ const p=PRODUCTS.find(x=>x.id===s.pid),c=COUNTRY.find(x=
 function tvSnapshot(){
   // месячный расход держания: аренда склада+точки по всем лежащим партиям → в поток бланка
   const rent = active.reduce((s,a)=> s + (a.phase==='selling' ? (a.wh.rent + (a.m.rent||0)) : 0), 0);
-  return { skill, active: active.map(serBatch), rent };
+  return { skill, brand, active: active.map(serBatch), rent };
 }
 let _syncPend=false;
 function tvSync(){ if(!BRIDGED||_syncPend) return; _syncPend=true; setTimeout(()=>{ _syncPend=false; try{ parent.postMessage({type:'tv_state', cash:Math.round(cash*100)/100, state:tvSnapshot()}, '*'); }catch(_){} }, 120); }
@@ -912,6 +966,7 @@ window.addEventListener('message', function(e){
   if(typeof d.cash==='number') cash=d.cash;                  // касса = баланс из бланка игрока
   if(d.state && Array.isArray(d.state.active)){              // восстановить сохранённые партии
     if(typeof d.state.skill==='number') skill=d.state.skill;
+    if(d.state.brand && typeof d.state.brand==='object') brand=Object.assign({active:false,level:0,loyalty:0}, d.state.brand);   // 🏷️ восстановить бренд
     active = d.state.active.map(deserBatch).filter(Boolean);
   } else { active = []; }                                     // первый вход — старт без партий
   if(_tickId){ clearInterval(_tickId); _tickId=setInterval(stepMonth, 11000); }  // в игре месяцы медленнее

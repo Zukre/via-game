@@ -11722,6 +11722,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ts: Date.now()
             });
             if(p.actionLog.length > ACTION_LOG_CAP) p.actionLog.splice(0, p.actionLog.length - ACTION_LOG_CAP);
+            // 👶 ПАССИВНЫЙ ПРИМЕР: ребёнок копирует, КАК ты живёшь. Твоё поведение тихо лепит его ценности.
+            if(opts.sphere==='азарт' || opts.sphere==='тень'){ try{ childExample(p, -1); }catch(e){} }   // азарт, обман/срез угла — роняют
+            else if(opts.sphere==='совесть'){ try{ const _t=String(text); if(/честно/.test(_t)) childExample(p, +1); else if(/схитр|уклон|тень|обман/.test(_t)) childExample(p, -1); }catch(e){} }   // честно платишь — растит; хитришь/уклоняешься — роняет
         }
         window.logAction = logAction;
         // 📜 Провал — тоже событие жизни. Короткая обёртка: пишет строку с меткой ✗ и причиной.
@@ -12756,6 +12759,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const relType = rel ? (rel.psychotype||rel.type||rel.myType||null) : null;
             if(relType){
                 obs.push({br:'Отношения', q:'Почему ты выбираешь именно так?', verdict:'Твой рисунок в любви — «'+relType+'».', because:'кого мы выбираем и как уходим — самый честный датчик привязанности. Здесь виден твой способ быть близко.', sig:'тип: '+relType});
+            }
+            // 👶 РОДИТЕЛЬ (Д5): во что ты вложил СЛЕДУЮЩЕГО человека — в картинку (деньги/школы) или в человека (время/связь).
+            //   Самый честный слой блока Дети. Читает p.kids (шкалы + исход). Пороги так, чтобы новорождённый без вложений молчал.
+            const _kids = Array.isArray(p.kids) ? p.kids : [];
+            if(_kids.length){
+                let _bondS=0,_eduS=0; const _gr=[];
+                for(const k of _kids){ const sc=k.scales||{}; _bondS+=_mn(sc.bond); _eduS+=_mn(sc.edu); if(k.outcome) _gr.push(k.outcome); }
+                const _bondA=Math.round(_bondS/_kids.length), _eduA=Math.round(_eduS/_kids.length);
+                const _good=_gr.filter(o=>o==='surpass'||o==='support').length, _bad=_gr.filter(o=>o==='dependent'||o==='distant').length;
+                const _grTxt=_gr.length?(' · выросли: опора/обгон '+_good+', мимо '+_bad):'';
+                if(_eduA>=20 && (_eduA-_bondA)>=20){
+                    obs.push({br:'Родитель', q:'Чем ты вкладывался в детей — деньгами или собой?', verdict:'Ты давал ребёнку деньги и школы, но не время. Образование '+_eduA+' — а связь всего '+_bondA+'.', because:'деньгами откупиться проще, чем быть рядом: внимание стоит хода, которого вечно жаль. Но ребёнок наследует не счёт, а то, сколько в нём было тебя.', sig:'дети: деньги '+_eduA+' / связь '+_bondA+_grTxt});
+                    vote('external',1);
+                } else if(_bondA>=72 && _bondA>=_eduA){
+                    strengths.push('Ты вкладывал в детей себя, не только деньги — связь '+_bondA+'. Это переживёт тебя: что посеял в человека, то и вырастет.');
+                }
             }
             // 🪞 ПАТТЕРН ЧЕРЕЗ ЖИЗНИ (Ринат 15 сен): бесплатный удар — тянет ли тебя к одному типу из жизни в жизнь.
             // На заходе в Зеркало текущая жизнь ещё НЕ в PROFILE.runs — берём прошлые + текущий выбор.
@@ -15229,6 +15248,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.savings=Math.round((p.savings-amt)*100)/100;
             p.donatedTotal=Math.round(((Number(p.donatedTotal)||0)+amt)*100)/100;
             logChoice(p, 'отдать на благотворительность?', 'отдал людям', {declined:['оставить деньги себе'], paid:'−'+fmtN(amt)+'$ навсегда', amt:amt, sphere:'люди'});
+            try{ childExample(p, +2); }catch(e){}   // 👶 пример: щедрость родителя растит ценности ребёнка
             if(amt>=CHARITY_AUCTION_MIN) p.bigDonations=(Number(p.bigDonations)||0)+1;
             p.shadow=Math.max(0,(Number(p.shadow)||0));   // (не трогаем тень — это чистое добро)
             // Ринат 22июл: карта души за благотворительность — за РАЗЫ, не за суммы.
@@ -15945,6 +15965,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             soulYearTick(p);                                        // 🕯️ прожитый год: чистые годы, висящий долг, отпускает ли дно
             try{ bizYearTick(p); }catch(e){}                        // 🏢 годовой тик бизнеса: тяготы + закон внимания (износ потока без развития)
             try{ realtyYearTick(p); }catch(e){}                     // 📈 годовой тик недвижимости: капитализация, созревание котлована, жизнь арендатора
+            try{ childYearTick(p); }catch(e){}                      // 👶 годовой тик детей: заброшенный год роняет связь, флаг вложения — годовой
+            try{ childHelperCheck(p); }catch(e){}                   // 👶 ребёнку стукнуло 18 → исход (опора/обгон/иждивенец/отдалился)
             try{ bizReportCheck(p); }catch(e){}                     // 🏢 раз в 3 года — окно отчёта «было→стало» + решение развивать
             p.savings=Math.round((Number(p.savings)+flow)*100)/100;
             if((f.bankPay||0)>0) p.bankInterestPaid=Math.round(((Number(p.bankInterestPaid)||0)+f.bankPay)*100)/100;   // 🏦 копим «переплату» — сколько всего отдал банку процентами (урок цены долга)
@@ -18172,6 +18194,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
                 ${/* 🏡 ОБРАЗ ЖИЗНИ — шаг 1: показать текущий дом и машину из бланка (только зеркало) */''}
                 <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.45),rgba(8,10,14,.82)),url('cat_imgs/win_obraz.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">🏡 Образ жизни <span class="sec-hint">— дом и машина</span></summary><div class="sec-in">${winCover('win_assets')}<div class="card"><div class="block-title">🏡 Как ты живёшь</div>${renderLifestylePanel(p)}</div></div></details>
+
+                ${/* 👨‍👩‍👧 СЕМЬЯ · ДЕТИ — постоянный вход в «Наследие» (годовой выбор деньги/время, рост до 18, исход). Открывает проверенное окно. */''}
+                <details class="sec"><summary style="background-image:linear-gradient(rgba(8,10,14,.45),rgba(8,10,14,.82)),url('cat_imgs/cell_kids.webp');background-size:cover;background-position:center;min-height:84px;border-radius:12px;">👨‍👩‍👧 Семья · Дети <span class="sec-hint">— расти и вкладывай</span></summary><div class="sec-in"><div class="card"><div class="block-title">👨‍👩‍👧 Дети и наследие</div><p style="font-size:12.5px;color:#cdc8bd;line-height:1.55;margin:0 0 10px;">Заведи ребёнка и расти его: каждый год выбирай — вложить деньги (образование/здоровье) или провести год рядом (−доход, +связь). Как вырастишь — таким и станет в 18: опора, тот кто обгонит тебя, иждивенец или отдалится. Во что ты вложил следующего человека — Зеркало запомнит.</p><button onclick="openChildModal(${p.id})" class="btn" style="width:100%;padding:12px;font-weight:800;background:linear-gradient(180deg,#efd8a3,#d9b877);color:#20180a;">👶 Открыть «Наследие»${(p.kids&&p.kids.length)?' · детей: '+p.kids.length:''}</button></div></div></details>
 
                 ${/* 🎨 ХОББИ · ОТДЫХ — восстановление здоровья и остужение выгорания (новая ветка, 3окт) */''}
                 <details class="sec"><summary style="background:linear-gradient(135deg,#17241b,#0d1512);min-height:84px;border-radius:12px;display:flex;align-items:center;padding:0 16px;color:#aef0c8;font-family:Georgia,serif;font-size:17px;font-weight:700;">🎨 Хобби и отдых <span class="sec-hint" style="color:#7fae92;margin-left:8px;">— восстановление и радость</span></summary><div class="sec-in"><div class="card"><div class="block-title">🎨 Отдых · восстановление</div>${renderHobbyPanel(p)}</div></div></details>
@@ -22203,35 +22228,128 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // 👶 ДЕТИ 2.0 — НАСЛЕДИЕ (Ринат: растёт до 18 по годам, во что вложишь — тем и силён, в 18 → помощник).
         //   Ветки: 💹 дело (пассив), 🛠️ труд (доход), 🕯️ дух (репутация). Часы = год с сервера (как ферма).
         const CHILD_BRANCHES = { biz:{e:'💹',label:'Дело / учёба'}, work:{e:'🛠️',label:'Труд / спорт'}, soul:{e:'🕯️',label:'Дух / совесть'} };
+        // 👶 ДЕТИ Д3 — ИСХОД В 18. Считается по накопленным шкалам: «человек» (связь+ценности, растёт от ВРЕМЕНИ)
+        //   и «навыки» (образование+здоровье, растут от ДЕНЕГ). Вложил и то и то → обгонит; только человека →
+        //   опора; только деньги → иждивенец; забросил → отдалился. Пороги ⚖️ — финалит Ринат.
+        const CHILD_OUTCOMES = {
+            surpass:  {e:'🏆', label:'обогнал тебя', say:'превзошёл тебя — высшая родительская победа'},
+            support:  {e:'🤝', label:'опора',        say:'стал опорой: помогает делом и заботой'},
+            dependent:{e:'🛋️', label:'иждивенец',    say:'сидит на шее — деньги дал, человека не вырастил'},
+            distant:  {e:'🚪', label:'отдалился',     say:'ушёл своей дорогой — связь потеряна'}
+        };
+        function childOutcome(k){ const s=childScales(k); const human=(s.values+s.bond)/2, skill=(s.edu+s.health)/2;   // ⚖️
+            if(human>=70 && skill>=70) return 'surpass';      // вложил и время, и деньги
+            if(human>=62) return 'support';                   // дал человека (время/ценности/связь)
+            if(skill>=62 && human<58) return 'dependent';     // откупался деньгами, человека нет
+            return 'distant';                                 // забросил
+        }
         function childAge(k){ return Math.max(0, Math.min(18, curYear() - (Number(k.bornY)|| curYear()))); }
         function openChildModal(id){ const p=state.players.find(x=>x.id==id); if(!p) return; p.kids=p.kids||[]; childHelperCheck(p); state.childModal={pId:id}; save(id); render(); }
         function closeChildModal(){ state.childModal=null; render(); }
-        function childHelperCheck(p){   // дети 18+ становятся помощниками — разовая активация пассива по ветке
-            if(!p||!Array.isArray(p.kids)) return; const sal=p.prof&&p.prof.salary||3000; let any=false;
+        function childHelperCheck(p){   // дети 18+ → исход по шкалам (Д3): пассив / опора / иждивенец / отдалился
+            if(!p||!Array.isArray(p.kids)) return; const sal=(p.prof&&p.prof.salary)||3000; let any=false;
             for(const k of p.kids){ if(k.helper) continue; if(childAge(k)>=18){ k.helper=true; any=true; p.assets=p.assets||[];
-                const br=k.branch||'work'; const cf = br==='biz'?Math.round(sal*0.35): br==='work'?Math.round(sal*0.22):Math.round(sal*0.10);
-                if(br==='soul') p.repScore=(Number(p.repScore)||0)+6;
-                p.assets.push({id:Date.now()+Math.floor(Math.random()*1000),type:'BUSINESS',title:'🧑 Наследник ('+(CHILD_BRANCHES[br].label)+')',cf,price:0,down:0});
-                p.notify='🧑 Твой ребёнок вырос (18 лет) и стал помощником по ветке «'+CHILD_BRANCHES[br].label+'» — '+(br==='soul'?'поднял репутацию':'пассив +'+fmtN(cf)+'$/мес')+'!';
+                const br=k.branch||'work', oc=childOutcome(k); k.outcome=oc; const O=CHILD_OUTCOMES[oc];
+                if(oc==='surpass'){ const cf=Math.round(sal*0.45); p.repScore=(Number(p.repScore)||0)+8;   // ⚖️
+                    p.assets.push({id:Date.now()+Math.floor(Math.random()*1000),type:'BUSINESS',title:'🏆 Наследник — обошёл тебя ('+CHILD_BRANCHES[br].label+')',cf,price:0,down:0});
+                    p.notify='🏆 Твой ребёнок вырос и ПРЕВЗОШЁЛ тебя — вошёл в дело и тянет +'+fmtN(cf)+'$/мес. Ты вложил и время, и средства. Высшая победа родителя.';
+                } else if(oc==='support'){ const cf=Math.round(sal*0.30); if(br==='soul') p.repScore=(Number(p.repScore)||0)+6;   // ⚖️
+                    p.assets.push({id:Date.now()+Math.floor(Math.random()*1000),type:'BUSINESS',title:'🤝 Наследник-опора ('+CHILD_BRANCHES[br].label+')',cf,price:0,down:0});
+                    p.notify='🤝 Ребёнок вырос опорой — ты дал ему человека, не только деньги. Помогает, пассив +'+fmtN(cf)+'$/мес.';
+                } else if(oc==='dependent'){   // пассива нет; расходы на ребёнка остаются (childExp) — «сидит на шее»
+                    p.notify='🛋️ Ребёнок вырос иждивенцем: деньги в него вложил, а человека — нет. Помощи не будет, а он всё так же тянет из кассы.';
+                } else {   // distant — отдалился
+                    p.notify='🚪 Ребёнок вырос и отдалился — ты был слишком занят заработком. Своя тяжёлая дорога, связь потеряна.';
+                }
+                try{ logSignal('family','исход_'+oc, 1); }catch(e){}
+                try{ logAction(p, O.e, 'Ребёнок вырос (18): '+O.label, {sphere:'наследие'}); }catch(e){}
+                // Д4 — разовая отдача взрослого ребёнка в кассу (поверх пассива): обгон/опора помогают деньгами, иждивенца вытаскиваешь. ⚖️
+                let _give=0;
+                if(oc==='surpass') _give=Math.round(sal*4);
+                else if(oc==='support') _give=Math.round(sal*2);
+                else if(oc==='dependent') _give=-Math.round(sal*3);
+                if(_give){ p.savings=Math.round(((Number(p.savings)||0)+_give)*100)/100;
+                    try{ logAction(p, O.e, (_give>0?'Взрослый ребёнок помог деньгами +':'Вытащил взрослого ребёнка из передряги −')+fmtN(Math.abs(_give))+'$', {amt:_give, sphere:'наследие'}); }catch(e){}
+                }
             } }
             if(any) save(p.id);
         }
         function childBirth(branch){ const m=state.childModal; if(!m) return; const p=state.players.find(x=>x.id==m.pId); if(!p) return;
-            p.kids=p.kids||[]; p.kids.push({bornY:curYear(), branch, helper:false}); p.children=(Number(p.children)||0)+1;
+            p.kids=p.kids||[]; p.kids.push({bornY:curYear(), branch, helper:false, scales:{health:70,edu:0,values:50,bond:60}, invY:0}); p.children=(Number(p.children)||0)+1;
             { const _b={biz:'дело/учёба',work:'труд/спорт',soul:'дух/совесть'}; logChoice(p, 'завести ребёнка — во что вкладываешь', _b[branch]||branch, {declined:Object.keys(_b).filter(k=>k!==branch).map(k=>_b[k]), paid:'взял расходы, растишь наследника', sphere:'наследие'}); }
             const cc=Number(p.prof&&p.prof.childCost)||0;
             p.notify='👶 Пополнение! Растишь по ветке «'+CHILD_BRANCHES[branch].label+'». Расходы +'+fmtN(cc)+'$/мес, но в 18 станет помощником.';
             save(p.id); render();
+        }
+        // 👶 ДЕТИ Д2 — ежегодное вложение (деньги ↔ время). Поверх ветки Д1: ветка = куда растёт,
+        //   шкалы = насколько вложил. Одно активное вложение (деньги ИЛИ время) на ребёнка в год.
+        //   Числа ⚖️ — финалит Ринат на живом прогоне.
+        function childScales(k){ if(!k.scales||typeof k.scales!=='object') k.scales={health:70,edu:0,values:50,bond:60}; return k.scales; }
+        function _clamp100(v){ return Math.max(0, Math.min(100, Math.round(v))); }
+        // 👶 ПАССИВНЫЙ ПРИМЕР (Д2): ребёнок учится не словам, а тому, КАК ты живёшь. Твои поступки в
+        //   других блоках тихо качают его «ценности». Азарт/обман роняют, щедрость/честность растят.
+        //   Зовётся из общих чокпоинтов (logAction по сфере, благотворительность). Без save/render — их делает вызвавший.
+        function childExample(p, delta){
+            if(!p||!Array.isArray(p.kids)||!delta) return false; let any=false;
+            for(const c of p.kids){ if(childAge(c)>=18) continue; const s=childScales(c); s.values=_clamp100(s.values+delta); any=true; }
+            return any;
+        }
+        function childInvestCost(p){ return Math.max(400, (Number(p.prof&&p.prof.childCost)||200)*4); }   // ⚖️ год кружков/учёбы/здоровья
+        function childTimeCost(p){ return Math.round((Number(p.prof&&p.prof.salary)||3000)*0.5); }         // ⚖️ цена внимания — полмесяца заработка
+        function childInvestMoney(pid, idx){
+            const p=state.players.find(x=>x.id==pid); if(!p||!Array.isArray(p.kids)) return; const k=p.kids[idx]; if(!k) return;
+            if(childAge(k)>=18){ alert('Ребёнок уже вырос — вложения в детстве закрыты.'); return; }
+            if(k.invY===curYear()){ alert('В этом году ты уже вложился в этого ребёнка. Вложение — раз в год (деньги ИЛИ время).'); return; }
+            const cost=childInvestCost(p);
+            if((Number(p.savings)||0) < cost){ alert('Не хватает денег на вложение в ребёнка: нужно '+fmtN(cost)+'$.'); return; }
+            if(!confirm('💰 Вложить '+fmtN(cost)+'$ в образование/здоровье ребёнка в этом году?\n\n+образование, +здоровье. Деньги растят навыки, но не связь.')) return;
+            p.savings=Math.round((p.savings-cost)*100)/100;
+            const s=childScales(k); s.edu=_clamp100(s.edu+10); s.health=_clamp100(s.health+5); k.invY=curYear();   // ⚖️
+            try{ logSignal('family','откупается_деньгами', 1); }catch(e){}
+            try{ logAction(p,'💰','Вложил деньги в ребёнка (образование/здоровье)',{amt:-cost, sphere:'наследие'}); }catch(e){}
+            p.notify='💰 Вложил '+fmtN(cost)+'$ в ребёнка — выросли образование и здоровье. Но деньги не растят связь.';
+            save(pid); render();
+        }
+        function childInvestTime(pid, idx){
+            const p=state.players.find(x=>x.id==pid); if(!p||!Array.isArray(p.kids)) return; const k=p.kids[idx]; if(!k) return;
+            if(childAge(k)>=18){ alert('Ребёнок уже вырос — вложения в детстве закрыты.'); return; }
+            if(k.invY===curYear()){ alert('В этом году ты уже вложился в этого ребёнка. Вложение — раз в год (деньги ИЛИ время).'); return; }
+            const cost=childTimeCost(p);
+            if(!confirm('⏳ Провести год рядом с ребёнком вместо заработка?\n\nПропустишь часть дохода (−'+fmtN(cost)+'$), но вырастут связь и ценности — то, что деньгами не купишь.')) return;
+            p.savings=Math.round(((Number(p.savings)||0)-cost)*100)/100;   // честная цена внимания: недополученный заработок
+            const s=childScales(k); s.bond=_clamp100(s.bond+12); s.values=_clamp100(s.values+6); k.invY=curYear();   // ⚖️
+            try{ logSignal('family','даёт_внимание', 1); }catch(e){}
+            try{ logAction(p,'⏳','Провёл год с ребёнком (−доход, +связь)',{amt:-cost, sphere:'наследие'}); }catch(e){}
+            p.notify='⏳ Ты был рядом — связь и ценности ребёнка выросли. Заработок в этом году меньше, но человек важнее.';
+            save(pid); render();
+        }
+        // Годовой тик детей (зовётся из giveSalary): заброшенный год чуть роняет связь, флаг вложения — годовой.
+        function childYearTick(p){
+            if(!p||!Array.isArray(p.kids)||!p.kids.length) return; const y=curYear();
+            if(p._childY==null){ p._childY=y; return; }
+            if(y<=p._childY) return;
+            for(const k of p.kids){ if(childAge(k)>=18) continue; const s=childScales(k);
+                if((k.invY||0) < y-1){ s.bond=_clamp100(s.bond-4); }   // ⚖️ заброшенность: ни денег, ни времени за год
+            }
+            p._childY=y;
         }
         function renderChildModal(){
             const m=state.childModal; if(!m) return '';
             const p=state.players.find(x=>x.id==m.pId); if(!p) return '';
             const kids=p.kids||[], cc=Number(p.prof&&p.prof.childCost)||0;
             const wrap=(inner)=>`<div style="position:fixed;inset:0;background:rgba(3,5,8,.9);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px;"><div style="background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid var(--lx-gold-ln);border-radius:16px;padding:22px;max-width:440px;width:100%;text-align:center;">${inner}</div></div>`;
-            const kidsList = kids.length ? kids.map(k=>{ const a=childAge(k), br=CHILD_BRANCHES[k.branch||'work']; const done=k.helper||a>=18;
-                return `<div style="display:flex;gap:8px;align-items:center;font-size:12.5px;padding:8px 10px;border-radius:8px;border:1px solid ${done?'#1f6b45':'var(--lx-line)'};background:var(--lx-ink);margin:5px 0;color:#cbd5e1;text-align:left;">
-                    <span style="font-size:20px;">${done?'🧑':'👶'}</span><span style="flex:1;">${br.e} ветка «${br.label}»<br><span style="font-size:11px;color:#9c988e;">${done?'вырос — помощник (18+)':a+' лет · растёт до 18'}</span></span></div>`; }).join('')
-                : '<div style="font-size:12px;color:#9c988e;margin:8px 0;">Детей пока нет. Ребёнок растёт до 18 лет и станет помощником по той ветке, в какую вложишь.</div>';
+            const _bar=(lbl,val,col)=>`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;font-size:10px;color:#9c988e;"><span style="width:92px;flex:0 0 auto;">${lbl}</span><span style="flex:1;height:6px;border-radius:4px;background:#1a1f2b;overflow:hidden;"><span style="display:block;height:100%;width:${_clamp100(val)}%;background:${col};"></span></span><span style="width:24px;text-align:right;color:#cbd5e1;">${Math.round(val)}</span></div>`;
+            const kidsList = kids.length ? kids.map((k,idx)=>{ const a=childAge(k), br=CHILD_BRANCHES[k.branch||'work']; const done=k.helper||a>=18; const s=childScales(k); const invd=(k.invY===curYear());
+                const bars = done ? '' : `<div style="margin-top:7px;">${_bar('💪 Здоровье',s.health,'#3b82f6')}${_bar('🎓 Образование',s.edu,'#a78bfa')}${_bar('🧭 Ценности',s.values,'#f59e0b')}${_bar('🤍 Связь',s.bond,'#ef4444')}</div>`;
+                const btns = done ? '' : `<div style="display:flex;gap:6px;margin-top:8px;">
+                        <button onclick="childInvestMoney(${p.id},${idx})" class="btn"${invd?' disabled':''} style="flex:1;padding:8px;font-size:11px;background:var(--lx-ink);border:1px solid var(--lx-line);color:${invd?'#4b5563':'#f3efe6'};font-weight:700;">💰 Вложить деньги<br><span style="font-size:9px;color:#9c988e;font-weight:400;">образование/здоровье · ${fmtN(childInvestCost(p))}$</span></button>
+                        <button onclick="childInvestTime(${p.id},${idx})" class="btn"${invd?' disabled':''} style="flex:1;padding:8px;font-size:11px;background:var(--lx-ink);border:1px solid var(--lx-line);color:${invd?'#4b5563':'#f3efe6'};font-weight:700;">⏳ Провести год вместе<br><span style="font-size:9px;color:#9c988e;font-weight:400;">−доход · +связь/ценности</span></button>
+                    </div>${invd?'<div style="font-size:10px;color:#6b7280;margin-top:4px;">В этом году вложение уже сделано — следующее на новый год.</div>':''}`;
+                const oc=k.outcome&&CHILD_OUTCOMES[k.outcome]; const doneTxt = oc ? oc.e+' '+oc.label+' (18+) — '+oc.say : 'вырос — помощник (18+)';
+                return `<div style="font-size:12.5px;padding:9px 11px;border-radius:8px;border:1px solid ${done?'#1f6b45':'var(--lx-line)'};background:var(--lx-ink);margin:6px 0;color:#cbd5e1;text-align:left;">
+                    <div style="display:flex;gap:8px;align-items:center;"><span style="font-size:20px;">${done?(oc?oc.e:'🧑'):'👶'}</span><span style="flex:1;">${br.e} ветка «${br.label}»<br><span style="font-size:11px;color:#9c988e;">${done?doneTxt:a+' лет · растёт до 18'}</span></span></div>
+                    ${bars}${btns}</div>`; }).join('')
+                : '<div style="font-size:12px;color:#9c988e;margin:8px 0;">Детей пока нет. Ребёнок растёт до 18 лет. Каждый год выбираешь: вложить деньги (образование/здоровье) или провести год рядом (−доход, +связь). Как вырастишь — тем и силён.</div>';
             const opt=(k,e,label,sub)=>`<button onclick="childBirth('${k}')" class="btn" style="display:block;width:100%;margin:6px 0;padding:11px;text-align:left;background:var(--lx-ink);border:1px solid var(--lx-line);color:#f3efe6;font-weight:700;">${e} ${label}<br><span style="font-size:11px;color:#9c988e;font-weight:400;">${sub}</span></button>`;
             return wrap(`<div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#c4b5fd;font-weight:800;">👶 Дети · наследие</div>
                 <div style="font-size:12px;color:#9c988e;line-height:1.5;margin:8px 0 10px;">Ребёнок растёт по годам, тянет расходы (+${fmtN(cc)}$/мес каждый), а в 18 становится живым помощником по ветке, в которую ты его растил. Как вырастишь — тем и силён.</div>
@@ -22312,7 +22430,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!pid){ state.pendingQR = type; alert('📷 Карта отсканирована. Сначала войди под своим бланком — карта применится сама.'); render(); return; }
             if(type==='world' && !state.isAdmin){ alert('🌍 Мировое событие теперь открывает только ведущий — тебе тянуть не нужно. Ты увидишь результат, когда оно случится.'); return; }
             if(type==='ticket'){ showCardPreview(pid,type); return; }
-            if(type==='child'){ showCardPreview(pid,type); return; }
+            if(type==='child'){ const _pp=state.players.find(x=>x.id==pid); if(_pp && Array.isArray(_pp.kids) && _pp.kids.some(k=>childAge(k)<18)){ resolveChild(pid); } else { showCardPreview(pid,type); } return; }   // 👶 уже есть растущий ребёнок → сразу «Наследие» (вложиться), а не «будет ребёнок»
             if(String(type).startsWith('invest_')){ showCardPreview(pid,type); return; }   // депозиты/облигации/рискованные (мелкие сделки)
             // РЕАЛЬНАЯ карта-актив (Малые активы): скан asset_<id> → офер покупки ИМЕННО этой карты
             if(String(type).startsWith('asset_')){
