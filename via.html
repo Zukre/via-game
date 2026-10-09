@@ -10660,16 +10660,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function careerRank(p){ return CAREER_LADDER[careerLvl(p)]; }
         function careerPromote(){
             const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
-            const lvl = careerLvl(p); if(lvl >= CAREER_LADDER.length-1){ alert('Ты на вершине карьеры — региональный директор.'); return; }
+            const lvl = careerLvl(p); if(lvl >= CAREER_LADDER.length-1){ toast('Ты на вершине карьеры — региональный директор.'); return; }
             const next = CAREER_LADDER[lvl+1];
             const haveSkills = (p.selfSkills||[]).length;
-            if(haveSkills < next.skills){ try{ logFail(p,'🎓','Хотел повышение до «'+next.name+'»','не хватило навыков: нужно '+next.skills+', есть '+haveSkills,{sphere:'развитие'}); }catch(e){} alert('🎓 Для «'+next.name+'» нужно '+next.skills+' навыка из «Развить себя» (у тебя '+haveSkills+'). Учись дальше.'); return; }
-            if((Number(p.savings)||0) < next.cost){ try{ logFail(p,'🎓','Хотел повышение до «'+next.name+'»','не хватило кассы — нужно '+fmtN(next.cost)+'$',{sphere:'развитие'}); }catch(e){} alert('Не хватает кассы. Повышение до «'+next.name+'» стоит '+fmtN(next.cost)+'$.'); return; }
-            if(!confirm('Повыситься до «'+next.name+'» за '+fmtN(next.cost)+'$?\n\nЗарплата ×'+next.salMult+', но и уровень жизни (расходы) ×'+next.expMult+'.\nБонус навсегда: '+next.bonus+'.')) return;
+            if(haveSkills < next.skills){ try{ logFail(p,'🎓','Хотел повышение до «'+next.name+'»','не хватило навыков: нужно '+next.skills+', есть '+haveSkills,{sphere:'развитие'}); }catch(e){} toast('🎓 Для «'+next.name+'» нужно '+next.skills+' навыка из «Развить себя» (у тебя '+haveSkills+'). Учись дальше.'); return; }
+            if((Number(p.savings)||0) < next.cost){ try{ logFail(p,'🎓','Хотел повышение до «'+next.name+'»','не хватило кассы — нужно '+fmtN(next.cost)+'$',{sphere:'развитие'}); }catch(e){} toast('Не хватает кассы. Повышение до «'+next.name+'» стоит '+fmtN(next.cost)+'$.'); return; }
+            viaConfirm('Повыситься до «'+next.name+'» за '+fmtN(next.cost)+'$?\n\nЗарплата ×'+next.salMult+', но и уровень жизни (расходы) ×'+next.expMult+'.\nБонус навсегда: '+next.bonus+'.', function(){
             p.savings = Math.round(((Number(p.savings)||0) - next.cost)*100)/100;
             p.careerLvl = lvl+1;
             p.notify = '🪜 Повышение! Теперь ты «'+next.name+'». Бонус: '+next.bonus+'.';
             save(); render();
+            }, {yes:'Повыситься'});
         }
 
         // ─── 🐄 ФЕРМА (Рынок скота) — ПУЛЬТ БАЛАНСА. Всё крутится тут, механика не трогается. ───
@@ -11069,7 +11070,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const y=curYear(); const fresh=(p.farm.meatFreshY==null)?y:p.farm.meatFreshY;
             if(y>fresh){ p.farm.stock.meat=0; p.notify='🥩 Мясо протухло на складе — без 🧊 холодильника оно живёт 1 год. Продавай в тот же год или купи холодильник.'; }
         }
-        function farmBuyFeedType(ft){ const p=farmMe(); if(!p||!p.farm) return; const T=(FARM_CFG.feedTypes||{})[ft]; if(!T) return; const b=T.bundle; if(p.savings<b.cost){ alert('Не хватает кассы. '+T.name+': '+b.qty+' за '+fmtN(b.cost)+'$.'); return; } farmSpend(p,b.cost); p.farm.feedStores=p.farm.feedStores||{}; p.farm.feedStores[ft]=(Number(p.farm.feedStores[ft])||0)+b.qty; save(p.id); render(); }
+        function farmBuyFeedType(ft){ const p=farmMe(); if(!p||!p.farm) return; const T=(FARM_CFG.feedTypes||{})[ft]; if(!T) return; const b=T.bundle; if(p.savings<b.cost){ toast('Не хватает кассы. '+T.name+': '+b.qty+' за '+fmtN(b.cost)+'$.'); return; } farmSpend(p,b.cost); p.farm.feedStores=p.farm.feedStores||{}; p.farm.feedStores[ft]=(Number(p.farm.feedStores[ft])||0)+b.qty; save(p.id); render(); }
         function farmTractors(p){ return (p&&p.farm)?(Number(p.farm.tractors)|| (p.farm.tractor?1:0)):0; }   // 🚜 сколько тракторов (совместимость со старым boolean)
         function farmBuyTractor(){ const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.tractor; const boost=FARM_CFG.tractorSelfBoost||0; const heads=farmHeads(p); const covered=farmSelfCap(p); const deficit=Math.max(0,heads-covered); const suggest=boost>0?Math.max(1,Math.ceil(deficit/boost)):1;
             farmAskQty({ title:'🚜 Трактор — купить', note:'Цена '+fmtN(price)+'$/шт. Каждый тянет +'+boost+' голов сам — меньше нужно фермеров. Есть '+farmTractors(p)+' · голов на ферме '+heads+' · сам тянешь '+covered+(deficit>0?(' → не хватает на '+deficit):' → хватает на всех'), def:suggest, min:1, max:999, okLabel:'Купить',
@@ -11087,18 +11088,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function farmCanMakeMeat(p){ return farmHasSlaughter(p) && farmButchers(p)>0; }   // ГЕЙТ: без бойни И убойщиков мясо не сделать
         function farmHireCowboy(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.cowboys=farmCowboys(p)+1; save(p.id); render(); }
         function farmFireCowboy(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.cowboys=Math.max(0,farmCowboys(p)-1); save(p.id); render(); }
-        function farmHireButcher(){ const p=farmMe(); if(!p||!p.farm) return; if(!farmHasSlaughter(p)){ alert('🏭 Сначала купи Бойню — убойщикам негде работать.'); return; } p.farm.butchers=farmButchers(p)+1; save(p.id); render(); }
+        function farmHireButcher(){ const p=farmMe(); if(!p||!p.farm) return; if(!farmHasSlaughter(p)){ toast('🏭 Сначала купи Бойню — убойщикам негде работать.'); return; } p.farm.butchers=farmButchers(p)+1; save(p.id); render(); }
         function farmFireButcher(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.butchers=Math.max(0,farmButchers(p)-1); save(p.id); render(); }
-        function farmBuySlaughter(){ const p=farmMe(); if(!p||!p.farm) return; if(farmHasSlaughter(p)){ alert('🏭 Бойня уже есть.'); return; } if(p.savings<FARM_LABOR.slaughterhouse){ alert('Не хватает кассы. Бойня стоит '+fmtN(FARM_LABOR.slaughterhouse)+'$.'); return; } farmSpend(p,FARM_LABOR.slaughterhouse); p.farm.slaughterhouse=true; save(p.id); render(); alert('🏭 Бойня построена! Теперь найми убойщиков — и сможешь пускать скот на мясо.'); }
+        function farmBuySlaughter(){ const p=farmMe(); if(!p||!p.farm) return; if(farmHasSlaughter(p)){ toast('🏭 Бойня уже есть.'); return; } if(p.savings<FARM_LABOR.slaughterhouse){ toast('Не хватает кассы. Бойня стоит '+fmtN(FARM_LABOR.slaughterhouse)+'$.'); return; } farmSpend(p,FARM_LABOR.slaughterhouse); p.farm.slaughterhouse=true; save(p.id); render(); toast('🏭 Бойня построена! Теперь найми убойщиков — и сможешь пускать скот на мясо.'); }
         // 🐄 ПАСТБИЩЕ ДЛЯ АНГУСОВ (отдельная земля-выгул, разная площадь; строить нельзя — только выгул)
         function farmPastureTier(p){ return (p&&p.farm)?(Number(p.farm.pasture)||0):0; }
         function farmPastureCap(p){ const t=farmPastureTier(p); return t>0?PASTURE_SIZES[Math.min(t,PASTURE_SIZES.length)-1].cap:0; }
-        function farmBuyPasture(){ const p=farmMe(); if(!p||!p.farm) return; const t=farmPastureTier(p); if(t>=PASTURE_SIZES.length){ alert('🐄 Уже огромное ранчо — расширять некуда.'); return; } const nx=PASTURE_SIZES[t]; if(p.savings<nx.price){ alert('Не хватает кассы. «'+nx.name+'» стоит '+fmtN(nx.price)+'$.'); return; } farmSpend(p,nx.price); p.farm.pasture=t+1; save(p.id); render(); alert('🐄 '+(t===0?'Куплено':'Расширено до «'+nx.name+'»')+' — вмещает '+fmtN(nx.cap)+' ангусов на выгуле. Строить тут нельзя, только выгул.'); }
+        function farmBuyPasture(){ const p=farmMe(); if(!p||!p.farm) return; const t=farmPastureTier(p); if(t>=PASTURE_SIZES.length){ toast('🐄 Уже огромное ранчо — расширять некуда.'); return; } const nx=PASTURE_SIZES[t]; if(p.savings<nx.price){ toast('Не хватает кассы. «'+nx.name+'» стоит '+fmtN(nx.price)+'$.'); return; } farmSpend(p,nx.price); p.farm.pasture=t+1; save(p.id); render(); toast('🐄 '+(t===0?'Куплено':'Расширено до «'+nx.name+'»')+' — вмещает '+fmtN(nx.cap)+' ангусов на выгуле. Строить тут нельзя, только выгул.'); }
         function farmBuyWater(){ const p=farmMe(); if(!p||!p.farm) return; const b=FARM_CFG.waterBundle; const use=(FARM_CFG.usePerHeadYr||12); const heads=farmHeads(p); const need=heads*use; const have=Math.floor(Number(p.farm.waterStock)||0); const unit=b.cost/b.qty; const deficit=Math.max(0,need-have); const def=Math.max(b.qty, Math.ceil((deficit||b.qty)/b.qty)*b.qty);
             farmAskQty({ title:'💧 Вода — купить запас', note:'Цена '+unit.toFixed(2)+'$/ед (пачка '+b.qty+' за '+fmtN(b.cost)+'$). Запас '+fmtN(have)+' · пьют ~'+Math.round(need)+'/год. Это разовая покупка из кассы — НЕ ежемесячный платёж (ежемесячно тянет только 🚰 водопровод).', def:def, min:1, max:999999, okLabel:'Купить',
                 preview:(q)=>{ const cost=Math.round(q*unit); const pp=farmMe(); const lasts=need>0?((have+q)/need):null; return 'Стоит <b>'+fmtN(cost)+'$</b>'+(lasts!=null?' · хватит на ~'+lasts.toFixed(1)+' лет':' · пока некого поить')+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
                 onOk:(q)=>{ const pp=farmMe(); if(!pp||!pp.farm||q<1) return; const cost=Math.round(q*unit); if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } farmSpend(pp,cost); pp.farm.waterStock=(Number(pp.farm.waterStock)||0)+q; save(pp.id); render(); farmToast('💧 Куплено воды: +'+fmtN(q)+' ед. (запас '+fmtN(Math.floor(Number(pp.farm.waterStock)||0))+')'); } }); }
-        function farmInstallWater(){ const p=farmMe(); if(!p||!p.farm) return; if(p.farm.waterMain){ alert('Водопровод уже проведён.'); return; } const cost=(FARM_CFG.waterMainByLand||{})[p.farm.land]||5000; if(p.savings<cost){ alert('Не хватает кассы. Провести воду на «'+FARM_CFG.land[p.farm.land].name+'»: '+fmtN(cost)+'$ (чем больше земля — тем дороже).'); return; } farmSpend(p,cost); p.farm.waterMain=true; save(p.id); render(); alert('🚰 Вода проведена! Скот поится сам — но содержание тянет пассив '+FARM_CFG.waterPerHeadMo+'$/гол/мес.'); }
+        function farmInstallWater(){ const p=farmMe(); if(!p||!p.farm) return; if(p.farm.waterMain){ toast('Водопровод уже проведён.'); return; } const cost=(FARM_CFG.waterMainByLand||{})[p.farm.land]||5000; if(p.savings<cost){ toast('Не хватает кассы. Провести воду на «'+FARM_CFG.land[p.farm.land].name+'»: '+fmtN(cost)+'$ (чем больше земля — тем дороже).'); return; } farmSpend(p,cost); p.farm.waterMain=true; save(p.id); render(); toast('🚰 Вода проведена! Скот поится сам — но содержание тянет пассив '+FARM_CFG.waterPerHeadMo+'$/гол/мес.'); }
         function farmToggleAutoFeed(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.autoFeed=!p.farm.autoFeed; save(p.id); render(); }
         function farmHireWorker(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.workers=(Number(p.farm.workers)||0)+1; save(p.id); render(); }
         function farmFireWorker(){ const p=farmMe(); if(!p||!p.farm) return; p.farm.workers=Math.max(0,(Number(p.farm.workers)||0)-1); save(p.id); render(); }
@@ -11947,7 +11948,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 logSignal('lifestyle', 'home_downgrade', 0);
                 p.notify = '🏠 Ты переехал на съём: аренда ' + fmtN(H.pay) + '$/мес, жильём не владеешь.' + (_ref>0?' Продал старое — вернул '+fmtN(_ref)+'$ за свою долю.':'');
             } else if (mode === 'buyout') {
-                if (cash < H.body) { alert('Выкупить «' + H.name + '» стоит ' + fmtN(H.body) + '$ — не хватает кассы.'); return; }
+                if (cash < H.body) { toast('Выкупить «' + H.name + '» стоит ' + fmtN(H.body) + '$ — не хватает кассы.'); return; }
                 p.savings = cash - H.body;
                 p.homeLvl = lvl; p.homeBody = H.body; p.homePay = H.upkeep; p.mLeft = 0; p.isM = true;
                 logSignal('lifestyle', 'home_buyout', lvl);
@@ -11960,7 +11961,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 logSignal('lifestyle', 'home_downgrade', lvl);
                 p.notify = '🏠 Переехал в «' + H.name + '»: платёж ' + fmtN(H.pay) + '$/мес.' + (_ref>0?' Продал прежнее — вернул '+fmtN(_ref)+'$ за долю.':'');
             } else { // credit — апгрейд в кредит: аванс из кассы, месячный платёж замещает старый
-                if (cash < H.down) { alert('Аванс за «' + H.name + '» — ' + fmtN(H.down) + '$ — не хватает кассы.'); return; }
+                if (cash < H.down) { toast('Аванс за «' + H.name + '» — ' + fmtN(H.down) + '$ — не хватает кассы.'); return; }
                 p.savings = cash - H.down;
                 p.homeLvl = lvl; p.homeBody = H.body; p.homePay = H.pay; p.mLeft = H.body; p.isM = false;
                 logSignal('lifestyle', 'home_upgrade', lvl);
@@ -12040,7 +12041,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const C = LIFESTYLE_CARS[lvl]; if(!C) return;
             const cash = Number(p.savings) || 0;
             if (mode === 'buyout') {
-                if (cash < C.body) { alert('Выкупить «' + C.name + '» стоит ' + fmtN(C.body) + '$ — не хватает кассы.'); return; }
+                if (cash < C.body) { toast('Выкупить «' + C.name + '» стоит ' + fmtN(C.body) + '$ — не хватает кассы.'); return; }
                 p.savings = cash - C.body;
                 p.carLvl = lvl; p.carBody = C.body; p.carPay = 0; p.aLeft = 0; p.isA = true;
                 logSignal('lifestyle', 'car_buyout', lvl);
@@ -12054,7 +12055,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 logSignal('lifestyle', 'car_downgrade', lvl);
                 p.notify = '🚗 Пересел на «' + C.name + '»: платёж ' + fmtN(C.pay) + '$/мес.' + (_ref>0?' Продал прежнюю — вернул '+fmtN(_ref)+'$.':'');
             } else { // credit — апгрейд в кредит: аванс из кассы, месячный платёж замещает старый
-                if (cash < C.down) { alert('Аванс за «' + C.name + '» — ' + fmtN(C.down) + '$ — не хватает кассы.'); return; }
+                if (cash < C.down) { toast('Аванс за «' + C.name + '» — ' + fmtN(C.down) + '$ — не хватает кассы.'); return; }
                 p.savings = cash - C.down;
                 p.carLvl = lvl; p.carBody = C.body; p.carPay = C.pay; p.aLeft = C.body; p.isA = false;
                 logSignal('lifestyle', 'car_upgrade', lvl);
@@ -12124,7 +12125,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const cur = (kind === 'watch') ? curWatchLvl(p) : curPhoneLvl(p);
             if (lvl <= cur) return;   // статус только вверх — назад не «продаём»
             const cash = Number(p.savings) || 0;
-            if (cash < item.price) { try{ logFail(p,'🏡','Хотел купить «'+item.name+'»','не хватило кассы — нужно '+fmtN(item.price)+'$',{sphere:'образ жизни'}); }catch(e){} alert('«' + item.name + '» стоит ' + fmtN(item.price) + '$ — не хватает кассы.'); return; }
+            if (cash < item.price) { try{ logFail(p,'🏡','Хотел купить «'+item.name+'»','не хватило кассы — нужно '+fmtN(item.price)+'$',{sphere:'образ жизни'}); }catch(e){} toast('«' + item.name + '» стоит ' + fmtN(item.price) + '$ — не хватает кассы.'); return; }
             p.savings = cash - item.price;
             if (kind === 'watch') p.watchLvl = lvl; else p.phoneLvl = lvl;
             try{ logAction(p, (kind==='watch'?'⌚':'📱'), 'Купил «'+item.name+'»', {sphere:'образ жизни', amt:-item.price}); }catch(e){}
@@ -13060,7 +13061,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 a.href = url; a.download = 'via_runs_'+Date.now()+'.json';
                 document.body.appendChild(a); a.click();
                 setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 500);
-            } catch(e){ console.warn('exportRuns', e); alert('Не удалось выгрузить: '+e.message); }
+            } catch(e){ console.warn('exportRuns', e); toast('Не удалось выгрузить: '+e.message); }
         }
         function renderArchiveModal(){
             if(!state.archiveModal) return '';
@@ -13324,16 +13325,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function openBuyModal(id){
             const a=assetById(id); if(!a) return;
             const p=state.players.find(x=>x.id==state.currentPlayerId);
-            if(p && (Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
+            if(p && (Number(p.jail)||0)>0){ toast('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
             // ⚠️ МЕМ-ГЕЙТ (Ринат 19июл): при заходе в мем — окно риска с подтверждением. Без «понимаю» не пускаем.
-            if(p && assetCat(a)==='meme' && !p.memeOk){
-                if(!localStorage.getItem('memeRiskAck')){
-                    if(!confirm('☠️ МЕМКОИН «'+a.name+'» — ЭКСТРЕМАЛЬНЫЙ РИСК.\n\nРиск потери 80–99%. Мемы почти всегда обнуляются. Торгуешь на СВОЙ страх и риск — брокер НЕ несёт ответственности за твою торговлю.\n\nПодтверждаешь, что заходишь на свой риск? (спросим один раз)')) return;
-                    localStorage.setItem('memeRiskAck','1');
-                }
-                p.memeOk=true;   // подтвердил — эту партию больше не спрашиваем
+            const _open = function(){ state.buyModal={assetId:String(id), qty:0}; paintOverlays(); slipSoon('buy'); };
+            if(p && assetCat(a)==='meme' && !p.memeOk && !localStorage.getItem('memeRiskAck')){
+                viaConfirm('☠️ МЕМКОИН «'+a.name+'» — ЭКСТРЕМАЛЬНЫЙ РИСК.\n\nРиск потери 80–99%. Мемы почти всегда обнуляются. Торгуешь на СВОЙ страх и риск — брокер НЕ несёт ответственности за твою торговлю.\n\nПодтверждаешь, что заходишь на свой риск? (спросим один раз)', function(){
+                    localStorage.setItem('memeRiskAck','1'); if(p) p.memeOk=true; _open();
+                }, {yes:'На свой риск'});
+                return;
             }
-            state.buyModal={assetId:String(id), qty:0}; paintOverlays(); slipSoon('buy');
+            if(p && assetCat(a)==='meme'){ p.memeOk=true; }   // уже подтверждал (ack в этом/прошлом сеансе) — просто помечаем партию
+            _open();
         }
         function closeBuyModal(){ state.buyModal=null; paintOverlays(); }
         function setBuyByFrac(frac){
@@ -13347,7 +13349,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // не хватает и на одну — говорим об этом честно, а не молчим.
             if(q < 1){
                 if((Number(p.savings)||0) >= unit){ q = 1; }
-                else { alert('Не хватает даже на 1 шт «'+a.name+'»: цена '+fmtPrice(a.price)+'$ + комиссия брокера, а в кассе '+fmtN(p.savings)+'$.'); return; }
+                else { toast('Не хватает даже на 1 шт «'+a.name+'»: цена '+fmtPrice(a.price)+'$ + комиссия брокера, а в кассе '+fmtN(p.savings)+'$.'); return; }
             }
             bm.qty = q;
             paintOverlays(); slipSoon('buy');
@@ -13380,7 +13382,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         async function confirmBuy(){
             const bm=state.buyModal; if(!bm) return;
             const id=bm.assetId, q=Math.floor(Number(bm.qty)||0);
-            if(!q||q<1){ alert('Выбери количество — кнопкой % / Мин / Макс или впиши вручную.'); return; }
+            if(!q||q<1){ toast('Выбери количество — кнопкой % / Мин / Макс или впиши вручную.'); return; }
             state.buyModal=null;
             await buyAssetQty(id, q);
         }
@@ -13428,18 +13430,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         async function buyAssetQty(id, q){
             let p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(id);
             if(!p||!a) return;
-            if((Number(p.jail)||0)>0){ alert('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
+            if((Number(p.jail)||0)>0){ toast('🔒 Ты в тюрьме — покупка недоступна. Только казино.'); return; }
             // 🔒 БИРЖА ЗАКРЫТА (Ринат 18июл): окно покупки жёсткое — покупать можно ТОЛЬКО когда ведущий
             // открыл окно (кнопка ▶ на пульте). Раньше проверку делали только боты, люди покупали всегда.
             // Гейтим лишь во время активной партии (движок хода идёт), чтобы не ломать лобби/фри-плей.
-            if(!buyWindowOpen()){ const bb=state.board; if(bb && Array.isArray(bb.order) && bb.order.length){ alert('🔒 Биржа закрыта. Покупка доступна, только когда ведущий откроет окно покупки (кнопка ▶ на пульте).'); return; } }
+            if(!buyWindowOpen()){ const bb=state.board; if(bb && Array.isArray(bb.order) && bb.order.length){ toast('🔒 Биржа закрыта. Покупка доступна, только когда ведущий откроет окно покупки (кнопка ▶ на пульте).'); return; } }
             q=Math.floor(Number(q)||0);
             if(!q||q<1) return;
             const p0=a.price;                       // витрина ДО сделки
             let fill=p0;                            // цена исполнения (со стаканом)
             // 🛡️ АНТИ-ТИПО: даже по текущей витрине столько не потянуть (напр. миллион битков) →
             // мгновенный отказ БЕЗ обращения к бирже. Рынок НЕ двигается от одного ввода суммы.
-            if(q*p0 > p.savings){ alert('Не хватает кассы: '+fmtN(q)+' шт × '+p0+'$ = '+fmtN(Math.round(q*p0))+'$, а у тебя '+fmtN(p.savings)+'$. Рынок не тронут — уменьши количество.'); return; }
+            if(q*p0 > p.savings){ toast('Не хватает кассы: '+fmtN(q)+' шт × '+p0+'$ = '+fmtN(Math.round(q*p0))+'$, а у тебя '+fmtN(p.savings)+'$. Рынок не тронут — уменьши количество.'); return; }
             lastSaveT=Date.now();                   // защита от гонки: пока идёт сделка, push не подменяет state.players
             const origQ=q;
             if(SERVER_MODE){
@@ -13453,7 +13455,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 //    что реально по карману. У мемов тонкий стакан → МАКС «уезжает», это и чиним.
                 const feePct0=tradeFeePct(p);
                 const maxAff=Math.floor((Number(p.savings)||0)/(fill*(1+feePct0)));
-                if(maxAff<1){ alert('Не хватает даже на 1 шт «'+a.name+'» — при этом объёме стакан поднимает цену до ~'+fill+'$. Касса '+fmtN(p.savings)+'$.'); return; }
+                if(maxAff<1){ toast('Не хватает даже на 1 шт «'+a.name+'» — при этом объёме стакан поднимает цену до ~'+fill+'$. Касса '+fmtN(p.savings)+'$.'); return; }
                 if(q>maxAff){ q=maxAff; }   // подогнали под кассу (рынок ещё не тронут — котировка)
                 // 3) КОММИТ: теперь реально двигаем цену для всех и берём по факту (объём меньше → слиппедж меньше)
                 try{
@@ -13473,7 +13475,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const feePct=tradeFeePct(p);
             const fee=Math.round(cost*feePct*100)/100;
             const totalCost=Math.round((cost+fee)*100)/100;
-            if(p.savings<totalCost){ try{ logFail(p,'📉','Хотел купить актив на бирже','не хватило кассы — нужно '+fmtN(Math.round(totalCost))+'$ (с комиссией)',{sphere:'деньги'}); }catch(e){} alert('Не хватает кассы (цена + комиссия). Нужно '+fmtN(Math.round(totalCost))+'$ (в т.ч. комиссия биржи '+fmtN(fee)+'$), есть '+fmtN(p.savings)+'$.'); return; }
+            if(p.savings<totalCost){ try{ logFail(p,'📉','Хотел купить актив на бирже','не хватило кассы — нужно '+fmtN(Math.round(totalCost))+'$ (с комиссией)',{sphere:'деньги'}); }catch(e){} toast('Не хватает кассы (цена + комиссия). Нужно '+fmtN(Math.round(totalCost))+'$ (в т.ч. комиссия биржи '+fmtN(fee)+'$), есть '+fmtN(p.savings)+'$.'); return; }
             p.savings=Math.round((p.savings-totalCost)*100)/100;
             const bst=pstat(p); bst.buys++; bst.buyAmt=Math.round((bst.buyAmt+cost)*100)/100; bst.feePaid=Math.round(((bst.feePaid||0)+fee)*100)/100;
             p.holdings=p.holdings||{};
@@ -13520,11 +13522,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else if(typeof _pre==='number' && _pre>0){ q=Math.min(_pre, have); }// быстрый пресет, но не больше чем есть
             else { openSellModal(id); return; }   // 🆕 окно с живым проскальзыванием вместо системного prompt
             if(!q||q<1) return;
-            if(q>have){ alert('У тебя только '+have+' шт.'); return; }
+            if(q>have){ toast('У тебя только '+have+' шт.'); return; }
             lastSaveT=Date.now();                   // защита от гонки: пока идёт сделка, push не подменяет state.players
             const r=await sellHolding(p,id,q); save(); render();
             if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Твой объём просадил рынок: витрина была '+r.p0+'$, выход по ~'+r.fill+'$/шт.') : '';
-                alert('✅ Продано '+r.qty+' «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ ('+(r.feePct*100).toFixed(1)+'%) → +'+fmtN(r.net)+'$ в кассу · чистая прибыль по позиции '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$'+moved); }
+                toast('✅ Продано '+r.qty+' «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ ('+(r.feePct*100).toFixed(1)+'%) → +'+fmtN(r.net)+'$ в кассу · чистая прибыль по позиции '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$'+moved); }
         }
         // Продать ВСЮ позицию по одному активу (кнопка «Продать» у актива).
         async function sellWhole(id){
@@ -13534,7 +13536,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             lastSaveT=Date.now();
             const r=await sellHolding(p,id,have); save(); render();
             if(r){ const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Объём просадил рынок: витрина '+r.p0+'$, выход по ~'+r.fill+'$.') : '';
-                alert('✅ Продано всё «'+r.name+'» ('+fmtN(r.qty)+' шт) по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу · чистая прибыль по позиции '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$'+moved); }
+                toast('✅ Продано всё «'+r.name+'» ('+fmtN(r.qty)+' шт) по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу · чистая прибыль по позиции '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$'+moved); }
         }
         // Продать ДОЛЮ позиции (Ринат 18июл: кнопка 50%). frac=0.5 → половина (округляем вниз, минимум 1 шт).
         async function sellFrac(id, frac){
@@ -13546,13 +13548,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const r=await sellHolding(p,id,q); save(); render();
             if(r){ const left = (p.holdings&&p.holdings[id]) ? (Number(p.holdings[id].qty)||0) : 0;
                 const moved = Math.abs(r.fill-r.p0)>0.0001 ? ('\n📉 Объём просадил рынок: витрина '+r.p0+'$, выход по ~'+r.fill+'$.') : '';
-                alert('✅ Продано '+fmtN(r.qty)+' шт «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу · чистая прибыль '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$. Осталось '+fmtN(left)+' шт.'+moved); }
+                toast('✅ Продано '+fmtN(r.qty)+' шт «'+r.name+'» по ~'+r.fill+'$ · комиссия '+fmtN(r.fee)+'$ → +'+fmtN(r.net)+'$ в кассу · чистая прибыль '+(r.profit>=0?'+':'')+fmtN(r.profit)+'$. Осталось '+fmtN(left)+' шт.'+moved); }
         }
-        async function sellAllAssets(){
+        function sellAllAssets(){
             const pid=state.currentPlayerId;
             let p=state.players.find(x=>x.id==pid); if(!p) return;
-            const ids=Object.keys(p.holdings||{}); if(!ids.length){ alert('Нет активов для продажи.'); return; }
-            if(!confirm('Продать ВСЕ активы разом ('+ids.length+' поз.) по рынку?\nМемкоины крупным объёмом просядут, спишется комиссия. В истории сделок будет цена каждой продажи.')) return;
+            const ids=Object.keys(p.holdings||{}); if(!ids.length){ toast('Нет активов для продажи.'); return; }
+            viaConfirm('Продать ВСЕ активы разом ('+ids.length+' поз.) по рынку?\nМемкоины крупным объёмом просядут, спишется комиссия. В истории сделок будет цена каждой продажи.', async function(){
             let totNet=0, totFee=0, cnt=0;
             for(const id of ids){
                 lastSaveT=Date.now(); lastSavedId=pid;         // держим окно антизатирания открытым весь цикл
@@ -13562,7 +13564,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 save(pid);                                     // сохраняем СЕБЯ после каждой продажи — сервер не откатит позиции
             }
             render();
-            alert('✅ Продано всё ('+cnt+' поз.) → +'+fmtN(totNet)+'$ в кассу (комиссия биржи '+fmtN(totFee)+'$). Цены продаж — в истории сделок.');
+            toast('✅ Продано всё ('+cnt+' поз.) → +'+fmtN(totNet)+'$ в кассу (комиссия биржи '+fmtN(totFee)+'$). Цены продаж — в истории сделок.');
+            }, {yes:'Продать всё'});
         }
         // Быстрый выбор количества за клик: число, 'min', 'max' (машина сама считает на всю кассу).
         function setQty(v){ state.qtyPreset=v; render(); }
@@ -13775,29 +13778,33 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
             const t=DEPOSIT_TIERS.find(x=>x.k===tier); if(!t) return;
             const el=document.getElementById('depAmt'); const amt=Math.floor(Number(el?el.value:0));
-            if(!amt||amt<1){ alert('Впиши сумму вклада (число больше 0).'); return; }
-            if(amt>p.savings){ alert('Не хватает кассы. У тебя '+fmtN(p.savings)+'$.'); return; }
-            if(t.lock>0 && !confirm('Положить '+fmtN(amt)+'$ на «'+t.n+'» под '+t.rate+'%/год?\n\n⚠️ Снимешь раньше '+t.lock+' лет — потеряешь 40% и проценты сгорят.')) return;
+            if(!amt||amt<1){ toast('Впиши сумму вклада (число больше 0).'); return; }
+            if(amt>p.savings){ toast('Не хватает кассы. У тебя '+fmtN(p.savings)+'$.'); return; }
+            const _place=function(){
             p.savings=Math.round((p.savings-amt)*100)/100;
             p.deposits=p.deposits||[];
             p.deposits.push({id:uid(), amount:amt, tier:t.k, rate:t.rate, lock:t.lock, placedY:curYear()});
             logChoice(p, 'отложить в запас?', 'положил на депозит «'+(t.n||'')+'»', {declined:['держать под рукой','вложить в дело'], paid:'−'+fmtN(amt)+'$ в подушку', amt:amt, sphere:'осторожность'});
             save(); render();
+            };
+            if(t.lock>0){ viaConfirm('Положить '+fmtN(amt)+'$ на «'+t.n+'» под '+t.rate+'%/год?\n\n⚠️ Снимешь раньше '+t.lock+' лет — потеряешь 40% и проценты сгорят.', _place, {yes:'Положить'}); } else { _place(); }
         }
         function withdrawDeposit(id){
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p||!p.deposits) return;
             const d=p.deposits.find(x=>x.id===id); if(!d) return;
             const yrs=Math.max(0,curYear()-(d.placedY||1)); const accrued=depAccrued(d);
             const early=(d.lock>0 && yrs<d.lock); let payout;
+            const _do=function(){
+                p.savings=Math.round((p.savings+payout)*100)/100;
+                p.deposits=p.deposits.filter(x=>x.id!==id);
+                try{ logAction(p, '🏦', early?'Снял вклад досрочно (−40% штраф)':'Снял вклад с процентами', {sphere:'осторожность', amt:payout, ok:!early, why: early?'досрочно, штраф 40%':''}); }catch(e){}
+                save(); render();
+            };
             if(early){ payout=Math.round((Number(d.amount)||0)*0.60);
-                if(!confirm('Снять досрочно? Держал '+yrs+' из '+d.lock+' лет.\nШтраф −40%: вернётся '+fmtN(payout)+'$ (проценты сгорят).')) return;
+                viaConfirm('Снять досрочно? Держал '+yrs+' из '+d.lock+' лет.\nШтраф −40%: вернётся '+fmtN(payout)+'$ (проценты сгорят).', _do, {yes:'Снять досрочно'});
             } else { payout=(Number(d.amount)||0)+accrued;
-                if(!confirm('Снять вклад? Вернётся '+fmtN(payout)+'$ (вложил '+fmtN(d.amount)+' + проценты '+fmtN(accrued)+').')) return;
+                viaConfirm('Снять вклад? Вернётся '+fmtN(payout)+'$ (вложил '+fmtN(d.amount)+' + проценты '+fmtN(accrued)+').', _do, {yes:'Снять вклад'});
             }
-            p.savings=Math.round((p.savings+payout)*100)/100;
-            p.deposits=p.deposits.filter(x=>x.id!==id);
-            try{ logAction(p, '🏦', early?'Снял вклад досрочно (−40% штраф)':'Снял вклад с процентами', {sphere:'осторожность', amt:payout, ok:!early, why: early?'досрочно, штраф 40%':''}); }catch(e){}
-            save(); render();
         }
         // Сколько человек заработает, если положит сумму на этот срок.
         // Проценты простые — ровно как считает depAccrued, чтобы обещание совпало с выплатой.
@@ -13850,9 +13857,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try{
                 const r = await fetch('/p2p/'+action, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
                 const j = await r.json().catch(()=>({}));
-                if(j && j.error){ alert('Не вышло: '+j.error); return null; }
+                if(j && j.error){ toast('Не вышло: '+j.error); return null; }
                 return j;
-            }catch(e){ alert('Нет связи с сервером — сделка не прошла.'); return null; }
+            }catch(e){ toast('Нет связи с сервером — сделка не прошла.'); return null; }
         }
         function p2pOthers(p){ return (state.players||[]).filter(x=>x.id!==p.id); }
         // Входящие: сделки, где я в списке «кому» и ещё не ответил.
@@ -13871,7 +13878,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const m=state.sdelkaModal; if(!m || !m.drawn || m.drawn.kind!=='business') return;
             const c=m.drawn.card; if(!c || !((Number(c.cf)||0)>0)) return;
             const p=state.players.find(x=>x.id==m.pId); if(!p) return;
-            if(!p2pOthers(p).length){ alert('Пока не с кем скидываться — за столом ты один.'); return; }
+            if(!p2pOthers(p).length){ toast('Пока не с кем скидываться — за столом ты один.'); return; }
             state.partnerModal={pId:m.pId, picked:[], card:c, token:m.token||null};
             render();
         }
@@ -13886,26 +13893,27 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const amount=Math.floor(Number((document.getElementById('loanAmt')||{}).value)||0);
             const pct=Math.max(0,Math.min(20,Math.floor(Number((document.getElementById('loanPct')||{}).value)||0)));
             const p=state.players.find(x=>x.id==pid); if(!p) return;
-            if(!to){ alert('Выбери, кому даёшь в долг.'); return; }
-            if(amount<1){ alert('Впиши сумму займа.'); return; }
-            if(amount>(Number(p.savings)||0)){ alert('В кассе только '+fmtN(Math.round(p.savings))+'$.'); return; }
+            if(!to){ toast('Выбери, кому даёшь в долг.'); return; }
+            if(amount<1){ toast('Впиши сумму займа.'); return; }
+            if(amount>(Number(p.savings)||0)){ toast('В кассе только '+fmtN(Math.round(p.savings))+'$.'); return; }
             const who=(state.players.find(x=>x.id==to)||{}).name||'игрок';
             const due=Math.round(amount*(1+pct/100));
-            if(!confirm('Дать '+who+' в долг '+fmtN(amount)+'$ под '+pct+'%?\n\nОн вернёт '+fmtN(due)+'$. Деньги уйдут из кассы, только если он СОГЛАСИТСЯ.')) return;
+            viaConfirm('Дать '+who+' в долг '+fmtN(amount)+'$ под '+pct+'%?\n\nОн вернёт '+fmtN(due)+'$. Деньги уйдут из кассы, только если он СОГЛАСИТСЯ.', async function(){
             const r=await p2pCall('create',{kind:'loan',from:pid,to:[to],amount:amount,pct:pct});
-            if(r&&r.ok){ logChoice(p, 'дать человеку в долг?', 'дал в долг '+who, {declined:['держать деньги у себя'], paid:'−'+fmtN(amount)+'$ в долг под '+pct+'%', amt:amount, sphere:'люди'}); state.loanModal=null; await pollServer(true); alert('📨 Запрос отправлен '+who+'. Деньги уйдут, когда он примет.'); render(); }
-            else if(r&&r.reason==='not_enough') alert('Не хватает кассы на такой заём.');
+            if(r&&r.ok){ logChoice(p, 'дать человеку в долг?', 'дал в долг '+who, {declined:['держать деньги у себя'], paid:'−'+fmtN(amount)+'$ в долг под '+pct+'%', amt:amount, sphere:'люди'}); state.loanModal=null; await pollServer(true); toast('📨 Запрос отправлен '+who+'. Деньги уйдут, когда он примет.'); render(); }
+            else if(r&&r.reason==='not_enough') toast('Не хватает кассы на такой заём.');
+            }, {yes:'Дать в долг'});
         }
         // Ничего не спрашиваем руками: название, цена, поток и обязательства берутся из карты,
         // которую человек уже отсканировал. Владельцем станет он — партнёры получат только поток.
         async function sendPartner(pid){
             const m=state.partnerModal; if(!m || !m.card) return;
             const c=m.card;
-            if(!m.picked.length){ alert('Выбери, кого зовёшь в долю.'); return; }
+            if(!m.picked.length){ toast('Выбери, кого зовёшь в долю.'); return; }
             const n=m.picked.length+1, share=Math.round(c.price/n), cfShare=Math.round((Number(c.cf)||0)/n);
             const p=state.players.find(x=>x.id==pid);
-            if(share>(Number(p.savings)||0)){ alert('Твоя доля '+fmtN(share)+'$, а в кассе '+fmtN(Math.round(p.savings))+'$.'); return; }
-            if(!confirm('Партнёрство: «'+c.t+'» за '+fmtN(c.price)+'$.\n\nСкидываются '+n+' — по '+fmtN(share)+'$ с каждого, поток по '+fmtN(cfShare)+'$/мес.\n\nДело записывается на ТЕБЯ: ты владелец, развивать можешь только ты. Партнёры получают долю потока — разовьёшь дело, вырастет и у них.\n\nДеньги спишутся у всех, только когда согласятся все.')) return;
+            if(share>(Number(p.savings)||0)){ toast('Твоя доля '+fmtN(share)+'$, а в кассе '+fmtN(Math.round(p.savings))+'$.'); return; }
+            viaConfirm('Партнёрство: «'+c.t+'» за '+fmtN(c.price)+'$.\n\nСкидываются '+n+' — по '+fmtN(share)+'$ с каждого, поток по '+fmtN(cfShare)+'$/мес.\n\nДело записывается на ТЕБЯ: ты владелец, развивать можешь только ты. Партнёры получают долю потока — разовьёшь дело, вырастет и у них.\n\nДеньги спишутся у всех, только когда согласятся все.', async function(){
             const r=await p2pCall('create',{kind:'partner',from:pid,to:m.picked,amount:c.price,cf:Number(c.cf)||0,
                                             price:Number(c.val||c.price)||0,liab:Number(c.liab)||0,title:c.t});
             if(r&&r.ok){
@@ -13914,27 +13922,28 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 if(m.token){ const pp=state.players.find(x=>x.id==pid); if(pp){ pp.ownedCards=pp.ownedCards||[]; if(!pp.ownedCards.includes(m.token)) pp.ownedCards.push(m.token); } }
                 state.sdelkaModal=null;                       // карта отыграна — окно сделки закрываем
                 await pollServer(true);
-                alert('📨 Позвал в долю. Дело откроется, когда согласятся все.'); render();
+                toast('📨 Позвал в долю. Дело откроется, когда согласятся все.'); render();
             }
+            }, {yes:'Позвать в долю'});
         }
         async function p2pRespond(id, pid, accept){
             const r=await p2pCall('respond',{id:id,pid:pid,accept:accept});
             if(r&&r.ok===false){
-                if(r.reason==='lender_broke') alert('У того, кто предлагал заём, уже не хватает денег — сделка отменена.');
-                else if(r.reason==='partner_broke') alert('Не у всех хватило денег на долю ('+(r.who||[]).join(', ')+') — дело не открылось, деньги не списаны.');
-                else if(r.reason==='closed') alert('Эта сделка уже закрыта.');
-            } else if(r&&r.waiting){ alert('✅ Ты согласился. Ждём ещё '+r.waiting+' партнёр(ов).'); }
+                if(r.reason==='lender_broke') toast('У того, кто предлагал заём, уже не хватает денег — сделка отменена.');
+                else if(r.reason==='partner_broke') toast('Не у всех хватило денег на долю ('+(r.who||[]).join(', ')+') — дело не открылось, деньги не списаны.');
+                else if(r.reason==='closed') toast('Эта сделка уже закрыта.');
+            } else if(r&&r.waiting){ toast('✅ Ты согласился. Ждём ещё '+r.waiting+' партнёр(ов).'); }
             await pollServer(true); render();
         }
-        async function p2pRepay(id, pid, left){
-            const v=prompt('Сколько вернуть? Остаток долга '+fmtN(left)+'$:', String(Math.round(left)));
-            if(v===null) return;
-            const amt=Math.floor(Number(String(v).replace(/[^0-9]/g,''))||0);
-            if(amt<1) return;
-            const r=await p2pCall('repay',{id:id,pid:pid,amount:amt});
-            if(r&&r.ok===false&&r.reason==='not_enough') alert('Не хватает кассы на такой платёж.');
-            else { const _pp=state.players.find(x=>x.id==pid); if(_pp) logChoice(_pp, 'вернуть долг человеку?', 'вернул долг', {declined:['потянуть с возвратом'], paid:'−'+fmtN(amt)+'$ отдал', amt:amt, sphere:'долг'}); }
-            await pollServer(true); render();
+        function p2pRepay(id, pid, left){
+            viaInputModal({ title:'Вернуть долг', sub:'Остаток долга '+fmtN(left)+'$', value:Math.round(left), confirm:'Вернуть', onOk:async function(v){
+                const amt=Math.floor(Number(String(v).replace(/[^0-9]/g,''))||0);
+                if(amt<1) return 'Введи сумму больше нуля.';
+                const r=await p2pCall('repay',{id:id,pid:pid,amount:amt});
+                if(r&&r.ok===false&&r.reason==='not_enough'){ toast('Не хватает кассы на такой платёж.'); return; }
+                const _pp=state.players.find(x=>x.id==pid); if(_pp) logChoice(_pp, 'вернуть долг человеку?', 'вернул долг', {declined:['потянуть с возвратом'], paid:'−'+fmtN(amt)+'$ отдал', amt:amt, sphere:'долг'});
+                await pollServer(true); render();
+            }});
         }
         // ── 💰 Всё «друг на друге» живёт в окне кнопки у кассы (Ринат 23июл: плитку заняли
         //    коллекция и аукцион). Входящие + мои долги/займы + форма «дать в долг» — одно окно. ──
@@ -14153,19 +14162,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                              : '<p style="font-size:12px;color:#6d6a62;line-height:1.55;margin:0;">Коллекция пуста. Вещи приходят только с торгов: живой молоток и запечатанные ящики. Аукцион открывает ведущий — не пропусти.</p>'}
             </div>`;
         }
-        async function colSell(pid, key){
+        function colSell(pid, key){
             const it = COL_ITEMS[key]||{}; const now = colPrice(key);
-            const v = prompt('«'+(it.name||key)+'» уйдёт с молотка на СЛЕДУЮЩИХ торгах.\nКрасная цена сейчас '+fmtN(now)+'$.\n\nМинимальная ставка (старт торгов):', String(Math.max(1,Math.round(now*0.5))));
-            if(v===null) return;
-            const minp = Math.floor(Number(String(v).replace(/[^0-9]/g,''))||0);
-            if(minp<1) return;
-            try{
-                const r = await fetch('/auction/sell',{method:'POST',headers:{'Content-Type':'application/json'},
-                                                       body:JSON.stringify({pid:pid,key:key,min:minp})});
-                const j = await r.json();
-                if(j && j.ok===false) alert('Не получилось: вещь не найдена в коллекции.');
-            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
-            await pollServer(true); render();
+            viaInputModal({ title:'«'+(it.name||key)+'» — на молоток', sub:'Уйдёт с молотка на СЛЕДУЮЩИХ торгах.\nКрасная цена сейчас '+fmtN(now)+'$.\nМинимальная ставка (старт торгов):', value:Math.max(1,Math.round(now*0.5)), confirm:'Выставить на торги', onOk:async function(v){
+                const minp = Math.floor(Number(String(v).replace(/[^0-9]/g,''))||0);
+                if(minp<1) return 'Введи ставку больше нуля.';
+                try{
+                    const r = await fetch('/auction/sell',{method:'POST',headers:{'Content-Type':'application/json'}, body:JSON.stringify({pid:pid,key:key,min:minp})});
+                    const j = await r.json();
+                    if(j && j.ok===false){ toast('Не получилось: вещь не найдена в коллекции.'); return; }
+                }catch(e){ toast('Не дошло до сервера — попробуй ещё раз.'); return; }
+                await pollServer(true); render();
+            }});
         }
         // ── 🔨 Зал торгов: лот, живая ставка, антиснайпер, тёмные ящики ──
         // 🔨 ВЫБОР РЕДКОСТИ на аукционе (Ринат 4авг: «сюда засунуть рарность» — верхняя полоса).
@@ -14296,16 +14304,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         async function aucBid(pid, amount, rar){
             if(!amount){
                 amount = Math.floor(Number((document.getElementById('aucAmt')||{}).value)||0);
-                if(amount<1){ alert('Впиши свою ставку числом.'); return; }
+                if(amount<1){ toast('Впиши свою ставку числом.'); return; }
             }
             let j=null;
             try{
                 const r = await fetch('/auction/bid',{method:'POST',headers:{'Content-Type':'application/json'},
                                                       body:JSON.stringify({pid:pid, amount:amount, rar:rar})});
                 j = await r.json();
-            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
+            }catch(e){ toast('Не дошло до сервера — попробуй ещё раз.'); return; }
             if(j && j.ok===false){
-                alert(j.reason==='low' ? 'Мало: сейчас нужно от '+fmtN(Math.round(j.need||0))+'$.'
+                toast(j.reason==='low' ? 'Мало: сейчас нужно от '+fmtN(Math.round(j.need||0))+'$.'
                     : j.reason==='not_enough' ? 'В кассе не хватает на такую ставку.'
                     : j.reason==='yours' ? 'Твоя ставка и так держит лот.'
                     : j.reason==='own' ? 'Это твой лот — свою вещь не перебивают.'
@@ -14314,19 +14322,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             await pollServer(true); render();
         }
         async function aucDark(pid){
-            if(!confirm('Взять запечатанный ящик за 4 000$?\nВнутри вещь — всегда. Но что именно, узнаешь после оплаты.')) return;
+            viaConfirm('Взять запечатанный ящик за 4 000$?\nВнутри вещь — всегда. Но что именно, узнаешь после оплаты.', async function(){
             let j=null;
             try{
                 const r = await fetch('/auction/dark',{method:'POST',headers:{'Content-Type':'application/json'},
                                                        body:JSON.stringify({pid:pid})});
                 j = await r.json();
-            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
+            }catch(e){ toast('Не дошло до сервера — попробуй ещё раз.'); return; }
             if(j && j.ok===false){
-                alert(j.reason==='sold_out' ? 'Ящики кончились.' : j.reason==='not_enough' ? 'В кассе нет 4 000$.' : 'Сейчас нельзя — торгов нет.');
+                toast(j.reason==='sold_out' ? 'Ящики кончились.' : j.reason==='not_enough' ? 'В кассе нет 4 000$.' : 'Сейчас нельзя — торгов нет.');
                 return;
             }
             if(j && j.ok){ state.darkReveal = j; }
             await pollServer(true); render();
+            }, {yes:'Взять ящик'});
         }
         // Вскрытие ящика — маленький театр: вещь, красная цена, повезло или переплатил.
         function renderDarkReveal(){
@@ -14344,18 +14353,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div></div>`;
         }
         async function aucOpenTorgi(){
-            if(!confirm(SOLO_APP?'Открыть торги?\nВыйдут редкие лоты, таинственный коллекционер будет торговаться против тебя. Можно выставить и свои вещи.':'Открыть аукцион всему столу?\nИгра выставит лоты, следом пойдут вещи игроков.')) return;
+            viaConfirm(SOLO_APP?'Открыть торги?\nВыйдут редкие лоты, таинственный коллекционер будет торговаться против тебя. Можно выставить и свои вещи.':'Открыть аукцион всему столу?\nИгра выставит лоты, следом пойдут вещи игроков.', async function(){
             let j=null;
             try{
                 const r = await fetch('/auction/open',{method:'POST',headers:{'Content-Type':'application/json'},
                                                        body:JSON.stringify({by:(SOLO_APP?'игрок':'ведущий')})});
                 j = await r.json();
-            }catch(e){ alert('Сервер не ответил — попробуй ещё раз.'); return; }
+            }catch(e){ toast('Сервер не ответил — попробуй ещё раз.'); return; }
             if(j && j.ok===false){
-                alert(j.reason==='busy' ? 'Торги уже идут.' : 'Выставить нечего — все вещи разобраны.');
+                toast(j.reason==='busy' ? 'Торги уже идут.' : 'Выставить нечего — все вещи разобраны.');
                 return;
             }
             await pollServer(true); render();
+            }, {yes:'Открыть'});
         }
         // Часы молотка: тикают точечно (textContent), не перерисовывая экран. Антиснайпер
         // двигает endsAt на сервере — свежее время приезжает broadcast'ом в data-ends.
@@ -14392,15 +14402,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         async function rumorChoose(pid, choice){
             const r = state.rumor; if(!r || r.resolved) return;
             const c = RUMOR_CHOICES.find(x=>x.k===choice); if(!c) return;
-            if(!confirm('Слух: «'+r.text+'»\n\nТвоё решение — «'+c.t+'».\n'+c.d+'\n\nПереиграть будет нельзя.')) return;
+            viaConfirm('Слух: «'+r.text+'»\n\nТвоё решение — «'+c.t+'».\n'+c.d+'\n\nПереиграть будет нельзя.', async function(){
             let j=null;
             try{
                 const res = await fetch('/world/rumor',{method:'POST',headers:{'Content-Type':'application/json'},
                                                        body:JSON.stringify({pid:pid, choice:choice})});
                 j = await res.json();
-            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
+            }catch(e){ toast('Не дошло до сервера — попробуй ещё раз.'); return; }
             if(!j || j.ok===false){
-                alert(j && j.reason==='already' ? 'Ты уже решил по этому слуху.'
+                toast(j && j.reason==='already' ? 'Ты уже решил по этому слуху.'
                     : j && j.reason==='closed'  ? 'Поздно — всё уже случилось.'
                     : 'Не получилось, попробуй ещё раз.');
                 return;
@@ -14408,11 +14418,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const _rp = state.players.find(x=>x.id==pid);
             if(_rp) logChoice(_rp, 'слух на бирже: как поступить?', c.t, {declined:RUMOR_CHOICES.filter(x=>x.k!==choice).map(x=>x.t), paid:'решение по непроверенной молве', sphere:'доверие'});
             if(choice==='check'){
-                alert('🔎 Проверка обошлась в '+fmtN(Math.round(j.fee||0))+'$.\n\n'
+                toast('🔎 Проверка обошлась в '+fmtN(Math.round(j.fee||0))+'$.\n\n'
                       + (j.truth ? 'Слух ПОДТВЕРДИЛСЯ. Так и будет.'
                                  : 'Слух ПУСТОЙ. Ничего этого не случится.'));
             }
             await pollServer(true); render();
+            }, {yes:'Решить'});
         }
         // Сервер положил игроку итог по слуху (resolve_rumor) — показываем ОДИН раз и стираем.
         function rumorResultCheck(p){
@@ -14457,29 +14468,31 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         async function ipoChoose(pid, action){
             const io = state.ipo; if(!io || io.resolved) return;
             let amount = 0;
+            const _do = async function(){
+                let j=null;
+                try{
+                    const res = await fetch('/ipo/choice',{method:'POST',headers:{'Content-Type':'application/json'},
+                                                           body:JSON.stringify({pid:pid, action:action, amount:amount})});
+                    j = await res.json();
+                }catch(e){ toast('Не дошло до сервера — попробуй ещё раз.'); return; }
+                if(!j || j.ok===false){
+                    toast(j && j.reason==='already'     ? 'Ты уже решил по этому IPO.'
+                        : j && j.reason==='closed'      ? 'Поздно — окно раннего входа закрылось.'
+                        : j && j.reason==='not_enough'  ? 'Столько нет в кассе.'
+                        : j && j.reason==='no_amount'   ? 'Впиши сумму.'
+                        : 'Не получилось, попробуй ещё раз.');
+                    return;
+                }
+                await pollServer(true); render();
+            };
             if(action==='invest'){
                 const el = document.getElementById('ipoAmt');
                 amount = Math.max(0, Math.floor(Number(el && el.value)||0));
-                if(amount < 1){ alert('Впиши сумму раннего входа.'); return; }
-                if(!confirm('🚀 Влететь в IPO «'+io.nm+'» на '+fmtN(amount)+'$?\n\nМожет быть ×3..10 в луну, а может — скам в ноль. Переиграть нельзя.')) return;
+                if(amount < 1){ toast('Впиши сумму раннего входа.'); return; }
+                viaConfirm('🚀 Влететь в IPO «'+io.nm+'» на '+fmtN(amount)+'$?\n\nМожет быть ×3..10 в луну, а может — скам в ноль. Переиграть нельзя.', _do, {yes:'Влететь'});
             } else {
-                if(!confirm('🧊 Переждать «'+io.nm+'»?\n\nНичего не вложишь. Если монета стрельнёт — упустишь; если скам — сбережёшь деньги.')) return;
+                viaConfirm('🧊 Переждать «'+io.nm+'»?\n\nНичего не вложишь. Если монета стрельнёт — упустишь; если скам — сбережёшь деньги.', _do, {yes:'Переждать'});
             }
-            let j=null;
-            try{
-                const res = await fetch('/ipo/choice',{method:'POST',headers:{'Content-Type':'application/json'},
-                                                       body:JSON.stringify({pid:pid, action:action, amount:amount})});
-                j = await res.json();
-            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
-            if(!j || j.ok===false){
-                alert(j && j.reason==='already'     ? 'Ты уже решил по этому IPO.'
-                    : j && j.reason==='closed'      ? 'Поздно — окно раннего входа закрылось.'
-                    : j && j.reason==='not_enough'  ? 'Столько нет в кассе.'
-                    : j && j.reason==='no_amount'   ? 'Впиши сумму.'
-                    : 'Не получилось, попробуй ещё раз.');
-                return;
-            }
-            await pollServer(true); render();
         }
         // Сервер положил игроку итог по IPO (resolve_ipo) — показываем ОДИН раз через notify и стираем.
         function ipoResultCheck(p){
@@ -14558,20 +14571,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         async function braceChoose(pid, stance){
             const br = state.brace; if(!br || br.resolved) return;
             const st = STANCES[stance]; if(!st) return;
-            if(!confirm('🌍 Эпоха надвигается.\n\nТвоя стойка — «'+st.nm+'».\n'+st.c+'\n\nУгадаешь эпоху — заработаешь; встанешь не туда — потеряешь. Переиграть нельзя.')) return;
+            viaConfirm('🌍 Эпоха надвигается.\n\nТвоя стойка — «'+st.nm+'».\n'+st.c+'\n\nУгадаешь эпоху — заработаешь; встанешь не туда — потеряешь. Переиграть нельзя.', async function(){
             let j=null;
             try{
                 const res = await fetch('/brace/choice',{method:'POST',headers:{'Content-Type':'application/json'},
                                                          body:JSON.stringify({pid:pid, stance:stance})});
                 j = await res.json();
-            }catch(e){ alert('Не дошло до сервера — попробуй ещё раз.'); return; }
+            }catch(e){ toast('Не дошло до сервера — попробуй ещё раз.'); return; }
             if(!j || j.ok===false){
-                alert(j && j.reason==='already' ? 'Ты уже выбрал стойку.'
+                toast(j && j.reason==='already' ? 'Ты уже выбрал стойку.'
                     : j && j.reason==='closed'  ? 'Поздно — эпоха уже настала.'
                     : 'Не получилось, попробуй ещё раз.');
                 return;
             }
             await pollServer(true); render();
+            }, {yes:'Выбрать стойку'});
         }
         function renderBraceModal(p){
             const br = state.brace;
@@ -14797,7 +14811,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p=state.players.find(x=>x.id==pid); if(!p) return;
             const a=(p.assets||[])[idx]; if(!a) return;
             const u=BIZ_UPGRADES.find(x=>x.k===key); if(!u) return;
-            if(bizLevel(a) !== u.lvl){ alert('Сначала пройди предыдущую ступень развития.'); return; }
+            if(bizLevel(a) !== u.lvl){ toast('Сначала пройди предыдущую ступень развития.'); return; }
             state.bizBudget={pId:pid, idx:idx, key:key};
             state.bizModal=null; render();
         }
@@ -14816,8 +14830,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // Берём сумму из состояния (её ставит setBizAmt), поле ввода — только если оно есть.
             const el=document.getElementById('bizAmt');
             const amt=Math.floor(Number((el && el.value) || m.amt || 0));
-            if(amt < u.min){ alert('Минимальный вход в «'+u.t+'» — '+fmtN(u.min)+'$.'); return; }
-            if((Number(p.savings)||0) < amt){ alert('Не хватает кассы: у тебя '+fmtN(Math.round(Number(p.savings)||0))+'$.'); return; }
+            if(amt < u.min){ toast('Минимальный вход в «'+u.t+'» — '+fmtN(u.min)+'$.'); return; }
+            if((Number(p.savings)||0) < amt){ toast('Не хватает кассы: у тебя '+fmtN(Math.round(Number(p.savings)||0))+'$.'); return; }
             // деньги уходят СРАЗУ — как в жизни: заплатил, а результат ещё неизвестен
             p.savings=Math.round(((Number(p.savings)||0)-amt)*100)/100;
             const mult=amt/u.min;
@@ -15242,9 +15256,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function doCharity(v){
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
             const amt=Math.floor(Number(v)||0);
-            if(!amt||amt<1){ alert('Впиши сумму пожертвования (число больше 0).'); return; }
-            if(amt>p.savings){ alert('Не хватает кассы. У тебя '+fmtN(p.savings)+'$.'); return; }
-            if(!confirm('Отдать '+fmtN(amt)+'$ на благотворительность? Деньги уйдут навсегда — но душа растёт.')) return;
+            if(!amt||amt<1){ toast('Впиши сумму пожертвования (число больше 0).'); return; }
+            if(amt>p.savings){ toast('Не хватает кассы. У тебя '+fmtN(p.savings)+'$.'); return; }
+            viaConfirm('Отдать '+fmtN(amt)+'$ на благотворительность? Деньги уйдут навсегда — но душа растёт.', function(){
             p.savings=Math.round((p.savings-amt)*100)/100;
             p.donatedTotal=Math.round(((Number(p.donatedTotal)||0)+amt)*100)/100;
             logChoice(p, 'отдать на благотворительность?', 'отдал людям', {declined:['оставить деньги себе'], paid:'−'+fmtN(amt)+'$ навсегда', amt:amt, sphere:'люди'});
@@ -15259,6 +15273,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const aucNow=(Number(p.bigDonations)||0)>=CHARITY_AUCTION_NEED;
             p.notify='🕯️ Ты отдал '+fmtN(amt)+'$ на благотворительность. Щедрость запоминается.'+(amt>=CHARITY_AUCTION_MIN?(aucNow?' 🎟️ Аукцион открыт!':' 🎟️ +1 к аукциону.'):'');
             save(); render();
+            }, {yes:'Отдать'});
         }
         function renderCharityModal(){
             if(!state.charityModal) return '';
@@ -15380,30 +15395,32 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         async function doTrain(key){
             const p = me(); if(!p) return;
             const t = trainByKey(key); if(!t) return;
-            if(!confirm(`Пройти «${t.name}» за ${fmtN(trainPrice(p,t))}$?\n\nВажно: сам по себе навык денег НЕ приносит. Он откроет создание и сдвинет колоду удачи.\nКаждый следующий навык будет дороже — выбирай, кем становишься.`)) return;
+            viaConfirm(`Пройти «${t.name}» за ${fmtN(trainPrice(p,t))}$?\n\nВажно: сам по себе навык денег НЕ приносит. Он откроет создание и сдвинет колоду удачи.\nКаждый следующий навык будет дороже — выбирай, кем становишься.`, async function(){
             try{
                 const r = await fetch('/self/train',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:p.id, key})});
                 const j = await r.json();
-                if(j && j.ok===false) alert(j.reason==='not_enough' ? 'Не хватает денег: нужно '+fmtN(j.cost)+'$.' : 'Этот навык у тебя уже есть.');
-            }catch(e){ console.warn('self/train:',e); alert('Сеть подвела — попробуй ещё раз.'); }
+                if(j && j.ok===false) toast(j.reason==='not_enough' ? 'Не хватает денег: нужно '+fmtN(j.cost)+'$.' : 'Этот навык у тебя уже есть.');
+            }catch(e){ console.warn('self/train:',e); toast('Сеть подвела — попробуй ещё раз.'); }
+            }, {yes:'Пройти'});
         }
         async function doCreate(key){
             const p = me(); if(!p) return;
             const cr = CREATIONS.find(c => c.key===key); if(!cr) return;
             const d = deckOf(p, cr);
-            if(!confirm(`Создать «${cr.name}» за ${fmtN(createPrice(p,cr))}$?\n\nКолода: ${d.fails} карты «не пошло» и ${d.wins} «пошло».\nПровал забирает деньги целиком — но даёт опыт.`)) return;
+            viaConfirm(`Создать «${cr.name}» за ${fmtN(createPrice(p,cr))}$?\n\nКолода: ${d.fails} карты «не пошло» и ${d.wins} «пошло».\nПровал забирает деньги целиком — но даёт опыт.`, async function(){
             try{
                 const r = await fetch('/self/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:p.id, key})});
                 const j = await r.json();
                 if(j && j.ok===false){
-                    alert(j.reason==='not_enough' ? 'Не хватает денег: нужно '+fmtN(j.cost)+'$.'
+                    toast(j.reason==='not_enough' ? 'Не хватает денег: нужно '+fmtN(j.cost)+'$.'
                         : j.reason==='already' ? 'Ты это уже создал.' : 'Пока закрыто — не хватает навыков.');
                     return;
                 }
                 if(j && j.ok){ state.deckResult = j;
                     try{ logAction(p, j.won?'💡':'💥', j.won?('Создал дело «'+(j.name||'')+'» — взлетело (+'+fmtN(j.cf||0)+'$/мес навсегда)'):('Создал дело «'+(j.name||'')+'» — не взлетело, '+fmtN(j.cost||0)+'$ сгорели'), {sphere:'дело', amt: j.won?null:-(Math.round(Number(j.cost)||0)), ok: !!j.won, why: j.won?'':'дело не взлетело'}); }catch(e){}
                     render(); }
-            }catch(e){ console.warn('self/create:',e); alert('Сеть подвела — попробуй ещё раз.'); }
+            }catch(e){ console.warn('self/create:',e); toast('Сеть подвела — попробуй ещё раз.'); }
+            }, {yes:'Создать'});
         }
         async function doDevelop(key){
             const p = me(); if(!p) return;
@@ -15415,12 +15432,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const mineAsset = (p.assets||[]).find(a => a.kind==='CREATION' && (a.ckey===key || String(a.title||'').startsWith(cr.name)));
             const base = Number(mine.base) || Number(mineAsset&&mineAsset.price) || cr.cost;
             const cost = Math.round(base * DEV_COST_MULT[nxt]);
-            if(!confirm(`«${CREATION_STEPS[key][nxt]}» за ${fmtN(cost)}$?\n\nПоток удвоится: ${fmtN(mine.cf)} → ${fmtN(mine.cf*2)}$/мес.\nЭто не лотерея — ступень берётся наверняка.`)) return;
+            viaConfirm(`«${CREATION_STEPS[key][nxt]}» за ${fmtN(cost)}$?\n\nПоток удвоится: ${fmtN(mine.cf)} → ${fmtN(mine.cf*2)}$/мес.\nЭто не лотерея — ступень берётся наверняка.`, async function(){
             try{
                 const r = await fetch('/self/develop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:p.id, key})});
                 const j = await r.json();
-                if(j && j.ok===false) alert(j.reason==='not_enough' ? 'Не хватает денег: нужно '+fmtN(j.cost)+'$.' : j.reason==='max_level' ? 'Это уже развито до конца.' : 'Сначала создай это.');
-            }catch(e){ console.warn('self/develop:',e); alert('Сеть подвела — попробуй ещё раз.'); }
+                if(j && j.ok===false) toast(j.reason==='not_enough' ? 'Не хватает денег: нужно '+fmtN(j.cost)+'$.' : j.reason==='max_level' ? 'Это уже развито до конца.' : 'Сначала создай это.');
+            }catch(e){ console.warn('self/develop:',e); toast('Сеть подвела — попробуй ещё раз.'); }
+            }, {yes:'Развить'});
         }
         // Показ вытянутой карты. Состав колоды виден — в этом вся мораль ветки.
         function renderDeckResult(){
@@ -15465,8 +15483,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function hireAnalyst(tier){
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
             const A=analystBy(tier); if(!A) return;
-            const m=state.market; if(!m||!m.assets){ alert('Рынок ещё грузится — попробуй через пару секунд.'); return; }
-            if((Number(p.savings)||0) < A.fee){ alert('Не хватает кассы на «'+A.name+'»: нужно '+fmtN(A.fee)+'$, а есть '+fmtN(p.savings)+'$.'); return; }
+            const m=state.market; if(!m||!m.assets){ toast('Рынок ещё грузится — попробуй через пару секунд.'); return; }
+            if((Number(p.savings)||0) < A.fee){ toast('Не хватает кассы на «'+A.name+'»: нужно '+fmtN(A.fee)+'$, а есть '+fmtN(p.savings)+'$.'); return; }
             // истинное направление = к якорю (реверсия). Даём верное с вероятностью acc, иначе — обратное (врёт).
             const pool=m.assets.filter(a=>['stock','crypto','metal','comm'].includes(assetCat(a)));
             const src=pool.length?pool:m.assets;
@@ -15541,10 +15559,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const chg=(a.price-c.entry)/c.entry; const dm=c.dir==='long'?1:-1; return Math.round(c.stake*c.lev*chg*dm); }
         function openMarginModal(){
             const p=state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
-            const m=state.market; if(!m||!m.assets){ alert('Рынок ещё грузится — попробуй через пару секунд.'); return; }
+            const m=state.market; if(!m||!m.assets){ toast('Рынок ещё грузится — попробуй через пару секунд.'); return; }
             // 🔒 (Ринат 3авг «лонг/шорт ставится даже когда рынок закрыт»): плечо гейтим окном покупки, как акции.
-            if(!buyWindowOpen()){ const bb=state.board; if(bb && Array.isArray(bb.order) && bb.order.length){ alert('🔒 Биржа закрыта. Плечо и шорт доступны только когда ведущий откроет окно покупки (кнопка ▶ на пульте).'); return; } }
-            if(p.mpos){ alert('Сначала закрой открытую позицию с плечом (кнопка «Закрыть позицию»).'); return; }
+            if(!buyWindowOpen()){ const bb=state.board; if(bb && Array.isArray(bb.order) && bb.order.length){ toast('🔒 Биржа закрыта. Плечо и шорт доступны только когда ведущий откроет окно покупки (кнопка ▶ на пульте).'); return; } }
+            if(p.mpos){ toast('Сначала закрой открытую позицию с плечом (кнопка «Закрыть позицию»).'); return; }
             let def=(p.analyst&&p.analyst.assetId)?p.analyst.assetId:null;
             if(!def){ const cr=m.assets.find(x=>assetCat(x)==='crypto'); def=cr?cr.id:m.assets[0].id; }
             state.marginModal={assetId:String(def), lev:1, amt:0}; paintOverlays();
@@ -15579,12 +15597,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function confirmMargin(dir){
             const mm=state.marginModal; if(!mm) return;
             const p=state.players.find(x=>x.id==state.currentPlayerId); const a=assetById(mm.assetId);
-            if(!p||!a){ alert('Выбери актив.'); return; }
-            if(!buyWindowOpen()){ const bb=state.board; if(bb && Array.isArray(bb.order) && bb.order.length){ alert('🔒 Биржа закрыта — плечо/шорт нельзя открыть, пока ведущий не откроет окно покупки.'); state.marginModal=null; paintOverlays(); return; } }
-            if(p.mpos){ alert('Сначала закрой открытую позицию с плечом.'); return; }
+            if(!p||!a){ toast('Выбери актив.'); return; }
+            if(!buyWindowOpen()){ const bb=state.board; if(bb && Array.isArray(bb.order) && bb.order.length){ toast('🔒 Биржа закрыта — плечо/шорт нельзя открыть, пока ведущий не откроет окно покупки.'); state.marginModal=null; paintOverlays(); return; } }
+            if(p.mpos){ toast('Сначала закрой открытую позицию с плечом.'); return; }
             const amt=Math.floor(Number(mm.amt)||0);
-            if(amt<1){ alert('Впиши сумму ставки.'); return; }
-            if(amt>(Number(p.savings)||0)){ alert('Столько нет в кассе. У тебя '+fmtN(p.savings)+'$.'); return; }
+            if(amt<1){ toast('Впиши сумму ставки.'); return; }
+            if(amt>(Number(p.savings)||0)){ toast('Столько нет в кассе. У тебя '+fmtN(p.savings)+'$.'); return; }
             const lev=Number(mm.lev)||1;
             p.savings=Math.round(((Number(p.savings)||0)-amt)*100)/100;
             p.mpos={assetId:String(mm.assetId), name:a.name, dir, stake:amt, lev, entry:a.price, openTime:Date.now()};
@@ -15893,8 +15911,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(_slotSpinning) return;
             const el=document.getElementById('betAmt');
             const bet=Math.floor(Number(el?el.value:0));
-            if(!bet||bet<1){ alert('Введи ставку (число больше 0).'); return; }
-            if(bet>p.savings){ alert('Не хватает кассы. У тебя '+Math.round(p.savings)+'$.'); return; }
+            if(!bet||bet<1){ toast('Введи ставку (число больше 0).'); return; }
+            if(bet>p.savings){ toast('Не хватает кассы. У тебя '+Math.round(p.savings)+'$.'); return; }
             // ставка списывается СРАЗУ
             p.savings=Math.round((p.savings-bet)*100)/100;
             const st=pstat(p); st.casinoPlays++;
@@ -16425,8 +16443,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // кто реально помогает за столом и подсказывает.
         function s5Service(pid){
             const p = state.players.find(x => x.id == pid); if(!p) return;
-            if(p.cursed){ alert('У него сгорела колода. Круг души закрыт.'); return; }
-            if(s5has(p,'service')){ alert('«Служение людям» у него уже есть.'); return; }
+            if(p.cursed){ toast('У него сгорела колода. Круг души закрыт.'); return; }
+            if(s5has(p,'service')){ toast('«Служение людям» у него уже есть.'); return; }
             s5give(p, 'service'); save(p.id); render();
         }
 
@@ -17612,7 +17630,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         async function confirmSell(){
             const m = state.sellModal; if(!m) return;
             const id = m.assetId, q = Math.floor(Number(m.qty)||0);
-            if(!q || q<1){ alert('Выбери количество — кнопкой или впиши вручную.'); return; }
+            if(!q || q<1){ toast('Выбери количество — кнопкой или впиши вручную.'); return; }
             state.sellModal = null;
             const p = state.players.find(x=>x.id==state.currentPlayerId); if(!p) return;
             lastSaveT = Date.now();
@@ -17727,13 +17745,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(mode==='loan'){ const m=bizLoan(o); need=m.down; liab=m.liab; cf=m.net; how='в кредит'; }
             else { need=o.cost; how='наличными'; }
             if(sav<need){ p.notify='💸 Не хватает кассы: нужно '+fmtN(need)+'$, у тебя '+fmtN(sav)+'$.'; render(); return; }
-            if(cf<0 && !confirm('⚠️ «'+o.title+'»: платёж по кредиту больше потока — минус '+fmtN(-cf)+'$/мес. Разовьёшь дело (поток вырастет) или попадёшь в кассовый разрыв. Берём?')) return;
+            const _buy = function(){
             p.savings=Math.round(sav-need);
             p.assets=p.assets||[];
             p.assets.push({ id:Date.now()+Math.floor(Math.random()*1000), type:'BUSINESS', title:o.emoji+' '+o.title, price:o.cost, down:need, liab, cf, stage:o.stage, bizLvl:0, bought:true });
             try{ logAction(p,'🏢','Открыл бизнес «'+o.title+'» ('+how+') за '+fmtN(need)+'$'+(cf>=0?', пассив +'+fmtN(cf)+'$/мес':', пока минус '+fmtN(-cf)+'$/мес — развивай') , {sphere:'деньги', amt:-need, ok:cf>=0}); }catch(e){}
             p.notify='🏢 Твоё дело: «'+o.title+'». '+(how==='в кредит'?'Кредит '+fmtN(liab)+'$. ':'')+(cf>=0?'Пассив +'+fmtN(cf)+'$/мес. Развивай — ступени удваивают поток.':'Поток '+fmtN(cf)+'$/мес — развивай, пока не съел кассу.');
             save(pId); render();
+            };
+            if(cf<0){ viaConfirm('⚠️ «'+o.title+'»: платёж по кредиту больше потока — минус '+fmtN(-cf)+'$/мес. Разовьёшь дело (поток вырастет) или попадёшь в кассовый разрыв. Берём?', _buy, {yes:'Берём'}); } else { _buy(); }
         }
         // 🧨 КАССОВЫЙ РАЗРЫВ — главный урок бизнеса: гибнут не от убытка, а когда нечем платить СЕГОДНЯ.
         // Зовётся из giveSalary ПОСЛЕ начисления потока: если у тебя есть дело, а касса ушла в минус —
@@ -17851,13 +17871,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             else if(mode==='mortgage' && o.val>0 && !o.reit){ const m=realtyMortgage(o); need=m.down; liab=m.liab; cf=m.net; how='ипотека'; }
             else { need=o.val; cf=o.rent; how='наличными'; }
             if(sav<need){ p.notify='💸 Не хватает кассы: нужно '+fmtN(need)+'$, у тебя '+fmtN(sav)+'$.'; render(); return; }
-            if(cf<0 && !confirm('⚠️ Объект «'+o.title+'»: аренда не покроет ипотеку — минус '+fmtN(-cf)+'$/мес из твоего потока. На флипе/котловане это нормально: цель — отремонтировать и продать дороже. Берём?')) return;
+            const _buy = function(){
             p.savings=Math.round(sav-need);
             p.assets=p.assets||[];
             p.assets.push({ id:Date.now()+Math.floor(Math.random()*1000), type:'ESTATE', title:o.emoji+' '+o.title, price:(o.val>0?o.val:o.deposit), down:need, liab, cf, rung:o.rung, flip:!!o.flip, reit:!!o.reit, bought:true });
             try{ logAction(p,'🏠','Купил недвижимость «'+o.title+'» ('+how+') за '+fmtN(need)+'$'+(cf>=0?', рента +'+fmtN(cf)+'$/мес':', пока минус '+fmtN(-cf)+'$/мес — на ремонт и перепродажу'), {sphere:'деньги', amt:-need, ok:cf>=0}); }catch(e){}
             p.notify='🏠 Твой объект: «'+o.title+'». '+(how==='ипотека'?'Ипотека '+fmtN(liab)+'$. ':'')+(cf>=0?'Рента +'+fmtN(cf)+'$/мес.':'Поток '+fmtN(cf)+'$/мес — ремонтируй в «Развивать» и продай дороже.');
             save(pId); render();
+            };
+            if(cf<0){ viaConfirm('⚠️ Объект «'+o.title+'»: аренда не покроет ипотеку — минус '+fmtN(-cf)+'$/мес из твоего потока. На флипе/котловане это нормально: цель — отремонтировать и продать дороже. Берём?', _buy, {yes:'Берём'}); } else { _buy(); }
         }
         // 📈 КАПИТАЛИЗАЦИЯ + жизнь арендатора — ГОДОВОЙ ТИК (зовётся из giveSalary раз в круг-год).
         // Второй рычаг заработка: стоимость объектов дышит с рынком и эпохой (рост/падение), поэтому
@@ -18615,20 +18637,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         async function boardRoll(usePhysical){
             const sel=document.getElementById('boardPid'); const pid=sel?Number(sel.value):null;
-            if(!pid){ alert('Выбери игрока.'); return; }
+            if(!pid){ toast('Выбери игрока.'); return; }
             let value;
             if(usePhysical){
                 const el=document.getElementById('dieVal'); value=Math.max(1,Math.min(6,parseInt(el&&el.value,10)||0));
-                if(!value){ alert('Впиши, сколько выпало на кубике (1–6).'); return; }
+                if(!value){ toast('Впиши, сколько выпало на кубике (1–6).'); return; }
             }
             // 🐞 23июл: ошибка сервера раньше глоталась молча — фишка стояла, ведущий не понимал почему.
             try{
                 const res = await fetch('/turn/roll',{method:'POST',headers:{'Content-Type':'application/json'},
                     body:JSON.stringify(value?{pid,value}:{pid})});
-                if(!res.ok){ alert('🎲 Ход НЕ прошёл ('+(await res.text()||res.status)+'). Попробуй ещё раз.'); return; }
+                if(!res.ok){ toast('🎲 Ход НЕ прошёл ('+(await res.text()||res.status)+'). Попробуй ещё раз.'); return; }
                 state.dieDraft='';        // ход сделан — кубик очищаем, выбор возвращаем к ходящему
                 state.boardSelPid=null;
-            }catch(e){ alert('🎲 Сервер не ответил — ход НЕ сделан. Проверь связь и попробуй ещё раз.'); }
+            }catch(e){ toast('🎲 Сервер не ответил — ход НЕ сделан. Проверь связь и попробуй ещё раз.'); }
             // Зарплата теперь начисляется САМА на сервере при проходе клетки «Зарплата» (Ринат 10июл).
             // Клиентское авто-начисление убрано, чтобы не удваивать.
         }
@@ -18636,12 +18658,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // Ошибся с кубиком — вернул как было. Зарплату/тюрьму сдвиг не трогает: чистое перемещение.
         async function boardNudge(delta){
             const sel=document.getElementById('boardPid'); const pid=sel?Number(sel.value):null;
-            if(!pid){ alert('Выбери игрока.'); return; }
+            if(!pid){ toast('Выбери игрока.'); return; }
             try{
                 const res = await fetch('/turn/move',{method:'POST',headers:{'Content-Type':'application/json'},
                     body:JSON.stringify({pid:pid, delta:delta})});
-                if(!res.ok) alert('Фишка не сдвинулась: '+(await res.text()||res.status));
-            }catch(e){ alert('Сервер не ответил — фишка не сдвинулась.'); }
+                if(!res.ok) toast('Фишка не сдвинулась: '+(await res.text()||res.status));
+            }catch(e){ toast('Сервер не ответил — фишка не сдвинулась.'); }
         }
         async function boardNext(){
             // 🐞 (Ринат 23июл «боты ходят не по очереди, будто один»): раньше был fire-and-forget —
@@ -19515,16 +19537,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             </div>`;
         }
 
-        function farmBuyLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||p.farm) return; if(p.savings<L.price){ alert('Не хватает кассы. Нужно '+L.price+'$'); return; } farmSpend(p,L.price); try{logAction(p,'🌾','Купил землю: '+L.name,{sphere:'дело',amt:-L.price});}catch(e){} p.farm={land:size,barn:false,capUsed:0,courses:[],animals:[],batches:[],manager:false,buildings:{}}; state.farmTab='buy'; save(p.id); render(); alert('🌍 Куплена земля: '+L.name+'! Теперь построй амбар.'); }
+        function farmBuyLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||p.farm) return; if(p.savings<L.price){ toast('Не хватает кассы. Нужно '+L.price+'$'); return; } farmSpend(p,L.price); try{logAction(p,'🌾','Купил землю: '+L.name,{sphere:'дело',amt:-L.price});}catch(e){} p.farm={land:size,barn:false,capUsed:0,courses:[],animals:[],batches:[],manager:false,buildings:{}}; state.farmTab='buy'; save(p.id); render(); toast('🌍 Куплена земля: '+L.name+'! Теперь построй амбар.'); }
         // ⬆️ Улучшить землю с ДОПЛАТОЙ РАЗНИЦЫ (Александр 27июл): всё хозяйство остаётся, просто больше слотов.
-        function farmUpgradeLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||!p.farm) return; const cur=FARM_CFG.land[p.farm.land]; if(!cur){ return; } const diff=L.price-cur.price; if(diff<=0){ alert('Это не больше текущей земли.'); return; } if(p.savings<diff){ alert('Не хватает кассы. Доплата разницы: '+fmtN(diff)+'$ (было '+fmtN(cur.price)+', станет '+fmtN(L.price)+').'); return; } farmSpend(p,diff); p.farm.land=size; save(p.id); render(); alert('🌍 Земля расширена до «'+L.name+'» за доплату '+fmtN(diff)+'$! Теперь мест под строения: '+L.slots+'. Всё хозяйство на месте.'); }
-        function farmBuildStructure(bkey){ const _sy=window.scrollY; const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } p.farm.buildings=p.farm.buildings||{}; if(p.farm.buildings[bkey]){ alert('«'+B.name+'» уже построено.'); return; } const L=FARM_CFG.land[p.farm.land]; const built=Object.keys(p.farm.buildings).length; if(built>=L.slots){ alert('🌍 На этой земле мест под строения нет ('+built+'/'+L.slots+'). Купи землю больше — большие территории дороже.'); return; } if(p.savings<B.price){ alert('Не хватает кассы. «'+B.name+'» стоит '+B.price+'$.'); return; } farmSpend(p,B.price); p.farm.buildings[bkey]={lvl:1}; save(p.id); render(); alert('🏗️ Построено: «'+B.name+'» — вмещает '+B.cap+'. Теперь заводи туда живность.'); farmKeepScroll(_sy); }
+        function farmUpgradeLand(size){ const p=farmMe(); const L=FARM_CFG.land[size]; if(!p||!L||!p.farm) return; const cur=FARM_CFG.land[p.farm.land]; if(!cur){ return; } const diff=L.price-cur.price; if(diff<=0){ toast('Это не больше текущей земли.'); return; } if(p.savings<diff){ toast('Не хватает кассы. Доплата разницы: '+fmtN(diff)+'$ (было '+fmtN(cur.price)+', станет '+fmtN(L.price)+').'); return; } farmSpend(p,diff); p.farm.land=size; save(p.id); render(); toast('🌍 Земля расширена до «'+L.name+'» за доплату '+fmtN(diff)+'$! Теперь мест под строения: '+L.slots+'. Всё хозяйство на месте.'); }
+        function farmBuildStructure(bkey){ const _sy=window.scrollY; const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!p.farm.barn){ toast('Сначала построй амбар.'); return; } p.farm.buildings=p.farm.buildings||{}; if(p.farm.buildings[bkey]){ toast('«'+B.name+'» уже построено.'); return; } const L=FARM_CFG.land[p.farm.land]; const built=Object.keys(p.farm.buildings).length; if(built>=L.slots){ toast('🌍 На этой земле мест под строения нет ('+built+'/'+L.slots+'). Купи землю больше — большие территории дороже.'); return; } if(p.savings<B.price){ toast('Не хватает кассы. «'+B.name+'» стоит '+B.price+'$.'); return; } farmSpend(p,B.price); p.farm.buildings[bkey]={lvl:1}; save(p.id); render(); toast('🏗️ Построено: «'+B.name+'» — вмещает '+B.cap+'. Теперь заводи туда живность.'); farmKeepScroll(_sy); }
         // 🧹 Снести строение и освободить слот (Александр 27июл: не быть прикованным к первому выбору). Возврат 40%.
-        function farmDemolish(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!(p.farm.buildings||{})[bkey]) return; if(farmBuildingUsed(p,bkey)>0){ alert('🚧 В «'+B.name+'» ещё есть живность. Сначала продай или зарежь всех оттуда, потом сноси.'); return; } const back=Math.round(B.price*0.4); if(!confirm('Снести «'+B.name+'»? Вернётся '+fmtN(back)+'$ (40%), место освободится.')) return; delete p.farm.buildings[bkey]; farmSpend(p,-back); save(p.id); render(); alert('🧹 «'+B.name+'» снесено. +'+fmtN(back)+'$, место свободно.'); }
-        function farmUpgradeStructure(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B||!B.up) return; const b=(p.farm.buildings||{})[bkey]; if(!b){ alert('Сначала построй строение.'); return; } if(b.lvl>=2){ alert('«'+B.name+'» уже улучшено до максимума.'); return; } if(p.savings<B.up.price){ alert('Не хватает кассы. Улучшение стоит '+B.up.price+'$.'); return; } farmSpend(p,B.up.price); b.lvl=2; save(p.id); render(); alert('⬆️ «'+B.name+'» улучшено — теперь вмещает '+B.up.cap+'.'); }
-        function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ alert('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); }
-        function farmLearn(key){ const _sy=window.scrollY; const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ alert('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); farmToast('🎓 Изучено: '+FARM_CFG.courseName[key]); }
-        function farmBuyAnimal(kind){ const _sy=window.scrollY; const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ alert('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ alert('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ alert('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const isPast=(bkey==='pasture'); const B=isPast?{name:'🐄 Пастбище (выгул)'}:FARM_BUILDINGS[bkey]; if(!bkey||!B){ alert('Этому виду негде жить.'); return; } if(isPast ? farmPastureTier(p)<=0 : (!p.farm.buildings || !p.farm.buildings[bkey])){ alert(isPast?'🐄 Сначала купи ПАСТБИЩЕ для ангусов — отдельная земля-выгул (раздел «Строения» на вкладке 🛒 Купить). На нём только выгул, строить нельзя.':('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).')); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ alert(isPast?('🐄 Пастбище заполнено: '+_used+'/'+_cap+'. Расширь площадь или продай/зарежь часть.'):('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.')); return; } farmAskQty({ title:'Купить «'+c.name+'»', note:'Цена '+fmtN(farmBuyPrice(c))+'$/'+(c.crop?'шт':'гол')+' · свободно '+_room+' в «'+B.name+'»', def:1, min:1, max:_room, okLabel:'Купить',
+        function farmDemolish(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B) return; if(!(p.farm.buildings||{})[bkey]) return; if(farmBuildingUsed(p,bkey)>0){ toast('🚧 В «'+B.name+'» ещё есть живность. Сначала продай или зарежь всех оттуда, потом сноси.'); return; } const back=Math.round(B.price*0.4); viaConfirm('Снести «'+B.name+'»? Вернётся '+fmtN(back)+'$ (40%), место освободится.', function(){ delete p.farm.buildings[bkey]; farmSpend(p,-back); save(p.id); render(); toast('🧹 «'+B.name+'» снесено. +'+fmtN(back)+'$, место свободно.'); }, {yes:'Снести'}); }
+        function farmUpgradeStructure(bkey){ const p=farmMe(); const B=FARM_BUILDINGS[bkey]; if(!p||!p.farm||!B||!B.up) return; const b=(p.farm.buildings||{})[bkey]; if(!b){ toast('Сначала построй строение.'); return; } if(b.lvl>=2){ toast('«'+B.name+'» уже улучшено до максимума.'); return; } if(p.savings<B.up.price){ toast('Не хватает кассы. Улучшение стоит '+B.up.price+'$.'); return; } farmSpend(p,B.up.price); b.lvl=2; save(p.id); render(); toast('⬆️ «'+B.name+'» улучшено — теперь вмещает '+B.up.cap+'.'); }
+        function farmBuildBarn(){ const p=farmMe(); if(!p||!p.farm||p.farm.barn) return; if(p.savings<FARM_CFG.barn){ toast('Не хватает кассы. Нужно '+FARM_CFG.barn+'$'); return; } farmSpend(p,FARM_CFG.barn); p.farm.barn=true; save(p.id); render(); }
+        function farmLearn(key){ const _sy=window.scrollY; const p=farmMe(); if(!p||!p.farm) return; const price=FARM_CFG.courses[key]; if(price==null||(p.farm.courses||[]).includes(key)) return; if(key!=='base' && !p.farm.courses.includes('base')){ toast('Сначала выучи «Фермерство».'); return; } if(p.savings<price){ toast('Не хватает кассы. Нужно '+price+'$'); return; } farmSpend(p,price); p.farm.courses.push(key); save(p.id); render(); farmToast('🎓 Изучено: '+FARM_CFG.courseName[key]); }
+        function farmBuyAnimal(kind){ const _sy=window.scrollY; const p=farmMe(); const c=FARM_CFG.animals[kind]; if(!p||!c||!p.farm) return; const L=FARM_CFG.land[p.farm.land]; if(!p.farm.barn){ toast('Сначала построй амбар.'); return; } if(!p.farm.courses.includes('base')){ toast('Сначала выучи «Фермерство».'); return; } if(!farmHasCourses(p,c.need)){ toast('Нужен курс: '+c.need.map(n=>FARM_CFG.courseName[n]).join(', ')); return; } const existing=(p.farm.animals||[]).find(x=>x.kind===kind); const bkey=farmHouseOf(kind); const isPast=(bkey==='pasture'); const B=isPast?{name:'🐄 Пастбище (выгул)'}:FARM_BUILDINGS[bkey]; if(!bkey||!B){ toast('Этому виду негде жить.'); return; } if(isPast ? farmPastureTier(p)<=0 : (!p.farm.buildings || !p.farm.buildings[bkey])){ toast(isPast?'🐄 Сначала купи ПАСТБИЩЕ для ангусов — отдельная земля-выгул (раздел «Строения» на вкладке 🛒 Купить). На нём только выгул, строить нельзя.':('🏗️ Сначала построй «'+B.name+'» — этот вид живёт там (раздел «Строения» на вкладке 🛒 Купить).')); return; } const _cap=farmBuildingCap(p,bkey), _used=farmBuildingUsed(p,bkey), _room=_cap-_used; if(_room<=0){ toast(isPast?('🐄 Пастбище заполнено: '+_used+'/'+_cap+'. Расширь площадь или продай/зарежь часть.'):('🏗️ «'+B.name+'» заполнено: '+_used+'/'+_cap+'. Улучши строение или продай/зарежь часть.')); return; } farmAskQty({ title:'Купить «'+c.name+'»', note:'Цена '+fmtN(farmBuyPrice(c))+'$/'+(c.crop?'шт':'гол')+' · свободно '+_room+' в «'+B.name+'»', def:1, min:1, max:_room, okLabel:'Купить',
                 preview:(q)=>{ const cost=farmBuyPrice(c)*q; const pp=farmMe(); return 'Итого <b>'+fmtN(cost)+'$</b>'+(pp&&cost>pp.savings?' <span style="color:#f87171;">— мало кассы</span>':''); },
                 onOk:(qty)=>{ const pp=farmMe(); if(!pp||!pp.farm||qty<1) return; const cost=farmBuyPrice(c)*qty; if(pp.savings<cost){ farmToast('Не хватает кассы: нужно '+fmtN(cost)+'$'); return; } const ex=(pp.farm.animals||[]).find(x=>x.kind===kind); farmSpend(pp,cost); try{logAction(pp,'🐮','Купил '+qty+' × '+c.name,{sphere:'дело',amt:-cost});}catch(e){} if(ex){ ex.count=(ex.count||1)+qty; } else { pp.farm.animals.push({aid:'a'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,age:0,mature:false,by:curYear(),count:qty}); } pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); const tot=((pp.farm.animals||[]).find(x=>x.kind===kind)||{}).count||qty; farmToast('✅ Куплено '+qty+' «'+c.name+'» — всего '+tot); } }); }
         // 🧹 УБРАТЬ / УТИЛИЗИРОВАТЬ (Ринат 27июл): культуры и живность без убоя — выкосить/убрать, освободить место. Возврат 30% цены.
@@ -19541,7 +19563,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     // 🦴🦬 побочка убоя (Ринат 4авг): у копытного скота — копыта, у рогатого — ещё и рога → на склад
                     let bpMsg=''; if(farmFeedType(aa.kind)==='hay'){ const hide=Math.round(c.meat*FARM_BYPRODUCT.hideFrac)*n; if(hide>0){ pp.farm.stock.hide=(Number(pp.farm.stock.hide)||0)+hide; bpMsg+=' · 🐾 шкура +'+fmtN(hide); } const hoov=Math.round(c.meat*FARM_BYPRODUCT.hoovesFrac)*n; if(hoov>0){ pp.farm.stock.hooves=(Number(pp.farm.stock.hooves)||0)+hoov; bpMsg+=' · 🦴 копыта +'+fmtN(hoov); } if(FARM_HORNED[aa.kind]){ const hrn=Math.round(c.meat*FARM_BYPRODUCT.hornsFrac)*n; if(hrn>0){ pp.farm.stock.horns=(Number(pp.farm.stock.horns)||0)+hrn; bpMsg+=' · 🦬 рога +'+fmtN(hrn); } } }
                     pp.farm.capUsed=farmHeads(pp); save(pp.id); render(); farmToast(lost>0?('🔪 Под нож '+n+' → склад полон, холодильник вместил не всё (потеряно ~'+fmtN(lost)+'$ мяса). Расширь холодильник!'+bpMsg):('🔪 Под нож '+n+' «'+c.name+'» → мясо на склад'+bpMsg)); } }); }
-        function farmBuyFridge(){ const p=farmMe(); if(!p||!p.farm) return; const t=farmFridgeTier(p); if(t>=FRIDGE_TIERS.length){ alert('🧊 Уже максимальный холодильник — расширять некуда.'); return; } const nx=FRIDGE_TIERS[t]; if(p.savings<nx.cost){ alert('Не хватает кассы. «'+nx.name+'» холодильник стоит '+fmtN(nx.cost)+'$.'); return; } farmSpend(p,nx.cost); p.farm.fridgeTier=t+1; p.farm.fridge=true; save(p.id); render(); alert('🧊 '+(t===0?'Куплен':'Расширен до «'+nx.name+'»')+' холодильник — вмещает '+fmtN(nx.cap)+' мяса, хранится долго и не тухнет.'); }
+        function farmBuyFridge(){ const p=farmMe(); if(!p||!p.farm) return; const t=farmFridgeTier(p); if(t>=FRIDGE_TIERS.length){ toast('🧊 Уже максимальный холодильник — расширять некуда.'); return; } const nx=FRIDGE_TIERS[t]; if(p.savings<nx.cost){ toast('Не хватает кассы. «'+nx.name+'» холодильник стоит '+fmtN(nx.cost)+'$.'); return; } farmSpend(p,nx.cost); p.farm.fridgeTier=t+1; p.farm.fridge=true; save(p.id); render(); toast('🧊 '+(t===0?'Куплен':'Расширен до «'+nx.name+'»')+' холодильник — вмещает '+fmtN(nx.cap)+' мяса, хранится долго и не тухнет.'); }
         // 🐊👜 сшить сумку из кожи крокодила: списывает кожу со склада, кладёт дорогой товар «сумка» на склад
         function farmMakeBag(){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock=p.farm.stock||{}; const leather=Math.floor(Number(st.crocleather)||0); if(leather<FARM_LEATHER.perBag){ farmToast('Мало кожи: нужно '+FARM_LEATHER.perBag+' ед. на сумку (есть '+fmtN(leather)+').'); return; } st.crocleather=leather-FARM_LEATHER.perBag; st.bag=(Number(st.bag)||0)+FARM_LEATHER.bagValue; save(p.id); render(); farmToast('👜 Сшита сумка из крокодила! На склад +'+fmtN(FARM_LEATHER.bagValue)+'$ товара — продать в 📦 Склад.'); }
         function farmManager(on){ const p=farmMe(); if(!p||!p.farm) return; p.farm.manager=!!on; save(p.id); render(); }
@@ -19555,24 +19577,24 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function batchValue(b){ const cfg=FARM_CFG.aging[b.kind]; if(!cfg) return 0; return Math.round(cfg.baseSell*Math.pow(1+cfg.rate, batchYears(b))); }
         function farmLayBatch(kind){
             const p=farmMe(); const cfg=FARM_CFG.aging[kind]; if(!p||!cfg||!p.farm) return;
-            if(!(p.farm.courses||[]).includes(cfg.need)){ alert('Нужен курс: '+FARM_CFG.courseName[cfg.need]); return; }
-            if((p.farm.batches||[]).length >= FARM_CELLAR_CAP){ alert('🍷 Погреб полон ('+FARM_CELLAR_CAP+' партий). Продай выдержанное, чтобы освободить место.'); return; }
+            if(!(p.farm.courses||[]).includes(cfg.need)){ toast('Нужен курс: '+FARM_CFG.courseName[cfg.need]); return; }
+            if((p.farm.batches||[]).length >= FARM_CELLAR_CAP){ toast('🍷 Погреб полон ('+FARM_CELLAR_CAP+' партий). Продай выдержанное, чтобы освободить место.'); return; }
             farmClock(p);                                    // подтянуть накопленное сырьё
             p.farm.stock = p.farm.stock || {};
             const have = Math.floor(Number(p.farm.stock[cfg.src])||0);
-            if(have < cfg.srcQty){ alert('Не хватает сырья: нужно '+cfg.srcQty+' '+cfg.srcName+', есть '+have+'.\n'+(cfg.src==='milk'?'Заведи коров и дай им год — молоко копится.':'Посади виноград/фрукты и дай им год — урожай копится.')); return; }
-            if(p.savings<cfg.layCost){ alert('Не хватает кассы на процесс. Нужно '+cfg.layCost+'$'); return; }
+            if(have < cfg.srcQty){ toast('Не хватает сырья: нужно '+cfg.srcQty+' '+cfg.srcName+', есть '+have+'.\n'+(cfg.src==='milk'?'Заведи коров и дай им год — молоко копится.':'Посади виноград/фрукты и дай им год — урожай копится.')); return; }
+            if(p.savings<cfg.layCost){ toast('Не хватает кассы на процесс. Нужно '+cfg.layCost+'$'); return; }
             p.farm.stock[cfg.src] = have - cfg.srcQty;        // сырьё потрачено — количество ограничено
             farmSpend(p,cfg.layCost);
             p.farm.batches=p.farm.batches||[];
             p.farm.batches.push({bid:'b'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),kind:kind,years:0,layY:curYear()});
             save(p.id); render();
         }
-        function farmSellBatch(bid){ const p=farmMe(); if(!p||!p.farm) return; const b=(p.farm.batches||[]).find(x=>x.bid===bid); if(!b) return; const cfg=FARM_CFG.aging[b.kind]; const val=batchValue(b); farmSpend(p,-val); try{logAction(p,'🌾','Продал выдержку: '+cfg.name+' ('+(b.years||0)+' лет)',{sphere:'дело',amt:val});}catch(e){} p.farm.batches=p.farm.batches.filter(x=>x.bid!==bid); save(p.id); render(); alert('💰 Продано: '+cfg.name+' выдержки '+(b.years||0)+' лет — +'+val+'$ в кассу!'); }
+        function farmSellBatch(bid){ const p=farmMe(); if(!p||!p.farm) return; const b=(p.farm.batches||[]).find(x=>x.bid===bid); if(!b) return; const cfg=FARM_CFG.aging[b.kind]; const val=batchValue(b); farmSpend(p,-val); try{logAction(p,'🌾','Продал выдержку: '+cfg.name+' ('+(b.years||0)+' лет)',{sphere:'дело',amt:val});}catch(e){} p.farm.batches=p.farm.batches.filter(x=>x.bid!==bid); save(p.id); render(); toast('💰 Продано: '+cfg.name+' выдержки '+(b.years||0)+' лет — +'+val+'$ в кассу!'); }
 
         // ─── 📦 СКЛАД: продажа товара (всё сразу или по отдельности), холодильник, запас корма ───
-        function farmSellProduct(prod){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; const units=Math.floor(Number(st[prod])||0); if(units<=0){ alert('Этого товара на складе нет.'); return; } const val=Math.round(units*farmUnitPrice(prod)); st[prod]=0; if(prod==='meat') p.farm.meatFreshY=null; farmSpend(p,-val); try{logAction(p,'🌾','Продал со склада: '+units+' × '+(FARM_STOCK_LABELS[prod]||prod),{sphere:'дело',amt:val});}catch(e){} save(p.id); render(); alert('💰 Продано со склада: '+(FARM_STOCK_LABELS[prod]||prod)+' — +'+fmtN(val)+'$ по живой цене.'); }
-        function farmSellAllStock(){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; let total=0, any=false; for(const prod in FARM_STOCK_LABELS){ const units=Math.floor(Number(st[prod])||0); if(units>0){ total+=Math.round(units*farmUnitPrice(prod)); st[prod]=0; any=true; } } if(!any){ alert('Склад пуст — продавать нечего.'); return; } p.farm.meatFreshY=null; farmSpend(p,-total); try{logAction(p,'🌾','Продал весь склад фермы',{sphere:'дело',amt:total});}catch(e){} save(p.id); render(); alert('💰 Продан весь склад — +'+fmtN(total)+'$ в кассу!'); }
+        function farmSellProduct(prod){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; const units=Math.floor(Number(st[prod])||0); if(units<=0){ toast('Этого товара на складе нет.'); return; } const val=Math.round(units*farmUnitPrice(prod)); st[prod]=0; if(prod==='meat') p.farm.meatFreshY=null; farmSpend(p,-val); try{logAction(p,'🌾','Продал со склада: '+units+' × '+(FARM_STOCK_LABELS[prod]||prod),{sphere:'дело',amt:val});}catch(e){} save(p.id); render(); toast('💰 Продано со склада: '+(FARM_STOCK_LABELS[prod]||prod)+' — +'+fmtN(val)+'$ по живой цене.'); }
+        function farmSellAllStock(){ const p=farmMe(); if(!p||!p.farm) return; const st=p.farm.stock||{}; let total=0, any=false; for(const prod in FARM_STOCK_LABELS){ const units=Math.floor(Number(st[prod])||0); if(units>0){ total+=Math.round(units*farmUnitPrice(prod)); st[prod]=0; any=true; } } if(!any){ toast('Склад пуст — продавать нечего.'); return; } p.farm.meatFreshY=null; farmSpend(p,-total); try{logAction(p,'🌾','Продал весь склад фермы',{sphere:'дело',amt:total});}catch(e){} save(p.id); render(); toast('💰 Продан весь склад — +'+fmtN(total)+'$ в кассу!'); }
         // 🌾 ОКНО КОЛИЧЕСТВА корма (Ринат 28июл): впиши, сколько купить; видно цену и на сколько лет хватит.
         function farmCloseModal(){ const m=document.getElementById('farmModal'); if(m) m.remove(); }
         // 🩹 (Ринат 28июл «покупаешь животных — кидает вверх»): нативные prompt/alert сбрасывают прокрутку,
@@ -19623,25 +19645,30 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 </div></div>`; document.body.appendChild(m); farmFeedQtyPreview(ft); }
         function farmFeedQtyStep(ft,d){ const i=document.getElementById('farmQtyInput'); if(!i) return; i.value=Math.max(1,(parseInt(i.value,10)||0)+d); farmFeedQtyPreview(ft); }
         function farmFeedQtyPreview(ft){ const p=farmMe(); const T=(FARM_CFG.feedTypes||{})[ft]; const i=document.getElementById('farmQtyInput'), o=document.getElementById('farmQtyPrev'); if(!p||!T||!i||!o) return; const q=Math.max(0,parseInt(i.value,10)||0); const unit=T.bundle.cost/T.bundle.qty; const cost=Math.round(q*unit); const need=farmFeedNeed(p,ft); const have=Math.floor(Number((p.farm.feedStores||{})[ft])||0); const lasts=need>0?((have+q)/need):null; o.innerHTML='Стоит <b>'+fmtN(cost)+'$</b>'+(lasts!=null?' · хватит на ~'+lasts.toFixed(1)+' лет':' · этому корму пока некого кормить')+(cost>p.savings?' <span style="color:#f87171;">— мало кассы</span>':''); }
-        function farmFeedBuyConfirm(ft){ const p=farmMe(); if(!p||!p.farm) return; const T=(FARM_CFG.feedTypes||{})[ft]; if(!T) return; const i=document.getElementById('farmQtyInput'); const q=Math.max(0,parseInt(i&&i.value,10)||0); if(q<1) return; const unit=T.bundle.cost/T.bundle.qty; const cost=Math.round(q*unit); if(p.savings<cost){ alert('Не хватает кассы: нужно '+fmtN(cost)+'$.'); return; } farmSpend(p,cost); p.farm.feedStores=p.farm.feedStores||{}; p.farm.feedStores[ft]=(Number(p.farm.feedStores[ft])||0)+q; farmCloseModal(); save(p.id); render(); }
+        function farmFeedBuyConfirm(ft){ const p=farmMe(); if(!p||!p.farm) return; const T=(FARM_CFG.feedTypes||{})[ft]; if(!T) return; const i=document.getElementById('farmQtyInput'); const q=Math.max(0,parseInt(i&&i.value,10)||0); if(q<1) return; const unit=T.bundle.cost/T.bundle.qty; const cost=Math.round(q*unit); if(p.savings<cost){ toast('Не хватает кассы: нужно '+fmtN(cost)+'$.'); return; } farmSpend(p,cost); p.farm.feedStores=p.farm.feedStores||{}; p.farm.feedStores[ft]=(Number(p.farm.feedStores[ft])||0)+q; farmCloseModal(); save(p.id); render(); }
         function farmSignContract(id){ const p=farmMe(); if(!p||!p.farm) return; const cf=FARM_CONTRACTS[id]; if(!cf) return;
             if(farmContracts(p).some(c=>c.id===id)){ farmToast('Такой контракт уже подписан.'); return; }
             const rep=repScore(p).rep; if(rep<cf.rep){ farmToast('Мало репутации для этого заказчика: нужно ≥'+cf.rep+' (у тебя '+rep+').'); return; }
             // ⚖️ честная поставка: не даём молча подписать то, что ферма не тянет. Мясо копится убоем → смотрим склад; остальное — годовое производство.
             const have=Math.floor(Number((p.farm.stock||{})[cf.prod])||0); const rate=farmProdRate(p,cf.prod);
             const canSupply = cf.prod==='meat' ? (have>=cf.qtyYr) : (rate>=cf.qtyYr || have>=cf.qtyYr);
+            const _sign = function(){
+                if(p.farm.contractY==null) p.farm.contractY=curYear();
+                p.farm.contracts.push({id:id, since:curYear(), ok:true, strikes:0});
+                save(p.id); render(); farmToast('🤝 Контракт подписан: '+cf.name+'. Держи поставки — капает +'+fmtN(cf.payMo)+'$/мес в пассив.');
+            };
             if(!canSupply){
                 const line = cf.prod==='meat'
                     ? 'нужно '+fmtN(cf.qtyYr)+' мяса/год, а на складе '+fmtN(have)
                     : 'нужно '+fmtN(cf.qtyYr)+'/год, а ферма даёт ~'+fmtN(rate)+'/год';
-                if(!confirm('Ферма пока НЕ тянет этот контракт: '+line+'.\n\nПодпишешь — два года недобора подряд, и заказчик разорвёт контракт, ударив по репутации.\n\nВсё равно подписать?')) return;
+                viaConfirm('Ферма пока НЕ тянет этот контракт: '+line+'.\n\nПодпишешь — два года недобора подряд, и заказчик разорвёт контракт, ударив по репутации.\n\nВсё равно подписать?', _sign, {yes:'Подписать'});
+                return;
             }
-            if(p.farm.contractY==null) p.farm.contractY=curYear();
-            p.farm.contracts.push({id:id, since:curYear(), ok:true, strikes:0});
-            save(p.id); render(); farmToast('🤝 Контракт подписан: '+cf.name+'. Держи поставки — капает +'+fmtN(cf.payMo)+'$/мес в пассив.'); }
+            _sign();
+        }
         function farmCancelContract(id){ const p=farmMe(); if(!p||!p.farm) return; const cf=FARM_CONTRACTS[id]||{};
-            if(!confirm('Расторгнуть контракт «'+(cf.name||id)+'» по-хорошему? Пассив пропадёт, но репутация не пострадает.')) return;
-            p.farm.contracts=(p.farm.contracts||[]).filter(c=>c.id!==id); save(p.id); render(); farmToast('Контракт расторгнут по-хорошему — репутация цела.'); }
+            viaConfirm('Расторгнуть контракт «'+(cf.name||id)+'» по-хорошему? Пассив пропадёт, но репутация не пострадает.', function(){
+            p.farm.contracts=(p.farm.contracts||[]).filter(c=>c.id!==id); save(p.id); render(); farmToast('Контракт расторгнут по-хорошему — репутация цела.'); }, {yes:'Расторгнуть'}); }
         function renderFarmContracts(p){
             if(!p.farm) return '';
             farmClock(p);
@@ -20061,14 +20088,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (p.prof && p.prof.real) { p.notify = '🪞 Твой бланк — это твоя реальная жизнь. Растёшь на своих цифрах: собес, навыки, активы.'; save(); render(); return; }
             const opts = professionsDB.filter(pr => pr.name !== p.prof.name);
             const np = opts[Math.floor(Math.random()*opts.length)];
-            const ok = confirm(`🔀 ШАНС СМЕНИТЬ ПРОФЕССИЮ!\n\nНовая: ${np.name} · з/п ${np.salary}$ (налог ${np.taxes}$)\nТекущая: ${p.prof.name} · з/п ${p.prof.salary}$\n\nПоменять? Касса, активы, долги и дети остаются — меняются зарплата и ставки расходов профессии.`);
-            if (ok) {
+            viaConfirm(`🔀 ШАНС СМЕНИТЬ ПРОФЕССИЮ!\n\nНовая: ${np.name} · з/п ${np.salary}$ (налог ${np.taxes}$)\nТекущая: ${p.prof.name} · з/п ${p.prof.salary}$\n\nПоменять? Касса, активы, долги и дети остаются — меняются зарплата и ставки расходов профессии.`, function(){
                 const old = p.prof.name; p.prof = np;
                 p.notify = `🔀 Профессия изменена: ${old} → ${np.name}. Новая зарплата ${np.salary}$.`;
-            } else {
+                save(); render();
+            }, {yes:'Поменять', onNo:function(){
                 p.notify = `🔀 Шанс смены был — ты ОСТАЛСЯ: ${p.prof.name}.`;
-            }
-            save(); render();
+                save(); render();
+            }});
         }
 
         // 🎴 КЛЕТКИ как компактные цветные плашки (Ринат 19июл — как в макете), вместо развёрнутых панелей.
@@ -20262,14 +20289,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function openSkillTree(id){ const p=state.players.find(x=>x.id===id); if(!p) return; skillBranches(p); state.skillModal={ pId:id }; render(); }
         function closeSkillModal(){ state.skillModal=null; render(); }
         function skillInvestSelf(){ const m=state.skillModal; if(!m) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
-            const cost=4000; if((Number(p.savings)||0)<cost){ alert('Вложиться в себя стоит '+fmtN(cost)+'$ — не хватает кассы.'); return; }
+            const cost=4000; if((Number(p.savings)||0)<cost){ toast('Вложиться в себя стоит '+fmtN(cost)+'$ — не хватает кассы.'); return; }
             p.savings=Math.round(((Number(p.savings)||0)-cost)*100)/100; p.skillPts=(Number(p.skillPts)||0)+1;
             logChoice(p, 'вложить деньги в себя?', 'вложился в себя (рост)', {declined:['оставить деньги в кассе'], paid:'−'+fmtN(cost)+'$ в развитие', amt:cost, sphere:'развитие'});
             p.notify='📚 Вложился в себя −'+fmtN(cost)+'$ → +1 очко навыка. Развитие двигает игру.'; save(); render(); }
         function skillUnlock(bk, idx){ const m=state.skillModal; if(!m) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
             const b=SKILL_BRANCHES.find(x=>x.key===bk); if(!b) return; const sk=b.skills[idx]; if(!sk) return;
-            if(!skillCanUnlock(p,bk,idx)){ alert('Сначала открой предыдущий навык этой ветки.'); return; }
-            const pts=Number(p.skillPts)||0; if(pts<sk.cost){ alert('Не хватает очков навыка: нужно '+sk.cost+', есть '+pts+'. Очко даёт клетка «Навык» или «вложиться в себя».'); return; }
+            if(!skillCanUnlock(p,bk,idx)){ toast('Сначала открой предыдущий навык этой ветки.'); return; }
+            const pts=Number(p.skillPts)||0; if(pts<sk.cost){ toast('Не хватает очков навыка: нужно '+sk.cost+', есть '+pts+'. Очко даёт клетка «Навык» или «вложиться в себя».'); return; }
             p.skillPts=pts-sk.cost; skillBranches(p)[bk].push(idx);
             logChoice(p, 'куда вложить очко развития', 'навык «'+(sk.nm||'')+'» ('+((b&&b.name)||bk)+')', {declined:['копить очки','развивать другую ветку'], paid:'−'+sk.cost+' очк. развития', sphere:'развитие'});
             p.notify=(sk.legend?'🌟 ЛЕГЕНДА! ':'✅ ')+'Открыт навык «'+sk.nm+'» — '+sk.buff+'.'; save(); render(); }
@@ -20697,19 +20724,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // ВЕДУЩИЙ: запускает IPO новой монеты — сервер рассылает окно раннего входа всему столу (оверлей
         // через SSE), по закрытии окна сам резолвит судьбу монеты (resolve_ipo). Клиент только просит запуск.
         function hostLaunchIpo(){
-            if(!SERVER_MODE){ alert('🚀 IPO работает только на сервере (общий стол).'); return; }
+            if(!SERVER_MODE){ toast('🚀 IPO работает только на сервере (общий стол).'); return; }
             fetch('/ipo/launch',{method:'POST',headers:{'Content-Type':'application/json'}})
               .then(r=>r.json())
-              .then(j=>{ if(j && j.ok===false && j.reason==='active') alert('🚀 IPO уже идёт — дождись, пока закроется окно раннего входа.'); })
+              .then(j=>{ if(j && j.ok===false && j.reason==='active') toast('🚀 IPO уже идёт — дождись, пока закроется окно раннего входа.'); })
               .catch(e=>console.warn('ipo:',e));
         }
         // ВЕДУЩИЙ: объявляет надвигающуюся эпоху — сервер рассылает окно подготовки всему столу (оверлей
         // через SSE), по закрытии окна сам резолвит стойки (resolve_brace). Клиент только просит запуск.
         function hostLaunchBrace(){
-            if(!SERVER_MODE){ alert('🌍 Стойка перед эпохой работает только на сервере (общий стол).'); return; }
+            if(!SERVER_MODE){ toast('🌍 Стойка перед эпохой работает только на сервере (общий стол).'); return; }
             fetch('/brace/launch',{method:'POST',headers:{'Content-Type':'application/json'}})
               .then(r=>r.json())
-              .then(j=>{ if(j && j.ok===false && j.reason==='active') alert('⏳ Эпоха уже надвигается — дождись, пока закроется окно подготовки.'); })
+              .then(j=>{ if(j && j.ok===false && j.reason==='active') toast('⏳ Эпоха уже надвигается — дождись, пока закроется окно подготовки.'); })
               .catch(e=>console.warn('brace:',e));
         }
         function maybeShowWorld(){
@@ -21354,7 +21381,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p = state.players.find(x => x.id === m.pId); if (!p) return;
             const c = m.drawn.card;
             const price = (c.k==='risk') ? (Number(c.price)||0) : entrepCost(p, c.price);   // 🏗️ Предприниматель: вход в дело −15% (кроме ставки-риска)
-            if ((Number(p.savings)||0) < price){ alert('🔒 Не хватает денег. Нужно '+price+'$, есть '+Math.round(Number(p.savings)||0)+'$ — нельзя.'); return; }
+            if ((Number(p.savings)||0) < price){ toast('🔒 Не хватает денег. Нужно '+price+'$, есть '+Math.round(Number(p.savings)||0)+'$ — нельзя.'); return; }
             p.savings = Math.round(((Number(p.savings)||0) - price)*100)/100;
             logChoice(p, 'взять деловую сделку?', 'купил дело «'+(c.t||'')+'»', {declined:['пройти мимо сделки'], paid:'−'+price+'$ в дело', amt:price, sphere:'дело'});
             if (c.k === 'flip') {                       // купил и сразу перепродал (разовый кэш)
@@ -21541,7 +21568,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const MED_DISEASES=[{t:'Простуда 🤧',sev:1},{t:'Скачки давления 🩸',sev:1},{t:'Спина и суставы 🦴',sev:2},{t:'Сердце 🫀',sev:2},{t:'Серьёзная болезнь 🏥',sev:3},{t:'Опасная болезнь ☠️',sev:4}];
         function medDiseaseChance(p,checked){ const h=pHealth(p); let base=Math.max(0.06,(100-h)/140); if(checked) base*=0.4; return Math.min(0.9,base); }
         function medPay(p,amt){ amt=Math.max(0,Math.round(amt)); const fc=Math.min(amt,Math.max(0,Number(p.savings)||0)); p.savings=(Number(p.savings)||0)-fc; const rest=amt-fc; if(rest>0){p.bankLoan=(Number(p.bankLoan)||0)+rest; p.autoDebtFlag=true;} return amt; }
-        function medCheckup(){ const m=state.medModal; if(!m||m.checked) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return; const cost=500; if((Number(p.savings)||0)<cost){ alert('Чек-ап стоит '+cost+'$ — не хватает кассы.'); return; } p.savings=(Number(p.savings)||0)-cost; p.health=Math.min(100,pHealth(p)+6); m.checked=true; save(); render(); }
+        function medCheckup(){ const m=state.medModal; if(!m||m.checked) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return; const cost=500; if((Number(p.savings)||0)<cost){ toast('Чек-ап стоит '+cost+'$ — не хватает кассы.'); return; } p.savings=(Number(p.savings)||0)-cost; p.health=Math.min(100,pHealth(p)+6); m.checked=true; save(); render(); }
         function medFace(){ const m=state.medModal; if(!m||m.done) return; const p=state.players.find(x=>x.id===m.pId); if(!p) return;
             if(Math.random() < medDiseaseChance(p,m.checked)){
                 const pool=MED_DISEASES.filter(d=> pHealth(p)>=30 ? d.sev<=3 : true);
@@ -21713,13 +21740,102 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (el) el.innerHTML = blankPreviewText();
         }
 
+        // ─── 🔐 ВНУТРИСТРАНИЧНАЯ МОДАЛКА PIN (замена нативного prompt — он не работает в Telegram Mini App) ───
+        // onOk(value): вернуть true → закрыть; вернуть строку → показать её как ошибку и оставить открытой.
+        function viaPinModal(opts){
+            opts = opts || {};
+            var old = document.getElementById('viaPinModal'); if (old) old.remove();
+            var ov = document.createElement('div'); ov.id = 'viaPinModal';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:6000;background:rgba(4,6,9,.94);display:flex;align-items:center;justify-content:center;padding:18px;';
+            ov.innerHTML = '<div style="width:360px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid #c8a24a;border-radius:18px;padding:22px 20px;box-shadow:0 30px 70px rgba(0,0,0,.7);text-align:center;">'
+                + '<div style="font-family:Georgia,serif;font-size:21px;color:#c8a24a;font-weight:700;">' + (opts.title || 'PIN') + '</div>'
+                + (opts.sub ? '<div style="font-size:12.5px;color:#9c988e;line-height:1.5;margin:8px 4px 2px;">' + opts.sub + '</div>' : '')
+                + '<input id="viaPinInput" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" '
+                + 'style="width:160px;text-align:center;letter-spacing:.45em;font-size:26px;font-weight:800;margin:16px auto 4px;display:block;padding:11px;border-radius:12px;border:1px solid #23324a;background:#0e1420;color:#e7ebf3;">'
+                + '<div id="viaPinErr" style="min-height:16px;font-size:12px;color:#f87171;margin-bottom:6px;"></div>'
+                + '<button id="viaPinOk" style="width:100%;background:linear-gradient(180deg,#c8a24a,#a9842f);color:#20180a;font-weight:800;padding:12px;border:none;border-radius:12px;cursor:pointer;font-size:14px;">' + (opts.confirm || 'OK') + '</button>'
+                + (opts.cancel === false ? '' : '<button id="viaPinCancel" style="width:100%;margin-top:8px;background:#1b2130;color:#9c988e;padding:10px;border:none;border-radius:12px;cursor:pointer;font-size:13px;">Отмена</button>')
+                + '</div>';
+            document.body.appendChild(ov);
+            var inp = document.getElementById('viaPinInput');
+            var err = document.getElementById('viaPinErr');
+            function close(){ try { ov.remove(); } catch(e){} }
+            function submit(){
+                var val = (inp.value || '').replace(/[^0-9]/g, '');
+                var r = opts.onOk ? opts.onOk(val) : true;
+                if (r === true) { close(); }
+                else { err.textContent = (typeof r === 'string' ? r : (opts.errText || 'Проверь PIN (3–4 цифры)')); try { inp.focus(); inp.select(); } catch(e){} }
+            }
+            document.getElementById('viaPinOk').onclick = submit;
+            var cx = document.getElementById('viaPinCancel'); if (cx) cx.onclick = function(){ close(); if (opts.onCancel) opts.onCancel(); };
+            inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') submit(); });
+            setTimeout(function(){ try { inp.focus(); } catch(e){} }, 60);
+        }
+
+        // ─── 💬 ВНУТРИСТРАНИЧНЫЙ ВВОД СУММЫ (замена нативного prompt для игровых действий — Telegram-safe) ───
+        // opts: {title, sub, value(префилл), confirm, onOk(val)}. onOk вернул строку → ошибка инлайн+открыто;
+        // иначе (true/undefined/Promise) → закрыть. onOk может быть async (await внутри).
+        function viaInputModal(opts){
+            opts = opts || {};
+            var old = document.getElementById('viaInputModal'); if (old) old.remove();
+            var ov = document.createElement('div'); ov.id = 'viaInputModal';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:6000;background:rgba(4,6,9,.94);display:flex;align-items:center;justify-content:center;padding:18px;';
+            ov.innerHTML = '<div style="width:380px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid #c8a24a;border-radius:18px;padding:22px 20px;box-shadow:0 30px 70px rgba(0,0,0,.7);text-align:center;">'
+                + '<div style="font-family:Georgia,serif;font-size:19px;color:#c8a24a;font-weight:700;line-height:1.3;">' + (opts.title || 'Введи сумму') + '</div>'
+                + (opts.sub ? '<div style="font-size:12.5px;color:#c9c3b6;line-height:1.5;margin:10px 2px 2px;white-space:pre-line;">' + opts.sub + '</div>' : '')
+                + '<input id="viaInputField" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="' + (opts.value != null ? String(opts.value) : '') + '" '
+                + 'style="width:200px;text-align:center;font-size:24px;font-weight:800;margin:16px auto 4px;display:block;padding:11px;border-radius:12px;border:1px solid #23324a;background:#0e1420;color:#e7ebf3;">'
+                + '<div id="viaInputErr" style="min-height:16px;font-size:12px;color:#f87171;margin-bottom:6px;"></div>'
+                + '<button id="viaInputOk" style="width:100%;background:linear-gradient(180deg,#c8a24a,#a9842f);color:#20180a;font-weight:800;padding:12px;border:none;border-radius:12px;cursor:pointer;font-size:14px;">' + (opts.confirm || 'OK') + '</button>'
+                + '<button id="viaInputCancel" style="width:100%;margin-top:8px;background:#1b2130;color:#9c988e;padding:10px;border:none;border-radius:12px;cursor:pointer;font-size:13px;">Отмена</button>'
+                + '</div>';
+            document.body.appendChild(ov);
+            var inp = document.getElementById('viaInputField');
+            var err = document.getElementById('viaInputErr');
+            function close(){ try { ov.remove(); } catch(e){} }
+            function submit(){
+                var val = (inp.value || '');
+                Promise.resolve(opts.onOk ? opts.onOk(val) : true).then(function(r){
+                    if (typeof r === 'string') { err.textContent = r; try { inp.focus(); inp.select(); } catch(e){} }
+                    else { close(); }
+                });
+            }
+            document.getElementById('viaInputOk').onclick = submit;
+            document.getElementById('viaInputCancel').onclick = function(){ close(); if (opts.onCancel) opts.onCancel(); };
+            inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') submit(); });
+            setTimeout(function(){ try { inp.focus(); inp.select(); } catch(e){} }, 60);
+        }
+
+        // ─── ❓ ПОДТВЕРЖДЕНИЕ ДА/НЕТ (замена нативного confirm — Telegram-safe) ───
+        // В Telegram использует родной tg.showConfirm; на вебе — внутристраничную модалку. onYes() на «да».
+        function viaConfirm(msg, onYes, opts){
+            opts = opts || {};
+            var tg = window.Telegram && window.Telegram.WebApp;
+            if (tg && typeof tg.showConfirm === 'function') {
+                try { tg.showConfirm(String(msg), function(ok){ if (ok) { if (onYes) onYes(); } else if (opts.onNo) opts.onNo(); }); return; } catch(e){}
+            }
+            var old = document.getElementById('viaConfirmModal'); if (old) old.remove();
+            var ov = document.createElement('div'); ov.id = 'viaConfirmModal';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:6100;background:rgba(4,6,9,.94);display:flex;align-items:center;justify-content:center;padding:18px;';
+            ov.innerHTML = '<div style="width:400px;max-width:100%;background:linear-gradient(180deg,#141821,#0b0e14);border:1px solid #c8a24a;border-radius:18px;padding:22px 20px;box-shadow:0 30px 70px rgba(0,0,0,.7);text-align:center;">'
+                + '<div id="viaConfirmMsg" style="font-size:14px;color:#e7ebf3;line-height:1.55;white-space:pre-line;margin-bottom:16px;"></div>'
+                + '<button id="viaConfirmYes" style="width:100%;background:linear-gradient(180deg,#c8a24a,#a9842f);color:#20180a;font-weight:800;padding:12px;border:none;border-radius:12px;cursor:pointer;font-size:14px;">' + (opts.yes || 'Да') + '</button>'
+                + '<button id="viaConfirmNo" style="width:100%;margin-top:8px;background:#1b2130;color:#9c988e;padding:10px;border:none;border-radius:12px;cursor:pointer;font-size:13px;">' + (opts.no || 'Отмена') + '</button>'
+                + '</div>';
+            document.body.appendChild(ov);
+            document.getElementById('viaConfirmMsg').textContent = String(msg);
+            function close(){ try { ov.remove(); } catch(e){} }
+            document.getElementById('viaConfirmYes').onclick = function(){ close(); if (onYes) onYes(); };
+            document.getElementById('viaConfirmNo').onclick = function(){ close(); if (opts.onNo) opts.onNo(); };
+        }
+
         function reg() {
             const name = (document.getElementById('pName').value || state.nameDraft || '').trim();
-            if (!name) { alert('Напиши, как тебя зовут.'); return; }
+            if (!name) { toast('Напиши, как тебя зовут.'); return; }
             const pr = blankToProf(state.blankDraft);
-            if (pr.salary <= 0) { alert('Впиши свой реальный доход в месяц — с него начинается твой бланк.'); return; }
-            const pin = (prompt('Придумай свой PIN (3 или 4 цифры) — чтобы быстро заходить ТОЛЬКО в свой бланк:') || '').trim();
-            if (!/^\d{3,4}$/.test(pin)) { alert('PIN должен быть из 3 или 4 цифр. Регистрация отменена.'); return; }
+            if (pr.salary <= 0) { toast('Впиши свой реальный доход в месяц — с него начинается твой бланк.'); return; }
+            viaPinModal({ title:'Придумай свой PIN', sub:'3 или 4 цифры — чтобы заходить ТОЛЬКО в свой бланк', confirm:'Создать бланк', onOk:function(pin){
+            if (!/^\d{3,4}$/.test(pin)) { return 'PIN должен быть из 3 или 4 цифр.'; }
             const newId = Date.now();
             try { localStorage.setItem('via_me', JSON.stringify({id:newId, pin})); } catch(e){}
             state.players.push({
@@ -21739,6 +21855,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // ВОРОНКА (гипотеза Astana Hub): новый бланк = новый проход. Растим вечный счётчик карточки.
             try { PROFILE.games = (PROFILE.games || 0) + 1; saveProfile(); } catch(e){ console.warn('PROFILE games++', e); }
             state.chosenProf = null; state.blankDraft = { role:'', income:'', taxes:'', housing:'', auto:'', credit:'', other:'', savings:'' }; state.nameDraft = ''; state.sexDraft = 'm'; save(newId); render();
+            return true;
+            }});
         }
 
         // ─── ИНВЕСТИЦИИ (карты Рината: депозиты 🟩 / облигации 🟦 / рискованные 🟥) — вкладываешь сумму, получаешь % каждый круг ───
@@ -21756,11 +21874,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         ];
         function resolveInvest(pid, iv){
             const p=state.players.find(x=>x.id==pid); if(!p) return;
-            let amt=parseInt(((prompt('Сколько вложить в «'+iv.t+'»? Минимум '+iv.min+'$:', iv.min))||'').replace(/[^0-9]/g,''))||iv.min;
+            // #18: последнее честное предупреждение (в тексте модалки) — кубик бросается СРАЗУ после подтверждения.
+            const _riskWarn = iv.risk ? ('⚠️ '+iv.risk+'% ШАНС ПОТЕРЯТЬ '+(iv.loss==='all'?'ВСЁ':'ПОЛОВИНУ')+'. Розыгрыш происходит сразу после подтверждения.') : '';
+            viaInputModal({ title:'Вложить в «'+iv.t+'»', sub:('Минимум '+iv.min+'$.'+(_riskWarn?'\n'+_riskWarn:'')), value:iv.min, confirm:(iv.risk?'Рискнуть и вложить':'Вложить'), onOk:function(v){
+            let amt=parseInt(String(v).replace(/[^0-9]/g,''))||iv.min;
             if(amt<iv.min) amt=iv.min;
-            if((Number(p.savings)||0) < amt){ alert('Не хватает денег: нужно '+amt+'$, у тебя '+Math.round(Number(p.savings)||0)+'$'); return; }
-            // #18: последнее честное предупреждение — кубик бросается ПРЯМО СЕЙЧАС, не «когда-нибудь на рынке».
-            if(iv.risk && !confirm('⚠️ «'+iv.t+'» — '+iv.risk+'% ШАНС ПОТЕРЯТЬ '+(iv.loss==='all'?'ВСЁ':'ПОЛОВИНУ')+'.\n\nВкладываешь '+amt+'$. Розыгрыш происходит сразу: с вероятностью '+iv.risk+'% ты '+(iv.loss==='all'?'теряешь все '+amt+'$':'теряешь половину, '+Math.round(amt/2)+'$')+'.\n\nВкладываем?')) return;
+            if((Number(p.savings)||0) < amt){ return 'Не хватает: нужно '+amt+'$, у тебя '+Math.round(Number(p.savings)||0)+'$'; }
             p.savings=Math.round(((Number(p.savings)||0)-amt)*100)/100;
             p.assets=p.assets||[];
             if(iv.risk){
@@ -21784,6 +21903,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.notify='✅ Вложено '+amt+'$ в «'+iv.t+'» → +'+cf+'$/круг.';
             state.sdelkaModal={pId:pid,drawn:{emoji:(iv.kind==='bond'?'🟦':'🟩'),title:'Вложение оформлено',text:'Вложено '+amt+'$ в «'+iv.t+'». Доход +'+cf+'$ каждый круг ('+iv.rate+'%).'+(iv.term?' Срок ~'+iv.term+' кругов.':''),color:'#5cb08b'}};
             save(); render();
+            }});
         }
         // ─── РЕАЛЬНЫЕ КАРТЫ РИНАТА: колода «Малые активы» (пассивы: заплатил вход → получаешь доход; продажа = стоимость минус обязательства) ───
         // pay = сколько платишь при покупке; val = стоимость при продаже; cf = доход/мес; liab = обязательства (ипотека)
@@ -21906,7 +22026,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     title='🚔 Поймали: '+card.t; text=`+${card.get}$, но выпало ${roll} → штраф −${card.penalty}$. Итог ${card.get-card.penalty}$.`; color='#f87171'; }
                 else { title='😈 Пронесло: '+card.t; text=`+${card.get}$ и не поймали (выпало ${roll}).`; color='#34d399'; }
             } else if(card.k==='bet'){
-                if((Number(p.savings)||0) < card.invest){ alert('🔒 Не хватает на вложение '+card.invest+'$.'); return; }
+                if((Number(p.savings)||0) < card.invest){ toast('🔒 Не хватает на вложение '+card.invest+'$.'); return; }
                 p.savings=Math.round(((Number(p.savings)||0)-card.invest)*100)/100;
                 const roll=1+Math.floor(Math.random()*6);
                 if(roll>=card.win){ p.savings=Math.round(((Number(p.savings)||0)+card.payout)*100)/100;
@@ -22102,7 +22222,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const norm=s=>String(s||'').toLowerCase().replace(/[«»"'`().,\-—:]/g,'').replace(/\s+/g,' ').trim();
             const key=norm(c.t);
             const idx=(p.assets||[]).findIndex(a=>{ const at=norm(a.title); return at && key && (at.includes(key)||key.includes(at)); });
-            if(idx<0){ alert('У тебя нет объекта «'+c.t+'» в бланке. Если он есть — продай через пульт ведущего.'); return; }
+            if(idx<0){ toast('У тебя нет объекта «'+c.t+'» в бланке. Если он есть — продай через пульт ведущего.'); return; }
             const a=p.assets[idx];
             const net=Math.round((c.price-(Number(a.liab)||0))*100)/100;
             p.savings=Math.round(((Number(p.savings)||0)+net)*100)/100;
@@ -22298,30 +22418,32 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function childTimeCost(p){ return Math.round((Number(p.prof&&p.prof.salary)||3000)*0.5); }         // ⚖️ цена внимания — полмесяца заработка
         function childInvestMoney(pid, idx){
             const p=state.players.find(x=>x.id==pid); if(!p||!Array.isArray(p.kids)) return; const k=p.kids[idx]; if(!k) return;
-            if(childAge(k)>=18){ alert('Ребёнок уже вырос — вложения в детстве закрыты.'); return; }
-            if(k.invY===curYear()){ alert('В этом году ты уже вложился в этого ребёнка. Вложение — раз в год (деньги ИЛИ время).'); return; }
+            if(childAge(k)>=18){ toast('Ребёнок уже вырос — вложения в детстве закрыты.'); return; }
+            if(k.invY===curYear()){ toast('В этом году ты уже вложился в этого ребёнка. Вложение — раз в год (деньги ИЛИ время).'); return; }
             const cost=childInvestCost(p);
-            if((Number(p.savings)||0) < cost){ alert('Не хватает денег на вложение в ребёнка: нужно '+fmtN(cost)+'$.'); return; }
-            if(!confirm('💰 Вложить '+fmtN(cost)+'$ в образование/здоровье ребёнка в этом году?\n\n+образование, +здоровье. Деньги растят навыки, но не связь.')) return;
+            if((Number(p.savings)||0) < cost){ toast('Не хватает денег на вложение в ребёнка: нужно '+fmtN(cost)+'$.'); return; }
+            viaConfirm('💰 Вложить '+fmtN(cost)+'$ в образование/здоровье ребёнка в этом году?\n\n+образование, +здоровье. Деньги растят навыки, но не связь.', function(){
             p.savings=Math.round((p.savings-cost)*100)/100;
             const s=childScales(k); s.edu=_clamp100(s.edu+10); s.health=_clamp100(s.health+5); k.invY=curYear();   // ⚖️
             try{ logSignal('family','откупается_деньгами', 1); }catch(e){}
             try{ logAction(p,'💰','Вложил деньги в ребёнка (образование/здоровье)',{amt:-cost, sphere:'наследие'}); }catch(e){}
             p.notify='💰 Вложил '+fmtN(cost)+'$ в ребёнка — выросли образование и здоровье. Но деньги не растят связь.';
             save(pid); render();
+            }, {yes:'Вложить'});
         }
         function childInvestTime(pid, idx){
             const p=state.players.find(x=>x.id==pid); if(!p||!Array.isArray(p.kids)) return; const k=p.kids[idx]; if(!k) return;
-            if(childAge(k)>=18){ alert('Ребёнок уже вырос — вложения в детстве закрыты.'); return; }
-            if(k.invY===curYear()){ alert('В этом году ты уже вложился в этого ребёнка. Вложение — раз в год (деньги ИЛИ время).'); return; }
+            if(childAge(k)>=18){ toast('Ребёнок уже вырос — вложения в детстве закрыты.'); return; }
+            if(k.invY===curYear()){ toast('В этом году ты уже вложился в этого ребёнка. Вложение — раз в год (деньги ИЛИ время).'); return; }
             const cost=childTimeCost(p);
-            if(!confirm('⏳ Провести год рядом с ребёнком вместо заработка?\n\nПропустишь часть дохода (−'+fmtN(cost)+'$), но вырастут связь и ценности — то, что деньгами не купишь.')) return;
+            viaConfirm('⏳ Провести год рядом с ребёнком вместо заработка?\n\nПропустишь часть дохода (−'+fmtN(cost)+'$), но вырастут связь и ценности — то, что деньгами не купишь.', function(){
             p.savings=Math.round(((Number(p.savings)||0)-cost)*100)/100;   // честная цена внимания: недополученный заработок
             const s=childScales(k); s.bond=_clamp100(s.bond+12); s.values=_clamp100(s.values+6); k.invY=curYear();   // ⚖️
             try{ logSignal('family','даёт_внимание', 1); }catch(e){}
             try{ logAction(p,'⏳','Провёл год с ребёнком (−доход, +связь)',{amt:-cost, sphere:'наследие'}); }catch(e){}
             p.notify='⏳ Ты был рядом — связь и ценности ребёнка выросли. Заработок в этом году меньше, но человек важнее.';
             save(pid); render();
+            }, {yes:'Побыть рядом'});
         }
         // Годовой тик детей (зовётся из giveSalary): заброшенный год чуть роняет связь, флаг вложения — годовой.
         function childYearTick(p){
@@ -22365,17 +22487,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function applyCardPreview(){ const cp=state.cardPreview; state.cardPreview=null; if(cp&&cp.apply) cp.apply(); }
         function showCardPreview(pid, type){
             var cp=null;
-            if(String(type).startsWith('black_')){ var c=BLACK_CARDS.find(x=>x.id===parseInt(type.slice(6),10)); if(!c){alert('Нет карты: '+type);return;}
+            if(String(type).startsWith('black_')){ var c=BLACK_CARDS.find(x=>x.id===parseInt(type.slice(6),10)); if(!c){toast('Нет карты: '+type);return;}
                 var d='',ln=[];
                 if(c.k==='crime'){ d='Быстрые криминальные деньги — но с риском, что поймают.'; ln=[['Получишь сразу','+'+c.get+'$','#5cb08b'],['Если бросок ≤'+c.catch,'−'+c.penalty+'$','#cf9a9a']]; }
                 else if(c.k==='bet'){ d='Рискованное вложение на удачу.'; ln=[['Вложишь','−'+c.invest+'$','#cf9a9a'],['Если бросок ≥'+c.win,'+'+c.payout+'$','#5cb08b']]; }
                 else { d=c.note||'Разовый эффект.'; if(c.get) ln=[['Эффект',(c.get>=0?'+':'')+c.get+'$', c.get>=0?'#5cb08b':'#cf9a9a']]; }
                 cp={emoji:'🖤',tag:'Чёрный рынок',title:c.t,desc:d,lines:ln,color:'#b98bff',apply:function(){resolveBlackCard(pid,c);}};
-            } else if(String(type).startsWith('passive_')){ var v=PASSIVE_CARDS.find(x=>x.id===parseInt(type.slice(8),10)); if(!v){alert('Нет карты: '+type);return;}
+            } else if(String(type).startsWith('passive_')){ var v=PASSIVE_CARDS.find(x=>x.id===parseInt(type.slice(8),10)); if(!v){toast('Нет карты: '+type);return;}
                 var l2=[]; if(v.cash)l2.push(['Разовая потеря','−'+v.cash+'$','#cf9a9a']); if(v.pct)l2.push(['Потеря наличных','−'+v.pct+'%','#cf9a9a']);
                 if(v.exp)l2.push(['К расходам навсегда','+'+v.exp+'$/мес','#cf9a9a']); if(v.tax)l2.push(['К налогам','+'+v.tax+'$','#cf9a9a']); if(v.taxPct)l2.push(['К налогам','+'+v.taxPct+'%','#cf9a9a']);
                 cp={emoji:'📕',tag:'Пассив · расход',title:v.t,desc:v.note||'Расход или обязательство.',lines:l2,color:'#cf9a9a',apply:function(){resolvePassiveCard(pid,v);}};
-            } else if(String(type).startsWith('event_')){ var e=EVENT_CARDS.find(x=>x.id===parseInt(type.slice(6),10)); if(!e){alert('Нет карты: '+type);return;}
+            } else if(String(type).startsWith('event_')){ var e=EVENT_CARDS.find(x=>x.id===parseInt(type.slice(6),10)); if(!e){toast('Нет карты: '+type);return;}
                 var d3='',l3=[];
                 if(e.roll==='ruletka'){d3='Крути рулетку удачи!';l3=[['Бросок 1-2','−300$','#cf9a9a'],['3-4','0$','#9c988e'],['5-6','+600$','#5cb08b']];}
                 else if(e.roll==='sluhi'){d3='Слухи в офисе — бросай кубик.';l3=[['Бросок 1-2','−100$','#cf9a9a'],['3-4','0$','#9c988e'],['5-6','+200$','#5cb08b']];}
@@ -22385,7 +22507,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             } else if(type==='ticket'){ cp={emoji:'🎫',tag:'Золотой билет',title:'Золотой билет',desc:'Счастливая клетка! Бросай кубик — награда растёт, шестёрка = джекпот.',lines:[['Бросок 1','+1000$','#5cb08b'],['Бросок 5','+15000$','#5cb08b'],['Бросок 6 · ДЖЕКПОТ','+30000$','#efd8a3']],color:'#efd8a3',apply:function(){resolveGoldenTicket(pid);}};
             } else if(type==='child'){ var pp=state.players.find(x=>x.id==pid); var cc=(pp&&pp.prof&&pp.prof.childCost)||0;
                 cp={emoji:'👶',tag:'Дети',title:'Пополнение в семье',desc:'У тебя будет ребёнок! Радость — но и расходы растут каждый круг.',lines:[['Детей станет',(((pp&&pp.children)||0)+1)+'',''],['Расходы','+'+cc+'$/мес','#cf9a9a']],color:'#b98bff',apply:function(){resolveChild(pid);}};
-            } else if(String(type).startsWith('invest_')){ var iv=INVEST_CARDS.find(x=>x.id===parseInt(type.slice(7),10)); if(!iv){alert('Нет карты: '+type);return;}
+            } else if(String(type).startsWith('invest_')){ var iv=INVEST_CARDS.find(x=>x.id===parseInt(type.slice(7),10)); if(!iv){toast('Нет карты: '+type);return;}
                 var tg = iv.kind==='deposit'?'Депозит':(iv.kind==='bond'?'Облигация':'Рискованное вложение');
                 var cl = iv.kind==='risk'?'#cf9a9a':(iv.kind==='bond'?'#8fb3e0':'#5cb08b');
                 var em = iv.kind==='risk'?'🟥':(iv.kind==='bond'?'🟦':'🟩');
@@ -22427,8 +22549,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function applyQRCard(type){
             const pid = state.currentPlayerId;
-            if(!pid){ state.pendingQR = type; alert('📷 Карта отсканирована. Сначала войди под своим бланком — карта применится сама.'); render(); return; }
-            if(type==='world' && !state.isAdmin){ alert('🌍 Мировое событие теперь открывает только ведущий — тебе тянуть не нужно. Ты увидишь результат, когда оно случится.'); return; }
+            if(!pid){ state.pendingQR = type; toast('📷 Карта отсканирована. Сначала войди под своим бланком — карта применится сама.'); render(); return; }
+            if(type==='world' && !state.isAdmin){ toast('🌍 Мировое событие теперь открывает только ведущий — тебе тянуть не нужно. Ты увидишь результат, когда оно случится.'); return; }
             if(type==='ticket'){ showCardPreview(pid,type); return; }
             if(type==='child'){ const _pp=state.players.find(x=>x.id==pid); if(_pp && Array.isArray(_pp.kids) && _pp.kids.some(k=>childAge(k)<18)){ resolveChild(pid); } else { showCardPreview(pid,type); } return; }   // 👶 уже есть растущий ребёнок → сразу «Наследие» (вложиться), а не «будет ребёнок»
             if(String(type).startsWith('invest_')){ showCardPreview(pid,type); return; }   // депозиты/облигации/рискованные (мелкие сделки)
@@ -22436,10 +22558,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(String(type).startsWith('asset_')){
                 const aid = parseInt(String(type).slice(6),10);
                 const card = ASSET_CARDS.find(c=>c.id===aid);
-                if(!card){ alert('Нет такой карты-актива: '+type); return; }
+                if(!card){ toast('Нет такой карты-актива: '+type); return; }
                 const own=cardOwner(type);
-                if(own && own.id!=pid){ alert('🔒 Эта карта уже куплена игроком «'+own.name+'» — закреплена за ним. Повторно взять нельзя.'); return; }
-                if(own && own.id==pid){ alert('✅ Эта карта уже твоя — повторно её не берут.'); return; }
+                if(own && own.id!=pid){ toast('🔒 Эта карта уже куплена игроком «'+own.name+'» — закреплена за ним. Повторно взять нельзя.'); return; }
+                if(own && own.id==pid){ toast('✅ Эта карта уже твоя — повторно её не берут.'); return; }
                 state.players = state.players.map(x=>x.id==pid ? {...x, allow:'sdelka'} : x);
                 save(pid);   // скан = разрешение; сохраняем на сервер, чтобы синхра не стёрла «allow» → не «жди ведущего»
                 state.view='player';
@@ -22451,10 +22573,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(String(type).startsWith('big_')){
                 const gid = parseInt(String(type).slice(4),10);
                 const card = BIG_CARDS.find(c=>c.id===gid);
-                if(!card){ alert('Нет такой крупной сделки: '+type); return; }
+                if(!card){ toast('Нет такой крупной сделки: '+type); return; }
                 const own=cardOwner(type);
-                if(own && own.id!=pid){ alert('🔒 Эта сделка уже куплена игроком «'+own.name+'» — закреплена за ним. Повторно взять нельзя.'); return; }
-                if(own && own.id==pid){ alert('✅ Эта сделка уже твоя — повторно её не берут.'); return; }
+                if(own && own.id!=pid){ toast('🔒 Эта сделка уже куплена игроком «'+own.name+'» — закреплена за ним. Повторно взять нельзя.'); return; }
+                if(own && own.id==pid){ toast('✅ Эта сделка уже твоя — повторно её не берут.'); return; }
                 state.players = state.players.map(x=>x.id==pid ? {...x, allow:'sdelka'} : x);
                 save(pid);   // скан = разрешение; сохраняем на сервер, чтобы синхра не стёрла «allow»
                 state.view='player';
@@ -22469,7 +22591,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // у Рынка и Сделок (там «купить / отказаться»).
             if(String(type).startsWith('passive_')){
                 const pv = PASSIVE_CARDS.find(x=>x.id===parseInt(String(type).slice(8),10));
-                if(!pv){ alert('Нет карты: '+type); return; }
+                if(!pv){ toast('Нет карты: '+type); return; }
                 resolvePassiveCard(pid, pv);   // спишет и покажет карточку с результатом
                 return;
             }
@@ -22477,7 +22599,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(String(type).startsWith('market_')){
                 const mid = parseInt(String(type).slice(7),10);
                 const card = MARKET_CARDS.find(c=>c.id===mid);
-                if(!card){ alert('Нет такой карты рынка: '+type); return; }
+                if(!card){ toast('Нет такой карты рынка: '+type); return; }
                 state.view='player';
                 resolveMarketCard(pid, card);
                 return;
@@ -22485,7 +22607,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // СОБЫТИЯ: скан → предпросмотр карты → применить
             if(String(type).startsWith('event_')){ showCardPreview(pid,type); return; }
             const spec = QR_CARD[type];
-            if(!spec){ alert('Неизвестная карта в QR: '+type); return; }
+            if(!spec){ toast('Неизвестная карта в QR: '+type); return; }
             const [key, openName, drawName] = spec;
             state.players = state.players.map(x=>x.id==pid ? {...x, allow:key} : x);  // скан карты = доверенно (как выдал ведущий)
             save(pid);   // сохраняем «allow» на сервер, чтобы синхра не стёрла его до открытия/покупки → не «жди ведущего»
@@ -22498,12 +22620,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         async function startScan(){
             const hasBD = ('BarcodeDetector' in window);
             if(!hasBD && !window.jsQR){
-                alert('Твой браузер не умеет сканировать. Наведи на QR обычной камерой телефона — карта тоже откроется.');
+                toast('Твой браузер не умеет сканировать. Наведи на QR обычной камерой телефона — карта тоже откроется.');
                 return;
             }
             let stream;
             try{ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}}); }
-            catch(e){ alert('Камера недоступна: '+(e.message||e)); return; }
+            catch(e){ toast('Камера недоступна: '+(e.message||e)); return; }
             _scanStream=stream;
             _scanOverlay=document.createElement('div');   // оверлей ВНЕ render — broadcast не снесёт видео
             _scanOverlay.style.cssText='position:fixed;inset:0;z-index:5000;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;';
@@ -22542,7 +22664,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             let card=null;
             try{ card=new URL(raw).searchParams.get('card'); }catch(e){}
             if(!card && /^[a-z_]+$/i.test((raw||'').trim())) card=(raw||'').trim();
-            if(!card){ alert('Это не карта VIA: '+raw); return; }
+            if(!card){ toast('Это не карта VIA: '+raw); return; }
             applyQRCard(card);
         }
         function openPlayer(id) {
@@ -22552,11 +22674,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 let saved=null;
                 try { const me=JSON.parse(localStorage.getItem('via_me')||'{}'); if(me.id===id) saved=me.pin; } catch(e){}
                 if (saved !== p.pin) {
-                    const entered = (prompt('PIN для входа в бланк «'+p.name+'»:')||'').trim();
-                    if (entered !== p.pin) { alert('Неверный PIN — это чужой бланк.'); return; }
-                    try { localStorage.setItem('via_me', JSON.stringify({id, pin:entered})); } catch(e){}
+                    viaPinModal({ title:'PIN для входа', sub:'Бланк «'+p.name+'»', confirm:'Войти', onOk:function(entered){
+                        if (entered !== p.pin) { return 'Неверный PIN — это чужой бланк.'; }
+                        try { localStorage.setItem('via_me', JSON.stringify({id, pin:entered})); } catch(e){}
+                        _openPlayerNow(id);
+                        return true;
+                    }});
+                    return;
                 }
             }
+            _openPlayerNow(id);
+        }
+        function _openPlayerNow(id){
             state.currentPlayerId = id; state.view='player'; state.casinoUnlocked=false; _hl=null; _ld=null; render();
             if(state.pendingQR){ const t=state.pendingQR; state.pendingQR=null; applyQRCard(t); }   // отсканированная карта применяется сама
         }
@@ -22569,7 +22698,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function sendAsset() {
             const type = document.getElementById('aType').value;
             const title = document.getElementById('aT').value.trim();
-            if (!title) { alert('Введи название актива!'); return; }
+            if (!title) { toast('Введи название актива!'); return; }
             const details = { type, title };
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
 
@@ -22578,8 +22707,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const qty = Number(document.getElementById('aQty').value);
                 const now = Number(document.getElementById('aNow').value);
                 const div = Number(document.getElementById('aDiv').value) || 0;
-                if (!price || !qty) { alert('Укажи цену покупки и количество!'); return; }
-                if (div < 0 || div > 50) { alert('Дивиденды должны быть от 0 до 50%'); return; }
+                if (!price || !qty) { toast('Укажи цену покупки и количество!'); return; }
+                if (div < 0 || div > 50) { toast('Дивиденды должны быть от 0 до 50%'); return; }
                 details.price = price; details.qty = qty; details.now = now || price;
                 details.div = div;
                 details.cf = Math.round(price * qty * div / 100);  // месячный дивиденд от полной стоимости пакета
@@ -22587,12 +22716,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const down = Number(document.getElementById('aDown').value);
                 const price = Number(document.getElementById('aPrice').value);
                 const cf = Number(document.getElementById('aF').value);
-                if (!down || !price) { alert('Укажи первый взнос и цену!'); return; }
+                if (!down || !price) { toast('Укажи первый взнос и цену!'); return; }
                 details.down = down; details.price = price; details.cf = cf || 0;
             } else {  // OTHER — монеты/золото/антиквариат, БЕЗ дохода (только цена)
                 const price = Number(document.getElementById('aPrice').value);
                 const now = Number(document.getElementById('aNow').value);
-                if (!price) { alert('Укажи цену покупки!'); return; }
+                if (!price) { toast('Укажи цену покупки!'); return; }
                 details.price = price;
                 details.now = now || price;
                 details.cf = 0;  // дохода нет — только прибыль при продаже
@@ -22613,12 +22742,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function reqLoan(elId) {
             // Кредит просят из окна у кассы (id=bankAmt). Старая форма в «Долгах» убрана 23июл.
             const amt = Number((document.getElementById(elId || 'bankAmt') || {}).value);
-            if (!amt || amt < 1000) { alert('Минимальная сумма $1000. Кратно тысяче.'); return; }
+            if (!amt || amt < 1000) { toast('Минимальная сумма $1000. Кратно тысяче.'); return; }
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
-            if ((Number(p.bankLoan)||0) > 0) { alert('🏦 У тебя уже есть кредит ' + fmtN(p.bankLoan) + '$. Один кредит за раз — сначала закрой старый, потом бери новый.'); return; }
+            if ((Number(p.bankLoan)||0) > 0) { toast('🏦 У тебя уже есть кредит ' + fmtN(p.bankLoan) + '$. Один кредит за раз — сначала закрой старый, потом бери новый.'); return; }
             const cap = bankCap(p);
-            if (cap < 1000) { alert('🏦 Банк отказал: твой месячный поток ' + fmtN(Math.round(calc(p).flow)) + '$ — платить нечем. Подними поток и приходи.'); return; }
-            if (amt > cap) { alert('🏦 Банк смотрит на поток: ' + fmtN(Math.round(calc(p).flow)) + '$/мес × 10 = максимум ' + fmtN(cap) + '$. Больше не дадут.'); return; }
+            if (cap < 1000) { toast('🏦 Банк отказал: твой месячный поток ' + fmtN(Math.round(calc(p).flow)) + '$ — платить нечем. Подними поток и приходи.'); return; }
+            if (amt > cap) { toast('🏦 Банк смотрит на поток: ' + fmtN(Math.round(calc(p).flow)) + '$/мес × 10 = максимум ' + fmtN(cap) + '$. Больше не дадут.'); return; }
             // 🎮 СОЛО (Ринат 3окт, фикс): ведущего нет → кредит выдаём СРАЗУ (та же логика, что в appr()).
             // Раньше заявка висела PENDING и ждала одобрения, которого в SOLO_APP не будет — банк не работал.
             if (SOLO_APP) {
@@ -22631,7 +22760,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 save(p.id); render(); return;
             }
             if (state.deals.some(d => d.pId == p.id && d.type === 'TAKE_LOAN' && d.status === 'PENDING')) {
-                alert('⏳ Заявка на кредит уже у ведущего — не дублируй, он вот-вот одобрит.'); return;
+                toast('⏳ Заявка на кредит уже у ведущего — не дублируй, он вот-вот одобрит.'); return;
             }
             state.deals.push({ id: uid(), pId: p.id, pName: p.name, type:'TAKE_LOAN', details:{amount: amt}, status:'PENDING' });
             if (state.bankModal) { state.bankModal = null; p.notify = '🏦 Заявка на кредит ' + fmtN(amt) + '$ ушла ведущему. Деньги придут после одобрения.'; }
@@ -22644,21 +22773,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function payBank(amt) {
             const p = state.players.find(pl => pl.id == state.currentPlayerId);
             const owe = Math.round(Number(p.bankLoan) || 0), cash = Math.floor(Number(p.savings) || 0);
-            if (owe <= 0) { alert('Кредита банка нет — гасить нечего.'); return; }
+            if (owe <= 0) { toast('Кредита банка нет — гасить нечего.'); return; }
             amt = Math.floor(Number(amt) || 0);
             if (amt <= 0) amt = Math.min(owe, cash);        // без суммы — закрываем сколько тянет касса
             amt = Math.min(amt, owe);                        // не больше самого долга
-            if (cash <= 0 || amt < 1) { alert('🚫 В кассе пусто — гасить нечем. Подними поток и приходи.'); return; }
-            if (amt > cash) { alert('🚫 В кассе только '+fmtN(cash)+'$ — на такой платёж не хватает. Погаси суммой поменьше.'); return; }
+            if (cash <= 0 || amt < 1) { toast('🚫 В кассе пусто — гасить нечем. Подними поток и приходи.'); return; }
+            if (amt > cash) { toast('🚫 В кассе только '+fmtN(cash)+'$ — на такой платёж не хватает. Погаси суммой поменьше.'); return; }
             if (state.deals.some(d => d.pId == p.id && d.type === 'PAY_BANK' && d.status === 'PENDING')) {
-                alert('⏳ Платёж по кредиту уже у ведущего — дождись одобрения, не дублируй.'); return;
+                toast('⏳ Платёж по кредиту уже у ведущего — дождись одобрения, не дублируй.'); return;
             }
             const full = amt >= owe;
-            if (!confirm((full ? 'Закрыть кредит банка полностью за ' : 'Погасить часть кредита — ')+fmtN(amt)+'$? Спишется с кассы (у тебя '+fmtN(cash)+'$).'+(full?'':' Остаток '+fmtN(owe-amt)+'$ продолжит капать 10%/мес.'))) return;
+            viaConfirm((full ? 'Закрыть кредит банка полностью за ' : 'Погасить часть кредита — ')+fmtN(amt)+'$? Спишется с кассы (у тебя '+fmtN(cash)+'$).'+(full?'':' Остаток '+fmtN(owe-amt)+'$ продолжит капать 10%/мес.'), function(){
             // 🎮 СОЛО: гасим СРАЗУ (та же логика, что в appr() PAY_BANK) — ведущего нет.
             if (SOLO_APP) {
                 const pay = Math.min(amt, owe, Math.floor(Number(p.savings)||0));
-                if (pay < 1) { alert('🏦 В кассе не хватило — гасить нечем.'); return; }
+                if (pay < 1) { toast('🏦 В кассе не хватило — гасить нечем.'); return; }
                 p.savings = Math.round(((Number(p.savings)||0) - pay)*100)/100;
                 p.bankLoan = Math.round((owe - pay)*100)/100;
                 if (p.bankLoan<=0){ p.bankLoan=0; p.autoDebtFlag=false; logChoice(p,'закрыть кредит банка?','закрыл долг',{declined:['тянуть долг дальше'],paid:'−'+fmtN(pay)+'$, снял цепь',amt:pay,sphere:'свобода'}); }
@@ -22670,6 +22799,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             state.deals.push({ id: uid(), pId: p.id, pName: p.name, type:'PAY_BANK', details:{amount: amt}, status:'PENDING' });
             if (state.bankModal) state.bankModal = null;
             save(); render();
+            }, {yes: full ? 'Закрыть кредит' : 'Погасить'});
         }
 
         function send(type, details={}) {
@@ -22678,19 +22808,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             // заявки одного типа от одного игрока — одна уже висит и ждёт ведущего. Раньше при
             // воскрешении долга игрок жал «Погасить» повторно → ведущему летели дубли.
             if (state.deals.some(d => d.pId == p.id && d.type === type && d.status === 'PENDING')) {
-                alert('⏳ Такая заявка уже отправлена и ждёт ведущего. Не дублируй — он вот-вот одобрит.'); return;
+                toast('⏳ Такая заявка уже отправлена и ждёт ведущего. Не дублируй — он вот-вот одобрит.'); return;
             }
             // Погашение долга стоит денег — сразу проверяем кассу, не гоняя заявку к ведущему впустую.
+            const _submitDebt = function(){
+                const _id = uid();
+                state.deals.push({ id: _id, pId: p.id, pName: p.name, type, details, status:'PENDING' });
+                if (SOLO_APP) { appr(_id); return; }   // 🎮 соло (Ринат 3окт): ведущего нет → применяем сразу тем же кодом appr() (продажа активов/акций, погашение долгов)
+                save(); render();
+            };
             if (DEBT_FIELD[type]) {
                 const owe = Number(p[DEBT_FIELD[type]]) || 0;
                 const cash = Number(p.savings) || 0;
-                if (owe > 0 && cash < owe) { alert('🚫 Не хватает кассы, чтобы закрыть этот долг: нужно '+fmtN(owe)+'$, а у тебя '+fmtN(cash)+'$. Заработай и погаси.'); return; }
-                if (owe > 0 && !confirm('Закрыть долг за '+fmtN(owe)+'$? Спишется с кассы (у тебя '+fmtN(cash)+'$). Ежемесячный платёж исчезнет.')) return;
+                if (owe > 0 && cash < owe) { toast('🚫 Не хватает кассы, чтобы закрыть этот долг: нужно '+fmtN(owe)+'$, а у тебя '+fmtN(cash)+'$. Заработай и погаси.'); return; }
+                if (owe > 0) { viaConfirm('Закрыть долг за '+fmtN(owe)+'$? Спишется с кассы (у тебя '+fmtN(cash)+'$). Ежемесячный платёж исчезнет.', _submitDebt, {yes:'Закрыть долг'}); return; }
             }
-            const _id = uid();
-            state.deals.push({ id: _id, pId: p.id, pName: p.name, type, details, status:'PENDING' });
-            if (SOLO_APP) { appr(_id); return; }   // 🎮 соло (Ринат 3окт): ведущего нет → применяем сразу тем же кодом appr() (продажа активов/акций, погашение долгов)
-            save(); render();
+            _submitDebt();
         }
 
         function sellStock(aId, title) {
@@ -22698,8 +22831,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const asset = p.assets.find(a => a.id == aId);
             if (!asset) return;
             const sellQty = Number(document.getElementById('sellQty_'+aId).value);
-            if (!sellQty || sellQty < 1) { alert('Введи количество для продажи!'); return; }
-            if (sellQty > asset.qty) { alert(`Можно продать максимум ${asset.qty} шт!`); return; }
+            if (!sellQty || sellQty < 1) { toast('Введи количество для продажи!'); return; }
+            if (sellQty > asset.qty) { toast(`Можно продать максимум ${asset.qty} шт!`); return; }
             const _id = uid();
             state.deals.push({
                 id: _id, pId: p.id, pName: p.name,
@@ -22721,7 +22854,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const pl = state.players.find(x => x.id == d.pId);
                 const cap = pl ? bankCap(pl) : 0;
                 if ((Number(d.details.amount) || 0) > cap) {
-                    alert('🚫 Банк не даст «' + (pl ? pl.name : 'игрок') + '» столько: поток ' + fmtN(pl ? Math.round(calc(pl).flow) : 0) + '$/мес → максимум ' + fmtN(cap) + '$. Заявка отклонена — пусть просит меньше или растит поток.');
+                    toast('🚫 Банк не даст «' + (pl ? pl.name : 'игрок') + '» столько: поток ' + fmtN(pl ? Math.round(calc(pl).flow) : 0) + '$/мес → максимум ' + fmtN(cap) + '$. Заявка отклонена — пусть просит меньше или растит поток.');
                     state.deals = state.deals.filter(dl => dl.id != dId);
                     save(); render();
                     return;
@@ -22733,7 +22866,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const owe = pl ? (Number(pl[DEBT_FIELD[d.type]]) || 0) : 0;
                 const cash = pl ? (Number(pl.savings) || 0) : 0;
                 if (owe > 0 && cash < owe) {
-                    alert('🚫 У «'+(pl?pl.name:'игрок')+'» не хватает кассы на погашение: нужно '+fmtN(owe)+'$, есть '+fmtN(cash)+'$. Заявка НЕ одобрена — пусть заработает и подаст снова.');
+                    toast('🚫 У «'+(pl?pl.name:'игрок')+'» не хватает кассы на погашение: нужно '+fmtN(owe)+'$, есть '+fmtN(cash)+'$. Заявка НЕ одобрена — пусть заработает и подаст снова.');
                     return;   // заявка остаётся в списке, долг не тронут
                 }
             }
@@ -22824,7 +22957,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function bankAdjust(id, sign){
             const el=document.getElementById('bankAmt'+id);
             const amt=Math.round((Number(el&&el.value)||0)*100)/100;
-            if(!amt){ alert('Впиши сумму рядом с кассой.'); return; }
+            if(!amt){ toast('Впиши сумму рядом с кассой.'); return; }
             state.players = state.players.map(p => p.id==id
                 ? {...p, savings: Math.round(((Number(p.savings)||0)+sign*amt)*100)/100} : p);
             if(el) el.value='';
@@ -22835,19 +22968,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function admRemoveHolding(pid, hid) {
             const p = state.players.find(x => x.id == pid); if (!p) return;
             const nm = (p.holdings && p.holdings[hid] && p.holdings[hid].name) || 'этот актив';
-            if (!confirm('Закрыть позицию «' + nm + '» у игрока ' + p.name + '? (акции пропадут)')) return;
+            viaConfirm('Закрыть позицию «' + nm + '» у игрока ' + p.name + '? (акции пропадут)', function(){
             state.players = state.players.map(pl => {
                 if (pl.id != pid) return pl;
                 const h = {...(pl.holdings || {})}; delete h[hid];
                 return {...pl, holdings: h};
             });
             save(pid); render();
+            }, {yes:'Закрыть'});
         }
         function admRemoveAsset(pid, aid) {
             const p = state.players.find(x => x.id == pid); if (!p) return;
-            if (!confirm('Убрать этот актив у игрока ' + p.name + '?')) return;
+            viaConfirm('Убрать этот актив у игрока ' + p.name + '?', function(){
             state.players = state.players.map(pl => pl.id != pid ? pl : {...pl, assets: (pl.assets || []).filter(a => a.id != aid)});
             save(pid); render();
+            }, {yes:'Убрать'});
         }
         // ПРОДАТЬ позицию: деньги по текущей цене → в кассу игрока, позиция закрывается
         function admSellHolding(pid, hid) {
@@ -22855,13 +22990,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const h = (p.holdings || {})[hid]; if (!h) return;
             const pr = curPrice(hid) || 0;
             const proceeds = Math.round(pr * (h.qty || 0));
-            if (!confirm('Продать «' + (h.name || 'актив') + '»: ' + (h.qty||0) + ' шт × ' + pr + '$ = ' + proceeds + '$ → в кассу ' + p.name + '?')) return;
+            viaConfirm('Продать «' + (h.name || 'актив') + '»: ' + (h.qty||0) + ' шт × ' + pr + '$ = ' + proceeds + '$ → в кассу ' + p.name + '?', function(){
             state.players = state.players.map(pl => {
                 if (pl.id != pid) return pl;
                 const nh = {...(pl.holdings || {})}; delete nh[hid];
                 return {...pl, holdings: nh, savings: Math.round(((pl.savings || 0) + proceeds) * 100) / 100};
             });
             save(pid); render();
+            }, {yes:'Продать'});
         }
         function admSellAsset(pid, aid) {
             const p = state.players.find(x => x.id == pid); if (!p) return;
@@ -22872,10 +23008,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const msg = liab > 0
                 ? 'Продать «' + (a.title || 'актив') + '»: ' + gross + '$ − обязательства ' + liab + '$ = ' + proceeds + '$ → в кассу ' + p.name + '?'
                 : 'Продать «' + (a.title || 'актив') + '» за ' + proceeds + '$ → в кассу ' + p.name + '?';
-            if (!confirm(msg)) return;
+            viaConfirm(msg, function(){
             state.players = state.players.map(pl => pl.id != pid ? pl
                 : {...pl, assets: (pl.assets || []).filter(x => x.id != aid), savings: Math.round(((pl.savings || 0) + proceeds) * 100) / 100});
             save(pid); render();
+            }, {yes:'Продать'});
         }
         function setTaxPct(id, v) { const n = Math.max(0, Number(v)||0); state.players = state.players.map(p => p.id==id ? {...p, taxPct: n} : p); save(); render(); }
 
@@ -23047,9 +23184,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         // ❌ Отменить тюрьму целиком (Ринат 28июл): вытащить + убрать ВСЕ следы (штрафы/давление/скидку) — как будто не сидел.
         function jailCancel(id) {
             const pl = state.players.find(x=>x.id==id); const nm = pl ? (pl.name||'игрок') : 'игрок';
-            if(!confirm('❌ Отменить тюрьму для «'+nm+'» полностью? Снимутся срок, экран выбора и все следы (штраф к расходам, давление, скидка к налогам).')) return;
+            viaConfirm('❌ Отменить тюрьму для «'+nm+'» полностью? Снимутся срок, экран выбора и все следы (штраф к расходам, давление, скидка к налогам).', function(){
             state.players = state.players.map(p => p.id==id ? {...p, jail: 0, jailPending: null, otherExpPct: 0, jailPress: 0, taxDiscPct: 0} : p);
             save(); render();
+            }, {yes:'Отменить тюрьму'});
         }
         function toggleCasino(id) { state.players = state.players.map(p => p.id==id ? {...p, casinoOff: !p.casinoOff} : p); save(); render(); }
         // Откуп «дать на лапу» (Ринат 29июл): 20% от СВОЕЙ кассы. Раньше брали 10% общего котла,
@@ -23060,7 +23198,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const p = state.players.find(x => x.id == id); if (!p) return;
             const cost = jailBuyoutCost(p);
             if(cost <= 0){ farmToast('В кассе пусто — откупиться нечем. Отбывай ходы или заработай внутри.'); return; }
-            if (!confirm(`Дать на лапу и выйти сразу за 20% своей кассы (−${fmtN(cost)}$)? Останется ${fmtN(Math.round((Number(p.savings)||0)-cost))}$.`)) return;
+            viaConfirm(`Дать на лапу и выйти сразу за 20% своей кассы (−${fmtN(cost)}$)? Останется ${fmtN(Math.round((Number(p.savings)||0)-cost))}$.`, async function(){
             logChoice(p, 'тюрьма: откупиться или отсидеть', 'откупился взяткой', {declined:['отсидеть срок честно'], paid:'−'+fmtN(cost)+'$ на лапу, Дух в ноль', amt:cost, sphere:'тень'});
             // 🦁 откуп = ты согнулся: Дух в ноль, Льва на выходе не будет (взятка — не сила). Сохраняем флаг на сервер СРАЗУ,
             //    чтобы серверный broadcast освобождения не воскресил высокий Дух и не выдал Льва по ошибке.
@@ -23080,6 +23218,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ? {...x, savings: Math.round(((Number(x.savings)||0) - cost)*100)/100, jail: 0,
                     shadow:(Number(x.shadow)||0)+1} : x);   // 🕯️ откупился = сделка с собой (копится на «Ложь»)
             save(id); render();
+            }, {yes:'Дать на лапу'});
         }
         // ═══ 🔒 ТЮРЬМА 2.0 (Ринат 29июл): СНАЧАЛА СУД → потом давление в камере ═══
         // Порядок: клетка «Тюрьма» → ⚖️ СУД (можно нанять адвоката) → приговор:
@@ -23288,9 +23427,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function jailPressEvtFor(p){ const i=(((Number(p.jailCount)||0)*3)+(Number(p.jail)||0))%JAIL_PRESSURE.length; return JAIL_PRESSURE[(i+JAIL_PRESSURE.length)%JAIL_PRESSURE.length]; }
         function jailPressChoose(id, which){
             const p=state.players.find(x=>x.id==id); if(!p||(Number(p.jail)||0)<=0) return;
-            if(p.jailPressTurn){ alert('Проверку на этот ход ты уже прошёл. Дождись следующего хода.'); return; }
+            if(p.jailPressTurn){ toast('Проверку на этот ход ты уже прошёл. Дождись следующего хода.'); return; }
             const E=jailPressEvtFor(p); const opt = which==='bend'?E.bend:E.hold;
-            if(opt.kind==='pay' && (Number(p.savings)||0) < opt.amt){ alert('Платить нечем — придётся держаться.'); return; }
+            if(opt.kind==='pay' && (Number(p.savings)||0) < opt.amt){ toast('Платить нечем — придётся держаться.'); return; }
             { const _other = which==='bend'?E.hold:E.bend; logChoice(p, 'давление в тюрьме', opt.label||which, {declined:[(_other&&_other.label)||''], paid:opt.note||'', sphere:'характер'}); }
             state.players = state.players.map(x=>{
                 if(x.id!=id) return x;
@@ -23317,7 +23456,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         };
         function jailStandOf(p){ return JAIL_STAND[p&&p.jailStanding] || JAIL_STAND.normal; }
         // ── 🗓️ ДЕЛА ДНЯ (одно за ход, флаг jailActTurn сбрасывает сервер): работа=касса, молитва=Дух, качалка=тело, учёба=навык на воле ──
-        function jailDayGuard(p){ if(!p||(Number(p.jail)||0)<=0) return false; if(p.jailActTurn){ alert('🗓️ Дело на этот ход уже сделано. Дождись следующего.'); return false; } return true; }
+        function jailDayGuard(p){ if(!p||(Number(p.jail)||0)<=0) return false; if(p.jailActTurn){ toast('🗓️ Дело на этот ход уже сделано. Дождись следующего.'); return false; } return true; }
         function jailPray(id){ const p=state.players.find(x=>x.id==id); if(!jailDayGuard(p)) return;
             state.players=state.players.map(x=> x.id==id ? {...x, jailSpirit:Math.min(100,(Number(x.jailSpirit)!=null?Number(x.jailSpirit):JAIL_SPIRIT_START)+6), jailActTurn:true} : x);
             save(id); render(); farmToast('🕯️ Помолился, побыл с собой — на душе яснее.'); }
@@ -23364,20 +23503,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function jailCellmateDeal(id){
             const p=state.players.find(x=>x.id==id); if(!jailDayGuard(p)) return;
-            const stake=parseInt((prompt('🤝 Сделка с сокамерником. Сколько ставишь? (60% — навар +75%, 40% — кинут). Касса '+fmtN(Math.round(Number(p.savings)||0))+'$.','500')||'0'),10);
-            if(!stake||stake<1) return;
-            if(stake>(Number(p.savings)||0)){ alert('Столько нет в кассе.'); return; }
-            const win=Math.random()<0.6;
-            const delta = win ? Math.round(stake*0.75) : -stake;
-            state.players = state.players.map(x=> x.id==id ? {...x, savings:Math.round(((Number(x.savings)||0)+delta)*100)/100, jailActTurn:true} : x);
-            save(id); render();
-            alert(win ? ('🤝 Сокамерник не подвёл — навар +'+fmtN(Math.round(stake*0.75))+'$!') : ('🤝 Тебя кинули — потерял '+fmtN(stake)+'$.'));
+            viaInputModal({ title:'🤝 Сделка с сокамерником', sub:'60% — навар +75%, 40% — кинут.\nКасса '+fmtN(Math.round(Number(p.savings)||0))+'$.', value:500, confirm:'Поставить', onOk:function(v){
+                const stake=parseInt(String(v).replace(/[^0-9]/g,'')||'0',10);
+                if(!stake||stake<1) return 'Введи ставку больше нуля.';
+                if(stake>(Number(p.savings)||0)) return 'Столько нет в кассе.';
+                const win=Math.random()<0.6;
+                const delta = win ? Math.round(stake*0.75) : -stake;
+                state.players = state.players.map(x=> x.id==id ? {...x, savings:Math.round(((Number(x.savings)||0)+delta)*100)/100, jailActTurn:true} : x);
+                save(id); render();
+                toast(win ? ('🤝 Сокамерник не подвёл — навар +'+fmtN(Math.round(stake*0.75))+'$!') : ('🤝 Тебя кинули — потерял '+fmtN(stake)+'$.'));
+            }});
         }
         function jailLawyerAppeal(id){
             const p=state.players.find(x=>x.id==id); if(!p||(Number(p.jail)||0)<=0) return;
-            if(p.jailAppealTurn){ alert('⚖️ В этот ход адвокат уже подавал. Дождись следующего.'); return; }
+            if(p.jailAppealTurn){ toast('⚖️ В этот ход адвокат уже подавал. Дождись следующего.'); return; }
             const fee=2000;
-            if((Number(p.savings)||0)<fee){ alert('Не хватает на адвоката: нужно '+fmtN(fee)+'$.'); return; }
+            if((Number(p.savings)||0)<fee){ toast('Не хватает на адвоката: нужно '+fmtN(fee)+'$.'); return; }
             const win=Math.random()<0.4;   // 40% на досрочку
             state.players = state.players.map(x=>{
                 if(x.id!=id) return x;
@@ -23385,7 +23526,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 return {...x, savings:Math.round(((Number(x.savings)||0)-fee)*100)/100, jail:nj, _jailWrite:true, jailAppealTurn:true};
             });
             save(id); jailStripWrite(id); render();
-            alert(win ? '⚖️ Адвокат добился досрочки — минус ход!' : '⚖️ Суд отказал. Деньги ушли, срок прежний.');
+            toast(win ? '⚖️ Адвокат добился досрочки — минус ход!' : '⚖️ Суд отказал. Деньги ушли, срок прежний.');
         }
         function renderJailModal(p){
             // ═══ ⚖️ СУД 3.0: 6 вопросов → адвокат → приговор ═══
@@ -23523,7 +23664,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function gate(id, key) {
             const p = state.players.find(x => x.id === id);
             if (!p) return false;
-            if ((Number(p.jail)||0) > 0) { alert('🔒 Ты в тюрьме — доступна только лудка (казино). Отбывай ходы или откупись.'); return false; }
+            if ((Number(p.jail)||0) > 0) { toast('🔒 Ты в тюрьме — доступна только лудка (казино). Отбывай ходы или откупись.'); return false; }
             if (SOLO_APP) { p.allow = null; return true; }   // соло/авто-ход: клетки не запирает ведущий — действуешь в свой ход
             if (p.allow !== key) { showCellLocked(key); return false; }   // #17: объясняем клетку, а не глухой блок
             p.allow = null; save();   // одноразовое: разрешение потрачено
@@ -23531,10 +23672,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
 
         function deletePlayer(id, name) {
-            if (!confirm(`Удалить игрока "${name}" полностью?\n\nВсе его активы, долги и заявки также будут удалены. Это действие необратимо.`)) return;
+            viaConfirm(`Удалить игрока "${name}" полностью?\n\nВсе его активы, долги и заявки также будут удалены. Это действие необратимо.`, function(){
             state.players = state.players.filter(p => p.id != id);
             state.deals = state.deals.filter(d => d.pId != id);  // clean up pending deals too
             save(); render();
+            }, {yes:'Удалить'});
         }
 
         // ═══════ 📊 АНАЛИТИКА ИГРОКОВ (таблица для разбора + копилка между играми) ═══════
@@ -23553,7 +23695,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function prevSnapFor(name){ const h=analyticsHistory(); for(let i=h.length-1;i>=0;i--){ const pl=(h[i].players||[]).find(x=>x.name===name); if(pl) return {snap:h[i], pl}; } return null; }
         function saveSnapshot(auto){
             const players=(state.players||[]);
-            if(!players.length){ if(!auto) alert('Нет игроков для среза.'); return; }
+            if(!players.length){ if(!auto) toast('Нет игроков для среза.'); return; }
             const snap={ when:new Date().toLocaleString('ru-RU'), t:Date.now(), players: players.map(p=>{ const f=calc(p); const s=pstat(p); return {
                 name:p.name, prof:(p.prof&&p.prof.name)||'', net:pnetWorth(p), savings:Math.round(Number(p.savings)||0),
                 portfolio:Math.round(portfolioValue(p)), passive:f.passive, flow:f.flow,
@@ -23562,7 +23704,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 salaryTotal:Math.round(s.salaryTotal), children:Number(p.children)||0, jailCount:Number(p.jailCount)||0 }; }) };
             const h=analyticsHistory(); h.push(snap);
             try{ localStorage.setItem('via_analytics_history', JSON.stringify(h.slice(-200))); }catch(e){ console.warn('snap save',e); }
-            if(!auto){ alert('📸 Срез сохранён ('+snap.when+'). Теперь таблица покажет рост/просадку к этой точке в следующих играх.'); render(); }
+            if(!auto){ toast('📸 Срез сохранён ('+snap.when+'). Теперь таблица покажет рост/просадку к этой точке в следующих играх.'); render(); }
         }
         // Флажки «на что обратить внимание» — простые правила по данным игрока.
         function playerFlags(p,f,s){
@@ -23624,12 +23766,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
 
         function clearAllPlayers() {
-            if (!confirm(`ОЧИСТКА СТОЛА: удалить ВСЕХ ${state.players.length} игроков и все заявки?\n\nЭто действие необратимо.`)) return;
-            if (!confirm('Точно? Это удалит ВСЁ.')) return;
-            saveSnapshot(true);   // 📸 авто-срез итогов игры ПЕРЕД очисткой — данные копятся между играми
-            state.players = [];
-            state.deals = [];
-            save(); render();
+            viaConfirm(`ОЧИСТКА СТОЛА: удалить ВСЕХ ${state.players.length} игроков и все заявки?\n\nЭто действие необратимо.`, function(){
+                viaConfirm('Точно? Это удалит ВСЁ.', function(){
+                    saveSnapshot(true);   // 📸 авто-срез итогов игры ПЕРЕД очисткой — данные копятся между играми
+                    state.players = [];
+                    state.deals = [];
+                    save(); render();
+                }, {yes:'Да, удалить всё'});
+            }, {yes:'Продолжить'});
         }
 
         // ═══════ SYNC между вкладками — 4 канала надёжности ═══════
