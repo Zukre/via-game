@@ -12127,6 +12127,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const cash = Number(p.savings) || 0;
             if (cash < item.price) { try{ logFail(p,'🏡','Хотел купить «'+item.name+'»','не хватило кассы — нужно '+fmtN(item.price)+'$',{sphere:'образ жизни'}); }catch(e){} toast('«' + item.name + '» стоит ' + fmtN(item.price) + '$ — не хватает кассы.'); return; }
             p.savings = cash - item.price;
+            p.lifeCreepSpent = Math.round(((Number(p.lifeCreepSpent)||0) + item.price)*100)/100;   // 💸 09: копим «в картинку» (статус) — сырьё Зеркала «путь vs картинка»
             if (kind === 'watch') p.watchLvl = lvl; else p.phoneLvl = lvl;
             try{ logAction(p, (kind==='watch'?'⌚':'📱'), 'Купил «'+item.name+'»', {sphere:'образ жизни', amt:-item.price}); }catch(e){}
             logSignal('lifestyle', kind === 'watch' ? 'buy_watch' : 'buy_phone', lvl);
@@ -12162,6 +12163,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <div style="margin-top:16px;">
                     <div style="font-family:Georgia,serif;font-size:15px;font-weight:700;color:var(--lx-gold-br);margin-bottom:4px;">⌚ Статус — часы и телефон</div>
                     <p style="font-size:12px;color:#9c988e;line-height:1.5;margin:0 0 10px;">Разовые покупки из кассы — месячных платежей не добавляют, хода не требуют.</p>
+                    ${(Number(p.lifeCreepSpent)||0)>0?`<div style="font-size:12px;color:#d6a37a;background:rgba(214,163,122,.08);border:1px solid #5a3f28;border-radius:8px;padding:7px 10px;margin:0 0 10px;line-height:1.5;">💸 За жизнь в статус вложено: <b>${fmtN(Math.round(Number(p.lifeCreepSpent)||0))}$</b>. Это «картинка» — Зеркало запомнит. Спроси себя: столько же ушло в «путь» (в себя и в дело)?</div>`:''}
                     <div style="font-size:12px;color:#cdc8bd;font-weight:700;margin:0 0 6px;">Часы</div>
                     <div style="display:grid;grid-template-columns:repeat(2,1fr);margin:0 0 12px;gap:8px;">${strip('watch', LIFESTYLE_WATCHES, curWatchLvl(p), 'watches', 'watch')}</div>
                     <div style="font-size:12px;color:#cdc8bd;font-weight:700;margin:0 0 6px;">Телефон</div>
