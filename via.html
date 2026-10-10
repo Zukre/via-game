@@ -17838,9 +17838,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         const BIZ_ROLE_SELLER = { role:'продажник', salary:600, boost:1200 };   // зарплата/мес и выработка/мес при норме
         function bizStaffCapacity(a){ return BIZ_STAFF_CAP[Number(a&&a.stage)||1] || 0; }
         function bizEmpBoost(e){ return (e && e.perf==='bad') ? Math.round((Number(e.boost)||0)*0.3) : (Number(e&&e.boost)||0); }
+        const BIZ_ROLE_MANAGER = { role:'менеджер', salary:1500, boost:0 };   // управляющий: не продаёт сам, но держит команду и поднимает её выработку
+        const BIZ_MGR_LIFT = 1.25;   // 🧑‍💼 менеджер поднимает выработку каждого продажника (ручка Рината)
+        function bizHasManager(a){ return !!((a&&a.staff)||[]).some(e=>e&&e.role==='менеджер'); }
+        function bizSellers(a){ return ((a&&a.staff)||[]).filter(e=>e&&e.role!=='менеджер'); }
         function bizStaffNet(a){
-            const list=(a&&a.staff)||[]; const cap=bizStaffCapacity(a); let net=0;
-            list.forEach((e,i)=>{ const works=(i<cap); net += (works?bizEmpBoost(e):0) - (Number(e.salary)||0); });
+            const cap=bizStaffCapacity(a); const managed=bizHasManager(a); let net=0;
+            bizSellers(a).forEach((e,i)=>{
+                const works=(i<cap);
+                let boost = works ? bizEmpBoost(e) : 0;
+                if(managed && works) boost = Math.round(boost*BIZ_MGR_LIFT);   // под управляющим команда выдаёт больше
+                net += boost - (Number(e.salary)||0);
+            });
+            const mgr=((a&&a.staff)||[]).find(e=>e&&e.role==='менеджер');
+            if(mgr) net -= (Number(mgr.salary)||0);
             return Math.round(net);
         }
         // Вклад команды держим ОТДЕЛЬНЫМ полем a.staffCf (его прибавляет calc), НЕ запекаем в a.cf —
@@ -17863,6 +17874,22 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             p.notify = (n>cap)
                 ? '👔 Нанял продажника — но дело уже загружено (вместимость '+cap+'). Лишние руки без работы жрут зарплату. Расти стадию или не раздувай штат.'
                 : '👔 Нанял продажника: зарплата −'+fmtN(BIZ_ROLE_SELLER.salary)+'$/мес, но при норме даёт +'+fmtN(BIZ_ROLE_SELLER.boost)+'$/мес выручки.';
+            save(pid); render();
+        }
+        // 🧑‍💼 МЕНЕДЖЕР (Кусок 3): делегируешь — команда тянет БЕЗ твоего внимания (годовые просадки берёт на себя)
+        //   + поднимает выработку команды. Но стоит дорого и окупается только на масштабе (ресёрч: менеджера
+        //   берут при повторяемом процессе и объёме, а не «потому что устал»). Это и есть переход «работа → система».
+        function hireBizManager(pid, idx){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            const a=(p.assets||[])[idx]; if(!a || a.type!=='BUSINESS') return;
+            if(bizHasManager(a)){ toast('🧑‍💼 В этом деле уже есть управляющий.'); return; }
+            if(bizSellers(a).length < 2){ toast('🧑‍💼 Менеджер окупается на масштабе — сперва набери хотя бы 2 продажников, потом ставь управляющего.'); return; }
+            a.staff = a.staff || [];
+            a.staff.push({ id:Date.now()+Math.floor(Math.random()*1000), role:BIZ_ROLE_MANAGER.role, salary:BIZ_ROLE_MANAGER.salary, boost:0, perf:'ok' });
+            bizStaffSync(a);
+            try{ logChoice(p,'бизнес: делегировать','поставил управляющего',{paid:'−'+BIZ_ROLE_MANAGER.salary+'$/мес, дело без тебя',sphere:'дело'}); }catch(e){}
+            try{ logAction(p,'🧑‍💼','Поставил управляющего в «'+(a.title||'дело')+'»',{sphere:'деньги'}); }catch(e){}
+            p.notify='🧑‍💼 Поставил управляющего (−'+fmtN(BIZ_ROLE_MANAGER.salary)+'$/мес): команда тянет без твоего внимания — годовые просадки он берёт на себя, выработка команды выше. Дело стало системой, а не работой на себя. Окупается на масштабе.';
             save(pid); render();
         }
         function fireBizStaff(pid, idx, empId){
@@ -17900,27 +17927,34 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(!a || a.type!=='BUSINESS') return '';
             if((Number(a.stage)||1) < 2) return '';   // микро-дело держится на тебе
             const idx=(p.assets||[]).indexOf(a);
-            const list=(a.staff)||[]; const cap=bizStaffCapacity(a);
-            const net=bizStaffNet(a);
-            const rows = list.length ? list.map((e,i)=>{
+            const cap=bizStaffCapacity(a); const net=bizStaffNet(a); const managed=bizHasManager(a);
+            const sellers=bizSellers(a); const mgr=((a.staff)||[]).find(e=>e&&e.role==='менеджер');
+            const sellerRows = sellers.length ? sellers.map((e,i)=>{
                 const works=(i<cap);
                 const em = works ? (e.perf==='bad'?'🟠':'🟢') : '⚪';
                 const stat = works ? (e.perf==='bad'?'не тянет':'работает') : 'без загрузки';
-                const trainBtn = (e.perf==='bad') ? `<button onclick="trainBizStaff(${p.id},${idx},${e.id})" class="btn" style="padding:4px 9px;font-size:10.5px;background:#13251c;color:#8bd3a0;border:1px solid #2f6b3a;">🎓 Обучить −${fmtN((Number(e.salary)||0)*2)}$</button>` : '';
+                const shownBoost = works ? Math.round(bizEmpBoost(e)*(managed?BIZ_MGR_LIFT:1)) : 0;
+                const trainBtn = (e.perf==='bad' && !managed) ? `<button onclick="trainBizStaff(${p.id},${idx},${e.id})" class="btn" style="padding:4px 9px;font-size:10.5px;background:#13251c;color:#8bd3a0;border:1px solid #2f6b3a;">🎓 Обучить −${fmtN((Number(e.salary)||0)*2)}$</button>` : '';
                 return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 2px;border-top:1px solid #1b2330;font-size:12px;">
-                    <span style="color:#d8d2c4;">${em} ${e.role} <span style="color:#8a8578;">· −${fmtN(e.salary)}$/мес${works?(' · +'+fmtN(bizEmpBoost(e))+'$ выручки'):''} · ${stat}</span></span>
+                    <span style="color:#d8d2c4;">${em} ${e.role} <span style="color:#8a8578;">· −${fmtN(e.salary)}$/мес${works?(' · +'+fmtN(shownBoost)+'$ выручки'):''} · ${stat}</span></span>
                     <span style="display:flex;gap:5px;flex:0 0 auto;">${trainBtn}<button onclick="fireBizStaff(${p.id},${idx},${e.id})" class="btn" style="padding:4px 9px;font-size:10.5px;background:#2a1414;color:#f3b4b4;border:1px solid #6b2626;">Уволить</button></span>
                 </div>`;
             }).join('') : '<div style="font-size:11.5px;color:#9ca3af;padding:6px 2px;">Пока ты тянешь дело сам. Найми продажников — они растят выручку (в пределах размера дела).</div>';
+            const mgrRow = mgr ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 2px;border-top:1px solid #1b2330;font-size:12px;">
+                    <span style="color:#e8d9a0;">🧑‍💼 управляющий <span style="color:#8a8578;">· −${fmtN(mgr.salary)}$/мес · держит команду без тебя, +${Math.round((BIZ_MGR_LIFT-1)*100)}% выработки</span></span>
+                    <button onclick="fireBizStaff(${p.id},${idx},${mgr.id})" class="btn" style="flex:0 0 auto;padding:4px 9px;font-size:10.5px;background:#2a1414;color:#f3b4b4;border:1px solid #6b2626;">Уволить</button>
+                </div>` : '';
+            const mgrBtn = (!mgr && sellers.length>=2) ? `<button onclick="hireBizManager(${p.id},${idx})" class="btn" style="width:100%;margin-top:6px;padding:8px;font-size:12px;background:linear-gradient(180deg,#2a2412,#1c1810);color:#e8d9a0;border:1px solid #6b551f;font-weight:800;">🧑‍💼 Поставить управляющего · −${fmtN(BIZ_ROLE_MANAGER.salary)}$/мес — дело без твоего внимания</button>` : '';
             const netCol = net>=0?'#10b981':'#f87171';
             return `<div style="background:#0b0f15;border:1px solid #242833;border-left:3px solid #c9a24a;border-radius:10px;padding:10px 12px;margin:0 0 10px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px;">
-                    <b style="font-size:12.5px;color:#efd8a3;">👔 Команда дела · ${list.length}/${cap}</b>
+                    <b style="font-size:12.5px;color:#efd8a3;">👔 Команда дела · ${sellers.length}/${cap}${managed?' · 🧑‍💼 система':''}</b>
                     <span style="font-size:11.5px;color:${netCol};font-weight:800;">вклад в поток ${net>=0?'+':''}${fmtN(net)}$/мес</span>
                 </div>
-                ${rows}
+                ${sellerRows}${mgrRow}
                 <button onclick="hireBizStaff(${p.id},${idx})" class="btn" style="width:100%;margin-top:8px;padding:8px;font-size:12px;background:linear-gradient(180deg,#1d2b1a,#132012);color:#8bd3a0;border:1px solid #2f6b3a;font-weight:800;">👔 Нанять продажника · −${fmtN(BIZ_ROLE_SELLER.salary)}$/мес</button>
-                <div style="font-size:10px;color:#6d6a62;margin-top:5px;line-height:1.45;">Вместимость ${cap} — столько рук дело реально загружает на этой стадии. Наймёшь сверх — платишь зарплату без выработки. Расти стадию → расти команду.</div>
+                ${mgrBtn}
+                <div style="font-size:10px;color:#6d6a62;margin-top:5px;line-height:1.45;">Вместимость ${cap} — столько рук дело реально загружает на этой стадии. ${managed?'🧑‍💼 Управляющий держит команду без твоего внимания и поднимает выработку — но его зарплата окупается на масштабе.':'С ростом команды поставь управляющего — дело пойдёт без тебя (переход «работа → система»).'}</div>
             </div>`;
         }
         // ══════════ 🏠 ЛЕСТНИЦА ИНВЕСТОРА В НЕДВИЖИМОСТЬ (Ринат 3окт: оживить блок) ══════════
@@ -20672,8 +20706,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 p.staffCheckY=y; let slipName='';
                 for(const a of p.assets){
                     if(!a || a.type!=='BUSINESS' || !Array.isArray(a.staff) || !a.staff.length) continue;
-                    let slipped=false;
-                    a.staff.forEach((e,i)=>{ if(i<bizStaffCapacity(a) && e.perf!=='bad' && Math.random()<0.2){ e.perf='bad'; slipped=true; } });   // ~20%/год на выработчика — ручка Рината
+                    if(bizHasManager(a)) continue;   // 🧑‍💼 управляющий держит команду — без твоего внимания, годовых просадок нет
+                    let slipped=false; const cap=bizStaffCapacity(a);
+                    bizSellers(a).forEach((e,i)=>{ if(i<cap && e.perf!=='bad' && Math.random()<0.2){ e.perf='bad'; slipped=true; } });   // ~20%/год на выработчика — ручка Рината
                     if(slipped){ bizStaffSync(a); slipName=a.title||'дело'; }
                 }
                 if(slipName){ try{ toast('👔 В «'+slipName+'»: продажник перестал тянуть — обучи или уволь в панели команды.'); }catch(e){} }
