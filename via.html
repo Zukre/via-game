@@ -12764,6 +12764,32 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 obs.push({br:'Чёрный рынок', q:'Сколько раз ты выбирал быстрые грязные деньги?', verdict:'Ты ходил на чёрный рынок '+blackDeals+' раз — за кэшем, который не нужно зарабатывать.', because:'грязные деньги кажутся бесплатными: берёшь сейчас, а платишь позже — репутацией, свободой, тем, как на тебя смотрят свои. Самый быстрый рынок всегда и самый дорогой.', sig:'сделок втёмную: '+blackDeals+(shadow>0?(' · тень '+shadow):'')});
                 vote('chase',1);
             }
+            // 👔 РИСУНОК ОБРАЩЕНИЯ С ЛЮДЬМИ В ДЕЛЕ (Кусок 5 слоя команды)
+            const _coached=Number(p.staffCoached)||0, _fired=Number(p.staffFired)||0;
+            if(_coached+_fired>0){
+                const inv=_coached>=_fired;
+                obs.push({br:'Люди в деле', q:'Что ты делал, когда человек не тянул?',
+                    verdict: inv ? ('Когда продажник проседал, ты чаще вкладывался и учил ('+_coached+'), чем избавлялся ('+_fired+').')
+                                 : ('Когда продажник проседал, ты чаще менял его ('+_fired+'), чем помогал вырасти ('+_coached+').'),
+                    because: inv ? 'растить человека медленно и незаметно, зато команда помнит, кто в неё верил — на этом стоят сильные дела.'
+                                 : 'уволить быстрее, чем выучить, но каждый новый снова идёт путь с нуля, а люди чувствуют, что они расходники.',
+                    sig:'обучил '+_coached+' · уволил '+_fired});
+                vote(inv?'_build':'chase',1);
+            }
+            try{
+                const _bizList=(p.assets||[]).filter(a=>a&&a.type==='BUSINESS');
+                const _withTeam=_bizList.filter(a=>(typeof bizSellers==='function'?bizSellers(a).length:0)>0);
+                const _managedN=_bizList.filter(a=>(typeof bizHasManager==='function'&&bizHasManager(a))).length;
+                if(_withTeam.length>0){
+                    if(_managedN>0){
+                        obs.push({br:'Система', q:'Дело держится на тебе — или уже без тебя?', verdict:'Ты поставил управляющих — часть дел идёт без твоего внимания.', because:'отдать штурвал страшно: кажется, без тебя развалится. Кто проходит этот страх — получает систему и свободу, а не вторую работу.', sig:'дел с управляющим: '+_managedN+' из '+_bizList.length});
+                        vote('_build',1);
+                    } else {
+                        obs.push({br:'Система', q:'Ты владелец дела — или сам у себя работник?', verdict:'У тебя есть команда, но ни одного управляющего — всё держится на твоём внимании.', because:'пока каждый сбой идёт через тебя, ты не владелец бизнеса, а его самое узкое место. Это потолок в одного.', sig:'дел с командой: '+_withTeam.length+', без системы'});
+                        vote('avoid',1);
+                    }
+                }
+            }catch(e){}
             const rel = p.relationship || null;
             const relType = rel ? (rel.psychotype||rel.type||rel.myType||null) : null;
             if(relType){
