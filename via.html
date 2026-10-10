@@ -22478,6 +22478,23 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(pid); render();
             }, {yes:'Побыть рядом'});
         }
+        // 🌳 Б ВНУКИ — вложение деда/бабки (слабее: 0.5× цена, меньше прирост, гендер-тилт как у детей). Раз в год на внука.
+        function childInvestGrandkid(pid, ki, gi){
+            const p=state.players.find(x=>x.id==pid); if(!p||!Array.isArray(p.kids)) return; const k=p.kids[ki]; if(!k||!Array.isArray(k.grandkids)) return; const g=k.grandkids[gi]; if(!g) return;
+            if(childAge(g)>=18){ toast('Внук уже вырос — вложения в детстве закрыты.'); return; }
+            if(g.invY===curYear()){ toast('В этого внука ты в этом году уже вложился.'); return; }
+            const cost=Math.round(childInvestCost(p)*0.5);   // ⚠️ слабее вложения в ребёнка (0.5×) — число на выверку
+            if((Number(p.savings)||0)<cost){ toast('Не хватает на вложение во внука: нужно '+fmtN(cost)+'$.'); return; }
+            viaConfirm('🌳 Вложить '+fmtN(cost)+'$ во внука (учёба/здоровье/связь)?\n\nТы дед/бабка — вкладываешь меньше, но след в третьем поколении оставляешь.', function(){
+                p.savings=Math.round((p.savings-cost)*100)/100;
+                g.scales=g.scales||{health:70,edu:0,values:50,bond:60};
+                g.scales.edu=_clamp100(g.scales.edu+(g.gender==='f'?8:6)); g.scales.health=_clamp100(g.scales.health+(g.gender==='m'?5:3)); g.scales.bond=_clamp100(g.scales.bond+(g.gender==='f'?6:5));   // ⚖️ слабее + гендер-тилт
+                g.invY=curYear();
+                try{ logAction(p,'🌳','Вложил во внука (−'+fmtN(cost)+'$)',{amt:-cost, sphere:'наследие'}); }catch(e){}
+                p.notify='🌳 Вложил во внука — третье поколение чувствует твою руку.';
+                save(pid); render();
+            }, {yes:'Вложить'});
+        }
         // Годовой тик детей (зовётся из giveSalary): заброшенный год чуть роняет связь, флаг вложения — годовой.
         function childYearTick(p){
             if(!p||!Array.isArray(p.kids)||!p.kids.length) return; const y=curYear();
@@ -22503,7 +22520,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <button onclick="childInvestTime(${p.id},${idx})" class="btn"${invd?' disabled':''} style="flex:1;padding:8px;font-size:11px;background:var(--lx-ink);border:1px solid var(--lx-line);color:${invd?'#4b5563':'#f3efe6'};font-weight:700;">⏳ Провести год вместе<br><span style="font-size:9px;color:#9c988e;font-weight:400;">−доход · +связь/ценности</span></button>
                     </div>${invd?'<div style="font-size:10px;color:#6b7280;margin-top:4px;">В этом году вложение уже сделано — следующее на новый год.</div>':''}`;
                 const oc=k.outcome&&CHILD_OUTCOMES[k.outcome]; const doneTxt = oc ? oc.e+' '+oc.label+' (18+) — '+oc.say : 'вырос — помощник (18+)';
-                const gkHtml = (k.grandkids&&k.grandkids.length) ? '<div style="margin-top:8px;padding-left:10px;border-left:2px solid #3a3550;"><div style="font-size:10px;color:#8a7fa5;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">🌳 Твои внуки</div>'+k.grandkids.map(function(g){var ga=childAge(g); return '<div style="font-size:11px;color:#b9a7d0;margin:2px 0;">'+(g.gender==='f'?'👧 внучка':'👦 внук')+' · '+ga+' лет · '+childStage(g)+'</div>';}).join('')+'</div>' : '';
+                const gkHtml = (k.grandkids&&k.grandkids.length) ? '<div style="margin-top:8px;padding-left:10px;border-left:2px solid #3a3550;"><div style="font-size:10px;color:#8a7fa5;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">🌳 Твои внуки</div>'+k.grandkids.map(function(g,gi){var ga=childAge(g); var gInvd=(g.invY===curYear()); var gBtn=(ga<18)?('<button onclick="childInvestGrandkid('+p.id+','+idx+','+gi+')" class="btn"'+(gInvd?' disabled':'')+' style="margin-left:auto;padding:2px 8px;font-size:10px;background:var(--lx-ink);border:1px solid var(--lx-line);color:'+(gInvd?'#4b5563':'#d9c7a0')+';font-weight:700;">'+(gInvd?'вложено':'💛 вложить')+'</button>'):''; return '<div style="font-size:11px;color:#b9a7d0;margin:3px 0;display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span>'+(g.gender==='f'?'👧 внучка':'👦 внук')+' · '+ga+' лет · '+childStage(g)+'</span>'+gBtn+'</div>';}).join('')+'</div>' : '';
                 return `<div style="font-size:12.5px;padding:9px 11px;border-radius:8px;border:1px solid ${done?'#1f6b45':'var(--lx-line)'};background:var(--lx-ink);margin:6px 0;color:#cbd5e1;text-align:left;">
                     <div style="display:flex;gap:8px;align-items:center;"><span style="font-size:20px;">${done?(oc?oc.e:(k.gender==='f'?'👩':'🧑')):(a>=12?(k.gender==='f'?'👧':'👦'):'👶')}</span><span style="flex:1;"><b>${a>=18?(k.gender==='f'?'Женщина':'Мужчина'):(k.gender==='f'?'Девочка':'Мальчик')}</b> · ${br.e} ветка «${br.label}»<br><span style="font-size:11px;color:#9c988e;">${done?('взрослый · '+a+' лет'+(oc?' · '+oc.e+' '+oc.label:'')):(a+' лет · '+childStage(k))}</span></span></div>
                     ${bars}${btns}${gkHtml}</div>`; }).join('')
