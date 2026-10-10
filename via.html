@@ -22395,7 +22395,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if(skill>=62 && human<58) return 'dependent';     // откупался деньгами, человека нет
             return 'distant';                                 // забросил
         }
-        function childAge(k){ return Math.max(0, Math.min(18, curYear() - (Number(k.bornY)|| curYear()))); }
+        function childAge(k){ return Math.max(0, curYear() - (Number(k.bornY)|| curYear())); }   // 👶 Б: без капа 18 — ребёнок живёт свою жизнь (взрослеет в 18 → childHelperCheck, но возраст идёт дальше, до конца)
+        function childStage(k){ const a=childAge(k); if(a<=2) return 'младенец'; if(a<=11) return 'ребёнок'; if(a<=17) return 'подросток'; return 'взрослый'; }   // 👶 Б: стадии жизни
         function openChildModal(id){ const p=state.players.find(x=>x.id==id); if(!p) return; p.kids=p.kids||[]; childHelperCheck(p); state.childModal={pId:id}; save(id); render(); }
         function closeChildModal(){ state.childModal=null; render(); }
         function childHelperCheck(p){   // дети 18+ → исход по шкалам (Д3): пассив / опора / иждивенец / отдалился
@@ -22501,12 +22502,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     </div>${invd?'<div style="font-size:10px;color:#6b7280;margin-top:4px;">В этом году вложение уже сделано — следующее на новый год.</div>':''}`;
                 const oc=k.outcome&&CHILD_OUTCOMES[k.outcome]; const doneTxt = oc ? oc.e+' '+oc.label+' (18+) — '+oc.say : 'вырос — помощник (18+)';
                 return `<div style="font-size:12.5px;padding:9px 11px;border-radius:8px;border:1px solid ${done?'#1f6b45':'var(--lx-line)'};background:var(--lx-ink);margin:6px 0;color:#cbd5e1;text-align:left;">
-                    <div style="display:flex;gap:8px;align-items:center;"><span style="font-size:20px;">${done?(oc?oc.e:(k.gender==='f'?'👩':'🧑')):(k.gender==='f'?'👧':'👦')}</span><span style="flex:1;"><b>${k.gender==='f'?'Девочка':'Мальчик'}</b> · ${br.e} ветка «${br.label}»<br><span style="font-size:11px;color:#9c988e;">${done?doneTxt:a+' лет · растёт до 18'}</span></span></div>
+                    <div style="display:flex;gap:8px;align-items:center;"><span style="font-size:20px;">${done?(oc?oc.e:(k.gender==='f'?'👩':'🧑')):(a>=12?(k.gender==='f'?'👧':'👦'):'👶')}</span><span style="flex:1;"><b>${a>=18?(k.gender==='f'?'Женщина':'Мужчина'):(k.gender==='f'?'Девочка':'Мальчик')}</b> · ${br.e} ветка «${br.label}»<br><span style="font-size:11px;color:#9c988e;">${done?('взрослый · '+a+' лет'+(oc?' · '+oc.e+' '+oc.label:'')):(a+' лет · '+childStage(k))}</span></span></div>
                     ${bars}${btns}</div>`; }).join('')
                 : '<div style="font-size:12px;color:#9c988e;margin:8px 0;">Детей пока нет — ребёнок появится на клетке 👶 на поле, как в жизни. Тогда и начнёшь растить: каждый год деньги (учёба/здоровье) или время (связь/ценности). Как вырастишь — тем и силён.</div>';
             const opt=(k,e,label,sub)=>`<button onclick="childBirth('${k}')" class="btn" style="display:block;width:100%;margin:6px 0;padding:11px;text-align:left;background:var(--lx-ink);border:1px solid var(--lx-line);color:#f3efe6;font-weight:700;">${e} ${label}<br><span style="font-size:11px;color:#9c988e;font-weight:400;">${sub}</span></button>`;
             return wrap(`<div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#c4b5fd;font-weight:800;">👶 Дети · наследие</div>
-                <div style="font-size:12px;color:#9c988e;line-height:1.5;margin:8px 0 10px;">Ребёнок растёт по годам, тянет расходы (+${fmtN(cc)}$/мес каждый), а в 18 становится живым помощником по ветке, в которую ты его растил. Как вырастишь — тем и силён.</div>
+                <div style="font-size:12px;color:#9c988e;line-height:1.5;margin:8px 0 10px;">Ребёнок растёт по годам (младенец → ребёнок → подросток → взрослый), тянет расходы (+${fmtN(cc)}$/мес в детстве), а повзрослев начинает свою взрослую жизнь рядом — помогает тем, каким ты его вырастил. Как вырастишь — тем и силён.</div>
                 ${kidsList}
                 <div style="font-size:10.5px;color:#6d6a62;line-height:1.5;margin:12px 0 4px;">👶 Новые дети появляются только на клетке «Дети» на поле — как в жизни. Здесь ты их растишь.</div>
                 <button onclick="closeChildModal()" class="btn btn-gray" style="width:100%;margin-top:8px;padding:10px;">Закрыть</button>`);
