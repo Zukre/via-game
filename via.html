@@ -18131,6 +18131,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                         <h2 style="font-size:21px; font-weight:800;"><span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${playerColor(p.id)};border:1px solid #0f172a;box-shadow:0 0 8px ${playerColor(p.id)};vertical-align:middle;margin-right:7px;"></span>${p.name} <span style="font-size:13px;color:${playerColor(p.id)};font-weight:800;">(${playerColorName(p.id)})</span></h2>
                         <p style="color:#10b981; font-weight:bold; font-size:13px; margin-top:3px;">${p.prof.name} · Зарплата ${f.salary}$${f.skillBonus>0?` <span style="color:#a5b4fc;">(база ${p.prof.salary}$ +${Math.round(f.skillBonus*100)}% навыки)</span>`:''}</p>
                         ${(()=>{ const rk=careerRank(p), lv=careerLvl(p), nx=CAREER_LADDER[lv+1]; return `<p style="font-size:12px;color:#cdc8bd;margin-top:3px;">🪜 <b>${rk.name}</b>${lv>0?` · <span style="color:#a5b4fc;">${rk.bonus}</span>`:''}</p>${nx?`<button onclick="careerPromote()" class="btn" title="Повышение до «${nx.name.replace(/^[^ ]+ /,'')}» за ${fmtN(nx.cost)}$ и ${nx.skills} навыка. Поднимает зарплату (и расходы по статусу)." style="display:block;width:100%;background:radial-gradient(120% 120% at 50% 0,rgba(217,184,119,.30),transparent 72%),#241a0c;color:#efd8a3;border:1px solid var(--lx-gold-ln);box-shadow:0 0 16px -7px var(--lx-gold);font-weight:800;font-size:12px;padding:8px 10px;margin-top:6px;text-align:left;">⬆️ Повысить профессию → ${nx.name} <span style="color:#b98a3e;font-weight:700;">· ${fmtN(nx.cost)}$ · ${nx.skills}🎓</span></button><div style="font-size:10px;color:#9c8f6f;margin-top:3px;">🪜 Профессию можно растить по ступеням — выше ступень, выше зарплата.</div>`:`<div style="font-size:11px;color:#efd8a3;margin-top:3px;">🪜 Профессия на вершине 👑</div>`}`; })()}
+                        ${p.unemployed?'':`<button onclick="workOvertime(${p.id})" class="btn" title="Разовый заработок ценой выгорания" style="display:block;width:100%;background:#2a1a0c;color:#ffd9b0;border:1px solid #7a4a1e;font-weight:800;font-size:12px;padding:8px 10px;margin-top:6px;text-align:left;">💪 Взять переработку <span style="color:#d6a37a;font-weight:700;">· разово +кэш, но выгорание</span></button><div style="font-size:10px;color:#9c8f6f;margin-top:3px;">Деньги сейчас — ценой сил. Гонишь без отдыха → выгорание режет активный доход. Зеркало заметит.</div>`}
                     </div>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
                         <button onclick="openCharity()" class="btn" style="background:radial-gradient(120% 120% at 50% 0,rgba(217,184,119,.28),transparent 72%),#241a0c;color:#efd8a3;border:1px solid var(--lx-gold-ln);box-shadow:0 0 16px -7px var(--lx-gold);display:flex;align-items:center;gap:5px;font-weight:700;font-size:12px;padding:7px 11px;" title="Благотворительность — отдай, расти духом">🕯️ <span>Благотворительность</span>${(Number(p.donatedTotal)||0)>0?`<span style="font-size:10px;color:#b98a3e;font-weight:800;">${fmtN(Math.round(p.donatedTotal))}$</span>`:''}</button>
@@ -20146,6 +20147,27 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <button onclick="openInterview(${p.id})" class="btn" style="width:100%;background:#4f46e5;color:#fff;font-weight:800;font-size:14px;">💼 ПОЙТИ НА СОБЕСЕДОВАНИЕ</button>
                 </div>
             `;
+        }
+        // 💪 ПЕРЕРАБОТКА (11 Карьера, Кусок 3B) — добровольный размен время/здоровье↔деньги.
+        //   Зеркальное отражение отдыха (Хобби): даёт разовый кэш, но растит voidYears (выгорание).
+        //   Кап раз в год-круг (анти-эксплойт, как lastHobbyY). ⚠️ ЧИСЛА (оплата, +выгорание) — на выверку Рината.
+        function workOvertime(id){
+            const p=state.players.find(x=>x.id==id); if(!p) return;
+            if(p.unemployed){ p.notify='💼 Сначала устройся на работу — переработка бывает только при окладе.'; render(); return; }
+            const _y=(typeof curYear==='function')?curYear():0;
+            if(p.lastOtY===_y){ p.notify='💪 В этом году ты уже брал переработку. Пахать без передышки каждый год — прямой путь к выгоранию; следующая — в следующем круге.'; render(); return; }
+            const f=calc(p); const sal=Math.max(0, Math.round(Number(f.salary)||0));
+            if(sal<=0){ p.notify='💼 Нет оклада — переработку взять не с чего.'; render(); return; }
+            const pay=Math.max(500, Math.round(sal*0.5));   // ⚠️ разовая оплата ≈ полмесяца оклада — ЧИСЛО НА ВЫВЕРКУ
+            const voidAdd=2;                                 // ⚠️ +выгорание (порог укуса VOID_YEARS_BITE=3) — ЧИСЛО НА ВЫВЕРКУ
+            p.savings=Math.round(((Number(p.savings)||0)+pay)*100)/100;
+            p.voidYears=(Number(p.voidYears)||0)+voidAdd;
+            p.lastOtY=_y;
+            try{ logAction(p,'💪','Переработка: +'+fmtN(pay)+'$ сейчас, но выгорание +'+voidAdd, {sphere:'карьера', amt:pay, ok:true}); }catch(e){}
+            try{ logChoice(p,'взять переработку ради денег?','взял переработку — +'+fmtN(pay)+'$, выгорание +'+voidAdd,{declined:['поберечь силы, не гнать без передышки'], sphere:'карьера'}); }catch(e){}
+            const vy=Number(p.voidYears)||0; const bites=vy>VOID_YEARS_BITE;
+            p.notify='💪 Переработка: +'+fmtN(pay)+'$ в кассу сейчас. Но ты выжимаешь себя — выгорание '+vy+(bites?' (уже режет активный доход!)':' (при '+(VOID_YEARS_BITE+1)+'+ начнёт резать доход)')+'. Остудить — отдыхом в Хобби.';
+            save(id); render();
         }
 
         // ═══ 💼 КЛЕТКА КАРЬЕРА — СОБЕСЕДОВАНИЕ (Ринат 31июл, вживлено 6авг) ═══
