@@ -17822,10 +17822,80 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                        Дел: <b style="color:#e5e7eb;">${biz.length}</b> · пассив <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot)}$/мес</b> = <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot*12)}$/год</b>.<br>
                        Система: <b style="color:#8bd3a0;">${sys}</b> из ${biz.length} работают с командой, остальные держатся на тебе. Развивай — пройдёшь путь Ученик → Мастер; пока незаменим — это работа, а не бизнес.
                    </div>`
-                    + biz.map(a=>assetMgmtCard(a,p,hasP)).join('')
+                    + biz.map(a=>assetMgmtCard(a,p,hasP)+renderBizStaffPanel(a,p)).join('')
                 : '<p style="font-size:12px;color:#9ca3af;padding:2px 2px 8px;">Пока ни одного дела. Открой первое ниже — от микро-дела до франшизы. (Или построй своё с нуля в «Развивать себя».)</p>';
             const market=`<details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:800;color:#efd8a3;padding:9px 11px;background:#12161d;border:1px solid #242833;border-radius:10px;list-style:none;">🏢 Открыть бизнес — путь предпринимателя</summary><div style="padding:4px 2px;"><div style="font-size:11.5px;color:#9ca3af;line-height:1.6;margin:6px 0;"><b style="color:#efd8a3;">Как здесь зарабатывают:</b> пассив каждый месяц · развитие (каждая ступень удваивает поток) · сеть и франшиза (роялти) · продажа дела как актива. Бизнес — самая долгая ставка времени: сначала ест, потом кормит всю жизнь. <b style="color:#ff9a76;">Главный риск — кассовый разрыв:</b> гибнут не от убытка, а когда нечем платить сегодня. Держи запас кассы.</div>${renderBizMarket(p)}</div></details>`;
             return owned + market;
+        }
+        // ══════════ 👔 КОМАНДА БИЗНЕСА (Кусок 1: наём · зарплата/мес · влияние на поток) ══════════
+        // Ринат: «новичок → нанял продажников → не справляются → учить/увольнять → менеджеры/юристы».
+        // Кусок 1 = наём продажника: зарплата режет поток, выработка его поднимает — НО только в пределах
+        // вместимости дела по стадии. Перебор найма = лишние зарплаты без выработки = просадка (как в жизни:
+        // раздул штат не по размеру — съел маржу). Вклад команды складываем прямо в a.cf через трекер
+        // a.staffApplied (пересчёт при любом изменении; переживает развитие — оно тоже аддитивно к a.cf).
+        // Числа (зарплата/выработка/вместимость) — на выверку Рината. Недоработка и обучение/увольнение — Кусок 2.
+        const BIZ_STAFF_CAP = {1:0, 2:2, 3:4, 4:8, 5:20};   // сколько работников дело реально загружает по стадии
+        const BIZ_ROLE_SELLER = { role:'продажник', salary:600, boost:1200 };   // зарплата/мес и выработка/мес при норме
+        function bizStaffCapacity(a){ return BIZ_STAFF_CAP[Number(a&&a.stage)||1] || 0; }
+        function bizEmpBoost(e){ return (e && e.perf==='bad') ? Math.round((Number(e.boost)||0)*0.3) : (Number(e&&e.boost)||0); }
+        function bizStaffNet(a){
+            const list=(a&&a.staff)||[]; const cap=bizStaffCapacity(a); let net=0;
+            list.forEach((e,i)=>{ const works=(i<cap); net += (works?bizEmpBoost(e):0) - (Number(e.salary)||0); });
+            return Math.round(net);
+        }
+        function bizStaffSync(a){
+            if(!a) return; const newNet=bizStaffNet(a);
+            a.cf = Math.max(0, Math.round((Number(a.cf)||0) - (Number(a.staffApplied)||0) + newNet));
+            a.staffApplied = newNet;
+        }
+        function hireBizStaff(pid, idx){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            const a=(p.assets||[])[idx]; if(!a || a.type!=='BUSINESS') return;
+            if((Number(a.stage)||1) < 2){ toast('🔒 Микро-дело держится на тебе. Нанимать команду можно со стадии «Точка».'); return; }
+            a.staff = a.staff || [];
+            a.staff.push({ id:Date.now()+Math.floor(Math.random()*1000), role:BIZ_ROLE_SELLER.role, salary:BIZ_ROLE_SELLER.salary, boost:BIZ_ROLE_SELLER.boost, perf:'ok' });
+            bizStaffSync(a);
+            const cap=bizStaffCapacity(a), n=a.staff.length;
+            try{ logAction(p,'👔','Нанял продажника в «'+(a.title||'дело')+'»',{sphere:'деньги'}); }catch(e){}
+            p.notify = (n>cap)
+                ? '👔 Нанял продажника — но дело уже загружено (вместимость '+cap+'). Лишние руки без работы жрут зарплату. Расти стадию или не раздувай штат.'
+                : '👔 Нанял продажника: зарплата −'+fmtN(BIZ_ROLE_SELLER.salary)+'$/мес, но при норме даёт +'+fmtN(BIZ_ROLE_SELLER.boost)+'$/мес выручки.';
+            save(pid); render();
+        }
+        function fireBizStaff(pid, idx, empId){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            const a=(p.assets||[])[idx]; if(!a || !Array.isArray(a.staff)) return;
+            a.staff = a.staff.filter(e=>e.id!=empId);
+            bizStaffSync(a);
+            try{ logAction(p,'👔','Уволил сотрудника в «'+(a.title||'дело')+'»',{sphere:'деньги'}); }catch(e){}
+            p.notify='👔 Сотрудник уволен — зарплата больше не капает.';
+            save(pid); render();
+        }
+        function renderBizStaffPanel(a, p){
+            if(!a || a.type!=='BUSINESS') return '';
+            if((Number(a.stage)||1) < 2) return '';   // микро-дело держится на тебе
+            const idx=(p.assets||[]).indexOf(a);
+            const list=(a.staff)||[]; const cap=bizStaffCapacity(a);
+            const net=bizStaffNet(a);
+            const rows = list.length ? list.map((e,i)=>{
+                const works=(i<cap);
+                const em = works ? (e.perf==='bad'?'🟠':'🟢') : '⚪';
+                const stat = works ? (e.perf==='bad'?'не тянет':'работает') : 'без загрузки';
+                return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 2px;border-top:1px solid #1b2330;font-size:12px;">
+                    <span style="color:#d8d2c4;">${em} ${e.role} <span style="color:#8a8578;">· −${fmtN(e.salary)}$/мес${works?(' · +'+fmtN(bizEmpBoost(e))+'$ выручки'):''} · ${stat}</span></span>
+                    <button onclick="fireBizStaff(${p.id},${idx},${e.id})" class="btn" style="flex:0 0 auto;padding:4px 9px;font-size:10.5px;background:#2a1414;color:#f3b4b4;border:1px solid #6b2626;">Уволить</button>
+                </div>`;
+            }).join('') : '<div style="font-size:11.5px;color:#9ca3af;padding:6px 2px;">Пока ты тянешь дело сам. Найми продажников — они растят выручку (в пределах размера дела).</div>';
+            const netCol = net>=0?'#10b981':'#f87171';
+            return `<div style="background:#0b0f15;border:1px solid #242833;border-left:3px solid #c9a24a;border-radius:10px;padding:10px 12px;margin:0 0 10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px;">
+                    <b style="font-size:12.5px;color:#efd8a3;">👔 Команда дела · ${list.length}/${cap}</b>
+                    <span style="font-size:11.5px;color:${netCol};font-weight:800;">вклад в поток ${net>=0?'+':''}${fmtN(net)}$/мес</span>
+                </div>
+                ${rows}
+                <button onclick="hireBizStaff(${p.id},${idx})" class="btn" style="width:100%;margin-top:8px;padding:8px;font-size:12px;background:linear-gradient(180deg,#1d2b1a,#132012);color:#8bd3a0;border:1px solid #2f6b3a;font-weight:800;">👔 Нанять продажника · −${fmtN(BIZ_ROLE_SELLER.salary)}$/мес</button>
+                <div style="font-size:10px;color:#6d6a62;margin-top:5px;line-height:1.45;">Вместимость ${cap} — столько рук дело реально загружает на этой стадии. Наймёшь сверх — платишь зарплату без выработки. Расти стадию → расти команду.</div>
+            </div>`;
         }
         // ══════════ 🏠 ЛЕСТНИЦА ИНВЕСТОРА В НЕДВИЖИМОСТЬ (Ринат 3окт: оживить блок) ══════════
         // Соло-режим: ведущего/скана нет → объект нужно покупать В приложении. Лестница из дорожной
