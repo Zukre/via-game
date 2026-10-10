@@ -12431,7 +12431,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const farmInc = Math.round(farmIncome(p) * farmStaffedFrac(p));   // недобор фермеров → доход фермы падает
             const farmWage = 0;   // управляющие теперь в farmWorkerCost (иерархия труда)
             const farmFeedExp = farmFeed(p) + farmWaterCost(p) + farmAutoFeedCost(p) + farmWorkerCost(p) + farmVetCost(p);   // 🏗️ содержание фермы: корм+вода+авто-корм+фермеры+управляющие+прививки (пассив)
-            const _bizP = Math.round(p.assets.reduce((s, a) => s + Number(a.cf || 0) + (a.type==='BUSINESS'?Number(a.staffCf||0):0), 0) * (p.bottom ? 0.7 : 1) * (_clvl>=2?1.1:1));   // 🪜 рук.отдела: бизнесы +10% · +вклад команды (a.staffCf)
+            const _bizP = Math.round(p.assets.reduce((s, a) => s + Number(a.cf || 0) + (a.type==='BUSINESS'?Number(a.staffCf||0):0) - (a.type==='ESTATE'&&a.realtyManaged?Math.round(Number(a.cf||0)*REALTY_MGMT_FEE):0), 0) * (p.bottom ? 0.7 : 1) * (_clvl>=2?1.1:1));   // 🪜 рук.отдела: бизнесы +10% · +команда (staffCf) · −комиссия УК (managed ESTATE)
             const passive = Math.round((_bizP + farmInc) * (_clvl>=4?1.15:1));   // 🪜 региональный: весь пассив +15%
             const divInc = Math.round(marketDividendMonthly(p));   // 💰 дивиденды с акций — отдельной строкой в бланке, но полноценный месячный пассив
             const income = salary + passive + divInc;
@@ -18141,11 +18141,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     // 🛎️ ПОСУТОЧКА (ступень 4) = мини-бизнес: дохода больше, но и простоев больше (уборка/заселение/сезон).
                     const _vac = (a.rung===4) ? 0.22 : 0.12;   // шанс простоя
                     const _def = _vac + 0.08;                   // дальше — неплатёж/ремонт
-                    if(r<_vac){ const hit=Math.round(rent*(2+Math.floor(Math.random()*4))*(a.insured?0.5:1));   // простой 2-5 мес (страховка смягчает вдвое)
+                    if(!a.realtyManaged && r<_vac){ const hit=Math.round(rent*(2+Math.floor(Math.random()*4))*(a.insured?0.5:1));   // простой 2-5 мес (страховка смягчает вдвое; УК держит жильцов — не бьёт)
                         p.savings=Math.round((Number(p.savings)||0)-hit);
                         p.notify='🏚️ «'+(a.title||'объект')+'»: '+(a.rung===4?'простой между гостями':'арендатор съехал, простой')+' — минус '+fmtN(hit)+'$'+(a.insured?' (страховка смягчила)':'')+'.';
                         try{logAction(p,'🏚️','Простой аренды «'+(a.title||'')+'»: −'+fmtN(hit)+'$',{sphere:'деньги',amt:-hit,ok:false});}catch(e){}
-                    } else if(r<_def){ const hit=Math.round(rent*(1+Math.floor(Math.random()*2))*(a.insured?0.5:1));   // неплатёж/ремонт
+                    } else if(!a.realtyManaged && r<_def){ const hit=Math.round(rent*(1+Math.floor(Math.random()*2))*(a.insured?0.5:1));   // неплатёж/ремонт
                         p.savings=Math.round((Number(p.savings)||0)-hit);
                         p.notify='🔧 «'+(a.title||'объект')+'»: неплатёж или внеплановый ремонт — минус '+fmtN(hit)+'$'+(a.insured?' (страховка смягчила)':'')+'.';
                         try{logAction(p,'🔧','Ремонт/неплатёж «'+(a.title||'')+'»: −'+fmtN(hit)+'$',{sphere:'деньги',amt:-hit,ok:false});}catch(e){}
@@ -18212,6 +18212,29 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 <button onclick="realtyToggleInsure(${p.id},${a.id})" class="btn" style="flex:0 0 auto;padding:5px 10px;font-size:11px;background:${a.insured?'#374151':'#0d2b1a'};color:${a.insured?'#9ca3af':'#6ee7b7'};border:1px solid ${a.insured?'#374151':'#157347'};">${a.insured?'Отключить':'Застраховать'}</button>
             </div>`;
         }
+        // 🏢 УПРАВЛЯЮЩАЯ КОМПАНИЯ (Недвиж, делегирование → портфель без твоего внимания; аналог менеджера в бизнесе).
+        //   Комиссия REALTY_MGMT_FEE от ренты/мес; взамен УК ведёт жильцов → простои и неплатежи тебя не бьют (их держит УК).
+        //   Физику (ремонт/смета/рынок) не отменяет. Это переход «сам возишься с арендаторами → профи-инвестор, портфель-система».
+        const REALTY_MGMT_FEE = 0.10;   // доля ренты управляющей компании (ручка Рината)
+        function realtyToggleManage(pId, aId){
+            const p=state.players.find(x=>x.id==pId); if(!p) return;
+            const a=(p.assets||[]).find(x=>x&&x.id==aId); if(!a) return;
+            a.realtyManaged=!a.realtyManaged;
+            try{ if(a.realtyManaged) logChoice(p,'недвижимость: вести самому или отдать','отдал в управляющую компанию',{paid:'комиссия '+Math.round(REALTY_MGMT_FEE*100)+'% ренты',sphere:'актив'}); }catch(e){}
+            p.notify=a.realtyManaged
+                ? ('🏢 «'+(a.title||'объект')+'» под управляющей компанией: комиссия '+Math.round(REALTY_MGMT_FEE*100)+'% ренты, зато простои и неплатежи держит УК — объект работает без тебя.')
+                : ('🏢 «'+(a.title||'объект')+'» снят с управления — снова ведёшь жильцов сам.');
+            save(pId); render();
+        }
+        function realtyManageControl(a,p){
+            if(!a || a.type!=='ESTATE') return '';
+            const rent=Number(a.cf)||0; if(rent<=0 || a.reit) return '';   // УК нужна только доходным физ-объектам
+            const fee=Math.round(rent*REALTY_MGMT_FEE);
+            return `<div style="margin:-4px 0 10px;padding:7px 11px;background:#0c0f14;border:1px solid ${a.realtyManaged?'#4b5b7a':'#242833'};border-radius:0 0 10px 10px;font-size:11px;color:#9c988e;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <span>🏢 ${a.realtyManaged?`<b style="color:#aebfe6;">Под управлением</b> · комиссия ${fmtN(fee)}$/мес · простои и неплатежи держит УК`:`Ведёшь сам · простои и неплатежи бьют по тебе (УК брала бы ${fmtN(fee)}$/мес и снимала эту возню)`}</span>
+                <button onclick="realtyToggleManage(${p.id},${a.id})" class="btn" style="flex:0 0 auto;padding:5px 10px;font-size:11px;background:${a.realtyManaged?'#374151':'#161c28'};color:${a.realtyManaged?'#9ca3af':'#aebfe6'};border:1px solid ${a.realtyManaged?'#374151':'#4b5b7a'};">${a.realtyManaged?'Вести самому':'Отдать в УК'}</button>
+            </div>`;
+        }
         function renderRealtyBranch(p, hasP){
             const est=(p.assets||[]).filter(a=>a&&a.type==='ESTATE');
             const tot=est.reduce((s,a)=>s+(Number(a.cf)||0),0);
@@ -18223,7 +18246,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                        Объектов: <b style="color:#e5e7eb;">${est.length}</b> · стоимость портфеля <b style="color:#efd8a3;">${fmtN(val)}$</b>${debt>0?` · ипотеки <b style="color:#f87171;">${fmtN(debt)}$</b> · твой капитал <b style="color:#8bd3a0;">${fmtN(eq)}$</b>`:''}<br>
                        Рента: <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot)}$/мес</b> = <b style="color:${tot>=0?'#10b981':'#f87171'};">${tot>=0?'+':''}${fmtN(tot*12)}$/год</b>. Стоимость растёт каждый год с рынком — продашь дороже. «Развивать» = ремонт (растут и цена, и рента), флип — отремонтируй и продай.
                    </div>`
-                    + est.map(a=>assetMgmtCard(a,p,hasP)+realtyInsureControl(a,p)).join('')
+                    + est.map(a=>assetMgmtCard(a,p,hasP)+realtyInsureControl(a,p)+realtyManageControl(a,p)).join('')
                 : '<p style="font-size:12px;color:#9ca3af;padding:2px 2px 8px;">Пока ни одного объекта. Поднимись по лестнице ниже — от субаренды до девелопмента.</p>';
             const market=`<details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:800;color:#efd8a3;padding:9px 11px;background:#12161d;border:1px solid #242833;border-radius:10px;list-style:none;">🏗️ Купить объект — лестница инвестора</summary><div style="padding:4px 2px;"><div style="font-size:11.5px;color:#9ca3af;line-height:1.6;margin:6px 0;"><b style="color:#efd8a3;">Как здесь зарабатывают:</b> рента каждый месяц · рост стоимости со временем (продал дороже) · флип (купил дёшево → ремонт → продал) · переуступка на котловане · посуточка дороже долгосрочной · плечо (ипотека) умножает и доход, и риск. От простого к сложному — доход, сложность и риск растут вместе.</div>${renderRealtyMarket(p)}</div></details>`;
             return owned + market;
