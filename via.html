@@ -18145,7 +18145,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     </div>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
                         <button onclick="openCharity()" class="btn" style="background:radial-gradient(120% 120% at 50% 0,rgba(217,184,119,.28),transparent 72%),#241a0c;color:#efd8a3;border:1px solid var(--lx-gold-ln);box-shadow:0 0 16px -7px var(--lx-gold);display:flex;align-items:center;gap:5px;font-weight:700;font-size:12px;padding:7px 11px;" title="Благотворительность — отдай, расти духом">🕯️ <span>Благотворительность</span>${(Number(p.donatedTotal)||0)>0?`<span style="font-size:10px;color:#b98a3e;font-weight:800;">${fmtN(Math.round(p.donatedTotal))}$</span>`:''}</button>
-                        <button onclick="state.view='analytics';render();" class="btn" style="background:#4c1d95;color:#ddd6fe;display:flex;align-items:center;gap:5px;font-weight:700;font-size:12px;padding:7px 11px;" title="Таблица по всем игрокам">📊 <span>Аналитика</span></button>
+                        ${SOLO_APP?'':`<button onclick="state.view='analytics';render();" class="btn" style="background:#4c1d95;color:#ddd6fe;display:flex;align-items:center;gap:5px;font-weight:700;font-size:12px;padding:7px 11px;" title="Таблица по всем игрокам">📊 <span>Аналитика</span></button>`}
                         <button onclick="state.view='lobby';render();" class="btn btn-gray">← В лобби</button>
                     </div>
                 </div>
