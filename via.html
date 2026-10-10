@@ -12805,6 +12805,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     vote('avoid',1);
                 }
             }catch(e){}
+            // 🏠 РИСУНОК В НЕДВИЖИМОСТИ (аудит-кусок): плечо до отрицательного капитала + держит ли риск сам
+            try{
+                const _est=(p.assets||[]).filter(a=>a&&a.type==='ESTATE');
+                const _uw=Number(p.realtyUnderwater)||0;
+                const _incomeEst=_est.filter(a=>(Number(a.cf)||0)>0 && !a.reit);
+                const _prot=_incomeEst.filter(a=>a.insured||a.realtyManaged).length;
+                if(_uw>0){
+                    obs.push({br:'Недвижимость', q:'Насколько глубоко ты заходил в плечо?', verdict:'Рынок утаскивал твой объект ниже ипотеки '+_uw+' раз — ты был в отрицательном капитале.', because:'плечо множит и рост, и падение: на чужие деньги легко взять больше, чем выдержишь, и тогда просадка делает тебя должником за то, что уже не стоит своих денег.', sig:'под водой: '+_uw});
+                    vote('chase',1);
+                }
+                if(_incomeEst.length>=2 && _prot===0){
+                    obs.push({br:'Недвижимость', q:'Кто держит риск твоей недвижимости?', verdict:'У тебя '+_incomeEst.length+' доходных объекта, и ни один не застрахован и не отдан в управление.', because:'без страховки и УК каждый простой, неплатёж и ремонт бьёт прямо по тебе — это не инвестор с системой, а сам себе управдом.', sig:'доходных '+_incomeEst.length+' · под защитой 0'});
+                    vote('avoid',1);
+                }
+            }catch(e){}
             const rel = p.relationship || null;
             const relType = rel ? (rel.psychotype||rel.type||rel.myType||null) : null;
             if(relType){
@@ -18120,7 +18135,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     const np=Math.max(0, Math.round(old*(1+drift)));
                     a.price=np;
                     const liab=Number(a.liab)||0;   // отрицательный капитал на плече — честный риск падения
-                    if(liab>0 && np<liab && !a._uwarn){ a._uwarn=1; p.notify='🏚️ «'+(a.title||'объект')+'»: рынок просел НИЖЕ ипотеки — ты в отрицательном капитале. Держать и ждать или резать убыток?'; }
+                    if(liab>0 && np<liab && !a._uwarn){ a._uwarn=1; p.realtyUnderwater=(Number(p.realtyUnderwater)||0)+1; p.notify='🏚️ «'+(a.title||'объект')+'»: рынок просел НИЖЕ ипотеки — ты в отрицательном капитале. Держать и ждать или резать убыток?'; }
                     else if(liab>0 && np>=liab){ a._uwarn=0; }
                 }
                 // 🏦 АРЕНДАТОР ГАСИТ КРЕДИТ (ресёрч: «арендатор фактически гасит твой кредит, объект переходит к тебе»).
