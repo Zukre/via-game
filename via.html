@@ -17839,9 +17839,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function bizStaffCapacity(a){ return BIZ_STAFF_CAP[Number(a&&a.stage)||1] || 0; }
         function bizEmpBoost(e){ return (e && e.perf==='bad') ? Math.round((Number(e.boost)||0)*0.3) : (Number(e&&e.boost)||0); }
         const BIZ_ROLE_MANAGER = { role:'менеджер', salary:1500, boost:0 };   // управляющий: не продаёт сам, но держит команду и поднимает её выработку
+        const BIZ_ROLE_LAWYER  = { role:'юрист',   salary:1000, boost:0 };   // ⚖️ юрист: щит от внешних ударов (иск/проверка/кидок контрагента)
         const BIZ_MGR_LIFT = 1.25;   // 🧑‍💼 менеджер поднимает выработку каждого продажника (ручка Рината)
-        function bizHasManager(a){ return !!((a&&a.staff)||[]).some(e=>e&&e.role==='менеджер'); }
-        function bizSellers(a){ return ((a&&a.staff)||[]).filter(e=>e&&e.role!=='менеджер'); }
+        function bizHasManager(a){ return ((a&&a.staff)||[]).some(e=>e&&e.role==='менеджер'); }
+        function bizHasLawyer(a){ return ((a&&a.staff)||[]).some(e=>e&&e.role==='юрист'); }
+        function bizSellers(a){ return ((a&&a.staff)||[]).filter(e=>e&&e.role==='продажник'); }
         function bizStaffNet(a){
             const cap=bizStaffCapacity(a); const managed=bizHasManager(a); let net=0;
             bizSellers(a).forEach((e,i)=>{
@@ -17850,8 +17852,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 if(managed && works) boost = Math.round(boost*BIZ_MGR_LIFT);   // под управляющим команда выдаёт больше
                 net += boost - (Number(e.salary)||0);
             });
-            const mgr=((a&&a.staff)||[]).find(e=>e&&e.role==='менеджер');
-            if(mgr) net -= (Number(mgr.salary)||0);
+            ((a&&a.staff)||[]).forEach(e=>{ if(e && e.role!=='продажник') net -= (Number(e.salary)||0); });   // менеджер/юрист — оверхед (оклад без прямой выработки)
             return Math.round(net);
         }
         // Вклад команды держим ОТДЕЛЬНЫМ полем a.staffCf (его прибавляет calc), НЕ запекаем в a.cf —
@@ -17890,6 +17891,19 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try{ logChoice(p,'бизнес: делегировать','поставил управляющего',{paid:'−'+BIZ_ROLE_MANAGER.salary+'$/мес, дело без тебя',sphere:'дело'}); }catch(e){}
             try{ logAction(p,'🧑‍💼','Поставил управляющего в «'+(a.title||'дело')+'»',{sphere:'деньги'}); }catch(e){}
             p.notify='🧑‍💼 Поставил управляющего (−'+fmtN(BIZ_ROLE_MANAGER.salary)+'$/мес): команда тянет без твоего внимания — годовые просадки он берёт на себя, выработка команды выше. Дело стало системой, а не работой на себя. Окупается на масштабе.';
+            save(pid); render();
+        }
+        // ⚖️ ЮРИСТ (Кусок 4): держишь заранее → внешний удар (иск/проверка/кидок) гасится. Проактивность vs «авось».
+        function hireBizLawyer(pid, idx){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            const a=(p.assets||[])[idx]; if(!a || a.type!=='BUSINESS') return;
+            if(bizHasLawyer(a)){ toast('⚖️ У этого дела уже есть юрист на подписке.'); return; }
+            a.staff = a.staff || [];
+            a.staff.push({ id:Date.now()+Math.floor(Math.random()*1000), role:BIZ_ROLE_LAWYER.role, salary:BIZ_ROLE_LAWYER.salary, boost:0, perf:'ok' });
+            bizStaffSync(a);
+            try{ logChoice(p,'бизнес: защита','взял юриста заранее',{paid:'−'+BIZ_ROLE_LAWYER.salary+'$/мес подписка',sphere:'дело'}); }catch(e){}
+            try{ logAction(p,'⚖️','Взял юриста в «'+(a.title||'дело')+'»',{sphere:'деньги'}); }catch(e){}
+            p.notify='⚖️ Юрист на подписке (−'+fmtN(BIZ_ROLE_LAWYER.salary)+'$/мес): внешние удары — иск, проверка, кидок контрагента — он гасит. Защита стоит денег, но один удар без неё дороже.';
             save(pid); render();
         }
         function fireBizStaff(pid, idx, empId){
@@ -17945,15 +17959,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <button onclick="fireBizStaff(${p.id},${idx},${mgr.id})" class="btn" style="flex:0 0 auto;padding:4px 9px;font-size:10.5px;background:#2a1414;color:#f3b4b4;border:1px solid #6b2626;">Уволить</button>
                 </div>` : '';
             const mgrBtn = (!mgr && sellers.length>=2) ? `<button onclick="hireBizManager(${p.id},${idx})" class="btn" style="width:100%;margin-top:6px;padding:8px;font-size:12px;background:linear-gradient(180deg,#2a2412,#1c1810);color:#e8d9a0;border:1px solid #6b551f;font-weight:800;">🧑‍💼 Поставить управляющего · −${fmtN(BIZ_ROLE_MANAGER.salary)}$/мес — дело без твоего внимания</button>` : '';
+            const law=((a.staff)||[]).find(e=>e&&e.role==='юрист');
+            const lawRow = law ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 2px;border-top:1px solid #1b2330;font-size:12px;">
+                    <span style="color:#cbb8e6;">⚖️ юрист <span style="color:#8a8578;">· −${fmtN(law.salary)}$/мес · гасит внешние удары (иск/проверка/кидок)</span></span>
+                    <button onclick="fireBizStaff(${p.id},${idx},${law.id})" class="btn" style="flex:0 0 auto;padding:4px 9px;font-size:10.5px;background:#2a1414;color:#f3b4b4;border:1px solid #6b2626;">Отказаться</button>
+                </div>` : '';
+            const lawBtn = (!law) ? `<button onclick="hireBizLawyer(${p.id},${idx})" class="btn" style="width:100%;margin-top:6px;padding:8px;font-size:12px;background:linear-gradient(180deg,#221a2e,#161020);color:#cbb8e6;border:1px solid #5b4b7a;font-weight:800;">⚖️ Взять юриста · −${fmtN(BIZ_ROLE_LAWYER.salary)}$/мес — щит от исков и проверок</button>` : '';
             const netCol = net>=0?'#10b981':'#f87171';
             return `<div style="background:#0b0f15;border:1px solid #242833;border-left:3px solid #c9a24a;border-radius:10px;padding:10px 12px;margin:0 0 10px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px;">
                     <b style="font-size:12.5px;color:#efd8a3;">👔 Команда дела · ${sellers.length}/${cap}${managed?' · 🧑‍💼 система':''}</b>
                     <span style="font-size:11.5px;color:${netCol};font-weight:800;">вклад в поток ${net>=0?'+':''}${fmtN(net)}$/мес</span>
                 </div>
-                ${sellerRows}${mgrRow}
+                ${sellerRows}${mgrRow}${lawRow}
                 <button onclick="hireBizStaff(${p.id},${idx})" class="btn" style="width:100%;margin-top:8px;padding:8px;font-size:12px;background:linear-gradient(180deg,#1d2b1a,#132012);color:#8bd3a0;border:1px solid #2f6b3a;font-weight:800;">👔 Нанять продажника · −${fmtN(BIZ_ROLE_SELLER.salary)}$/мес</button>
-                ${mgrBtn}
+                ${mgrBtn}${lawBtn}
                 <div style="font-size:10px;color:#6d6a62;margin-top:5px;line-height:1.45;">Вместимость ${cap} — столько рук дело реально загружает на этой стадии. ${managed?'🧑‍💼 Управляющий держит команду без твоего внимания и поднимает выработку — но его зарплата окупается на масштабе.':'С ростом команды поставь управляющего — дело пойдёт без тебя (переход «работа → система»).'}</div>
             </div>`;
         }
@@ -20712,6 +20732,23 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     if(slipped){ bizStaffSync(a); slipName=a.title||'дело'; }
                 }
                 if(slipName){ try{ toast('👔 В «'+slipName+'»: продажник перестал тянуть — обучи или уволь в панели команды.'); }catch(e){} }
+                // ⚖️ ВНЕШНИЕ УДАРЫ (Кусок 4): раз в год дело может словить иск/проверку/кидок контрагента. Юрист заранее гасит до ~25%.
+                const BIZ_EXT=[{k:'иск от клиента',m:4},{k:'проверка регулятора',m:3},{k:'контрагент кинул',m:5}];   // m = во сколько месячных потоков обходится удар (ручка Рината)
+                for(const a of p.assets){
+                    if(!a || a.type!=='BUSINESS') continue;
+                    const base=Number(a.cf)||0; if(base<=0) continue;
+                    if(Math.random()<0.15){   // ~15%/год на дело — ручка Рината
+                        const ev=BIZ_EXT[Math.floor(Math.random()*BIZ_EXT.length)];
+                        const shield=bizHasLawyer(a);
+                        const hit=Math.round(base*ev.m*(shield?0.25:1));
+                        if(hit>0){
+                            p.savings=Math.round(((Number(p.savings)||0)-hit)*100)/100;
+                            p.bizExtHits=(Number(p.bizExtHits)||0)+1;
+                            try{ logAction(p,'⚖️','Внешний удар по «'+(a.title||'дело')+'»: '+ev.k+' −'+fmtN(hit)+'$'+(shield?' (юрист отбил большую часть)':''),{sphere:'деньги',amt:-hit,ok:false}); }catch(e){}
+                            try{ toast('⚖️ «'+(a.title||'дело')+'»: '+ev.k+' −'+fmtN(hit)+'$'+(shield?' — юрист отбил почти всё.':' — без юриста по полной. Подумай о защите.')); }catch(e){}
+                        }
+                    }
+                }
             }
         }
         // ══════════ 🏢 ОТЧЁТ РАЗ В 3 ГОДА (Ринат 12авг) ══════════
