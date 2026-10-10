@@ -18103,7 +18103,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     <img src="cat_imgs/jail_cell.webp" alt="" style="width:100%;max-width:280px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;margin-bottom:10px;background:#0a0806;" onerror="this.style.display='none'">
                     <div style="font-size:21px;font-weight:900;letter-spacing:.5px;color:#efd8a3;">🔒 Ты в камере</div>
                     <div style="font-size:13px;margin:6px 0;color:#d8c9ad;">Сидишь ещё <b style="color:#fbbf24;">${p.jail}</b> ход(ов). Клетки закрыты, но внутри есть дела: 🎰 казино, 📈 продажа акций, и ниже — работа, сделка, адвокат на досрочку.</div>
-                    <div style="font-size:12px;margin-bottom:8px;color:#b9ab8f;">🔢 За игру ты сидел <b>${Number(p.jailCount)||1}</b> раз(а). Срок уходит сам, когда ход доходит до тебя — нажимать ничего не надо. Хочешь выйти сразу — откупись.</div>
+                    <div style="font-size:12px;margin-bottom:8px;color:#b9ab8f;">🔢 За игру ты сидел <b>${Number(p.jailCount)||1}</b> раз(а). ${SOLO_APP?'Проживай отсидку сам: сделай дело дня, переживи давление — и жми «⏭️ Отсидеть ход» внизу, срок пойдёт.':'Срок уходит сам, когда ход доходит до тебя — нажимать ничего не надо.'} Хочешь выйти сразу — откупись.</div>
                     ${(()=>{ const up=(Number(p.otherExpPct)||0)+(Number(p.jailPress)||0), dn=Number(p.taxDiscPct)||0; if(!up&&!dn) return ''; const parts=[]; if(up) parts.push(`+${up}% к прочим расходам`); if(dn) parts.push(`−${dn}% к налогам`); return `<div style="font-size:11px;margin-bottom:10px;color:#c9b48f;background:rgba(0,0,0,.28);border-radius:8px;padding:6px 8px;">🩸 Следы тюрьмы (навсегда): ${parts.join(' · ')}${(Number(p.jailPress)||0)?` <span style="color:#d8a06a;">· давление сидки +${Number(p.jailPress)||0}%</span>`:''}</div>`; })()}
                     ${(()=>{ if(p.jailPressTurn){ return `<div style="margin:6px 0 10px;font-size:11.5px;color:#8fae8f;background:rgba(0,0,0,.25);border-radius:10px;padding:8px 10px;">✅ Проверку на этот ход ты прошёл. Новое давление придёт на следующем ходу.</div>`; }
                         const E=jailPressEvtFor(p); const cash=Number(p.savings)||0; const bendBlocked=(E.bend.kind==='pay'&&cash<E.bend.amt);
@@ -18127,11 +18127,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                             ${b(`jailStudy(${p.id})`,'📖 Учёба')}
                             ${b(`jailCellmateDeal(${p.id})`,'🤝 Сделка')}
                         </div>`; })()}
+                    ${SOLO_APP?`<button onclick="jailServeTurn(${p.id})" class="btn" style="width:100%;margin-top:10px;background:linear-gradient(180deg,#3a2f12,#241a0c);color:#efd8a3;border:1px solid var(--lx-gold-ln);box-shadow:0 0 16px -8px var(--lx-gold);font-weight:800;font-size:14px;padding:12px;">⏭️ Отсидеть ход → <span style="font-weight:600;font-size:11.5px;color:#c9b48f;">осталось ${p.jail}</span></button>`:''}
                     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px;">
                         <button onclick="jailLawyerAppeal(${p.id})" class="btn" style="background:${p.jailAppealTurn?'#374151':'#2a2033'};color:#d8c9ef;border:1px solid #6b5a8f;font-size:12px;padding:8px 12px;">⚖️ Адвокат — досрочка 2000$</button>
                         <button onclick="jailBuyout(${p.id})" class="btn" style="background:#fbbf24;color:#3a2a00;font-weight:800;font-size:12px;padding:8px 12px;">💸 На лапу (20% кассы −${fmtN(jailBuyoutCost(p))}$)</button>
                     </div>
-                    <div style="font-size:10px;color:#b9ab8f;margin-top:6px;text-align:center;">🔨 деньги в кассу · 🕯️ поднять дух · 🏋️ закалка · 📖 навык на волю · 🤝 риск ставкой. Срок и досрочку ведёт игра — жди свой ход.</div>
+                    <div style="font-size:10px;color:#b9ab8f;margin-top:6px;text-align:center;">🔨 деньги в кассу · 🕯️ поднять дух · 🏋️ закалка · 📖 навык на волю · 🤝 риск ставкой. ${SOLO_APP?'Жми «⏭️ Отсидеть ход», чтобы срок шёл; досрочка — через адвоката.':'Срок и досрочку ведёт игра — жди свой ход.'}</div>
                 </div>` : ''}
                 <div id="turnPlate">${turnPlateHtml(p)}</div>
                 ${SOLO_APP ? '' : (p.allow ? `<div style="background:linear-gradient(90deg,#065f46,#047857);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;text-align:center;">✅ Ведущий ОТКРЫЛ клетку: ${ALLOW_LABEL[p.allow]||p.allow}. Жми её кнопку и тяни карту.</div>` : `<div style="background:#1f2937;color:#9ca3af;padding:10px 14px;border-radius:10px;margin-bottom:10px;font-size:12px;text-align:center;">🔒 Клетки закрыты. Попал на клетку → жди, пока ведущий откроет её тебе.</div>`)}
@@ -21104,6 +21105,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             if (Math.random() < 0.35){                              // проверка поймала
                 const fine = Math.round(cost * 1.5);
                 _taxPay(p, fine);
+                // 🔒 РЕЦИДИВ: тень уже глубокая (≥6 — косячил не раз) → проверка не прощает, дело идёт в СУД → Тюрьма.
+                //    Угроза «ещё раз попадёшься — суд» наконец сбывается. (порог тени — ручка баланса Рината)
+                if ((Number(p.shadow)||0) >= 6){
+                    logChoice(p, 'налог: рецидив уклонения', 'попался на рецидиве — дело в суд', {declined:['заплатить честно'], paid:'штраф −'+fine+'$ и дело ушло в СУД', amt:fine, sphere:'совесть'});
+                    p.notify = `🚨 Рецидив уклонения: дело ушло в СУД. Теперь это Тюрьма.`;
+                    state.taxModal = null;                          // закрываем налоговую карту — на весь экран встаёт ⚖️ СУД
+                    setJail(p.id, 3);                               // плейсхолдер-срок; суд перезапишет приговор. jailPending='court'
+                    return;                                          // setJail сам save()+render()
+                }
                 m.drawn = { emoji:'🚨', title:'Уклонение вскрыто', color:'#f87171',
                     text:`Проверка поймала уклонение: штраф −${fine}$ и чёрная метка. Ещё раз попадёшься — дело уйдёт в суд, а это Тюрьма. Тень +2.` };
             } else {
@@ -23230,6 +23240,23 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             save(); render();
         }
         function jailDec(id) { state.players = state.players.map(p => p.id==id ? {...p, jail: Math.max(0, (Number(p.jail)||0)-1)} : p); save(); render(); }
+        // ⏭️ СОЛО: прожить один ход срока. В мультиплеере срок тает на сервере (/turn/next), а в соло-приложении
+        //    хода ведущего нет — игрок проживает отсидку сам. Зеркалим серверный тик: jail−1, давление сидки +1%,
+        //    сброс разовых флагов хода. Авторитетно через _jailWrite (иначе сервер воскресит старый срок).
+        function jailServeTurn(id){
+            const p=state.players.find(x=>x.id==id); if(!p||(Number(p.jail)||0)<=0) return;
+            state.players = state.players.map(x=>{
+                if(x.id!=id) return x;
+                const nj=Math.max(0,(Number(x.jail)||0)-1);
+                return {...x, jail:nj, _jailWrite:true,
+                    jailPress:Math.min(10,(Number(x.jailPress)||0)+1),   // 🩸 давление сидки копится (как на сервере)
+                    jailActTurn:false, jailPressTurn:false, jailAppealTurn:false, jailPressEvt:null,
+                    jailWorkedTurn:false, jailDealTurn:false };
+            });
+            save(id); jailStripWrite(id); render();
+            const left=(Number((state.players.find(x=>x.id==id)||{}).jail)||0);
+            farmToast(left>0 ? ('⏭️ Прожит ход — осталось сидеть '+left+'.') : '🔓 Срок отсижен — выходишь.');
+        }
         function jailFree(id) { state.players = state.players.map(p => p.id==id ? {...p, jail: 0, jailPending: null} : p); save(); render(); }   // 🔓 вытащить из тюрьмы (и снять залипший экран выбора)
         // ❌ Отменить тюрьму целиком (Ринат 28июл): вытащить + убрать ВСЕ следы (штрафы/давление/скидку) — как будто не сидел.
         function jailCancel(id) {
