@@ -12759,6 +12759,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 obs.push({br:'Тень', q:'Почему ты срезал угол в тень?', verdict:'Ты выбирал короткую выгоду в обход правил.', because:'короткая выгода в тени копит долг доверия — он всегда возвращается, просто позже.', sig:(jailCount>0?('срывов: '+jailCount):'след тени')});
                 vote('chase',1);
             }
+            const blackDeals = Number(p.blackDeals)||0;
+            if(blackDeals>0){
+                obs.push({br:'Чёрный рынок', q:'Сколько раз ты выбирал быстрые грязные деньги?', verdict:'Ты ходил на чёрный рынок '+blackDeals+' раз — за кэшем, который не нужно зарабатывать.', because:'грязные деньги кажутся бесплатными: берёшь сейчас, а платишь позже — репутацией, свободой, тем, как на тебя смотрят свои. Самый быстрый рынок всегда и самый дорогой.', sig:'сделок втёмную: '+blackDeals+(shadow>0?(' · тень '+shadow):'')});
+                vote('chase',1);
+            }
             const rel = p.relationship || null;
             const relType = rel ? (rel.psychotype||rel.type||rel.myType||null) : null;
             if(relType){
@@ -15997,6 +16002,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             try{ childYearTick(p); }catch(e){}                      // 👶 годовой тик детей: заброшенный год роняет связь, флаг вложения — годовой
             try{ childHelperCheck(p); }catch(e){}                   // 👶 ребёнку стукнуло 18 → исход (опора/обгон/иждивенец/отдалился)
             try{ bizReportCheck(p); }catch(e){}                     // 🏢 раз в 3 года — окно отчёта «было→стало» + решение развивать
+            if(p.blackAddict){ p.shadow=(Number(p.shadow)||0)+1; }  // 🖤 подсел на тёмный поток: тихо тянет ещё тень каждый год (Зеркало вскроет; ручка Рината)
             p.savings=Math.round((Number(p.savings)+flow)*100)/100;
             if((f.bankPay||0)>0) p.bankInterestPaid=Math.round(((Number(p.bankInterestPaid)||0)+f.bankPay)*100)/100;   // 🏦 копим «переплату» — сколько всего отдал банку процентами (урок цены долга)
             if(p.medInsured){ const _mp=Math.round((Number(p.prof&&p.prof.salary)||0)*0.015); if(_mp>0) p.savings=Math.round((p.savings-_mp)*100)/100; }   // 🛡️ премия медстраховки (ровный расход, зато лечение дешевле)
