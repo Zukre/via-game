@@ -17387,8 +17387,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                        + (Number(p.ccLeft)||0)+(Number(p.rLeft)||0)+(Number(p.bankLoan)||0);
             const prev = p.soulMark;
             if(prev){
-                const clean = (casino === prev.casino) && (shadow === prev.shadow);
+                const clean = (casino === prev.casino) && (shadow <= prev.shadow);   // не запачкался (снижение тени — тоже чисто)
                 p.cleanYears = clean ? (Number(p.cleanYears)||0) + 1 : 0;
+                // 🕯️ РЕАБИЛИТАЦИЯ (Тюрьма Кусок 2): честные годы гасят тень. Выход — шанс, не приговор.
+                //   Жил чисто пару лет подряд → тень тает на 1/год. Снова запачкался — отсчёт обнуляется.
+                //   (Благотворительностью тень НЕ откупается — см. doCharity: добро, не индульгенция. Чистят ДЕЛА-время.)
+                if(clean && (Number(p.cleanYears)||0) >= 2 && (Number(p.shadow)||0) > 0){
+                    p.shadow = Math.max(0, (Number(p.shadow)||0) - 1);
+                    try{ logSignal('soul','shadow_heal',1); }catch(e){}
+                    if((Number(p.shadow)||0) === 0 && !p._shadowCleared){ p._shadowCleared = true; p.notify = '🌅 Годы честной жизни отмыли тень дочиста — старое отпустило. Выход был шансом, и ты им стал.'; }
+                }
                 // ☠️ КОМПАУНДИНГ ЯДА: снова кормил распад → стаж яда растёт; бросил → тело медленно восстанавливается.
                 // Урок сигарет: чем дольше вкладывал, тем быстрее и мучительнее возвращается — с годами укус растёт.
                 if(!clean){ p.viceYears = (Number(p.viceYears)||0) + 1; p.viceScar = Math.max(Number(p.viceScar)||0, Number(p.viceYears)||0); }
@@ -17416,7 +17424,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     p.notify = '🌅 Что-то отпустило. Дела снова слушаются.';
                 }
             }
-            p.soulMark = {casino, shadow, debt};
+            p.soulMark = {casino, shadow:(Number(p.shadow)||0), debt};   // хранить тень ПОСЛЕ лечения — иначе спад зачтётся как «запачкался»
             // ⚖️ ЗАКОН РАВНОВЕСИЯ: копим годы пустоты, потом наказываем двигатель (мотивация + тело).
             const cold = balanceCold(p);
             if(cold.length >= VOID_COLD_NEED) p.voidYears = (Number(p.voidYears)||0) + 1;
