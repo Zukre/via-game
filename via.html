@@ -12431,7 +12431,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             const farmInc = Math.round(farmIncome(p) * farmStaffedFrac(p));   // недобор фермеров → доход фермы падает
             const farmWage = 0;   // управляющие теперь в farmWorkerCost (иерархия труда)
             const farmFeedExp = farmFeed(p) + farmWaterCost(p) + farmAutoFeedCost(p) + farmWorkerCost(p) + farmVetCost(p);   // 🏗️ содержание фермы: корм+вода+авто-корм+фермеры+управляющие+прививки (пассив)
-            const _bizP = Math.round(p.assets.reduce((s, a) => s + Number(a.cf || 0), 0) * (p.bottom ? 0.7 : 1) * (_clvl>=2?1.1:1));   // 🪜 рук.отдела: бизнесы +10%
+            const _bizP = Math.round(p.assets.reduce((s, a) => s + Number(a.cf || 0) + (a.type==='BUSINESS'?Number(a.staffCf||0):0), 0) * (p.bottom ? 0.7 : 1) * (_clvl>=2?1.1:1));   // 🪜 рук.отдела: бизнесы +10% · +вклад команды (a.staffCf)
             const passive = Math.round((_bizP + farmInc) * (_clvl>=4?1.15:1));   // 🪜 региональный: весь пассив +15%
             const divInc = Math.round(marketDividendMonthly(p));   // 💰 дивиденды с акций — отдельной строкой в бланке, но полноценный месячный пассив
             const income = salary + passive + divInc;
@@ -17815,7 +17815,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         }
         function renderBizBranch(p, hasP){
             const biz=(p.assets||[]).filter(a=>a&&a.type==='BUSINESS');
-            const tot=biz.reduce((s,a)=>s+(Number(a.cf)||0),0);
+            const tot=biz.reduce((s,a)=>s+(Number(a.cf)||0)+(Number(a.staffCf)||0),0);
             const sys=biz.filter(a=>bizLevel(a)>=1).length;
             const owned = biz.length
                 ? `<div style="background:#0d1016;border:1px solid #242833;border-radius:10px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:#9ca3af;line-height:1.7;">
@@ -17843,10 +17843,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             list.forEach((e,i)=>{ const works=(i<cap); net += (works?bizEmpBoost(e):0) - (Number(e.salary)||0); });
             return Math.round(net);
         }
+        // Вклад команды держим ОТДЕЛЬНЫМ полем a.staffCf (его прибавляет calc), НЕ запекаем в a.cf —
+        // иначе годовой износ/рост (bizYearTick масштабирует a.cf) рассинхронит долю команды. Миграция:
+        // если остался старый «запечённый» a.staffApplied — вынимаем его из a.cf и переходим на поле.
         function bizStaffSync(a){
-            if(!a) return; const newNet=bizStaffNet(a);
-            a.cf = Math.max(0, Math.round((Number(a.cf)||0) - (Number(a.staffApplied)||0) + newNet));
-            a.staffApplied = newNet;
+            if(!a) return;
+            if(a.staffApplied!=null){ a.cf = Math.max(0, Math.round((Number(a.cf)||0) - (Number(a.staffApplied)||0))); delete a.staffApplied; }
+            a.staffCf = bizStaffNet(a);
         }
         function hireBizStaff(pid, idx){
             const p=state.players.find(x=>x.id==pid); if(!p) return;
@@ -17865,10 +17868,32 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         function fireBizStaff(pid, idx, empId){
             const p=state.players.find(x=>x.id==pid); if(!p) return;
             const a=(p.assets||[])[idx]; if(!a || !Array.isArray(a.staff)) return;
-            a.staff = a.staff.filter(e=>e.id!=empId);
+            const e=a.staff.find(x=>x.id==empId); const sev=e?Math.round(Number(e.salary)||0):0;   // выходное ≈ оклад (увольнять не бесплатно)
+            const wasBad=e&&e.perf==='bad';
+            a.staff = a.staff.filter(x=>x.id!=empId);
+            if(sev>0) p.savings=Math.round(((Number(p.savings)||0)-sev)*100)/100;
+            if(wasBad) p.staffFired=(Number(p.staffFired)||0)+1;   // 🪞 рисунок: churn вместо вложения в людей
             bizStaffSync(a);
-            try{ logAction(p,'👔','Уволил сотрудника в «'+(a.title||'дело')+'»',{sphere:'деньги'}); }catch(e){}
-            p.notify='👔 Сотрудник уволен — зарплата больше не капает.';
+            if(wasBad){ try{ logChoice(p,'команда: не тянет','уволил',{declined:['обучить','терпеть'],paid:'выходное −'+sev+'$',sphere:'дело'}); }catch(e){} }
+            try{ logAction(p,'👔','Уволил сотрудника в «'+(a.title||'дело')+'» (выходное −'+fmtN(sev)+'$)',{sphere:'деньги',amt:-sev}); }catch(e){}
+            p.notify='👔 Уволил — выходное −'+fmtN(sev)+'$. Место свободно, найми замену.';
+            save(pid); render();
+        }
+        // 🎓 КОУЧИНГ недоработчика (ресёрч: вытянуть обычно дешевле, чем уволить-нанять-раскачать заново)
+        function trainBizStaff(pid, idx, empId){
+            const p=state.players.find(x=>x.id==pid); if(!p) return;
+            const a=(p.assets||[])[idx]; if(!a || !Array.isArray(a.staff)) return;
+            const e=a.staff.find(x=>x.id==empId); if(!e) return;
+            const cost=Math.round((Number(e.salary)||0)*2);   // ≈2 оклада
+            if((Number(p.savings)||0)<cost){ toast('На обучение нужно '+fmtN(cost)+'$.'); return; }
+            p.savings=Math.round(((Number(p.savings)||0)-cost)*100)/100;
+            p.staffCoached=(Number(p.staffCoached)||0)+1;   // 🪞 рисунок: вкладывается в людей
+            const ok=Math.random()<0.7;   // коучинг чаще вытягивает
+            if(ok) e.perf='ok';
+            bizStaffSync(a);
+            try{ logChoice(p,'команда: не тянет','обучил',{declined:['уволить','терпеть'],paid:'−'+cost+'$ в человека',sphere:'дело'}); }catch(e){}
+            try{ logAction(p,'🎓','Обучил сотрудника в «'+(a.title||'дело')+'» (−'+fmtN(cost)+'$)',{sphere:'деньги',amt:-cost}); }catch(e){}
+            p.notify = ok ? '🎓 Обучение дало плод — продажник снова тянет норму.' : '🎓 Вложился, но пока не выправился. Иногда нужен второй заход — или решение уволить.';
             save(pid); render();
         }
         function renderBizStaffPanel(a, p){
@@ -17881,9 +17906,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 const works=(i<cap);
                 const em = works ? (e.perf==='bad'?'🟠':'🟢') : '⚪';
                 const stat = works ? (e.perf==='bad'?'не тянет':'работает') : 'без загрузки';
+                const trainBtn = (e.perf==='bad') ? `<button onclick="trainBizStaff(${p.id},${idx},${e.id})" class="btn" style="padding:4px 9px;font-size:10.5px;background:#13251c;color:#8bd3a0;border:1px solid #2f6b3a;">🎓 Обучить −${fmtN((Number(e.salary)||0)*2)}$</button>` : '';
                 return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 2px;border-top:1px solid #1b2330;font-size:12px;">
                     <span style="color:#d8d2c4;">${em} ${e.role} <span style="color:#8a8578;">· −${fmtN(e.salary)}$/мес${works?(' · +'+fmtN(bizEmpBoost(e))+'$ выручки'):''} · ${stat}</span></span>
-                    <button onclick="fireBizStaff(${p.id},${idx},${e.id})" class="btn" style="flex:0 0 auto;padding:4px 9px;font-size:10.5px;background:#2a1414;color:#f3b4b4;border:1px solid #6b2626;">Уволить</button>
+                    <span style="display:flex;gap:5px;flex:0 0 auto;">${trainBtn}<button onclick="fireBizStaff(${p.id},${idx},${e.id})" class="btn" style="padding:4px 9px;font-size:10.5px;background:#2a1414;color:#f3b4b4;border:1px solid #6b2626;">Уволить</button></span>
                 </div>`;
             }).join('') : '<div style="font-size:11.5px;color:#9ca3af;padding:6px 2px;">Пока ты тянешь дело сам. Найми продажников — они растят выручку (в пределах размера дела).</div>';
             const netCol = net>=0?'#10b981':'#f87171';
@@ -20640,6 +20666,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 a.bizY = y;
             }
             if(changed) p.bizYearNote = '🏢 За год: '+(note||'мир идёт своим чередом')+'. Без развития поток дела тает — следи за бизнесом.';
+            // 👔 ГОДОВАЯ ПРОВЕРКА КОМАНДЫ (Кусок 2): раз в год часть продажников перестаёт тянуть → решай учить/увольнять/терпеть
+            if(p.staffCheckY==null){ p.staffCheckY=y; }
+            else if(y>p.staffCheckY){
+                p.staffCheckY=y; let slipName='';
+                for(const a of p.assets){
+                    if(!a || a.type!=='BUSINESS' || !Array.isArray(a.staff) || !a.staff.length) continue;
+                    let slipped=false;
+                    a.staff.forEach((e,i)=>{ if(i<bizStaffCapacity(a) && e.perf!=='bad' && Math.random()<0.2){ e.perf='bad'; slipped=true; } });   // ~20%/год на выработчика — ручка Рината
+                    if(slipped){ bizStaffSync(a); slipName=a.title||'дело'; }
+                }
+                if(slipName){ try{ toast('👔 В «'+slipName+'»: продажник перестал тянуть — обучи или уволь в панели команды.'); }catch(e){} }
+            }
         }
         // ══════════ 🏢 ОТЧЁТ РАЗ В 3 ГОДА (Ринат 12авг) ══════════
         // Игра быстрая — 3 года пролетают. Каждые 3 года дело САМО приходит с итогом:
