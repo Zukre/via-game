@@ -11333,6 +11333,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             taxModal: null,
             svyazModal: null,
             sdelkaModal: null,
+            blackModal: null,
             medModal: null,
             childModal: null,
             casinoUnlocked: false,
@@ -18450,6 +18451,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 ${renderTaxModal()}
                 ${renderSvyazModal()}
                 ${renderSdelkaModal()}
+                ${renderBlackModal()}
                 ${renderMarketModal()}
                 ${renderMedModal()}
                 ${renderChildModal()}
@@ -22037,34 +22039,65 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
             {id:78, t:'Локальное рекламное агентство',        pay:5000, val:5000, cf:0, liab:0},
             {id:79, t:'Бизнес по доставке еды',               pay:6500, val:6500, cf:0, liab:0},
         ];
-        // ─── КОЛОДА «Чёрный рынок» — криминал/риск. crime: +get, бросок ≤catch → −penalty; bet: −invest, бросок ≥win → +payout; instant: разовый эффект (+ note для длящегося, ведущий ведёт вручную) ───
+        // ─── КОЛОДА «Чёрный рынок» — САМЫЙ ОПАСНЫЙ РЫНОК (40 карт, 3 ступени, всё авто-применяется в соло) ───
+        // Поля: k 'crime' (+get, бросок ≤catch → −penalty) | 'bet' (−invest, бросок ≥win → +payout) | 'instant' (разовый get).
+        //   shadow (+тень — ядро), rep (±репутация), expPct (+% к прочим расходам навсегда),
+        //   jailRisk (на провале crime + тень густая shadow≥JAIL_SHADOW_AT → дело в СУД), jailDirect (провал → суд всегда),
+        //   curse (проклятие — судьба против, снимается искуплением), betray (предательство +betrayals), addict (подсел — тянет ещё).
+        //   tier: 1 по краю · 2 по локоть · 3 точка невозврата. Числа — на выверку Рината.
+        const JAIL_SHADOW_AT = 6;   // 🔒 густая тень = рецидив: на этом пороге провал чёрного рынка ведёт в суд (ручка Рината)
         const BLACK_CARDS = [
-            {id:1,  t:'Быстрые деньги из криминала', k:'crime', get:15000, catch:1, penalty:25000},
-            {id:2,  t:'Сомнительный инвестор',       k:'bet',   invest:10000, win:6, payout:20000},
-            {id:3,  t:'Мошенники с документами',     k:'instant', get:0, note:'Продать текущий актив +20%, но бросок 1-4 → сделка аннулируется, актив исчезает (веди вручную).'},
-            {id:4,  t:'Поддельные криптомонеты',     k:'bet',   invest:5000, win:4, payout:15000},
-            {id:5,  t:'Скупщик краденого телефона',  k:'instant', get:2000, note:'Следующее событие прими как НЕГАТИВНОЕ (веди вручную).'},
-            {id:6,  t:'Продажа «серых» гаджетов',    k:'crime', get:5000, catch:3, penalty:8000},
-            {id:7,  t:'Фальшивые купюры',            k:'instant', get:3000, note:'Потрать в этот же ход, иначе −6000$ (веди вручную).'},
-            {id:8,  t:'Чёрная аренда недвижимости',  k:'instant', get:0, note:'+20% дохода с одного объекта этот круг, но 0$ в следующий (веди вручную).'},
-            {id:9,  t:'Продажа контрафакта',         k:'crime', get:7000, catch:3, penalty:4000},
-            {id:10, t:'Теневая крипто-обменка',      k:'bet',   invest:5000, win:4, payout:12000},
-            {id:11, t:'Взятка проверяющему',         k:'instant', get:0, note:'Игнор любого штрафа этот круг, но +300$/мес расход навсегда (веди вручную).'},
-            {id:12, t:'Теневая перевозка',           k:'instant', get:1000, note:'Пропусти следующий ход (веди вручную).'},
-            {id:13, t:'Серый ремонт недвижимости',   k:'instant', get:0, note:'50/50: объект +10% или −10% стоимости (веди вручную).'},
-            {id:14, t:'Покупка документов',          k:'instant', get:0, note:'Продать объект по мин.цене +15%, но бросок 1-3 → аннулируется, объект исчезает (веди вручную).'},
-            {id:15, t:'«Левый охранник»',            k:'instant', get:-1000, note:'1 раз отменить негатив бизнеса, но +150$/мес расход след.круг (веди вручную).'},
-            {id:16, t:'Контрабандный товар',         k:'crime', get:6000, catch:3, penalty:9000},
-            {id:17, t:'Серый обмен валюты',          k:'bet',   invest:5000, win:5, payout:5500},
-            {id:18, t:'«Крыша района»',              k:'instant', get:-2000, note:'Защита 2 круга (мошенники/кражи/штрафы/проверки), потом ещё −2000$ (веди вручную).'},
+            // ── Ступень 1 · ПО КРАЮ (тень +1..2, поймают — штраф) ──
+            {id:1,  t:'Скупка краденых телефонов',   k:'crime', get:3000, catch:2, penalty:5000,  shadow:1, tier:1},
+            {id:2,  t:'Продажа «серых» гаджетов',    k:'crime', get:5000, catch:3, penalty:8000,  shadow:1, tier:1},
+            {id:3,  t:'Контрафактный товар',         k:'crime', get:7000, catch:3, penalty:9000,  shadow:2, tier:1},
+            {id:4,  t:'Фальшивые купюры',            k:'crime', get:4000, catch:2, penalty:7000,  shadow:2, tier:1},
+            {id:5,  t:'Реплики брендов',             k:'bet',   invest:4000, win:4, payout:11000, shadow:1, tier:1},
+            {id:6,  t:'Левая растаможка',            k:'crime', get:6000, catch:3, penalty:10000, shadow:2, tier:1},
+            {id:7,  t:'Перепродажа угнанных запчастей',k:'crime',get:5000, catch:2, penalty:9000, shadow:2, tier:1},
+            {id:8,  t:'Серый импорт техники',        k:'bet',   invest:6000, win:4, payout:14000, shadow:1, tier:1},
+            {id:9,  t:'Поддельные чеки на мелочь',   k:'crime', get:3000, catch:2, penalty:6000,  shadow:2, tier:1},
+            {id:10, t:'«Нал без вопросов»',          k:'instant', get:4000, shadow:2, expPct:1, tier:1, note:'Взял налом мимо кассы — но теперь «на карандаше»: +1% к расходам.'},
+            {id:11, t:'Подработка мимо налогов',     k:'instant', get:2500, shadow:1, tier:1, note:'Быстрый кэш в обход — тень запоминает.'},
+            {id:12, t:'Ночной скупщик лома',         k:'crime', get:2000, catch:1, penalty:4000,  shadow:1, tier:1},
+            {id:13, t:'Левые лотерейные билеты',     k:'bet',   invest:3000, win:5, payout:9000,  shadow:1, tier:1},
+            {id:14, t:'Перекуп «уценёнки» с подменой',k:'crime',get:4000, catch:3, penalty:6000,  shadow:1, tier:1},
+            // ── Ступень 2 · ПО ЛОКОТЬ (тень +3..4, репутация вниз, jailRisk) ──
+            {id:15, t:'Отмыв через подставной счёт', k:'crime', get:20000, catch:3, penalty:30000, shadow:3, rep:-5,  jailRisk:true, tier:2},
+            {id:16, t:'Поддельные документы (чужая личность)',k:'crime',get:15000,catch:3,penalty:25000,shadow:4,rep:-8,jailRisk:true,tier:2},
+            {id:17, t:'Крипто-разводка (rug pull)',  k:'bet',   invest:10000, win:5, payout:28000, shadow:3, rep:-6, tier:2},
+            {id:18, t:'Взятка в свой карман',        k:'instant', get:8000, shadow:3, rep:-4, expPct:1, tier:2, note:'Положил себе — но теперь повязан: +1% к расходам навсегда.'},
+            {id:19, t:'Поддельные инвестконтракты',  k:'crime', get:25000, catch:4, penalty:35000, shadow:4, rep:-10, jailRisk:true, tier:2},
+            {id:20, t:'Обналичка крупного кэша',     k:'crime', get:18000, catch:3, penalty:28000, shadow:3, rep:-5,  jailRisk:true, tier:2},
+            {id:21, t:'Контрабанда крупной партии',  k:'crime', get:30000, catch:4, penalty:45000, shadow:4, rep:-6,  jailRisk:true, tier:2},
+            {id:22, t:'«Серая» зарплата в конвертах', k:'instant', get:12000, shadow:3, rep:-4, tier:2, note:'Сэкономил на людях — но доверие к тебе падает.'},
+            {id:23, t:'Фальшивая страховая выплата', k:'crime', get:14000, catch:3, penalty:22000, shadow:3, rep:-5,  jailRisk:true, tier:2},
+            {id:24, t:'Поддельные сертификаты качества',k:'crime',get:10000,catch:3, penalty:16000, shadow:3, rep:-5,  tier:2},
+            {id:25, t:'Теневой перепродавец недвижимости',k:'instant',get:15000,shadow:4,rep:-4,tier:2,note:'Продал объект «втёмную» дороже рынка — но след остаётся.'},
+            {id:26, t:'Рейдерский захват доли',      k:'crime', get:40000, catch:4, penalty:60000, shadow:4, rep:-12, jailRisk:true, betray:true, tier:2},
+            {id:27, t:'Подкуп тендера',              k:'crime', get:35000, catch:4, penalty:50000, shadow:4, rep:-8,  jailRisk:true, tier:2},
+            {id:28, t:'Теневая крипто-обменка',      k:'bet',   invest:15000, win:5, payout:40000, shadow:3, rep:-5, tier:2},
+            // ── Ступень 3 · ТОЧКА НЕВОЗВРАТА (метит навсегда) ──
+            {id:29, t:'Сдать подельника ради навара',k:'instant', get:20000, shadow:5, rep:-15, betray:true, tier:3, note:'Предал своего. Деньги есть — а в душе зарубка.'},
+            {id:30, t:'«Крыша» от авторитета',       k:'instant', get:0, shadow:4, expPct:2, tier:3, note:'Теперь ты повязан: +2% к расходам навсегда, и просто так не соскочишь.'},
+            {id:31, t:'Долг у теневого банка',       k:'instant', get:50000, shadow:4, expPct:5, tier:3, note:'Взял много и сразу — но отдавать +5% к расходам навсегда. Не потянешь — утянет на дно.'},
+            {id:32, t:'Подсел на тёмный поток',      k:'instant', get:8000, shadow:3, addict:true, tier:3, note:'Лёгкие деньги затягивают — каждый круг будет тянуть ещё.'},
+            {id:33, t:'Сделка без выхода',           k:'crime', get:60000, catch:5, penalty:90000, shadow:6, jailDirect:true, tier:3},
+            {id:34, t:'Проклятая сделка (жадность)', k:'instant', get:45000, shadow:6, rep:-10, curse:true, tier:3, note:'Переступил через всё ради куша. Судьба это запомнит.'},
+            {id:35, t:'Продать свою репутацию',      k:'instant', get:30000, shadow:5, rep:-25, tier:3, note:'Торговля влиянием: взял деньгами — отдал именем.'},
+            {id:36, t:'Подставить партнёра по бизнесу',k:'instant', get:25000, shadow:5, rep:-18, betray:true, tier:3, note:'Кинул того, кто доверял. Доля твоя — совесть нет.'},
+            {id:37, t:'«Чёрная бухгалтерия» фирмы',  k:'instant', get:35000, shadow:5, expPct:3, jailRisk:true, tier:3, note:'Двойные книги: кэш сейчас, но это висит — +3% к расходам и риск суда.'},
+            {id:38, t:'Схема-пирамида (собрать с людей)',k:'crime',get:80000,catch:5,penalty:120000,shadow:6,rep:-20,jailDirect:true,betray:true,tier:3},
+            {id:39, t:'Залезть в «общак»',           k:'instant', get:40000, shadow:6, betray:true, curse:true, tier:3, note:'Взял чужое святое. Такое не прощают — ни люди, ни судьба.'},
+            {id:40, t:'Всё или ничего (большой тёмный куш)',k:'bet',invest:50000,win:6,payout:200000,shadow:6,rep:-10,tier:3},
         ];
         function resolveBlackCard(pid, card){
             const p = state.players.find(x=>x.id==pid); if(!p) return;
-            let title, text, color;
+            let title, text, color; let caught=false;
             if(card.k==='crime'){
                 p.savings = Math.round(((Number(p.savings)||0)+card.get)*100)/100;
                 const roll=1+Math.floor(Math.random()*6);
-                if(roll<=card.catch){ p.savings=Math.round(((Number(p.savings)||0)-card.penalty)*100)/100;
+                if(roll<=card.catch){ caught=true; p.savings=Math.round(((Number(p.savings)||0)-card.penalty)*100)/100;
                     title='🚔 Поймали: '+card.t; text=`+${card.get}$, но выпало ${roll} → штраф −${card.penalty}$. Итог ${card.get-card.penalty}$.`; color='#f87171'; }
                 else { title='😈 Пронесло: '+card.t; text=`+${card.get}$ и не поймали (выпало ${roll}).`; color='#34d399'; }
             } else if(card.k==='bet'){
@@ -22078,9 +22111,78 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                 if(card.get) p.savings=Math.round(((Number(p.savings)||0)+card.get)*100)/100;
                 title='🖤 '+card.t; text=(card.get?`${card.get>=0?'+':''}${card.get}$. `:'')+(card.note||''); color= (card.get||0)>=0?'#a78bfa':'#f87171';
             }
+            // ── ТЕНЕВЫЕ СЛЕДЫ (авто, без ведущего) ──
+            const trail=[];
+            if(card.shadow){ p.shadow=(Number(p.shadow)||0)+card.shadow; trail.push('тень +'+card.shadow); }
+            if(card.rep){ p.repScore=(Number(p.repScore)||0)+card.rep; trail.push('репутация '+card.rep); }
+            if(card.expPct){ p.otherExpPct=(Number(p.otherExpPct)||0)+card.expPct; trail.push('+'+card.expPct+'% к расходам навсегда'); }
+            if(card.betray){ p.betrayals=(Number(p.betrayals)||0)+1; trail.push('предательство'); }
+            if(card.addict){ p.blackAddict=true; trail.push('подсел на тёмный поток'); }
+            if(card.curse){ p.cursed=true; p.demonSign=true; trail.push('⚠️ проклятие — судьба против, пока не искупишь'); }
+            p.blackDeals=(Number(p.blackDeals)||0)+1;   // 🪞 Зеркало: сколько раз выбрал быстрые грязные деньги
+            try{ logChoice(p, 'чёрный рынок', card.t, {paid:(trail.join(' · ')||'грязные деньги'), amt:(card.get||card.payout||0), sphere:'тень'}); }catch(e){}
+            try{ logAction(p, '🖤', 'Чёрный рынок: '+card.t, {amt:(Number(card.get)||0), sphere:'тень'}); }catch(e){}
+            if(trail.length) text += ' · '+trail.join(' · ');
+            // ── 🔒 2-Й ВХОД В ТЮРЬМУ: взяли с поличным на крупном + тень густая (рецидив) → дело в СУД ──
+            if(caught && (card.jailDirect || (card.jailRisk && (Number(p.shadow)||0)>=JAIL_SHADOW_AT))){
+                p.notify = `🚨 Чёрный рынок: взяли с поличным — дело ушло в СУД. Теперь это Тюрьма.`;
+                state.blackModal=null; state.sdelkaModal=null;
+                save(); setJail(p.id, 3);   // setJail сам render() → на весь экран ⚖️ СУД
+                return;
+            }
             p.notify = `🖤 Чёрный рынок: ${card.t} — ${text}`;
             state.sdelkaModal = { pId:pid, drawn:{ emoji:'🖤', title, text, color } };
             save(); render();
+        }
+        // ─── 🕶️ СОЛО-ВХОД НА ЧЁРНЫЙ РЫНОК: клетка → модалка «тяни карту» → предпросмотр → провернуть/уйти ───
+        function openBlackMarket(id){
+            const p=state.players.find(x=>x.id==id); if(!p) return;
+            if((Number(p.jail)||0)>0){ toast('🔒 Ты в тюрьме — рынок недоступен.'); return; }
+            state.blackModal={ pId:id, drawn:null }; render();
+        }
+        function closeBlackModal(){ state.blackModal=null; render(); }
+        function drawBlackCard(){
+            const m=state.blackModal; if(!m) return;
+            m.drawn = BLACK_CARDS[Math.floor(Math.random()*BLACK_CARDS.length)];
+            render();
+        }
+        function blackMarketApply(){
+            const m=state.blackModal; if(!m||!m.drawn) return;
+            const c=m.drawn, pid=m.pId; state.blackModal=null;
+            resolveBlackCard(pid, c);
+        }
+        function renderBlackModal(){
+            const m=state.blackModal; if(!m) return '';
+            const wrap=(inner)=>`<div style="position:fixed;inset:0;background:rgba(2,2,6,.9);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px;">
+                <div style="background:linear-gradient(180deg,#120e1c,#070509);border:2px solid #4b2e6b;border-radius:16px;padding:20px;max-width:430px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.7),0 0 40px -10px #7c3aed;">${inner}</div></div>`;
+            if(!m.drawn){
+                return wrap(`<div style="text-align:center;">
+                    <div style="font-size:46px;">🕶️</div>
+                    <div style="font-size:18px;font-weight:800;color:#c4b5fd;margin:4px 0;">ЧЁРНЫЙ РЫНОК</div>
+                    <p style="color:#b9a9d6;font-size:13px;line-height:1.5;margin:8px 0 14px;">Тут быстрые грязные деньги — но тень всё помнит. Чем глубже лезешь, тем ближе суд и тюрьма. Тянешь карту?</p>
+                    <button onclick="drawBlackCard()" class="btn" style="width:100%;margin:5px 0;background:linear-gradient(180deg,#5b21b6,#3b1466);color:#ede9fe;border:1px solid #7c3aed;font-weight:800;padding:12px;">🖤 Тянуть карту рынка</button>
+                    <button onclick="closeBlackModal()" class="btn btn-gray" style="width:100%;margin:5px 0;padding:10px;">Уйти по-тихому</button>
+                </div>`);
+            }
+            const c=m.drawn; const tierTxt=c.tier===3?'точка невозврата':(c.tier===2?'по локоть':'по краю');
+            let ln=[];
+            if(c.k==='crime'){ ln.push(['Получишь сразу','+'+fmtN(c.get)+'$','#5cb08b']); ln.push(['Если бросок ≤'+c.catch+' (поймают)','−'+fmtN(c.penalty)+'$','#cf9a9a']); }
+            else if(c.k==='bet'){ ln.push(['Вложишь','−'+fmtN(c.invest)+'$','#cf9a9a']); ln.push(['Если бросок ≥'+c.win,'+'+fmtN(c.payout)+'$','#5cb08b']); }
+            else if(c.get){ ln.push(['Получишь',(c.get>=0?'+':'')+fmtN(c.get)+'$', c.get>=0?'#5cb08b':'#cf9a9a']); }
+            if(c.shadow) ln.push(['Тень','+'+c.shadow,'#b98bff']);
+            if(c.rep) ln.push(['Репутация',''+c.rep,'#cf9a9a']);
+            if(c.expPct) ln.push(['К расходам навсегда','+'+c.expPct+'%','#cf9a9a']);
+            if(c.betray) ln.push(['Предательство','да','#cf9a9a']);
+            if(c.curse) ln.push(['Проклятие','да','#ff6a4d']);
+            if(c.jailDirect) ln.push(['Провал','прямиком в СУД','#ff6a4d']);
+            else if(c.jailRisk) ln.push(['Если тень густая + поймают','дело в СУД','#ff6a4d']);
+            const rows=ln.map(x=>`<div style="display:flex;justify-content:space-between;padding:6px 2px;border-bottom:1px solid #1e1830;font-size:13px;"><span style="color:#b9a9d6;">${x[0]}</span><span style="font-weight:800;color:${x[2]};">${x[1]}</span></div>`).join('');
+            return wrap(`<div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;"><div style="font-size:34px;">🖤</div>
+                <div><div style="font-weight:800;font-size:15px;color:#c4b5fd;">${c.t}</div><div style="font-size:11px;color:#8a7fab;">Чёрный рынок · ${tierTxt}</div></div></div>
+                ${c.note?`<div style="font-size:12.5px;color:#d8cdeb;background:#0b0814;border-left:3px solid #7c3aed;border-radius:8px;padding:10px;margin-bottom:10px;line-height:1.45;">${c.note}</div>`:''}
+                <div style="border:1px solid #2a2140;border-radius:10px;padding:4px 10px;margin-bottom:12px;">${rows}</div>
+                <button onclick="blackMarketApply()" class="btn" style="width:100%;margin:5px 0;background:linear-gradient(180deg,#7c1d1d,#4a0f12);color:#fecaca;border:1px solid #b91c1c;font-weight:800;padding:12px;">🖤 Провернуть</button>
+                <button onclick="closeBlackModal()" class="btn btn-gray" style="width:100%;margin:5px 0;padding:10px;">Уйти (не связываться)</button>`);
         }
         // ─── КОЛОДА «Крупные сделки» — недвижка/бизнес: pay=взнос, val=цена объекта(продажа), liab=ипотека, cf=ЧИСТЫЙ ПОТОК/мес (может быть минус). note — длящаяся особенность (ведущий ведёт вручную) ───
         const BIG_CARDS = [
@@ -24205,7 +24307,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         ['🧳','Работа','Клетки и действия','работа',91.4,32.6,7],
         ['💸','Расходы','Клетки и действия','быт',91.4,49.7,7],
         ['🏦','Налоги','Клетки и действия','власть',91.32,64.85,7],
-        ['🕶️','Чёрный рынок','Товарка','тьма',90.15,82.21,9.8],
+        ['🕶️','Чёрный рынок','@black','тьма',90.15,82.21,9.8],
         ['💰','Зарплата','Доход и расходы','доход',80.89,84.44,7],
         ['🤝','Сделки','@deals','сделки',72.49,84.15,7],
         ['📈','Акции·Крипта','Биржа','инвест',64.95,84.59,7],
@@ -24322,7 +24424,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       (function(){var tabs=document.getElementById('vfTabs');if(!tabs)return;tabs.addEventListener('click',function(e){var b=e.target.closest('button[data-view]');if(!b)return;BOARD_VIEW=b.getAttribute('data-view');var bs=tabs.querySelectorAll('button');for(var i=0;i<bs.length;i++)bs[i].classList.toggle('on',bs[i]===b);var ipoBtn=document.getElementById('viIpoOpen');if(ipoBtn)ipoBtn.style.display=(BOARD_VIEW==='money')?'block':'none';renderField();});})();
       if(board){renderField();}
       function toast(m){var t=document.getElementById('viaToast');if(!t)return;t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('on');},2200);}
-      function enterCell(sec){ if(sec==='@deals'){ openDeals(); return; } if(sec==='@farm'){ showField(false); try{ if(typeof openFarm==='function') openFarm(); }catch(e){ toast('Ферма недоступна'); } return; } openRazdel(sec); }
+      function enterCell(sec){ if(sec==='@deals'){ openDeals(); return; } if(sec==='@black'){ var bp=curP(); if(bp){ showField(false); if(typeof openBlackMarket==='function') openBlackMarket(bp.id); } return; } if(sec==='@farm'){ showField(false); try{ if(typeof openFarm==='function') openFarm(); }catch(e){ toast('Ферма недоступна'); } return; } openRazdel(sec); }
       function openRazdel(key){
         var list=document.querySelectorAll('details.sec'),found=null;
         for(var i=0;i<list.length;i++){var s=list[i].querySelector('summary');if(s&&s.textContent.indexOf(key)!==-1){found=list[i];break;}}
