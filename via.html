@@ -17397,6 +17397,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
                     try{ logSignal('soul','shadow_heal',1); }catch(e){}
                     if((Number(p.shadow)||0) === 0 && !p._shadowCleared){ p._shadowCleared = true; p.notify = '🌅 Годы честной жизни отмыли тень дочиста — старое отпустило. Выход был шансом, и ты им стал.'; }
                 }
+                // 🖤 СОСКОЧИТЬ С ТЁМНОГО ПОТОКА (реабилитация): годы без НОВЫХ сделок чёрного рынка → тяга отпускает.
+                //   Считаем по blackDeals, НЕ по тени (её сам addict-дрейф +1/год пухнет — иначе соскочить было бы нельзя).
+                if(p.blackAddict){
+                    const _bd = Number(p.blackDeals)||0;
+                    const _away = (p._addictBdMark!=null) && (_bd === p._addictBdMark);
+                    p._addictCleanYears = _away ? (Number(p._addictCleanYears)||0)+1 : 0;
+                    p._addictBdMark = _bd;
+                    if((Number(p._addictCleanYears)||0) >= 3){ p.blackAddict=false; p._addictCleanYears=0; p.notify='🌅 Три года не возвращался к тёмному потоку — тяга отпустила. Ты соскочил.'; }
+                }
                 // ☠️ КОМПАУНДИНГ ЯДА: снова кормил распад → стаж яда растёт; бросил → тело медленно восстанавливается.
                 // Урок сигарет: чем дольше вкладывал, тем быстрее и мучительнее возвращается — с годами укус растёт.
                 if(!clean){ p.viceYears = (Number(p.viceYears)||0) + 1; p.viceScar = Math.max(Number(p.viceScar)||0, Number(p.viceYears)||0); }
